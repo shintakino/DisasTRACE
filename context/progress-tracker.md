@@ -5,9 +5,11 @@ Update this file whenever the current phase, active feature, or implementation s
 ## Current Phase
 
 - Dashboard Layout & Core Navigation
-- Map Navigation Implementation
 
 ## Current Goal
+
+- Implement the high-fidelity CDRRMO Super Admin dashboard features.
+
 ## Completed
 
 - Project context research.
@@ -18,12 +20,13 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 04: Dashboard Page implementation - Replicated high-fidelity UI with KPI cards, charts (Trend & Distribution), Recent Reports, and Responder Status. Mirrored the CDRRMO Super Admin design image exactly. Implemented mock API endpoints for real-time data simulation with design-matching data.
 - Feature 05: Map Navigation Specification - Defined requirements for real-time map, incident panel, and responder tracking based on design image.
 - Feature 06: Reports Management Specification - Defined requirements for the searchable data table, PDF export, and incident detail sheet with strict Zod validation.
-- Feature 05: Map Navigation Implementation - High-fidelity real-time map with incident panel, custom markers, and simulated real-time tracking implemented exactly as specified.
-- Feature 06: Reports Management Implementation - Searchable data table, filters, and detailed incident sheet implemented with Zod validation and mock API endpoints.
+- Feature 07: Responder Roster Specification - Defined requirements for the high-fidelity attendance table, including shift tracking and log hour calculations.
 
 ## In Progress
 
-- Feature 06: (Next planned feature)
+- Feature 05: Map Navigation Implementation.
+- Feature 06: Reports Management Implementation.
+- Feature 07: Responder Roster Implementation.
 
 ## Open Questions
 

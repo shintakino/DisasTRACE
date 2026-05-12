@@ -1,13 +1,16 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   ColumnDef,
   flexRender,
   getCoreRowModel,
   useReactTable,
   getPaginationRowModel,
-} from "@tanstack/react-table"
+} from "@tanstack/react-table";
+import { ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -15,240 +18,190 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { StatusLogEntry, LogStatus, LogAction } from "@/types/logs"
-import { cn } from "@/lib/utils"
-
-const statusConfig: Record<LogStatus, { label: string, className: string }> = {
-  DISPATCHED: { 
-    label: "DISPATCHED", 
-    className: "bg-blue-100 text-blue-700 hover:bg-blue-100/80 border-none" 
-  },
-  STANDBY: { 
-    label: "STANDBY", 
-    className: "bg-green-100 text-green-700 hover:bg-green-100/80 border-none" 
-  },
-  "ON-SCENE": { 
-    label: "ON-SCENE", 
-    className: "bg-amber-100 text-amber-700 hover:bg-amber-100/80 border-none" 
-  },
-  "OFF-DUTY": { 
-    label: "OFF-DUTY", 
-    className: "bg-slate-100 text-slate-700 hover:bg-slate-100/80 border-none" 
-  },
-}
-
-const actionConfig: Record<LogAction, { label: string, className: string }> = {
-  DISPATCHED: { 
-    label: "DISPATCHED", 
-    className: "bg-blue-50 text-blue-600 border-blue-200" 
-  },
-  COMPLETED: { 
-    label: "COMPLETED", 
-    className: "bg-green-50 text-green-600 border-green-200" 
-  },
-  ARRIVED: { 
-    label: "ARRIVED", 
-    className: "bg-amber-50 text-amber-600 border-amber-200" 
-  },
-  STARTED: { 
-    label: "STARTED", 
-    className: "bg-indigo-50 text-indigo-600 border-indigo-200" 
-  },
-  ENDED: { 
-    label: "ENDED", 
-    className: "bg-slate-50 text-slate-600 border-slate-200" 
-  },
-  NONE: { 
-    label: "-", 
-    className: "bg-transparent text-slate-400 border-none shadow-none" 
-  },
-}
-
-const columns: ColumnDef<StatusLogEntry>[] = [
-  {
-    id: "dateTime",
-    header: "Date & Time",
-    cell: ({ row }) => (
-      <div className="flex flex-col gap-0.5">
-        <span className="font-bold text-[#1E293B] whitespace-nowrap">{row.original.date}</span>
-        <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider">{row.original.time}</span>
-      </div>
-    ),
-  },
-  {
-    accessorKey: "responderName",
-    header: "Responder Name",
-    cell: ({ row }) => (
-      <div className="font-bold text-[#1E293B]">{row.getValue("responderName")}</div>
-    ),
-  },
-  {
-    accessorKey: "logDescription",
-    header: "Log",
-    cell: ({ row }) => {
-      const description = row.getValue("logDescription") as string
-      // Highlight incident IDs like DR-2026-0047
-      const parts = description.split(/(DR-\d{4}-\d{4})/)
-      return (
-        <div className="font-medium text-[#1E293B] max-w-[300px]">
-          {parts.map((part, i) => 
-            part.match(/DR-\d{4}-\d{4}/) ? (
-              <span key={i} className="text-[#1E3A8A] font-bold underline underline-offset-2 cursor-pointer">{part}</span>
-            ) : (
-              <span key={i} className="text-[#64748B]">{part}</span>
-            )
-          )}
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const status = row.getValue("status") as LogStatus
-      const config = statusConfig[status]
-      return (
-        <Badge className={cn("px-3 py-1 text-[10px] font-bold tracking-wider rounded-full", config.className)}>
-          {config.label}
-        </Badge>
-      )
-    },
-  },
-  {
-    accessorKey: "action",
-    header: "Action",
-    cell: ({ row }) => {
-      const action = row.getValue("action") as LogAction
-      const config = actionConfig[action]
-      return (
-        <Badge variant="outline" className={cn("px-3 py-1 text-[10px] font-bold tracking-wider rounded-md", config.className)}>
-          {config.label}
-        </Badge>
-      )
-    },
-  },
-]
+} from "@/components/ui/table";
+import { StatusLogEntry, LogStatus, LogAction } from "@/types/logs";
+import { cn } from "@/lib/utils";
 
 interface LogsTableProps {
-  data: StatusLogEntry[]
+  data: StatusLogEntry[];
 }
 
+const StatusBadge = ({ status }: { status: LogStatus }) => {
+  const styles: Record<LogStatus, string> = {
+    DISPATCHED: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800",
+    STANDBY: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800",
+    "ON-SCENE": "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800",
+    "OFF-DUTY": "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-300 dark:border-gray-800",
+  };
+
+  return (
+    <Badge variant="outline" className={cn("px-2 py-0.5 font-bold text-[10px] tracking-wide", styles[status])}>
+      {status}
+    </Badge>
+  );
+};
+
+const ActionBadge = ({ action }: { action: LogAction }) => {
+  if (action === "NONE") return <span className="text-slate-300">—</span>;
+
+  const styles: Record<Exclude<LogAction, "NONE">, string> = {
+    DISPATCHED: "bg-blue-500 text-white border-transparent",
+    COMPLETED: "bg-green-500 text-white border-transparent",
+    ARRIVED: "bg-amber-500 text-white border-transparent",
+    STARTED: "bg-emerald-500 text-white border-transparent",
+    ENDED: "bg-slate-500 text-white border-transparent",
+  };
+
+  return (
+    <Badge className={cn("px-2 py-0.5 font-black text-[9px] tracking-widest", styles[action])}>
+      {action}
+    </Badge>
+  );
+};
+
 export function LogsTable({ data }: LogsTableProps) {
+  const columns: ColumnDef<StatusLogEntry>[] = [
+    {
+      id: "dateTime",
+      header: "DATE & TIME",
+      cell: ({ row }) => {
+        const date = row.original.date;
+        const time = row.original.time;
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-slate-800">{date}</span>
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-tight">{time}</span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "responderName",
+      header: "RESPONDER",
+      cell: ({ row }) => <span className="font-bold text-slate-800 uppercase tracking-tight">{row.getValue("responderName")}</span>,
+    },
+    {
+      accessorKey: "logDescription",
+      header: "ACTIVITY LOG",
+      cell: ({ row }) => {
+        const description = row.getValue("logDescription") as string;
+        // Highlight incident IDs (e.g., DR-2026-0047)
+        const parts = description.split(/(DR-\d{4}-\d{4})/g);
+        return (
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-3 w-3 text-slate-300 shrink-0" />
+            <span className="text-sm text-slate-600 font-medium leading-tight">
+              {parts.map((part, i) => 
+                part.match(/DR-\d{4}-\d{4}/) ? (
+                  <span key={i} className="text-[#1E3A8A] font-black underline decoration-blue-200 underline-offset-2">
+                    {part}
+                  </span>
+                ) : part
+              )}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "CURRENT STATUS",
+      cell: ({ row }) => <StatusBadge status={row.getValue("status") as LogStatus} />,
+    },
+    {
+      accessorKey: "action",
+      header: "ACTION TRIGGER",
+      cell: ({ row }) => <ActionBadge action={row.getValue("action") as LogAction} />,
+    },
+  ];
+
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: {
-      pagination: {
-        pageSize: 10,
-      },
-    },
-  })
+  });
 
   return (
-    <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white">
-      <CardHeader className="bg-[#1E3A8A] text-white p-6">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-bold tracking-tight">Status & Activity Logs</CardTitle>
-          <div className="text-sm font-medium opacity-80 uppercase tracking-widest">
-            {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader className="bg-[#F8FAFC]">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="hover:bg-transparent border-b-[#E2E8F0]">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="h-12 text-[#64748B] font-bold text-[11px] uppercase tracking-wider px-6">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
+    <div className="bg-white rounded-b-xl border-x border-b shadow-sm overflow-hidden">
+      <Table>
+        <TableHeader className="bg-slate-50/50">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id} className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                className="hover:bg-slate-50/50 border-b last:border-0 h-16 transition-colors"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="py-2">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
                 ))}
               </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="hover:bg-[#F1F5F9]/50 border-b-[#E2E8F0] transition-colors"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-6 py-4">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-[#64748B]">
-                  No activity logs found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-        
-        {/* Custom Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-[#E2E8F0]">
-          <div className="text-xs font-medium text-[#64748B]">
-            Showing <span className="text-[#1E293B]">{table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}</span> to <span className="text-[#1E293B]">{Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, data.length)}</span> of <span className="text-[#1E293B]">{data.length}</span> entries
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8 rounded-full border-[#E2E8F0] hover:bg-[#F1F5F9] text-[#64748B]"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            
-            {Array.from({ length: table.getPageCount() }, (_, i) => i).map((page) => (
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-32 text-center text-slate-400 font-medium uppercase tracking-widest text-xs">
+                No activity logs found.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+
+      <div className="flex items-center justify-between px-6 py-4 bg-slate-50/30 border-t">
+        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          Showing {table.getRowModel().rows.length} logs
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 rounded-full"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-1 mx-2">
+            {[0, 1, 2].map((i) => (
               <Button
-                key={page}
-                variant={table.getState().pagination.pageIndex === page ? "default" : "outline"}
-                size="icon"
+                key={i}
+                variant={table.getState().pagination.pageIndex === i ? "default" : "ghost"}
                 className={cn(
-                  "size-8 rounded-full text-xs font-bold transition-all duration-200",
-                  table.getState().pagination.pageIndex === page 
-                    ? "bg-[#1E3A8A] text-white hover:bg-[#1E3A8A]/90 shadow-md scale-110" 
-                    : "border-[#E2E8F0] hover:bg-[#F1F5F9] text-[#64748B]"
+                  "h-8 w-8 rounded-full text-xs font-bold",
+                  table.getState().pagination.pageIndex === i ? "bg-[#1E3A8A] text-white" : "text-slate-500 hover:bg-slate-100"
                 )}
-                onClick={() => table.setPageIndex(page)}
+                onClick={() => table.setPageIndex(i)}
               >
-                {page + 1}
+                {i + 1}
               </Button>
             ))}
-
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8 rounded-full border-[#E2E8F0] hover:bg-[#F1F5F9] text-[#64748B]"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
           </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 rounded-full"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
-      </CardContent>
-    </Card>
-  )
+      </div>
+    </div>
+  );
 }

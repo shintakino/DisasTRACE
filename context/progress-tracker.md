@@ -27,14 +27,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 05: Map Navigation Implementation - High-fidelity real-time map with incident panel, custom markers, and simulated real-time tracking implemented exactly as specified.
 - Feature 06: Reports Management Implementation - High-fidelity table with Navy Blue header, row selection, and detailed incident sheet implemented with 'DRAFT' and 'SUBMITTED' status tracking and Zod validation.
 - Feature 07: Responder Roster Implementation - High-fidelity attendance table with Navy Blue header, shift tracking, and log hour calculations implemented exactly as specified with strict Zod validation.
-- Feature 08: Status & Logs Implementation - High-fidelity real-time activity tracking table with Navy Blue header, incident ID highlighting, and status/action badges implemented exactly as specified with strict Zod validation.
+- Feature 08: Status & Logs Implementation - High-fidelity real-time activity tracking table with Navy Blue header, incident ID highlighting, and status/action badges implemented with strict Zod validation.
 - Feature 09: User Management Implementation - High-fidelity user administration dashboard with summary cards, Navy Blue header table, and status/role management dialogs implemented exactly as specified with strict Zod validation.
 
 ## In Progress
 
 - Feature 10: Audit Logs Implementation.
-
-## Open Questions
 
 - Add unresolved product or implementation questions here.
 

@@ -1,11 +1,10 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapIncident, MapSummary, IncidentStatus } from "@/types/map";
-import { ArrowRight, MapPin } from "lucide-react";
+import { MapPin, Calendar, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface IncidentPanelProps {
@@ -31,48 +30,63 @@ export function IncidentPanel({
     return incident.status === filter;
   });
 
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "4-digit",
+  });
+
   return (
-    <div className="flex flex-col h-full w-[400px] border-r bg-background">
+    <div className="flex flex-col h-full w-[450px] border-r bg-white">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-6">
+        <h1 className="text-xl font-bold text-[#1e293b]">Incident Reports</h1>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#f1f5f9] rounded-lg text-[#64748b] text-xs font-semibold">
+          <Calendar size={14} />
+          <span>{currentDate}</span>
+        </div>
+      </div>
+
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-2 p-4">
+      <div className="grid grid-cols-4 gap-3 px-6 mb-6">
         <SummaryCard
           label="NEW"
           count={summary.new}
-          className="bg-[#E0F2FE] text-[#0369A1]"
+          className="bg-[#dae5f9] text-[#2c52a0]"
         />
         <SummaryCard
           label="ONGOING"
           count={summary.ongoing}
-          className="bg-[#FFEDD5] text-[#9A3412]"
+          className="bg-[#ffedd5] text-[#9a3412]"
         />
         <SummaryCard
           label="COMPLETED"
           count={summary.completed}
-          className="bg-[#DCFCE7] text-[#166534]"
+          className="bg-[#dcfce7] text-[#166534]"
         />
         <SummaryCard
           label="STANDBY"
           count={summary.standby}
-          className="bg-[#FEF9C3] text-[#854D0E]"
+          className="bg-[#fef9c3] text-[#854d0e]"
         />
       </div>
 
       {/* Filter Tabs */}
-      <div className="px-4 pb-2">
+      <div className="px-6 mb-4">
         <Tabs value={filter} onValueChange={onFilterChange} className="w-full">
-          <TabsList className="grid grid-cols-5 w-full bg-muted/50">
-            <TabsTrigger value="ALL" className="text-xs">ALL</TabsTrigger>
-            <TabsTrigger value="NEW" className="text-xs">NEW</TabsTrigger>
-            <TabsTrigger value="ONGOING" className="text-xs">ONGOING</TabsTrigger>
-            <TabsTrigger value="COMPLETED" className="text-xs">DONE</TabsTrigger>
-            <TabsTrigger value="STANDBY" className="text-xs">SBY</TabsTrigger>
+          <TabsList className="flex w-full bg-[#f1f5f9] p-1 rounded-lg h-auto">
+            <TabTrigger value="ALL">ALL</TabTrigger>
+            <TabTrigger value="NEW">NEW</TabTrigger>
+            <TabTrigger value="ONGOING">ONGOING</TabTrigger>
+            <TabTrigger value="COMPLETED">COMPLETED</TabTrigger>
+            <TabTrigger value="STANDBY">STANDBY</TabTrigger>
           </TabsList>
         </Tabs>
       </div>
 
       {/* Incident List */}
-      <ScrollArea className="flex-1 px-4 pb-4">
-        <div className="space-y-3">
+      <ScrollArea className="flex-1 px-6 pb-6">
+        <div className="space-y-4">
           {filteredIncidents.map((incident) => (
             <IncidentCard
               key={incident.id}
@@ -94,10 +108,21 @@ export function IncidentPanel({
 
 function SummaryCard({ label, count, className }: { label: string; count: number; className?: string }) {
   return (
-    <Card className={cn("p-3 flex flex-col items-center justify-center border-none shadow-sm", className)}>
-      <span className="text-[10px] font-bold tracking-wider">{label}</span>
-      <span className="text-2xl font-black mt-1">{count}</span>
-    </Card>
+    <div className={cn("p-4 flex flex-col items-start justify-center rounded-lg shadow-sm h-24", className)}>
+      <span className="text-2xl font-bold leading-none">{count}</span>
+      <span className="text-[10px] font-bold tracking-tight mt-1 opacity-80 uppercase">{label}</span>
+    </div>
+  );
+}
+
+function TabTrigger({ value, children }: { value: string; children: React.ReactNode }) {
+  return (
+    <TabsTrigger 
+      value={value} 
+      className="flex-1 text-[10px] font-bold py-1.5 rounded-md data-[state=active]:bg-[#1e293b] data-[state=active]:text-white transition-all text-[#64748b]"
+    >
+      {children}
+    </TabsTrigger>
   );
 }
 
@@ -110,49 +135,34 @@ function IncidentCard({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const statusColors: Record<IncidentStatus, string> = {
-    NEW: "bg-[#E0F2FE] text-[#0369A1] border-[#BAE6FD]",
-    ONGOING: "bg-[#FFEDD5] text-[#9A3412] border-[#FED7AA]",
-    COMPLETED: "bg-[#DCFCE7] text-[#166534] border-[#BBF7D0]",
-    STANDBY: "bg-[#FEF9C3] text-[#854D0E] border-[#FEF08A]",
-  };
-
   return (
-    <Card
+    <div
       className={cn(
-        "p-4 cursor-pointer transition-all border-2",
-        isSelected ? "border-primary ring-1 ring-primary" : "border-transparent hover:border-muted",
-        "bg-card shadow-sm"
+        "p-5 cursor-pointer transition-all rounded-xl",
+        isSelected ? "bg-[#f8fafc] ring-2 ring-[#1e293b]" : "bg-[#f8fafc] hover:bg-[#f1f5f9]"
       )}
       onClick={onClick}
     >
-      <div className="flex justify-between items-start mb-3">
-        <div className="space-y-0.5">
-          <div className="text-[10px] text-muted-foreground font-medium uppercase">
-            {incident.vehicleId || "UNASSIGNED"}
-          </div>
-          <div className="text-sm font-bold">{incident.caseId}</div>
+      <div className="mb-4">
+        <div className="text-[11px] text-[#64748b] font-semibold mb-1 uppercase tracking-tight">
+          {incident.vehicleId || "UNASSIGNED"}
         </div>
-        <Badge className={cn("text-[10px] px-1.5 py-0 border", statusColors[incident.status])} variant="outline">
-          {incident.status}
-        </Badge>
+        <div className="text-lg font-bold text-[#1e293b]">{incident.caseId}</div>
       </div>
 
-      <div className="flex items-center gap-3 text-xs">
-        <div className="flex flex-col items-center gap-1">
-          <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
-          <div className="w-0.5 h-6 bg-muted-foreground/20 border-l border-dashed" />
-          <MapPin className="w-3 h-3 text-primary" />
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 text-[#64748b] min-w-0">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#94a3b8] flex-shrink-0" />
+          <span className="text-[11px] font-medium truncate">{incident.origin}</span>
         </div>
-        <div className="flex flex-col gap-4">
-          <div className="text-muted-foreground truncate w-full max-w-[280px]">
-            {incident.origin}
-          </div>
-          <div className="font-semibold truncate w-full max-w-[280px]">
-            {incident.destination}
-          </div>
+        
+        <ArrowRight size={14} className="text-[#94a3b8] flex-shrink-0" />
+
+        <div className="flex items-center gap-1.5 text-[#64748b] min-w-0">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#94a3b8] flex-shrink-0" />
+          <span className="text-[11px] font-medium truncate">{incident.destination}, Baliwag City</span>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

@@ -21,12 +21,16 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 05: Map Navigation Specification - Defined requirements for real-time map, incident panel, and responder tracking based on design image.
 - Feature 06: Reports Management Specification - Defined requirements for the searchable data table, PDF export, and incident detail sheet with strict Zod validation.
 - Feature 07: Responder Roster Specification - Defined requirements for the high-fidelity attendance table, including shift tracking and log hour calculations.
+- Feature 08: Status & Logs Specification - Defined requirements for real-time activity tracking and audit trail logging with strict Zod validation.
+- Feature 09: User Management Specification - Defined requirements for user summary cards, administrative table, and status/role management with strict Zod validation.
 - Feature 05: Map Navigation Implementation - High-fidelity real-time map with incident panel, custom markers, and simulated real-time tracking implemented exactly as specified.
 - Feature 06: Reports Management Implementation - High-fidelity table with Navy Blue header, row selection, and detailed incident sheet implemented according to the updated spec.
+- Feature 07: Responder Roster Implementation - High-fidelity attendance table with Navy Blue header, shift tracking, and log hour calculations implemented exactly as specified with strict Zod validation.
+- Feature 08: Status & Logs Implementation - High-fidelity real-time activity tracking table with Navy Blue header, incident ID highlighting, and status/action badges implemented exactly as specified with strict Zod validation.
 
 ## In Progress
 
-- Feature 07: Responder Roster Implementation.
+- Feature 09: User Management Implementation.
 
 ## Open Questions
 

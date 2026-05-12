@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useRef, useEffect } from "react";
 import Map, { NavigationControl, Marker, MapRef } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MapIncident, MapResponder } from "@/types/map";
@@ -30,13 +30,24 @@ export function MapContainer({
 }: MapContainerProps) {
   const mapRef = useRef<MapRef>(null);
 
+  // Fly to incident when selected from the list
+  useEffect(() => {
+    if (selectedIncidentId) {
+      const selectedIncident = incidents.find((i) => i.id === selectedIncidentId);
+      if (selectedIncident) {
+        mapRef.current?.flyTo({
+          center: [selectedIncident.lng, selectedIncident.lat],
+          zoom: 15,
+          duration: 2000,
+          essential: true,
+        });
+      }
+    }
+  }, [selectedIncidentId, incidents]);
+
   const handleMarkerClick = useCallback((id: string, lat: number, lng: number) => {
     onSelectIncident(id);
-    mapRef.current?.flyTo({
-      center: [lng, lat],
-      zoom: 15,
-      duration: 2000,
-    });
+    // Note: useEffect above will handle the flyTo
   }, [onSelectIncident]);
 
   return (

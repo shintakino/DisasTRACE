@@ -60,8 +60,8 @@ export function ReportDetailSheet({
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-xl p-0 flex flex-col border-l-0 shadow-2xl">
-        <SheetHeader className="p-8 bg-[#1E3A8A] text-white">
+      <SheetContent className="sm:max-w-xl p-0 flex flex-col h-full overflow-hidden border-l-0 shadow-2xl">
+        <SheetHeader className="p-8 bg-[#1E3A8A] text-white shrink-0">
           <div className="flex items-center justify-between mb-4">
             <Badge variant="outline" className="text-blue-100 border-blue-400/50 font-mono tracking-wider">
               {report?.id || "LOADING..."}
@@ -88,7 +88,7 @@ export function ReportDetailSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 bg-slate-50">
+        <ScrollArea className="flex-1 min-h-0 bg-slate-50">
           {loading ? (
             <div className="p-12 flex flex-col items-center justify-center text-slate-400">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1E3A8A] mb-4"></div>

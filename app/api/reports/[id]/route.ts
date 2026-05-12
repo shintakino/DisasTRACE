@@ -4,29 +4,25 @@ import { DetailedIncidentReport } from "@/types/reports";
 const mockDetailedReports: Record<string, DetailedIncidentReport> = {
   "DR-2026-0047": {
     id: "DR-2026-0047",
+    responderName: "Bastes, Renzy",
     vehicleId: "AMB-001",
-    type: "Vehicular Collision",
-    origin: "Brgy. Bagong Nayon",
-    destination: "Baliuag District Hospital",
-    timestamp: "2026-05-13T10:30:00Z",
-    status: "COMPLETED",
-    responderName: "John Doe",
-    description: "Multi-vehicle collision involving two private cars and a motorcycle. Three casualties treated on site and transported.",
+    type: "Fire Emergency",
+    status: "DISPATCHED",
+    date: "21 March 2026",
+    time: "09:43 AM",
+    location: "Brgy. Sabang, Baliwag City",
+    description: "Fire reported in a residential area. Preliminary assessment indicates a kitchen fire that spread to the living room.",
     scenePhotos: [
-      "https://images.unsplash.com/photo-1599421142511-8979a831e137?auto=format&fit=crop&q=80&w=400",
-      "https://images.unsplash.com/photo-1582139329536-e7284fece509?auto=format&fit=crop&q=80&w=400",
+      "https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&fit=crop&q=80&w=400",
+      "https://images.unsplash.com/photo-1563911892437-1feda0179e1b?auto=format&fit=crop&q=80&w=400",
     ],
     logs: [
-      { action: "Dispatched", time: "2026-05-13T10:35:00Z" },
-      { action: "Arrived at Scene", time: "2026-05-13T10:42:00Z" },
-      { action: "Patient Transported", time: "2026-05-13T11:05:00Z" },
-      { action: "Arrived at Hospital", time: "2026-05-13T11:15:00Z" },
-      { action: "Resolved", time: "2026-05-13T11:45:00Z" },
+      { action: "Dispatched", time: "09:43 AM" },
+      { action: "En Route", time: "09:45 AM" },
+      { action: "Arrived at Scene", time: "09:55 AM" },
     ],
     participants: [
-      { name: "Juan Dela Cruz", contact: "09123456789", triageStatus: "Yellow" },
-      { name: "Maria Clara", contact: "09987654321", triageStatus: "Green" },
-      { name: "Sisa", contact: "N/A", triageStatus: "Red" },
+      { name: "Juan Dela Cruz", contact: "09123456789", triageStatus: "Green" },
     ],
   },
 };
@@ -39,7 +35,21 @@ export async function GET(
   const report = mockDetailedReports[id];
 
   if (!report) {
-    return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    // Fallback for demo purposes if ID doesn't exist in mockDetailedReports
+    return NextResponse.json({
+      id: id,
+      responderName: "Demo Responder",
+      vehicleId: "AMB-999",
+      type: "Medical Emergency",
+      status: "COMPLETED",
+      date: "21 March 2026",
+      time: "10:00 AM",
+      location: "Baliuag, Bulacan",
+      description: "Demo report details for Case " + id,
+      scenePhotos: ["https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?auto=format&fit=crop&q=80&w=400"],
+      logs: [{ action: "Report Generated", time: "10:00 AM" }],
+      participants: [],
+    });
   }
 
   return NextResponse.json(report);

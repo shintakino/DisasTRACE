@@ -1,60 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ReportTableItem, ReportStatus, IncidentType } from "@/types/reports";
+import { ReportEntry } from "@/types/reports";
 
-const mockReports: ReportTableItem[] = [
+const mockReports: ReportEntry[] = [
   {
     id: "DR-2026-0047",
-    vehicleId: "AMB-001",
-    type: "Vehicular Collision",
-    origin: "Brgy. Bagong Nayon",
-    destination: "Baliuag District Hospital",
-    timestamp: "2026-05-13T10:30:00Z",
-    status: "COMPLETED",
+    responderName: "Bastes, Renzy",
+    type: "Fire Emergency",
+    status: "DISPATCHED",
+    date: "21 March 2026",
+    time: "09:43 AM",
+    location: "Brgy. Sabang, Baliwag City",
   },
   {
     id: "DR-2026-0046",
-    vehicleId: "AMB-003",
-    type: "Medical Emergency",
-    origin: "Brgy. Tibag",
-    destination: "Sagrada Familia Hospital",
-    timestamp: "2026-05-13T09:15:00Z",
-    status: "ONGOING",
+    responderName: "Dela Cruz, Juan",
+    type: "Vehicular Collision",
+    status: "ON-SCENE",
+    date: "21 March 2026",
+    time: "09:30 AM",
+    location: "Brgy. Bagong Nayon, Baliwag City",
   },
   {
     id: "DR-2026-0045",
-    vehicleId: "AMB-002",
-    type: "Fire/Explosion",
-    origin: "Baliwag Public Market",
-    destination: "N/A",
-    timestamp: "2026-05-13T08:00:00Z",
-    status: "STANDBY",
+    responderName: "Santos, Maria",
+    type: "Medical Emergency",
+    status: "COMPLETED",
+    date: "21 March 2026",
+    time: "08:15 AM",
+    location: "Brgy. Tibag, Baliwag City",
   },
   {
     id: "DR-2026-0044",
-    vehicleId: "AMB-001",
+    responderName: "Gomez, Jose",
     type: "Structural Failure",
-    origin: "Brgy. Poblacion",
-    destination: "Baliuag District Hospital",
-    timestamp: "2026-05-12T22:45:00Z",
-    status: "COMPLETED",
+    status: "CANCELLED",
+    date: "20 March 2026",
+    time: "11:20 PM",
+    location: "Brgy. Poblacion, Baliwag City",
   },
   {
     id: "DR-2026-0043",
-    vehicleId: "AMB-004",
+    responderName: "Lopez, Ana",
     type: "Flood/Water",
-    origin: "Brgy. Sulivan",
-    destination: "Evacuation Center",
-    timestamp: "2026-05-12T18:20:00Z",
-    status: "NEW",
-  },
-  {
-    id: "DR-2026-0042",
-    vehicleId: "AMB-005",
-    type: "Unknown Cause",
-    origin: "Brgy. Makinabang",
-    destination: "Baliuag District Hospital",
-    timestamp: "2026-05-12T14:10:00Z",
-    status: "COMPLETED",
+    status: "PENDING",
+    date: "20 March 2026",
+    time: "06:45 PM",
+    location: "Brgy. Sulivan, Baliwag City",
   },
 ];
 
@@ -71,8 +62,9 @@ export async function GET(req: NextRequest) {
   if (search) {
     filtered = filtered.filter(
       (r) =>
-        r.id.toLowerCase().includes(search) ||
-        r.vehicleId.toLowerCase().includes(search)
+        r.responderName.toLowerCase().includes(search) ||
+        r.type.toLowerCase().includes(search) ||
+        r.id.toLowerCase().includes(search)
     );
   }
 

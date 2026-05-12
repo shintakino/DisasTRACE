@@ -1,43 +1,59 @@
-export interface KpiData {
-  totalIncidentsToday: number;
-  totalResponders: number;
-  totalResolvedToday: number;
-  avgResponseTime: string;
-}
+import { z } from "zod";
 
-export interface IncidentTrend {
-  month: string;
-  vehicular: number;
-  medical: number;
-  fire: number;
-  other: number;
-}
+export const KpiDataSchema = z.object({
+  totalIncidentsToday: z.number(),
+  totalResponders: z.number(),
+  totalResolvedToday: z.number(),
+  avgResponseTime: z.string(),
+});
 
-export interface IncidentDistribution {
-  name: string;
-  value: number;
-  fill: string;
-}
+export type KpiData = z.infer<typeof KpiDataSchema>;
 
-export interface RecentReport {
-  id: string;
-  vehicleId: string;
-  origin: string;
-  destination: string;
-  timestamp: string;
-}
+export const IncidentTrendSchema = z.object({
+  month: z.string(),
+  vehicular: z.number(),
+  medical: z.number(),
+  structural: z.number(),
+  fire: z.number(),
+  water: z.number(),
+  unknown: z.number(),
+});
 
-export interface Responder {
-  id: string;
-  name: string;
-  status: string;
-  initials: string;
-}
+export type IncidentTrend = z.infer<typeof IncidentTrendSchema>;
 
-export interface DashboardData {
-  kpis: KpiData;
-  trends: IncidentTrend[];
-  distribution: IncidentDistribution[];
-  reports: RecentReport[];
-  responders: Responder[];
-}
+export const IncidentDistributionSchema = z.object({
+  name: z.string(),
+  value: z.number(),
+  fill: z.string(),
+});
+
+export type IncidentDistribution = z.infer<typeof IncidentDistributionSchema>;
+
+export const RecentReportSchema = z.object({
+  id: z.string(),
+  vehicleId: z.string(),
+  origin: z.string(),
+  destination: z.string(),
+  timestamp: z.string(),
+});
+
+export type RecentReport = z.infer<typeof RecentReportSchema>;
+
+export const ResponderSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.string(),
+  initials: z.string(),
+});
+
+export type Responder = z.infer<typeof ResponderSchema>;
+
+export const DashboardDataSchema = z.object({
+  kpis: KpiDataSchema,
+  trends: z.array(IncidentTrendSchema),
+  distribution: z.array(IncidentDistributionSchema),
+  reports: z.array(RecentReportSchema),
+  responders: z.array(ResponderSchema),
+});
+
+export type DashboardData = z.infer<typeof DashboardDataSchema>;

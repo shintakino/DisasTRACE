@@ -65,7 +65,7 @@ async function seed() {
         await clerkClient.users.deleteUser(users.data[0].id);
       }
 
-      // Create new user
+      // Create new user with pre-verified credentials
       await clerkClient.users.createUser({
         emailAddress: [account.email],
         phoneNumber: [account.phoneNumber],
@@ -74,14 +74,17 @@ async function seed() {
         lastName: account.lastName,
         publicMetadata: account.publicMetadata as Record<string, unknown>,
         skipPasswordChecks: true,
+        // @ts-expect-error - Some Clerk versions use different property names for skipping verification
+        skipVerification: true,
       });
 
       console.log(`Created user: ${account.email} with role: ${account.publicMetadata.role}`);
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'status' in error) {
-        console.error(`Error seeding ${account.email}:`, (error as { status: number }).status);
+      console.error(`Error seeding ${account.email}:`);
+      if (error && typeof error === 'object' && 'errors' in error) {
+        console.dir((error as { errors: unknown[] }).errors, { depth: null });
       } else {
-        console.error(`Error seeding ${account.email}:`, error);
+        console.error(error);
       }
     }
   }

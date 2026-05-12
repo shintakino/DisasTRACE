@@ -47,10 +47,10 @@ export function AppSidebar() {
       <SidebarHeader className="flex items-center justify-center p-0 py-12 group-data-[state=expanded]:px-8 group-data-[state=expanded]:justify-start relative z-10 transition-all">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="relative h-16 w-16 group-data-[collapsible=icon]:h-14 group-data-[collapsible=icon]:w-14 shrink-0 transition-all">
-            <Image 
-              src="/assets/logoBaliwag.png" 
-              alt="Baliwag CDRRMO Logo" 
-              fill 
+            <Image
+              src="/assets/logoBaliwag.png"
+              alt="Baliwag CDRRMO Logo"
+              fill
               className="object-contain"
               priority
             />
@@ -74,7 +74,7 @@ export function AppSidebar() {
       <SidebarContent className="p-0">
         <SidebarGroup className="p-0">
           <SidebarGroupContent className="p-0">
-            <SidebarMenu className="gap-2 flex flex-col items-center group-data-[state=expanded]:items-start py-4">
+            <SidebarMenu className="gap-8 flex flex-col items-center group-data-[state=expanded]:items-start py-6">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title} className="w-full flex justify-center group-data-[state=expanded]:justify-start px-4">
                   <SidebarMenuButton

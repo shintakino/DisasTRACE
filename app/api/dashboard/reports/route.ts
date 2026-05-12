@@ -1,51 +1,36 @@
 import { NextResponse } from 'next/server';
 import { getUserRole } from '@/lib/auth';
+import { RecentReportSchema } from '@/types/dashboard';
+import { z } from 'zod';
 
 export async function GET() {
   const role = await getUserRole();
 
   if (role !== 'cdrrmo_super_admin') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    return NextResponse.json({ 
+      error: 'Unauthorized', 
+      message: `Access denied. This dashboard requires "cdrrmo_super_admin" role, but your session has "${role}".`,
+      currentRole: role 
+    }, { status: 403 });
   }
 
   // Mock data for recent incident reports
-  const reports = [
+  const reports = z.array(RecentReportSchema).parse([
     {
       id: 'DR-2026-0047',
       vehicleId: 'AMB-001',
       origin: 'CDRRMO HQ',
-      destination: 'Brgy. Sabang',
+      destination: 'Brgy. Sabang, Baliwag City',
       timestamp: new Date().toISOString(),
     },
     {
-      id: 'DR-2026-0048',
-      vehicleId: 'AMB-003',
-      origin: 'Brgy. Pagala',
-      destination: 'Baliwag District Hospital',
-      timestamp: new Date().toISOString(),
-    },
-    {
-      id: 'DR-2026-0049',
+      id: 'DR-2026-0041',
       vehicleId: 'AMB-002',
-      origin: 'SM City Baliwag',
-      destination: 'CDRRMO HQ',
-      timestamp: new Date().toISOString(),
-    },
-    {
-      id: 'DR-2026-0050',
-      vehicleId: 'AMB-005',
-      origin: 'Brgy. Makinabang',
-      destination: 'Bulacan Medical Center',
-      timestamp: new Date().toISOString(),
-    },
-    {
-      id: 'DR-2026-0051',
-      vehicleId: 'AMB-001',
       origin: 'CDRRMO HQ',
-      destination: 'Brgy. Tangos',
+      destination: 'San Jose Hwy, Baliwag City',
       timestamp: new Date().toISOString(),
     },
-  ];
+  ]);
 
   return NextResponse.json({ data: reports });
 }

@@ -1,53 +1,84 @@
+"use client"
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Truck, Siren, CheckCircle, Clock } from "lucide-react";
 import { KpiData } from "@/types/dashboard";
+import { motion } from "motion/react";
+
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const item = {
+  hidden: { opacity: 0, scale: 0.95, y: 10 },
+  show: { opacity: 1, scale: 1, y: 0 }
+};
 
 export function KpiCards({ data }: { data: KpiData }) {
   const kpis = [
     {
-      title: "Total Incidents Today",
+      title: "TOTAL INCIDENTS TODAY",
       value: data.totalIncidentsToday,
       icon: Truck,
-      gradient: "from-blue-600 to-blue-400",
+      gradient: "from-[#4776E6] to-[#3843D0]", // Vibrant blue
     },
     {
-      title: "Total Responders",
+      title: "TOTAL RESPONDERS",
       value: data.totalResponders,
       icon: Siren,
-      gradient: "from-red-600 to-red-400",
+      gradient: "from-[#FF416C] to-[#FF4B2B]", // Vibrant red
     },
     {
-      title: "Total Resolved Today",
+      title: "TOTAL RESOLVED TODAY",
       value: data.totalResolvedToday,
       icon: CheckCircle,
-      gradient: "from-green-600 to-green-400",
+      gradient: "from-[#11998e] to-[#38ef7d]", // Vibrant green
     },
     {
-      title: "Avg Response Time",
-      value: data.avgResponseTime,
+      title: "AVG RESPONSE TIME",
+      value: `${data.avgResponseTime}m`,
       icon: Clock,
-      gradient: "from-orange-600 to-orange-400",
+      gradient: "from-[#f09819] to-[#edde5d]", // Vibrant orange/yellow
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <motion.div 
+      variants={container}
+      initial="hidden"
+      animate="show"
+      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+    >
       {kpis.map((kpi, index) => (
-        <Card key={index} className="overflow-hidden border-none shadow-sm">
-          <CardContent className={`p-6 bg-gradient-to-br ${kpi.gradient} text-white flex items-center justify-between relative`}>
-            {/* Glassmorphism effect overlay */}
-            <div className="absolute inset-0 bg-white/10 backdrop-blur-[2px]" />
+        <motion.div
+          key={index}
+          variants={item}
+          whileHover={{ scale: 1.02, translateY: -5 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        >
+          <Card className={`overflow-hidden border-none ring-0 shadow-xl rounded-3xl p-0 bg-gradient-to-br ${kpi.gradient} relative h-32`}>
+            {/* Subtle overlay for depth */}
+            <div className="absolute inset-0 bg-black/5" />
             
-            <div className="relative z-10">
-              <p className="text-sm font-medium opacity-90">{kpi.title}</p>
-              <p className="text-3xl font-extrabold mt-1">{kpi.value}</p>
-            </div>
-            <div className="relative z-10 p-3 bg-white/20 rounded-xl backdrop-blur-md">
-              <kpi.icon className="h-8 w-8 text-white" />
-            </div>
-          </CardContent>
-        </Card>
+            <CardContent className="p-6 text-white relative z-10 h-full w-full">
+              <div className="flex flex-col h-full">
+                <p className="text-4xl font-black mb-1">{kpi.value}</p>
+                <p className="text-[10px] font-bold tracking-widest opacity-80 uppercase mt-auto">{kpi.title}</p>
+              </div>
+              
+              <div className="absolute top-6 right-6 opacity-30">
+                <kpi.icon className="size-8 stroke-[2]" />
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   );
 }

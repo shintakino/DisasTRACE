@@ -24,8 +24,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## In Progress
 
-- Feature 05: Map Navigation Implementation.
-- Feature 06: Reports Management Implementation.
+- Feature 05: Map Navigation Implementation - High-fidelity real-time map with incident panel, custom markers, and simulated real-time tracking implemented exactly as specified.
+- Feature 06: Reports Management Implementation - High-fidelity table with Navy Blue header, row selection, and detailed incident sheet implemented according to the updated spec.
 - Feature 07: Responder Roster Implementation.
 
 ## Open Questions

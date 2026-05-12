@@ -23,7 +23,6 @@ import {
   Users,
   ChevronRight,
 } from "lucide-react";
-import Image from "next/image";
 
 interface ReportDetailSheetProps {
   reportId: string | null;

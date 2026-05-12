@@ -53,7 +53,7 @@ export function IncidentTrends({ data }: { data: IncidentTrend[] }) {
               tickLine={false}
               tickMargin={10}
               axisLine={false}
-              tickFormatter={(value) => value.slice(0, 3)}
+              tickFormatter={(value: unknown) => (typeof value === 'string' ? value.slice(0, 3) : '')}
             />
             <ChartTooltip content={<ChartTooltipContent hideLabel />} />
             <ChartLegend content={<ChartLegendContent />} />
@@ -116,7 +116,7 @@ export function IncidentDistribution({ data }: { data: IncidentDistributionType[
                 className="fill-foreground"
                 stroke="none"
                 fontSize={12}
-                formatter={(value: string) => value.split(' ')[0]}
+                formatter={(value: unknown) => (typeof value === 'string' ? value.split(' ')[0] : '')}
               />
             </Pie>
             <ChartLegend 

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Empty } from "@/components/ui/empty";
+import { Empty, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 import { ArrowRight } from "lucide-react";
 import { RecentReport } from "@/types/dashboard";
 
@@ -12,7 +12,10 @@ export function RecentReports({ reports }: { reports: RecentReport[] }) {
           <CardTitle className="text-navy-900">Recent Incident Reports</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[300px]">
-          <Empty title="No recent incidents" description="Activity will appear here when reports are filed." />
+          <Empty>
+            <EmptyTitle>No recent incidents</EmptyTitle>
+            <EmptyDescription>Activity will appear here when reports are filed.</EmptyDescription>
+          </Empty>
         </CardContent>
       </Card>
     );

@@ -7,12 +7,15 @@ import { useMapData } from "@/hooks/use-map-data";
 import { MapIncident } from "@/types/map";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default function MapPage() {
   const { incidents, responders, summary, isLoading, error } = useMapData();
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
   const [filter, setFilter] = useState("ALL");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const handleSelectIncident = (incident: MapIncident | string) => {
     const id = typeof incident === "string" ? incident : incident.id;
@@ -34,7 +37,7 @@ export default function MapPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden relative">
       {isLoading ? (
         <>
           <div className="w-[400px] border-r p-4 space-y-4">
@@ -56,15 +59,33 @@ export default function MapPage() {
         </>
       ) : (
         <>
-          <IncidentPanel
-            summary={summary}
-            incidents={incidents}
-            onSelectIncident={handleSelectIncident}
-            selectedIncidentId={selectedIncidentId}
-            filter={filter}
-            onFilterChange={setFilter}
-          />
-          <div className="flex-1">
+          <div className={cn(
+            "transition-all duration-300 ease-in-out overflow-hidden flex",
+            isSidebarOpen ? "w-[400px]" : "w-0"
+          )}>
+            <IncidentPanel
+              summary={summary}
+              incidents={incidents}
+              onSelectIncident={handleSelectIncident}
+              selectedIncidentId={selectedIncidentId}
+              filter={filter}
+              onFilterChange={setFilter}
+            />
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            className={cn(
+              "absolute top-4 z-20 transition-all duration-300 shadow-md bg-background",
+              isSidebarOpen ? "left-[386px]" : "left-4"
+            )}
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          >
+            {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+
+          <div className="flex-1 relative">
             <MapContainer
               incidents={incidents}
               responders={responders}

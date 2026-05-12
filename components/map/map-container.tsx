@@ -3,12 +3,13 @@
 import React, { useCallback, useRef, useEffect } from "react";
 import Map, { NavigationControl, Marker, MapRef } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MapIncident, MapResponder } from "@/types/map";
+import { MapIncident, MapResponder, MapHospital } from "@/types/map";
 import { MapMarker } from "./map-marker";
 
 interface MapContainerProps {
   incidents: MapIncident[];
   responders: MapResponder[];
+  hospitals: MapHospital[];
   selectedIncidentId?: string;
   onSelectIncident: (id: string) => void;
 }
@@ -94,6 +95,22 @@ export function MapContainer({
               type="responder"
               status={responder.status === "DISPATCHED" ? "ONGOING" : "STANDBY"}
               label={responder.vehicleId}
+            />
+          </Marker>
+        ))}
+
+        {/* Hospital Markers */}
+        {hospitals.map((hospital) => (
+          <Marker
+            key={hospital.id}
+            latitude={hospital.lat}
+            longitude={hospital.lng}
+            anchor="bottom"
+          >
+            <MapMarker
+              type="hospital"
+              status="AVAILABLE"
+              label={hospital.name}
             />
           </Marker>
         ))}

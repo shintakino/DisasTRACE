@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export default function MapPage() {
-  const { incidents, responders, summary, isLoading, error } = useMapData();
+  const { incidents, responders, hospitals, summary, isLoading, error } = useMapData();
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
   const [filter, setFilter] = useState("ALL");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -89,6 +89,7 @@ export default function MapPage() {
             <MapContainer
               incidents={incidents}
               responders={responders}
+              hospitals={hospitals}
               selectedIncidentId={selectedIncidentId}
               onSelectIncident={setSelectedIncidentId}
             />

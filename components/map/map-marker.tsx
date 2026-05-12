@@ -1,16 +1,32 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { MapPin, Navigation } from "lucide-react";
+import { MapPin, Navigation, Hospital } from "lucide-react";
 
 interface MapMarkerProps {
-  type: "incident" | "responder";
+  type: "incident" | "responder" | "hospital";
   status: string;
   label: string;
   isSelected?: boolean;
 }
 
 export function MapMarker({ type, status, label, isSelected }: MapMarkerProps) {
+  if (type === "hospital") {
+    return (
+      <div className="relative group cursor-pointer flex flex-col items-center">
+        {/* Label */}
+        <div className="absolute -top-8 px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+          {label}
+        </div>
+
+        {/* Marker Icon */}
+        <div className="relative z-10 p-1.5 rounded-full border-2 bg-blue-600 border-blue-200 text-white shadow-lg">
+          <Hospital size={16} fill="currentColor" />
+        </div>
+      </div>
+    );
+  }
+
   if (type === "incident") {
     return (
       <div className="relative group cursor-pointer flex flex-col items-center">

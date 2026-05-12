@@ -39,3 +39,12 @@ export const MapSummarySchema = z.object({
   standby: z.number(),
 });
 export type MapSummary = z.infer<typeof MapSummarySchema>;
+
+export const MapHospitalSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  address: z.string(),
+  lat: z.number(),
+  lng: z.number(),
+});
+export type MapHospital = z.infer<typeof MapHospitalSchema>;

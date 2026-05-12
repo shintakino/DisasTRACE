@@ -6,6 +6,7 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { getNavItems, UserRole } from "@/lib/navigation"
 import { useUser } from "@clerk/nextjs"
+import { cn } from "@/lib/utils"
 
 import {
   Sidebar,
@@ -78,11 +79,11 @@ export function AppSidebar() {
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title} className="w-full flex justify-center group-data-[state=expanded]:justify-start px-4">
                   <SidebarMenuButton
-                    isActive={pathname === item.url}
+                    isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
                     tooltip={item.title}
                     className="h-12 w-12 group-data-[state=expanded]:w-full flex items-center justify-center group-data-[state=expanded]:justify-start rounded-xl transition-all"
                     render={(props) => (
-                      <Link href={item.url} {...props} className="flex items-center gap-3 w-full">
+                      <Link href={item.url} {...props} className={cn("flex items-center gap-3 w-full", props.className)}>
                         <item.icon className="size-6 shrink-0" />
                         <span className="group-data-[state=collapsed]:hidden font-medium truncate">
                           {item.title}

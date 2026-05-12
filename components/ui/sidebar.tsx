@@ -475,7 +475,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-lg p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-12 group-data-[collapsible=icon]:p-3 hover:bg-white/10 hover:text-white focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-white/10 data-open:hover:text-white data-active:bg-white data-active:text-[#1E3A8A] group-data-[state=expanded]:data-active:bg-white/15 group-data-[state=expanded]:data-active:text-white data-active:font-semibold [&_svg]:size-6 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-lg p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-12 group-data-[collapsible=icon]:p-3 hover:bg-white/10 hover:text-white focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-white/10 data-open:hover:text-white data-active:bg-white data-active:text-[#1E3A8A] data-active:font-bold data-active:shadow-lg [&_svg]:size-6 [&_svg]:shrink-0 [&>span:last-child]:truncate",
   {
     variants: {
       variant: {

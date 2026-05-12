@@ -52,6 +52,36 @@ export function MapContainer({
     // Note: useEffect above will handle the flyTo
   }, [onSelectIncident]);
 
+  const onMapLoad = useCallback((e: any) => {
+    const map = e.target;
+    
+    // Create a simple wood pattern programmatically to fix the missing image error
+    if (!map.hasImage("wood-pattern")) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        // Base wood color
+        ctx.fillStyle = "#3d2b1f";
+        ctx.fillRect(0, 0, 64, 64);
+        
+        // Grain lines
+        ctx.strokeStyle = "#2a1d15";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 20; i++) {
+          ctx.beginPath();
+          ctx.moveTo(Math.random() * 64, 0);
+          ctx.lineTo(Math.random() * 64, 64);
+          ctx.stroke();
+        }
+        
+        const imageData = ctx.getImageData(0, 0, 64, 64);
+        map.addImage("wood-pattern", imageData);
+      }
+    }
+  }, []);
+
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#0a0a1a]">
       <Map
@@ -60,6 +90,7 @@ export function MapContainer({
         style={{ width: "100%", height: "100%" }}
         mapStyle={MAP_STYLE}
         attributionControl={false}
+        onLoad={onMapLoad}
       >
         <NavigationControl position="bottom-right" />
 

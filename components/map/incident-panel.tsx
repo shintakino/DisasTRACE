@@ -31,10 +31,11 @@ export function IncidentPanel({
   });
 
   const currentDate = new Date().toLocaleDateString("en-US", {
+    timeZone: "Asia/Manila",
     month: "2-digit",
     day: "2-digit",
     year: "numeric",
-  });
+  }).replace(/\//g, ".");
 
   return (
     <div className="flex flex-col h-full w-[450px] border-r bg-white">

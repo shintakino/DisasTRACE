@@ -5,10 +5,12 @@ Update this file whenever the current phase, active feature, or implementation s
 ## Current Phase
 
 - Dashboard Layout & Core Navigation
+- Map Navigation Implementation
 
 ## Current Goal
+## In Progress
 
-- Mirror the CDRRMO Super Admin design for the primary layout and sidebar.
+- Feature 06: Reports Management - Implementing searchable data table, filters, and detailed incident sheet.
 
 ## Completed
 
@@ -17,11 +19,14 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 02: Authentication & RBAC (Web) - Clerk setup, route protection, high-fidelity custom sign-in page, seeded test accounts (Admin, PACC, Responder, User), and temporary mobile testing page.
 - Feature 03: Layout & Navigation - Shared dashboard layout and sidebar implemented, mirrored CDRRMO Super Admin design with dark navy sidebar, Baliwag seal, and custom header.
 - Feature 04: Dashboard Page Specification - Defined requirements for KPI cards, charts, and real-time updates based on design image.
-- Feature 04: Dashboard Page implementation - Replicated high-fidelity UI with KPI cards, charts (Trend & Distribution), Recent Reports, and Responder Status. Implemented mock API endpoints for real-time data simulation.
+- Feature 04: Dashboard Page implementation - Replicated high-fidelity UI with KPI cards, charts (Trend & Distribution), Recent Reports, and Responder Status. Mirrored the CDRRMO Super Admin design image exactly. Implemented mock API endpoints for real-time data simulation with design-matching data.
+- Feature 05: Map Navigation Specification - Defined requirements for real-time map, incident panel, and responder tracking based on design image.
+- Feature 06: Reports Management Specification - Defined requirements for the searchable data table, PDF export, and incident detail sheet with strict Zod validation.
+- Feature 05: Map Navigation Implementation - High-fidelity real-time map with incident panel, custom markers, and simulated real-time tracking implemented exactly as specified.
 
 ## In Progress
 
-- Feature 05: Real-time Incident Map.
+- Feature 06: (Next planned feature)
 
 ## Open Questions
 

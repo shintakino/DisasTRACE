@@ -8,7 +8,7 @@ import {
   useReactTable,
   getPaginationRowModel,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, UserMinus, ShieldAlert, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,18 +20,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ReportEntry, ReportStatus } from "@/types/reports";
+import { UserManagementEntry, UserStatus, UserRole } from "@/types/users";
 import { cn } from "@/lib/utils";
 
-interface ReportsTableProps {
-  data: ReportEntry[];
-  onViewDetails: (id: string) => void;
+interface UsersTableProps {
+  data: UserManagementEntry[];
+  onManageStatus: (user: UserManagementEntry) => void;
+  onDelete: (id: string) => void;
 }
 
-const StatusBadge = ({ status }: { status: ReportStatus }) => {
-  const styles: Record<ReportStatus, string> = {
-    SUBMITTED: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800",
-    DRAFT: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800",
+const StatusBadge = ({ status }: { status: UserStatus }) => {
+  const styles: Record<UserStatus, string> = {
+    ACTIVE: "bg-green-100 text-green-700 border-green-200",
+    SUSPENDED: "bg-orange-100 text-orange-700 border-orange-200",
+    DEACTIVATED: "bg-red-100 text-red-700 border-red-200",
+    PENDING: "bg-gray-100 text-gray-700 border-gray-200",
   };
 
   return (
@@ -41,10 +44,21 @@ const StatusBadge = ({ status }: { status: ReportStatus }) => {
   );
 };
 
-export function ReportsTable({ data, onViewDetails }: ReportsTableProps) {
+const RoleLabel = ({ role }: { role: UserRole }) => {
+  const labels: Record<UserRole, string> = {
+    public_user: "PUBLIC USER",
+    ambulance_responder: "RESPONDER",
+    pacc_admin: "PACC ADMIN",
+    cdrrmo_super_admin: "SUPER ADMIN",
+  };
+
+  return <span className="text-[10px] font-black text-slate-500 tracking-wider">{labels[role]}</span>;
+};
+
+export function UsersTable({ data, onManageStatus, onDelete }: UsersTableProps) {
   const [rowSelection, setRowSelection] = React.useState({});
 
-  const columns: ColumnDef<ReportEntry>[] = [
+  const columns: ColumnDef<UserManagementEntry>[] = [
     {
       id: "select",
       header: ({ table }) => (
@@ -67,49 +81,59 @@ export function ReportsTable({ data, onViewDetails }: ReportsTableProps) {
       enableHiding: false,
     },
     {
-      accessorKey: "responderName",
-      header: "RESPONDER NAME",
-      cell: ({ row }) => <span className="font-bold text-slate-800">{row.getValue("responderName")}</span>,
+      accessorKey: "fullName",
+      header: "FULL NAME",
+      cell: ({ row }) => <span className="font-bold text-slate-800">{row.getValue("fullName")}</span>,
     },
     {
-      accessorKey: "type",
-      header: "INCIDENT TYPE",
-      cell: ({ row }) => <span className="font-medium text-slate-600">{row.getValue("type")}</span>,
+      accessorKey: "email",
+      header: "EMAIL ADDRESS",
+      cell: ({ row }) => <span className="font-medium text-slate-600">{row.getValue("email")}</span>,
     },
     {
       accessorKey: "status",
       header: "STATUS",
-      cell: ({ row }) => <StatusBadge status={row.getValue("status") as ReportStatus} />,
+      cell: ({ row }) => <StatusBadge status={row.getValue("status") as UserStatus} />,
     },
     {
-      id: "dateTime",
-      header: "DATE & TIME",
-      cell: ({ row }) => {
-        const date = row.original.date;
-        const time = row.original.time;
-        return (
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-slate-800">{date}</span>
-            <span className="text-[10px] font-medium text-slate-500">{time}</span>
-          </div>
-        );
-      },
+      accessorKey: "role",
+      header: "ROLE",
+      cell: ({ row }) => <RoleLabel role={row.getValue("role") as UserRole} />,
     },
     {
-      accessorKey: "location",
-      header: "LOCATION",
-      cell: ({ row }) => <span className="text-sm text-slate-600 truncate max-w-[200px]" title={row.getValue("location")}>{row.getValue("location")}</span>,
+      accessorKey: "joinedDate",
+      header: "JOINED DATE",
+      cell: ({ row }) => <span className="text-sm text-slate-600">{row.getValue("joinedDate")}</span>,
+    },
+    {
+      accessorKey: "lastActive",
+      header: "LAST ACTIVE",
+      cell: ({ row }) => <span className="text-xs font-medium text-slate-500 italic">{row.getValue("lastActive")}</span>,
     },
     {
       id: "actions",
       header: "ACTION",
       cell: ({ row }) => (
-        <Button
-          onClick={() => onViewDetails(row.original.id)}
-          className="bg-[#1E3A8A] hover:bg-blue-800 text-white text-[10px] font-black px-4 h-7 rounded shadow-sm"
-        >
-          VIEW
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onManageStatus(row.original)}
+            className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            title="Manage Status & Role"
+          >
+            <ShieldAlert className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onDelete(row.original.id)}
+            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+            title="Delete User"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       ),
     },
   ];
@@ -159,7 +183,7 @@ export function ReportsTable({ data, onViewDetails }: ReportsTableProps) {
           ) : (
             <TableRow>
               <TableCell colSpan={columns.length} className="h-32 text-center text-slate-400 font-medium">
-                No reports found matching your search.
+                No users found matching your search.
               </TableCell>
             </TableRow>
           )}

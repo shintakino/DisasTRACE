@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Search, RotateCcw, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -118,17 +118,15 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
             Date From
           </label>
           <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-[140px] h-10 justify-start text-left font-normal",
-                  !dateFrom && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFrom ? format(dateFrom, "PP") : "Start Date"}
-              </Button>
+            <PopoverTrigger
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "w-[140px] h-10 justify-start text-left font-normal",
+                !dateFrom && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateFrom ? format(dateFrom, "PP") : "Start Date"}
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
@@ -145,17 +143,15 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
             Date To
           </label>
           <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-[140px] h-10 justify-start text-left font-normal",
-                  !dateTo && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateTo ? format(dateTo, "PP") : "End Date"}
-              </Button>
+            <PopoverTrigger
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "w-[140px] h-10 justify-start text-left font-normal",
+                !dateTo && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateTo ? format(dateTo, "PP") : "End Date"}
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar

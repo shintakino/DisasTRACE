@@ -23,14 +23,16 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 07: Responder Roster Specification - Defined requirements for the high-fidelity attendance table, including shift tracking and log hour calculations.
 - Feature 08: Status & Logs Specification - Defined requirements for real-time activity tracking and audit trail logging with strict Zod validation.
 - Feature 09: User Management Specification - Defined requirements for user summary cards, administrative table, and status/role management with strict Zod validation.
+- Feature 10: Audit Logs Specification - Defined requirements for the system-wide audit trail, tracking administrative actions with context paths and strict Zod validation.
 - Feature 05: Map Navigation Implementation - High-fidelity real-time map with incident panel, custom markers, and simulated real-time tracking implemented exactly as specified.
-- Feature 06: Reports Management Implementation - High-fidelity table with Navy Blue header, row selection, and detailed incident sheet implemented according to the updated spec.
+- Feature 06: Reports Management Implementation - High-fidelity table with Navy Blue header, row selection, and detailed incident sheet implemented with 'DRAFT' and 'SUBMITTED' status tracking and Zod validation.
 - Feature 07: Responder Roster Implementation - High-fidelity attendance table with Navy Blue header, shift tracking, and log hour calculations implemented exactly as specified with strict Zod validation.
 - Feature 08: Status & Logs Implementation - High-fidelity real-time activity tracking table with Navy Blue header, incident ID highlighting, and status/action badges implemented exactly as specified with strict Zod validation.
+- Feature 09: User Management Implementation - High-fidelity user administration dashboard with summary cards, Navy Blue header table, and status/role management dialogs implemented exactly as specified with strict Zod validation.
 
 ## In Progress
 
-- Feature 09: User Management Implementation.
+- Feature 10: Audit Logs Implementation.
 
 ## Open Questions
 
@@ -45,3 +47,4 @@ Update this file whenever the current phase, active feature, or implementation s
 - Reverted MFA verification flow in the custom sign-in page.
 - Modified `scripts/seed-clerk.ts` to include `skipVerification: true` to Bypass Client Trust for seeded accounts.
 - Decision made to rely on pre-verified seeded accounts for development/testing instead of a custom MFA UI flow.
+- Redid Feature 06 (Reports Management) implementation to correct the report status types to 'DRAFT' and 'SUBMITTED' and aligned the UI colors accordingly.

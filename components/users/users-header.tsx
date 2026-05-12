@@ -16,44 +16,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { IncidentType, ReportStatus, ReportFilter } from "@/types/reports";
+import { UserRole, UserStatus, UserFilter } from "@/types/users";
 import { cn } from "@/lib/utils";
 
-interface ReportsHeaderProps {
-  onFilterChange: (filters: ReportFilter) => void;
+interface UsersHeaderProps {
+  onFilterChange: (filters: UserFilter) => void;
   onExport: () => void;
 }
 
-export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) {
+export function UsersHeader({ onFilterChange, onExport }: UsersHeaderProps) {
   const [search, setSearch] = React.useState("");
-  const [type, setType] = React.useState<IncidentType | "all">("all");
-  const [status, setStatus] = React.useState<ReportStatus | "all">("all");
+  const [role, setRole] = React.useState<UserRole | "all">("all");
+  const [status, setStatus] = React.useState<UserStatus | "all">("all");
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
     onFilterChange({
       search: val || undefined,
-      type: type === "all" ? undefined : type,
+      role: role === "all" ? undefined : role,
       status: status === "all" ? undefined : status,
     });
   };
 
-  const handleTypeChange = (val: string) => {
-    const newType = val as IncidentType | "all";
-    setType(newType);
+  const handleRoleChange = (val: string) => {
+    const newRole = val as UserRole | "all";
+    setRole(newRole);
     onFilterChange({
       search: search || undefined,
-      type: newType === "all" ? undefined : newType,
+      role: newRole === "all" ? undefined : newRole,
       status: status === "all" ? undefined : status,
     });
   };
 
   const handleStatusChange = (val: string) => {
-    const newStatus = val as ReportStatus | "all";
+    const newStatus = val as UserStatus | "all";
     setStatus(newStatus);
     onFilterChange({
       search: search || undefined,
-      type: type === "all" ? undefined : type,
+      role: role === "all" ? undefined : role,
       status: newStatus === "all" ? undefined : newStatus,
     });
   };
@@ -61,15 +61,15 @@ export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) 
   return (
     <div className="bg-[#1E3A8A] p-6 rounded-t-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-white tracking-tight">RESPONDER REPORTS</h2>
-        <p className="text-blue-200 text-xs font-medium uppercase tracking-wider">Historical Incident Data</p>
+        <h2 className="text-xl font-bold text-white tracking-tight">USER ACCOUNTS</h2>
+        <p className="text-blue-200 text-xs font-medium uppercase tracking-wider">System Access Management</p>
       </div>
 
       <div className="flex items-center gap-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-300" />
           <Input
-            placeholder="Search reports..."
+            placeholder="Search users..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9 h-10 w-[240px] bg-white/10 border-blue-400/30 text-white placeholder:text-blue-300 focus:bg-white/20 transition-all"
@@ -84,19 +84,17 @@ export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) 
           <PopoverContent className="w-80 p-4" align="end">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Incident Type</label>
-                <Select value={type} onValueChange={handleTypeChange}>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Role</label>
+                <Select value={role} onValueChange={handleRoleChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="All Types" />
+                    <SelectValue placeholder="All Roles" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="Fire Emergency">Fire Emergency</SelectItem>
-                    <SelectItem value="Vehicular Collision">Vehicular Collision</SelectItem>
-                    <SelectItem value="Medical Emergency">Medical Emergency</SelectItem>
-                    <SelectItem value="Structural Failure">Structural Failure</SelectItem>
-                    <SelectItem value="Flood/Water">Flood/Water</SelectItem>
-                    <SelectItem value="Unknown Cause">Unknown Cause</SelectItem>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="public_user">Public User</SelectItem>
+                    <SelectItem value="ambulance_responder">Responder</SelectItem>
+                    <SelectItem value="pacc_admin">PACC Admin</SelectItem>
+                    <SelectItem value="cdrrmo_super_admin">Super Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -109,8 +107,10 @@ export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) 
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="DRAFT">Draft</SelectItem>
-                    <SelectItem value="SUBMITTED">Submitted</SelectItem>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                    <SelectItem value="DEACTIVATED">Deactivated</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -70,9 +70,8 @@ export function ReportDetailSheet({
               <Badge
                 className={cn(
                   "font-black text-[10px] tracking-widest px-3 py-1 border-none shadow-sm",
-                  report.status === "COMPLETED" ? "bg-green-500 text-white" :
-                  report.status === "DISPATCHED" ? "bg-blue-400 text-white" :
-                  report.status === "ON-SCENE" ? "bg-yellow-500 text-white" :
+                  report.status === "SUBMITTED" ? "bg-green-500 text-white" :
+                  report.status === "DRAFT" ? "bg-yellow-500 text-white" :
                   "bg-slate-400 text-white"
                 )}
               >

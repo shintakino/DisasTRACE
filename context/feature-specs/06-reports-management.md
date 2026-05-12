@@ -1,41 +1,35 @@
 # Feature Spec 06: Reports Management (CDRRMO Super Admin)
 
 ## Overview
-Implement a comprehensive incident reporting and data analysis center for the **CDRRMO Super Admin**. This interface allows admins to search, filter, and audit historical incident data, as well as export detailed reports for official documentation.
+Implement a high-fidelity incident report management system for the **CDRRMO Super Admin**. This interface allows admins to review detailed reports submitted by ambulance responders, filter through historical incident data, and export records for official documentation.
 
 ## Requirements
 
-### Filter & Search Bar
-A robust set of controls to narrow down incident records.
-- **Search**: Text input to search by Case ID or Vehicle ID.
-- **Date Range Picker**: Select "From" and "To" dates (default: last 30 days).
-- **Incident Type**: Select dropdown (e.g., Vehicular, Medical, Structural, Fire, Water, Unknown).
-- **Status Filter**: Select dropdown (e.g., NEW, ONGOING, COMPLETED, STANDBY).
-- **Reset Button**: Clear all filters.
+### Reports Header Actions (Blue Card Header)
+- **Card Styling**: The table and actions are contained within a Shadcn `Card` with a `bg-[#1E3A8A]` (Navy Blue) header area.
+- **Search Bar**: "Search reports..." input to search by responder name or incident type.
+- **Filter Button**: Popover-based filtering for status, incident type, and date range.
+- **Export PDF Button**: Primary button to export selected reports or the current filtered view as a PDF.
 
-### Reports Data Table
-A high-density table displaying all historical records using TanStack Table.
+### Responder Reports Table
+A high-density data table with row selection capabilities.
 - **Columns**:
-    - **Case ID**: Unique identifier (e.g., `DR-2026-0047`).
-    - **Vehicle**: Ambulance ID (e.g., `AMB-001`).
-    - **Incident Type**: Icon + Label (e.g., `Vehicular Collision`).
-    - **Location**: Origin -> Destination summary (using the `MoveRight` and `MapPin` icons).
-    - **Timestamp**: Date and time of the report.
-    - **Status**: Colored badge matching status colors in `ui-context.md`.
-    - **Actions**: "View Details" (opens a side sheet) and "Download PDF".
-- **Pagination**: 10-20 records per page with next/prev controls.
-- **Empty State**: Use the `Empty` component if no records match the criteria.
-
-### Export Functionality
-- **Export to PDF**: Generate a formal document for a specific incident report using the CDRRMO official header and seal.
-- **Batch Export**: Ability to download a CSV or summary PDF of multiple filtered records.
+    - **Selection**: Checkbox for individual or bulk row selection.
+    - **Responder Name**: Full name of the responder (e.g., "Bastes, Renzy").
+    - **Incident Type**: Descriptive label (e.g., "Fire Emergency").
+    - **Status**: Colored badge indicating the submission status (`DRAFT` or `SUBMITTED`).
+    - **Date & Time**: Multi-line cell with the date (e.g., "21 March 2026") and time (e.g., "09:43 AM").
+    - **Location**: Scene location string (e.g., "Brgy. Sabang, Baliwag City").
+    - **Action**: "VIEW" button to open the detailed report sheet.
+- **Pagination**: Circular navigation buttons (1, 2, 3...) with prev/next arrows matching the design.
 
 ### Incident Detail Sheet
-A slide-over sheet (Shadcn `Sheet`) providing deep-dive info on a selected case.
-- **Scene Photos**: Gallery of images uploaded from the field (stored in Supabase Storage).
-- **Responder Logs**: Timeline of activities (Dispatched -> Arrived -> Resolved).
-- **Outcome Summary**: Full notes and findings submitted by the responder.
-- **Participant Details**: Information about the involved parties (names, contact, triage status).
+A slide-over sheet (Shadcn `Sheet`) triggered by the "VIEW" button.
+- **Metadata**: Display Case ID, Responder Name, and Vehicle ID.
+- **Photos**: Gallery of scene photos uploaded by the responder.
+- **Incident Logs**: Step-by-step timeline of the response (Dispatch -> Arrival -> Resolution).
+- **Narrative**: The descriptive outcome and findings submitted by the responder.
+- **Participants**: List of victims or involved parties with triage statuses.
 
 ## Frontend Implementation
 
@@ -43,66 +37,58 @@ A slide-over sheet (Shadcn `Sheet`) providing deep-dive info on a selected case.
    ```typescript
    import { z } from "zod";
 
-   export const ReportStatusSchema = z.enum(["NEW", "ONGOING", "COMPLETED", "STANDBY"]);
+   export const ReportStatusSchema = z.enum(["DRAFT", "SUBMITTED"]);
    export type ReportStatus = z.infer<typeof ReportStatusSchema>;
 
    export const IncidentTypeSchema = z.enum([
+     "Fire Emergency",
      "Vehicular Collision",
      "Medical Emergency",
      "Structural Failure",
-     "Fire/Explosion",
      "Flood/Water",
      "Unknown Cause"
    ]);
    export type IncidentType = z.infer<typeof IncidentTypeSchema>;
 
+   export const ReportEntrySchema = z.object({
+     id: z.string(), // Case ID
+     responderName: z.string(),
+     type: IncidentTypeSchema,
+     status: ReportStatusSchema,
+     date: z.string(), // e.g., "21 March 2026"
+     time: z.string(), // e.g., "09:43 AM"
+     location: z.string(),
+   });
+   export type ReportEntry = z.infer<typeof ReportEntrySchema>;
+
    export const ReportFilterSchema = z.object({
      search: z.string().optional(),
-     dateFrom: z.date().optional(),
-     dateTo: z.date().optional(),
      type: IncidentTypeSchema.optional(),
      status: ReportStatusSchema.optional(),
+     dateRange: z.object({
+       from: z.date().optional(),
+       to: z.date().optional(),
+     }).optional(),
    });
    export type ReportFilter = z.infer<typeof ReportFilterSchema>;
-
-   export const DetailedIncidentReportSchema = z.object({
-     id: z.string(),
-     vehicleId: z.string(),
-     type: IncidentTypeSchema,
-     origin: z.string(),
-     destination: z.string(),
-     timestamp: z.string(),
-     status: ReportStatusSchema,
-     responderName: z.string(),
-     description: z.string().optional(),
-     scenePhotos: z.array(z.string()), // URLs to Supabase Storage
-     logs: z.array(z.object({
-       action: z.string(),
-       time: z.string(),
-     })),
-   });
-   export type DetailedIncidentReport = z.infer<typeof DetailedIncidentReportSchema>;
    ```
 
 2. **Components**:
-   - `ReportsTable.tsx`: Main data grid using `@tanstack/react-table`.
-   - `ReportFilters.tsx`: Container for the filter inputs and search bar.
-   - `ReportDetailSheet.tsx`: The side-over sheet for deep-dive analysis.
+   - `ReportsHeader.tsx`: Contains the title and the search/filter/export actions within the blue header.
+   - `ReportsTable.tsx`: Uses `@tanstack/react-table` with checkboxes and custom cell renderers.
+   - `ReportDetailSheet.tsx`: High-fidelity slide-over for full report inspection.
 
 ## Backend Architecture
 
 1. **REST API Endpoints (`app/api/reports/`)**:
-   - `GET /api/reports`: Returns paginated and filtered incident records.
-   - `GET /api/reports/[id]`: Returns full details for a single incident.
-   - `GET /api/reports/export/[id]`: Generates a PDF for a single report.
-
-2. **Data Aggregation**:
-   - Use Drizzle ORM to join `incidents`, `dispatches`, and `responder_reports`.
-   - All endpoints must enforce `cdrrmo_super_admin` role checks.
+   - `GET /api/reports`: Returns paginated and filtered incident reports.
+   - `GET /api/reports/[id]`: Returns detailed data for a specific report (photos, logs, participants).
+   - `POST /api/reports/export`: Generates a PDF for the selected Case IDs.
 
 ## Design Alignment Checklist
-- [ ] Table rows use high-density styling with `Inter` font.
-- [ ] Status badges match `ui-context.md` (e.g., COMPLETED = Green).
-- [ ] Detailed sheet includes the scene photo gallery.
-- [ ] PDF export includes the official CDRRMO seal and signature lines.
-- [ ] Loading states use `Skeleton` components for the table rows.
+- [ ] Table header is inside a `bg-[#1E3A8A]` card.
+- [ ] "VIEW" buttons are styled as small, navy-blue buttons.
+- [ ] Status badges match the `DRAFT` (Yellow/Orange) and `SUBMITTED` (Green) colors.
+- [ ] Date and Time are stacked within a single cell.
+- [ ] Checkboxes are consistently aligned.
+- [ ] All typography uses the `Inter` font family.

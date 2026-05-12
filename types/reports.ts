@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ReportStatusSchema = z.enum(["DISPATCHED", "ON-SCENE", "COMPLETED", "CANCELLED", "PENDING"]);
+export const ReportStatusSchema = z.enum(["DRAFT", "SUBMITTED"]);
 export type ReportStatus = z.infer<typeof ReportStatusSchema>;
 
 export const IncidentTypeSchema = z.enum([
@@ -9,7 +9,7 @@ export const IncidentTypeSchema = z.enum([
   "Medical Emergency",
   "Structural Failure",
   "Flood/Water",
-  "Unknown Cause"
+  "Unknown Cause",
 ]);
 export type IncidentType = z.infer<typeof IncidentTypeSchema>;
 
@@ -45,15 +45,19 @@ export const DetailedIncidentReportSchema = z.object({
   time: z.string(),
   location: z.string(),
   description: z.string().optional(),
-  scenePhotos: z.array(z.string()),
-  logs: z.array(z.object({
-    action: z.string(),
-    time: z.string(),
-  })),
-  participants: z.array(z.object({
-    name: z.string(),
-    contact: z.string(),
-    triageStatus: z.string(),
-  })).optional(),
+  scenePhotos: z.array(z.string()), // URLs to Supabase Storage
+  logs: z.array(
+    z.object({
+      action: z.string(),
+      time: z.string(),
+    })
+  ),
+  participants: z.array(
+    z.object({
+      name: z.string(),
+      contact: z.string(),
+      triageStatus: z.string(),
+    })
+  ).optional(),
 });
 export type DetailedIncidentReport = z.infer<typeof DetailedIncidentReportSchema>;

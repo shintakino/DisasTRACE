@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Implement Feature 08: Status & Logs (CDRRMO Super Admin) and Feature 13: Status & Logs (PACC Admin).
+- Implement remaining CDRRMO and PACC admin features (Map, Reports, Roster, Users).
 
 ## Completed
 
@@ -33,6 +33,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 14: Verification (PACC Admin) Specification - Defined requirements for the incident triage system, including queue management and report verification.
 - Feature 14: Verification (PACC Admin) Implementation - Implemented high-fidelity verification system with queue management, resident profiling, and triage actions. Mirrored the PACC Admin design exactly with strict Zod typing.
 - Feature 15: Users Approval (PACC Admin) Specification - Defined requirements for the manual registration review workflow, including identity document inspection and a master-detail approval queue.
+- Feature 15: Users Approval (PACC Admin) Implementation - Implemented manual registration review workflow with master-detail layout, identity document viewer, and role-based approval/rejection system.
 
 ## In Progress
 
@@ -42,7 +43,6 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 08: Status & Logs Implementation.
 - Feature 09: User Management Implementation.
 - Feature 10: Audit Logs Implementation.
-- Feature 15: Users Approval Implementation.
 
 ## Open Questions
 

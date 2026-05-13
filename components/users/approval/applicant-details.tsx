@@ -62,7 +62,7 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
               <div className="relative aspect-video bg-slate-200 group">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <button className="w-full h-full relative overflow-hidden">
+                    <div className="w-full h-full relative overflow-hidden cursor-pointer" role="button" tabIndex={0}>
                       <Image
                         src={applicant.identityDocument.imageUrl}
                         alt="Government ID"
@@ -75,7 +75,7 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
                           Click to Enlarge
                         </div>
                       </div>
-                    </button>
+                    </div>
                   </DialogTrigger>
                   <DialogContent className="max-w-5xl h-[80vh]">
                     <div className="relative w-full h-full">

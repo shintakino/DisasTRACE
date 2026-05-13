@@ -16,10 +16,6 @@ export default function UsersApprovalPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    fetchApplicants();
-  }, []);
-
   const fetchApplicants = async () => {
     setIsLoading(true);
     try {
@@ -30,12 +26,16 @@ export default function UsersApprovalPage() {
       if (data.applicants.length > 0) {
         setSelectedApplicant(data.applicants[0]);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to fetch applicants");
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchApplicants();
+  }, []);
 
   const handleApprove = async () => {
     if (!selectedApplicant) return;
@@ -57,7 +57,7 @@ export default function UsersApprovalPage() {
       } else {
         toast.error("Failed to approve application");
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred");
     } finally {
       setIsProcessing(false);
@@ -84,7 +84,7 @@ export default function UsersApprovalPage() {
       } else {
         toast.error("Failed to reject application");
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred");
     } finally {
       setIsProcessing(false);

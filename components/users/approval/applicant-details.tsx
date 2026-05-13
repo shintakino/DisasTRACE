@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Mail, Phone, MapPin, Calendar, CreditCard, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
-import { useState } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 interface ApplicantDetailsProps {

@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { isAdmin } from "@/lib/auth";
 import { MapIncidentSchema } from "@/types/map";
 import { z } from "zod";
 
 export async function GET() {
-  const { userId } = await auth();
-
-  if (!userId) {
+  if (!(await isAdmin())) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

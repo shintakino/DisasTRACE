@@ -30,9 +30,11 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 12: PACC Admin Map Navigation Implementation - Reused high-fidelity map components with role-based API security and design-aligned terminology.
 - Feature 13: PACC Admin Status & Logs Specification - Defined requirements for a dispatcher-focused audit trail, reusing existing log components with conditional UI.
 - Feature 13: PACC Admin Status & Logs Implementation - Reused high-fidelity log components with role-based column visibility (hidden Action column) and API security checks.
+- Feature 14: Verification (PACC Admin) Specification - Defined requirements for the incident triage system, including queue management and report verification.
 
 ## In Progress
 
+- Feature 14: Verification (PACC Admin) Implementation.
 - Feature 05: Map Navigation Implementation.
 - Feature 06: Reports Management Implementation.
 - Feature 07: Responder Roster Implementation.

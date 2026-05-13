@@ -66,7 +66,7 @@ export function IncidentPanel({
           accent="bg-orange-500"
         />
         <SummaryCard
-          label="DONE"
+          label="COMPLETED"
           count={summary.completed}
           className="bg-emerald-50 text-emerald-700 border-emerald-100"
           accent="bg-emerald-500"
@@ -85,9 +85,9 @@ export function IncidentPanel({
           <TabsList className="flex w-full bg-slate-100/80 p-1 rounded-xl h-11">
             <TabTrigger value="ALL">ALL</TabTrigger>
             <TabTrigger value="NEW">NEW</TabTrigger>
-            <TabTrigger value="ONGOING">LIVE</TabTrigger>
-            <TabTrigger value="COMPLETED">DONE</TabTrigger>
-            <TabTrigger value="STANDBY">SBY</TabTrigger>
+            <TabTrigger value="ONGOING">ONGOING</TabTrigger>
+            <TabTrigger value="COMPLETED">COMPLETED</TabTrigger>
+            <TabTrigger value="STANDBY">STANDBY</TabTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -210,7 +210,7 @@ function IncidentCard({
             "px-2 py-1 rounded-full text-[9px] font-black tracking-widest uppercase text-white shadow-sm",
             statusColors[incident.status]
           )}>
-            {incident.status === "ONGOING" ? "LIVE" : incident.status}
+            {incident.status}
           </div>
         </div>
 

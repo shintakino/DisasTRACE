@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 
 interface LogsTableProps {
   data: StatusLogEntry[];
+  hideActionColumn?: boolean;
 }
 
 const StatusBadge = ({ status }: { status: LogStatus }) => {
@@ -59,7 +60,7 @@ const ActionBadge = ({ action }: { action: LogAction }) => {
   );
 };
 
-export function LogsTable({ data }: LogsTableProps) {
+export function LogsTable({ data, hideActionColumn = false }: LogsTableProps) {
   const columns: ColumnDef<StatusLogEntry>[] = [
     {
       id: "dateTime",
@@ -77,12 +78,12 @@ export function LogsTable({ data }: LogsTableProps) {
     },
     {
       accessorKey: "responderName",
-      header: "RESPONDER",
+      header: "RESPONDER NAME",
       cell: ({ row }) => <span className="font-bold text-slate-800 uppercase tracking-tight">{row.getValue("responderName")}</span>,
     },
     {
       accessorKey: "logDescription",
-      header: "ACTIVITY LOG",
+      header: "LOG",
       cell: ({ row }) => {
         const description = row.getValue("logDescription") as string;
         // Highlight incident IDs (e.g., DR-2026-0047)
@@ -105,15 +106,19 @@ export function LogsTable({ data }: LogsTableProps) {
     },
     {
       accessorKey: "status",
-      header: "CURRENT STATUS",
+      header: "STATUS",
       cell: ({ row }) => <StatusBadge status={row.getValue("status") as LogStatus} />,
     },
-    {
-      accessorKey: "action",
-      header: "ACTION TRIGGER",
-      cell: ({ row }) => <ActionBadge action={row.getValue("action") as LogAction} />,
-    },
   ];
+
+  // Only add action column if not hidden
+  if (!hideActionColumn) {
+    columns.push({
+      accessorKey: "action",
+      header: "ACTION",
+      cell: ({ row }) => <ActionBadge action={row.getValue("action") as LogAction} />,
+    });
+  }
 
   const table = useReactTable({
     data,

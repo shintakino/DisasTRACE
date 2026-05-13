@@ -8,10 +8,10 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const period = searchParams.get('period') || 'monthly';
 
-  if (role !== 'cdrrmo_super_admin') {
+  if (role !== 'cdrrmo_super_admin' && role !== 'pacc_admin') {
     return NextResponse.json({ 
       error: 'Unauthorized', 
-      message: `Access denied. This dashboard requires "cdrrmo_super_admin" role, but your session has "${role}".`,
+      message: `Access denied. This dashboard requires Admin privileges, but your session has "${role}".`,
       currentRole: role 
     }, { status: 403 });
   }

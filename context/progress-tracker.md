@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Implement the high-fidelity CDRRMO Super Admin dashboard features.
+- Implement Feature 08: Status & Logs (CDRRMO Super Admin) and Feature 13: Status & Logs (PACC Admin).
 
 ## Completed
 
@@ -17,29 +17,32 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 02: Authentication & RBAC (Web) - Clerk setup, route protection, high-fidelity custom sign-in page, seeded test accounts (Admin, PACC, Responder, User), and temporary mobile testing page.
 - Feature 03: Layout & Navigation - Shared dashboard layout and sidebar implemented, mirrored CDRRMO Super Admin design with dark navy sidebar, Baliwag seal, and custom header.
 - Feature 04: Dashboard Page Specification - Defined requirements for KPI cards, charts, and real-time updates based on design image.
-- Feature 04: Dashboard Page implementation - Replicated high-fidelity UI with KPI cards, charts (Trend & Distribution), Recent Reports, and Responder Status. Mirrored the CDRRMO Super Admin design image exactly. Implemented mock API endpoints for real-time data simulation with design-matching data.
-- Feature 05: Map Navigation Specification - Defined requirements for real-time map, incident panel, and responder tracking based on design image.
-- Feature 06: Reports Management Specification - Defined requirements for the searchable data table, PDF export, and incident detail sheet with strict Zod validation.
-- Feature 07: Responder Roster Specification - Defined requirements for the high-fidelity attendance table, including shift tracking and log hour calculations.
-- Feature 08: Status & Logs Specification - Defined requirements for real-time activity tracking and audit trail logging with strict Zod validation.
-- Feature 09: User Management Specification - Defined requirements for user summary cards, administrative table, and status/role management with strict Zod validation.
-- Feature 10: Audit Logs Specification - Defined requirements for the system-wide audit trail, tracking administrative actions with context paths and strict Zod validation.
-- Feature 05: Map Navigation Implementation - High-fidelity real-time map with incident panel, custom markers, and simulated real-time tracking implemented exactly as specified.
-- Feature 06: Reports Management Implementation - High-fidelity table with Navy Blue header, row selection, and detailed incident sheet implemented with 'DRAFT' and 'SUBMITTED' status tracking and Zod validation.
-- Feature 07: Responder Roster Implementation - High-fidelity attendance table with Navy Blue header, shift tracking, and log hour calculations implemented exactly as specified with strict Zod validation.
-- Feature 08: Status & Logs Implementation - High-fidelity real-time activity tracking table with Navy Blue header, incident ID highlighting, and status/action badges implemented with strict Zod validation.
-- Feature 09: User Management Implementation - High-fidelity user administration dashboard with summary cards, Navy Blue header table, and status/role management dialogs implemented exactly as specified with strict Zod validation.
-- Feature 10: Audit Logs Implementation - High-fidelity system-wide audit trail with Navy Blue header, stacked action/context path column, and chronological event tracking implemented with strict Zod validation.
+- Feature 04: Dashboard Page implementation - Replicated high-fidelity UI with KPI cards, charts (Trend & Distribution), Recent Reports, and Responder Status. Mirrored the CDRRMO Super Admin design image exactly.
+- Feature 05: Map Navigation Specification - Defined requirements for real-time map, incident panel, and responder tracking.
+- Feature 06: Reports Management Specification - Defined requirements for the searchable data table, PDF export, and incident detail sheet with 'DRAFT' and 'SUBMITTED' status tracking.
+- Feature 07: Responder Roster Specification - Defined requirements for the attendance table, shift tracking, and log hour calculations.
+- Feature 08: Status & Logs Specification - Defined requirements for real-time activity tracking and audit trail logging.
+- Feature 09: User Management Specification - Defined requirements for user summary cards and administrative status/role management.
+- Feature 10: Audit Logs Specification - Defined requirements for system-wide action tracking and context paths.
+- Feature 11: PACC Admin Dashboard Specification - Defined requirements for the dispatcher-focused dashboard view.
+- Feature 11: PACC Admin Dashboard Implementation - Implemented role-based layout, dispatcher-focused KPI cards, recent reports, and a high-fidelity full-width responder grid.
+- Feature 12: PACC Admin Map Navigation Specification - Defined requirements for reusing high-fidelity map components with role-based scoping.
+- Feature 12: PACC Admin Map Navigation Implementation - Reused high-fidelity map components with role-based API security and design-aligned terminology.
+- Feature 13: PACC Admin Status & Logs Specification - Defined requirements for a dispatcher-focused audit trail, reusing existing log components with conditional UI.
+- Feature 13: PACC Admin Status & Logs Implementation - Reused high-fidelity log components with role-based column visibility (hidden Action column) and API security checks.
 
 ## In Progress
 
-- Final verification and project wrap-up.
+- Feature 05: Map Navigation Implementation.
+- Feature 06: Reports Management Implementation.
+- Feature 07: Responder Roster Implementation.
+- Feature 08: Status & Logs Implementation.
+- Feature 09: User Management Implementation.
+- Feature 10: Audit Logs Implementation.
 
-## Next Steps
+## Open Questions
 
-- Final review of all CDRRMO Super Admin features.
-- Ensure all Zod schemas are consistently used.
-- Verify responsiveness and accessibility across the dashboard.
+- Add unresolved product or implementation questions here.
 
 ## Architecture Decisions
 
@@ -50,4 +53,5 @@ Update this file whenever the current phase, active feature, or implementation s
 - Reverted MFA verification flow in the custom sign-in page.
 - Modified `scripts/seed-clerk.ts` to include `skipVerification: true` to Bypass Client Trust for seeded accounts.
 - Decision made to rely on pre-verified seeded accounts for development/testing instead of a custom MFA UI flow.
-- Redid Feature 06 (Reports Management) implementation to correct the report status types to 'DRAFT' and 'SUBMITTED' and aligned the UI colors accordingly.
+- Corrected Feature 06 status types to 'DRAFT' and 'SUBMITTED' only to align with the responder workflow.
+- Implemented Feature 13 (PACC Admin Status & Logs) by adding role-based column visibility to `LogsTable` and updating `LogsPage` and API security.

@@ -5,10 +5,10 @@ import { KpiDataSchema } from '@/types/dashboard';
 export async function GET() {
   const role = await getUserRole();
 
-  if (role !== 'cdrrmo_super_admin') {
+  if (role !== 'cdrrmo_super_admin' && role !== 'pacc_admin') {
     return NextResponse.json({ 
       error: 'Unauthorized', 
-      message: `Access denied. This dashboard requires "cdrrmo_super_admin" role, but your session has "${role}".`,
+      message: `Access denied. This dashboard requires Admin privileges, but your session has "${role}".`,
       currentRole: role 
     }, { status: 403 });
   }

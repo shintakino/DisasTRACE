@@ -7,6 +7,7 @@ import {
   UserCheck,
   ClipboardList,
   UserPlus,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react"
 
@@ -31,6 +32,11 @@ export const CDRRMO_NAV: NavItem[] = [
     title: "Status & Logs",
     url: "/logs",
     icon: Folder,
+  },
+  {
+    title: "Verification",
+    url: "/verification",
+    icon: ShieldCheck,
   },
   {
     title: "Reports",
@@ -69,6 +75,11 @@ export const PACC_NAV: NavItem[] = [
     title: "Status & Logs",
     url: "/logs",
     icon: Folder,
+  },
+  {
+    title: "Verification",
+    url: "/verification",
+    icon: ShieldCheck,
   },
   {
     title: "Users Approval",

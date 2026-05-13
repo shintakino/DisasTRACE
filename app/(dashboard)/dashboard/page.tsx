@@ -1,16 +1,21 @@
 "use client"
 
 import { useEffect, useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import { UserRole } from "@/lib/navigation";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { IncidentTrends, IncidentDistribution } from "@/components/dashboard/incident-charts";
 import { RecentReports } from "@/components/dashboard/recent-reports";
 import { ResponderStatus } from "@/components/dashboard/responder-status";
+import { PACCResponderGrid } from "@/components/dashboard/pacc-responder-grid";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { DashboardData, DashboardDataSchema } from "@/types/dashboard";
 
 export default function DashboardPage() {
+  const { user } = useUser();
+  const role = user?.publicMetadata?.role as UserRole;
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +102,7 @@ export default function DashboardPage() {
         <AlertDescription className="text-base mt-2">
           {error}
           <div className="mt-4 text-sm opacity-80">
-            Please ensure you are logged in with a Super Admin account and your Clerk Session Token is configured to include public metadata.
+            Please ensure you are logged in with a Super Admin or PACC Admin account and your Clerk Session Token is configured to include public metadata.
           </div>
         </AlertDescription>
       </Alert>
@@ -106,24 +111,67 @@ export default function DashboardPage() {
 
   if (!data) return null;
 
+  // Render CDRRMO Super Admin Layout
+  if (role === 'cdrrmo_super_admin') {
+    return (
+      <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 min-h-0">
+        <div className="shrink-0">
+          <KpiCards data={data.kpis} />
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
+          <IncidentTrends data={data.trends} />
+          <IncidentDistribution 
+            data={data.distribution} 
+            period={period}
+            onPeriodChange={setPeriod}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
+          <RecentReports reports={data.reports} />
+          <ResponderStatus responders={data.responders} />
+        </div>
+      </div>
+    );
+  }
+
+  // Render PACC Admin Layout
+  if (role === 'pacc_admin') {
+    return (
+      <div className="h-full overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:scrollbar-default">
+        <div className="shrink-0">
+          <KpiCards data={data.kpis} />
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[450px] shrink-0">
+          <div className="h-[450px] lg:h-full">
+            <RecentReports reports={data.reports} />
+          </div>
+          <div className="h-[450px] lg:h-full">
+            <IncidentDistribution 
+              data={data.distribution} 
+              period={period}
+              onPeriodChange={setPeriod}
+            />
+          </div>
+        </div>
+
+        <div className="w-full pb-4 shrink-0">
+          <PACCResponderGrid responders={data.responders} />
+        </div>
+      </div>
+    );
+  }
+
+  // Default Fallback
   return (
     <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 min-h-0">
       <div className="shrink-0">
         <KpiCards data={data.kpis} />
       </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
-        <IncidentTrends data={data.trends} />
-        <IncidentDistribution 
-          data={data.distribution} 
-          period={period}
-          onPeriodChange={setPeriod}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
-        <RecentReports reports={data.reports} />
-        <ResponderStatus responders={data.responders} />
+      <div className="flex-1 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-3xl">
+        <p className="text-gray-400 font-medium">No layout defined for your role.</p>
       </div>
     </div>
   );

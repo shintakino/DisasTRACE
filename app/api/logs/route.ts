@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuth } from "@clerk/nextjs/server";
 import { StatusLogEntry } from "@/types/logs";
 
 const mockLogs: StatusLogEntry[] = [
@@ -55,6 +56,13 @@ const mockLogs: StatusLogEntry[] = [
 ];
 
 export async function GET(req: NextRequest) {
+  const { sessionClaims } = await getAuth(req);
+  const role = sessionClaims?.metadata?.role;
+
+  if (role !== "cdrrmo_super_admin" && role !== "pacc_admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
   const searchParams = req.nextUrl.searchParams;
   const search = searchParams.get("search")?.toLowerCase();
   const status = searchParams.get("status");

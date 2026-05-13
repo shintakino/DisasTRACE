@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useUser } from "@clerk/nextjs"
 import { LogsHeader } from "@/components/logs/logs-header"
 import { LogsTable } from "@/components/logs/logs-table"
 import { StatusLogEntry, LogFilter } from "@/types/logs"
@@ -9,6 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 
 export default function LogsPage() {
+  const { user } = useUser()
+  const userRole = user?.publicMetadata?.role as string
+  const isPaccAdmin = userRole === "pacc_admin"
+
   const [logs, setLogs] = React.useState<StatusLogEntry[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [filters, setFilters] = React.useState<LogFilter>({})
@@ -59,7 +64,7 @@ export default function LogsPage() {
             <Skeleton className="h-16 w-full" />
           </div>
         ) : (
-          <LogsTable data={logs} />
+          <LogsTable data={logs} hideActionColumn={isPaccAdmin} />
         )}
       </Card>
     </div>

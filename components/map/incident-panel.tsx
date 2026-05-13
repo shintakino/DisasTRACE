@@ -38,7 +38,7 @@ export function IncidentPanel({
   }).replace(/\//g, ".");
 
   return (
-    <div className="flex flex-col h-full w-[450px] border-r bg-white shadow-xl z-10">
+    <div className="flex flex-col h-full w-[400px] border-r bg-white shadow-xl z-10">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-6 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-20">
         <div>

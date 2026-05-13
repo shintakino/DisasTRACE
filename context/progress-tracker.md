@@ -32,6 +32,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 13: PACC Admin Status & Logs Implementation - Reused high-fidelity log components with role-based column visibility (hidden Action column) and API security checks.
 - Feature 14: Verification (PACC Admin) Specification - Defined requirements for the incident triage system, including queue management and report verification.
 - Feature 14: Verification (PACC Admin) Implementation - Implemented high-fidelity verification system with queue management, resident profiling, and triage actions. Mirrored the PACC Admin design exactly with strict Zod typing.
+- Feature 15: Users Approval (PACC Admin) Specification - Defined requirements for the manual registration review workflow, including identity document inspection and a master-detail approval queue.
 
 ## In Progress
 
@@ -41,6 +42,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 08: Status & Logs Implementation.
 - Feature 09: User Management Implementation.
 - Feature 10: Audit Logs Implementation.
+- Feature 15: Users Approval Implementation.
 
 ## Open Questions
 

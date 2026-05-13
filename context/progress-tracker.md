@@ -59,3 +59,4 @@ Update this file whenever the current phase, active feature, or implementation s
 - Decision made to rely on pre-verified seeded accounts for development/testing instead of a custom MFA UI flow.
 - Corrected Feature 06 status types to 'DRAFT' and 'SUBMITTED' only to align with the responder workflow.
 - Implemented Feature 13 (PACC Admin Status & Logs) by adding role-based column visibility to `LogsTable` and updating `LogsPage` and API security.
+- Fixed hydration mismatch in `DashboardLayout` by refactoring `UserMenu` into a client-side only component using `next/dynamic`.

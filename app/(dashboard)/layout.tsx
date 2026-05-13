@@ -1,11 +1,26 @@
 "use client"
 
-import { UserButton, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { usePathname } from "next/navigation";
 import { getNavItems, UserRole } from "@/lib/navigation";
-import { Bell, ChevronDown } from "lucide-react";
+import { Bell } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const UserMenu = dynamic(() => import("@/components/dashboard/user-menu"), { 
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center gap-4 pl-6 border-l border-[#E2E8F0]">
+      <div className="flex flex-col items-end hidden sm:flex min-w-[100px]">
+        <div className="h-5 w-24 bg-slate-100 animate-pulse rounded" />
+        <div className="h-3 w-16 bg-slate-50 animate-pulse rounded mt-1" />
+      </div>
+      <div className="h-11 w-11 rounded-full bg-slate-100 animate-pulse" />
+      <div className="size-5 bg-slate-50 animate-pulse rounded hidden sm:block" />
+    </div>
+  )
+});
 
 export default function DashboardLayout({
   children,
@@ -14,6 +29,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const { user } = useUser();
+
   const role = user?.publicMetadata?.role as UserRole;
   const navItems = getNavItems(role);
 
@@ -46,25 +62,7 @@ export default function DashboardLayout({
               <Bell className="size-7" />
               <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5 rounded-full bg-destructive border-2 border-white" />
             </button>
-            <div className="flex items-center gap-4 pl-6 border-l border-[#E2E8F0]">
-              <div className="flex flex-col items-end hidden sm:flex">
-                <span className="text-base font-semibold text-[#1E293B] leading-tight">
-                  {user?.fullName || "User Name"}
-                </span>
-                <span className="text-xs font-medium text-[#64748B]">
-                  {getRoleLabel(role)}
-                </span>
-              </div>
-              <UserButton 
-                appearance={{
-                  elements: {
-                    userButtonAvatarBox: "h-11 w-11 border-2 border-[#1E3A8A]/10 hover:border-[#1E3A8A]/30 transition-all",
-                    userButtonTrigger: "focus:shadow-none focus:ring-0",
-                  }
-                }}
-              />
-              <ChevronDown className="size-5 text-[#64748B] hidden sm:block" />
-            </div>
+            <UserMenu role={role} getRoleLabel={getRoleLabel} />
           </div>
         </header>
         <main className="flex-1 overflow-hidden bg-[#F3F4F6] p-6">

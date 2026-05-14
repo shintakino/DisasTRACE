@@ -38,6 +38,10 @@ function InitialLayout() {
         if (segments[0] !== 'rejected') {
           router.replace('/(verification)/rejected');
         }
+      } else if (verificationStatus === 'unauthorized_platform') {
+        if (segments[0] !== 'unauthorized') {
+          router.replace('/(verification)/unauthorized');
+        }
       } else if (verificationStatus === 'approved') {
         if (inAuthGroup || inVerificationGroup) {
           router.replace('/(tabs)');

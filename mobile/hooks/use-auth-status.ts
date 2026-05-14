@@ -11,7 +11,7 @@ type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
 export function useAuthStatus() {
   const { user, isLoaded: isUserLoaded, isSignedIn } = useUser();
   const { getToken } = useAuth();
-  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | 'loading'>('loading');
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | 'loading' | 'unauthorized_platform'>('loading');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const checkVerification = async () => {
@@ -33,11 +33,26 @@ export function useAuthStatus() {
         },
       });
       
-      const status = VerificationStatusSchema.parse(response.data.verification_status);
-      setVerificationStatus(status);
+      const role = response.data.role;
+      const status = response.data.verification_status;
+
+      // Platform Restriction: Deny Web Admins on Mobile
+      if (role === 'cdrrmo_super_admin' || role === 'pacc_admin') {
+        setVerificationStatus('unauthorized_platform');
+        return;
+      }
+
+      setVerificationStatus(VerificationStatusSchema.parse(status));
     } catch (error) {
       console.error('Error checking verification status:', error);
+      
       // Fallback to metadata
+      const role = user.publicMetadata.role;
+      if (role === 'cdrrmo_super_admin' || role === 'pacc_admin') {
+        setVerificationStatus('unauthorized_platform');
+        return;
+      }
+
       const metaStatus = user.publicMetadata.verification_status as VerificationStatus | undefined;
       setVerificationStatus(metaStatus || 'pending');
     }

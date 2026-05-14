@@ -34,13 +34,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 14: Verification (PACC Admin) Implementation - Implemented high-fidelity verification system with queue management, resident profiling, and triage actions. Mirrored the PACC Admin design exactly with strict Zod typing.
 - Feature 15: Users Approval (PACC Admin) Specification - Defined requirements for the manual registration review workflow, including identity document inspection and a master-detail approval queue.
 - Feature 15: Users Approval (PACC Admin) Implementation - Implemented manual registration review workflow with master-detail layout, identity document viewer, and role-based approval/rejection system.
-- Feature 16: Mobile App Setup (Expo) Specification & Implementation - Initialized Expo project, configured Clerk, NativeWind, and Verification Gate.
-- Feature 17: Splash Screen & Role Selection (Mobile) Specification - Defined requirements for animated splash sequence and role-based entry point.
-- Feature 18: Infrastructure Setup & Environment Audit Specification - Audited environment variables and identified missing dependencies and configuration files for Drizzle and Supabase.
+- Feature 16: Mobile App Setup (Expo) - Initialized Expo project, configured Clerk, NativeWind, Verification Gate, and base navigation.
+- Feature 17: Splash Screen & Role Selection (Mobile) - Completed.
+- Feature 18: Infrastructure Setup & Environment Audit - Completed.
 
 ## In Progress
 
-- Feature 17: Splash Screen & Role Selection (Mobile) - Completed.
 - Feature 05: Map Navigation Implementation.
 - Feature 06: Reports Management Implementation.
 - Feature 07: Responder Roster Implementation.
@@ -67,9 +66,6 @@ Update this file whenever the current phase, active feature, or implementation s
 - Fixed hydration mismatch in `DashboardLayout` by refactoring `UserMenu` into a client-side only component using `next/dynamic`.
 - Configured `next.config.ts` to allow `placehold.co` for remote images used in mock data.
 - Fixed invalid HTML nesting in `ApplicantDetails` by replacing a nested button with a `div` inside `DialogTrigger`.
-- Initialized Expo project in `mobile/` directory with `npx create-expo-app@latest`.
-- Configured NativeWind v4 with `tailwind.config.js` and `metro.config.js`.
-- Implemented high-fidelity `sign-in` and `sign-up` screens in `mobile/app/(auth)/`.
-- Implemented `(verification)` group with `pending` and `rejected` screens.
-- Created `mobile/services/api.ts` and `mobile/components/ui/` primitives.
-- Created `app/api/users/me/route.ts` to provide user profile and verification status to the mobile app.
+- Initialized Expo project in `mobile/` directory with `npx create-expo-app@latest` (SDK 54).
+- Audited `mobile/` directory: Identfied missing NativeWind, Supabase, Lucide, and Location dependencies. Reorganized `app/` structure is required.
+- Updated Feature Spec 16 to include the current state and missing infrastructure requirements.

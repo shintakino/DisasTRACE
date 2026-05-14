@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { z } from "zod";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 const roleSchema = z.object({
   role: z.enum(["public_user", "ambulance_responder"]),
@@ -17,12 +20,21 @@ export async function GET() {
     return new NextResponse("User not found", { status: 404 });
   }
 
+  // Attempt to get additional data from our DB
+  let dbUser = null;
+  try {
+    const results = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    dbUser = results[0];
+  } catch (error) {
+    console.error("Database error fetching user:", error);
+  }
+
   return NextResponse.json({
     id: user.id,
     email: user.emailAddresses[0].emailAddress,
-    role: user.publicMetadata.role || 'public_user',
-    verification_status: user.publicMetadata.verification_status || 'approved',
-    rejection_reason: user.publicMetadata.rejection_reason,
+    role: dbUser?.role || user.publicMetadata.role || 'public_user',
+    verification_status: dbUser?.verificationStatus || user.publicMetadata.verification_status || 'approved',
+    rejection_reason: dbUser?.rejectionReason || user.publicMetadata.rejection_reason,
   });
 }
 

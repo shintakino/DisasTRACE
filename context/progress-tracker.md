@@ -40,7 +40,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## In Progress
 
-- Feature 17: Splash Screen & Role Selection (Mobile) - In Progress.
+- Feature 17: Splash Screen & Role Selection (Mobile) - Completed.
 - Feature 05: Map Navigation Implementation.
 - Feature 06: Reports Management Implementation.
 - Feature 07: Responder Roster Implementation.

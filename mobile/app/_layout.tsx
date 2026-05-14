@@ -1,24 +1,75 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { ClerkProvider, ClerkLoaded } from '@clerk/expo';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import tokenCache from '../lib/token-cache';
+import { useAuthStatus } from '../hooks/use-auth-status';
 import "../global.css";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+if (!publishableKey) {
+  throw new Error('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY');
+}
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+function InitialLayout() {
+  const { isLoaded, isSignedIn, verificationStatus } = useAuthStatus();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+    const inVerificationGroup = segments[0] === '(verification)';
+
+    if (!isSignedIn) {
+      if (!inAuthGroup) {
+        router.replace('/(auth)/sign-in');
+      }
+    } else {
+      // User is signed in
+      if (verificationStatus === 'pending') {
+        if (segments[1] !== 'pending') {
+          router.replace('/(verification)/pending');
+        }
+      } else if (verificationStatus === 'rejected') {
+        if (segments[1] !== 'rejected') {
+          router.replace('/(verification)/rejected');
+        }
+      } else if (verificationStatus === 'approved') {
+        if (inAuthGroup || inVerificationGroup || segments.length === 0 || segments[0] === 'index') {
+          router.replace('/(tabs)');
+        }
+      }
+    }
+  }, [isSignedIn, isLoaded, verificationStatus, segments]);
+
+  if (!isLoaded) {
+    return (
+      <View className="flex-1 items-center justify-center bg-background">
+        <ActivityIndicator size="large" color="#1E3A8A" />
+      </View>
+    );
+  }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(verification)" options={{ headerShown: false, gestureEnabled: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      <ClerkLoaded>
+        <InitialLayout />
+        <StatusBar style="auto" />
+      </ClerkLoaded>
+    </ClerkProvider>
   );
 }

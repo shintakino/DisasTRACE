@@ -33,7 +33,7 @@ export function useAuthStatus() {
     } catch (error) {
       console.error('Error checking verification status:', error);
       // Fallback to metadata
-      const metaStatus = user.publicMetadata.verification_status as VerificationStatus;
+      const metaStatus = user.publicMetadata.verification_status as VerificationStatus | undefined;
       setVerificationStatus(metaStatus || 'pending');
     }
   };

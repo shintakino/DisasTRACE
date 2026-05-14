@@ -38,8 +38,12 @@ export default function SignInScreen() {
 
       await setActive({ session: completeSignIn.createdSessionId });
       router.replace('/');
-    } catch (err: any) {
-      setError(err.errors?.[0]?.message || 'Sign in failed');
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errors' in err && Array.isArray(err.errors)) {
+        setError(err.errors[0]?.message || 'Sign in failed');
+      } else {
+        setError('Sign in failed');
+      }
     } finally {
       setLoading(false);
     }

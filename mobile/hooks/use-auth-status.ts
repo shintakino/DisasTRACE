@@ -22,7 +22,12 @@ export function useAuthStatus() {
 
     try {
       const token = await getToken();
-      const response = await axios.get(`${MOBILE_API_URL}/api/users/me`, {
+      // Ensure we don't have double /api if the env var already includes it
+      const baseUrl = MOBILE_API_URL?.endsWith('/api') 
+        ? MOBILE_API_URL.slice(0, -4) 
+        : MOBILE_API_URL;
+
+      const response = await axios.get(`${baseUrl}/api/users/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

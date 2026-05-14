@@ -21,8 +21,8 @@ function InitialLayout() {
   useEffect(() => {
     if (!isLoaded) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inVerificationGroup = segments[0] === '(verification)';
+    const inAuthGroup = segments[0] === 'sign-in' || segments[0] === 'sign-up';
+    const inVerificationGroup = segments[0] === 'pending' || segments[0] === 'rejected';
 
     if (!isSignedIn) {
       if (!inAuthGroup) {
@@ -31,15 +31,15 @@ function InitialLayout() {
     } else {
       // User is signed in
       if (verificationStatus === 'pending') {
-        if (segments[1] !== 'pending') {
+        if (segments[0] !== 'pending') {
           router.replace('/(verification)/pending');
         }
       } else if (verificationStatus === 'rejected') {
-        if (segments[1] !== 'rejected') {
+        if (segments[0] !== 'rejected') {
           router.replace('/(verification)/rejected');
         }
       } else if (verificationStatus === 'approved') {
-        if (inAuthGroup || inVerificationGroup || segments.length === 0 || segments[0] === 'index') {
+        if (inAuthGroup || inVerificationGroup) {
           router.replace('/(tabs)');
         }
       }

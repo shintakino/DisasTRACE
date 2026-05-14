@@ -46,6 +46,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0379946d-c22d-4f98-96e3-6689f3543426"
+      }
+    },
+    "owner": "shintakino"
   }
 }

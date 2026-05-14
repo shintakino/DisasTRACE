@@ -11,7 +11,8 @@ const SignInSchema = z.object({
 });
 
 export default function SignInScreen() {
-  const { signIn, setActive, isLoaded } = useSignIn();
+  const { signIn, fetchStatus } = useSignIn();
+  const isLoaded = fetchStatus === 'idle';
   const router = useRouter();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -19,31 +20,38 @@ export default function SignInScreen() {
   const [error, setError] = React.useState<string | null>(null);
 
   const onSignInPress = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || !signIn) return;
     setLoading(true);
     setError(null);
 
     try {
       const result = SignInSchema.safeParse({ email, password });
       if (!result.success) {
-        setError(result.error.errors[0].message);
+        setError(result.error.issues[0].message);
         setLoading(false);
         return;
       }
 
-      const completeSignIn = await signIn.create({
+      const { error: signInError } = await signIn.create({
         identifier: email,
         password,
       });
 
-      await setActive({ session: completeSignIn.createdSessionId });
-      router.replace('/');
-    } catch (err) {
-      if (err && typeof err === 'object' && 'errors' in err && Array.isArray(err.errors)) {
-        setError(err.errors[0]?.message || 'Sign in failed');
-      } else {
-        setError('Sign in failed');
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
       }
+
+      if (signIn.status === 'complete') {
+        await signIn.finalize();
+        router.replace('/');
+      } else {
+        setError(`Sign in status: ${signIn.status}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sign in failed';
+      setError(message);
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useSignUp } from '@clerk/expo';
+import { useSignUp, useClerk } from '@clerk/expo';
 import { useRouter, Link } from 'expo-router';
 import { z } from 'zod';
 import { UserPlus, User, ShieldCheck } from 'lucide-react-native';
@@ -13,7 +13,8 @@ const SignUpSchema = z.object({
 });
 
 export default function SignUpScreen() {
-  const { isLoaded, signUp, setActive } = useSignUp();
+  const { signUp, fetchStatus } = useSignUp();
+  const { loaded: isLoaded } = useClerk();
   const router = useRouter();
   const [fullName, setFullName] = React.useState('');
   const [email, setEmail] = React.useState('');
@@ -25,19 +26,19 @@ export default function SignUpScreen() {
   const [error, setError] = React.useState<string | null>(null);
 
   const onSignUpPress = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || !signUp) return;
     setLoading(true);
     setError(null);
 
     try {
       const result = SignUpSchema.safeParse({ fullName, email, password, role });
       if (!result.success) {
-        setError(result.error.errors[0].message);
+        setError(result.error.issues[0].message);
         setLoading(false);
         return;
       }
 
-      await signUp.create({
+      const { error: signUpError } = await signUp.create({
         emailAddress: email,
         password,
         unsafeMetadata: {
@@ -46,36 +47,46 @@ export default function SignUpScreen() {
         },
       });
 
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+
+      await signUp.verifications.sendEmailCode();
       setPendingVerification(true);
     } catch (err) {
-      if (err && typeof err === 'object' && 'errors' in err && Array.isArray(err.errors)) {
-        setError(err.errors[0]?.message || 'Sign up failed');
-      } else {
-        setError('Sign up failed');
-      }
+      const message = err instanceof Error ? err.message : 'Sign up failed';
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
   const onPressVerify = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || !signUp) return;
     setLoading(true);
 
     try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
+      const { error: verifyError } = await signUp.verifications.verifyEmailCode({
         code,
       });
 
-      await setActive({ session: completeSignUp.createdSessionId });
-      router.replace('/');
-    } catch (err) {
-      if (err && typeof err === 'object' && 'errors' in err && Array.isArray(err.errors)) {
-        setError(err.errors[0]?.message || 'Verification failed');
-      } else {
-        setError('Verification failed');
+      if (verifyError) {
+        setError(verifyError.message);
+        setLoading(false);
+        return;
       }
+
+      if (signUp.status === 'complete') {
+        await signUp.finalize();
+        router.replace('/');
+      } else {
+        setError(`Sign up status: ${signUp.status}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Verification failed';
+      setError(message);
     } finally {
       setLoading(false);
     }

@@ -37,7 +37,7 @@ export default function UnauthorizedPlatformPage() {
               Next Steps
             </p>
             <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside px-2">
-              <li>Open Expo Go or the DisasTRACE App on your phone.</li>
+              <li>Open the DisasTRACE App on your phone.</li>
               <li>Sign in with your registered credentials.</li>
               <li>Complete your field tasks through the mobile interface.</li>
             </ol>

@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useSignIn } from '@clerk/expo';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, Link, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LoginSchema, LoginType } from '../../schemas/auth';
-import { Eye, EyeSlash } from 'iconsax-react-native';
+import { Eye, EyeSlash, ArrowLeft } from 'iconsax-react-native';
 
 export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
   const isLoaded = fetchStatus === 'idle';
   const router = useRouter();
+  const { role } = useLocalSearchParams<{ role: string }>();
   const [showPassword, setShowPassword] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
@@ -24,7 +25,7 @@ export default function SignInScreen() {
     setGlobalError(null);
 
     try {
-      const { createdSessionId, error: signInError } = await signIn.create({
+      const { error: signInError } = await signIn.password({
         identifier: data.identifier,
         password: data.password,
       });
@@ -34,8 +35,18 @@ export default function SignInScreen() {
         return;
       }
 
-      if (createdSessionId) {
-        router.replace('/');
+      if (signIn.status === 'complete') {
+        await signIn.finalize({
+          navigate: ({ decorateUrl }) => {
+            const url = decorateUrl('/');
+            if (url.startsWith('http')) {
+              // Should not happen in Expo normally, but good for safety
+              return;
+            } else {
+              router.replace(url as any);
+            }
+          },
+        });
       } else {
         setGlobalError(`Sign in status: ${signIn.status}`);
       }
@@ -52,6 +63,14 @@ export default function SignInScreen() {
     >
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View className="flex-1 p-6 justify-center mt-10">
+          <TouchableOpacity 
+            onPress={() => router.back()}
+            className="absolute top-10 left-6 p-2 z-10"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <ArrowLeft color="#FFFFFF" size={28} />
+          </TouchableOpacity>
+
           <View className="mb-10 items-center">
             {/* Placeholder for DisasTRACE Logo */}
             <View className="w-24 h-24 bg-white/20 rounded-2xl items-center justify-center mb-6">
@@ -138,7 +157,7 @@ export default function SignInScreen() {
 
             <View className="flex-row justify-center mt-6">
               <Text className="text-gray-500">Don't have an account? </Text>
-              <Link href="/(auth)/sign-up" asChild>
+              <Link href={{ pathname: "/(auth)/sign-up", params: { role } }} asChild>
                 <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Text className="text-[#EF4444] font-bold">Sign Up</Text>
                 </TouchableOpacity>

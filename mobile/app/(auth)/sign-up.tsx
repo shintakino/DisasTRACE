@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { useSignUp, useClerk } from '@clerk/expo';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, Link, useLocalSearchParams } from 'expo-router';
 import { useSignUpStore } from '../../store/useSignUpStore';
 import { ArrowLeft, UserTick } from 'iconsax-react-native';
 
@@ -14,6 +14,7 @@ export default function SignUpScreen() {
   const { signUp, fetchStatus } = useSignUp();
   const { loaded: isLoaded } = useClerk();
   const router = useRouter();
+  const { role } = useLocalSearchParams<{ role: string }>();
   
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -44,9 +45,19 @@ export default function SignUpScreen() {
         return;
       }
 
-      // 2. We can prepare email verification or phone verification here
-      // For this wizard to complete, we show the success modal
-      setShowSuccessModal(true);
+      // In Core 3, we check the status after creation
+      if (signUp.status === 'complete') {
+        await signUp.finalize({
+          navigate: ({ decorateUrl }) => {
+            setShowSuccessModal(true);
+            return; // Modal handles navigation
+          },
+        });
+      } else {
+        // Handle other statuses (like verification needed)
+        // For now, mirroring the specified wizard completion
+        setShowSuccessModal(true);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign up failed';
       setError(message);

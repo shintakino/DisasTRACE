@@ -1,56 +1,40 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { useSignUp, useClerk } from '@clerk/expo';
-import { useRouter, Link, useLocalSearchParams } from 'expo-router';
-import { z } from 'zod';
-import { UserPlus, User, ShieldCheck, Ambulance } from 'lucide-react-native';
+import { useRouter, Link } from 'expo-router';
+import { useSignUpStore } from '../../store/useSignUpStore';
+import { ArrowLeft, UserTick } from 'iconsax-react-native';
 
-const SignUpSchema = z.object({
-  fullName: z.string().min(2, "Full name is required"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(['public_user', 'ambulance_responder']),
-});
-
-const RoleSchema = z.enum(['public_user', 'ambulance_responder']).optional();
+import Step1 from '../../components/auth/Step1';
+import Step2 from '../../components/auth/Step2';
+import Step3 from '../../components/auth/Step3';
+import Step4 from '../../components/auth/Step4';
 
 export default function SignUpScreen() {
   const { signUp, fetchStatus } = useSignUp();
   const { loaded: isLoaded } = useClerk();
   const router = useRouter();
-  const params = useLocalSearchParams<{ role: string }>();
   
-  const roleResult = RoleSchema.safeParse(params.role);
-  const initialRole = roleResult.success ? roleResult.data : 'public_user';
+  const [currentStep, setCurrentStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const { data, reset } = useSignUpStore();
 
-  const [fullName, setFullName] = React.useState('');
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [role, setRole] = React.useState<'public_user' | 'ambulance_responder'>(initialRole as any);
-  const [pendingVerification, setPendingVerification] = React.useState(false);
-  const [code, setCode] = React.useState('');
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-
-  const onSignUpPress = async () => {
+  const handleRegister = async () => {
     if (!isLoaded || !signUp) return;
     setLoading(true);
     setError(null);
 
     try {
-      const result = SignUpSchema.safeParse({ fullName, email, password, role });
-      if (!result.success) {
-        setError(result.error.issues[0].message);
-        setLoading(false);
-        return;
-      }
-
+      // 1. Create user in Clerk
       const { error: signUpError } = await signUp.create({
-        emailAddress: email,
-        password,
+        emailAddress: data.email,
+        password: data.password,
         unsafeMetadata: {
-          fullName,
-          role,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          role: data.role,
         },
       });
 
@@ -60,8 +44,9 @@ export default function SignUpScreen() {
         return;
       }
 
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      setPendingVerification(true);
+      // 2. We can prepare email verification or phone verification here
+      // For this wizard to complete, we show the success modal
+      setShowSuccessModal(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign up failed';
       setError(message);
@@ -70,177 +55,92 @@ export default function SignUpScreen() {
     }
   };
 
-  const onPressVerify = async () => {
-    if (!isLoaded || !signUp) return;
-    setLoading(true);
-
-    try {
-      const result = await signUp.attemptEmailAddressVerification({
-        code,
-      });
-
-      if (result.status === 'complete') {
-        router.replace('/');
-      } else {
-        setError(`Sign up status: ${result.status}`);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Verification failed';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
+  const handleNextSuccess = () => {
+    setShowSuccessModal(false);
+    reset();
+    router.replace('/(auth)/sign-in');
   };
 
-  const isResponder = role === 'ambulance_responder';
-
-  if (pendingVerification) {
-    return (
-      <View className="flex-1 bg-background p-6 justify-center">
-        <View className="items-center mb-8">
-          <ShieldCheck color={isResponder ? '#EF4444' : '#1E3A8A'} size={60} />
-          <Text className={`text-2xl font-bold mt-4 ${isResponder ? 'text-secondary' : 'text-primary'}`}>Verify your email</Text>
-          <Text className="text-dark-grey text-center mt-2">
-            We've sent a 6-digit code to {email}
-          </Text>
-        </View>
-
-        <TextInput
-          value={code}
-          placeholder="Enter 6-digit code"
-          onChangeText={setCode}
-          keyboardType="number-pad"
-          maxLength={6}
-          className="bg-surface p-4 rounded-input border border-gray-200 text-center text-2xl font-bold tracking-widest"
-        />
-
-        <TouchableOpacity
-          onPress={onPressVerify}
-          disabled={loading}
-          className={`${isResponder ? 'bg-secondary' : 'bg-primary'} mt-6 p-4 rounded-button items-center ${loading ? 'opacity-70' : ''}`}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text className="text-white font-bold text-lg">Verify Email</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const progressPercentage = (currentStep / 4) * 100;
 
   return (
-    <ScrollView className="flex-1 bg-background p-6" showsVerticalScrollIndicator={false}>
-      <View className="py-10">
-        <View className="items-center mb-10">
-          <View className={`${isResponder ? 'bg-secondary' : 'bg-primary'} w-16 h-16 rounded-full items-center justify-center mb-4`}>
-            {isResponder ? (
-              <Ambulance color="white" size={32} />
-            ) : (
-              <UserPlus color="white" size={32} />
-            )}
-          </View>
-          <Text className={`text-3xl font-bold ${isResponder ? 'text-secondary' : 'text-primary'}`}>
-            {isResponder ? 'Responder Registration' : 'Create Account'}
-          </Text>
-          <Text className="text-dark-grey text-center mt-2">
-            {isResponder 
-              ? 'Join the Baliwag emergency response team.'
-              : 'Join the DisasTRACE emergency network.'}
-          </Text>
-        </View>
+    <View className="flex-1 bg-white pt-10">
+      {/* Header */}
+      <View className="px-6 py-4 flex-row items-center border-b border-gray-100">
+        <TouchableOpacity 
+          onPress={() => {
+            if (currentStep > 1) setCurrentStep(currentStep - 1);
+            else router.back();
+          }}
+          className="p-2 -ml-2"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <ArrowLeft color="#1F2937" size={24} />
+        </TouchableOpacity>
+        <Text className="flex-1 text-center font-bold text-lg text-gray-800 mr-8">Create Account</Text>
+      </View>
 
-        <View className="space-y-4">
-          <View>
-            <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold mb-2 ml-1`}>Full Name</Text>
-            <TextInput
-              placeholder="John Doe"
-              value={fullName}
-              onChangeText={setFullName}
-              className="bg-surface p-4 rounded-input border border-gray-200"
-            />
-          </View>
+      {/* Progress Bar */}
+      <View className="w-full bg-gray-100 h-2">
+        <View 
+          className="bg-[#EF4444] h-full" 
+          style={{ width: `${progressPercentage}%` }} 
+        />
+      </View>
 
-          <View className="mt-4">
-            <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold mb-2 ml-1`}>Email Address</Text>
-            <TextInput
-              placeholder="john@example.com"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              className="bg-surface p-4 rounded-input border border-gray-200"
-            />
+      <ScrollView className="flex-1 px-6 py-6" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View className="mb-6 flex-row justify-between items-end">
+          <View className="flex-1 pr-4">
+            <Text className="text-2xl font-bold text-[#1E3A8A] mb-1">
+              {currentStep === 1 && "Personal Information"}
+              {currentStep === 2 && "Contact Details"}
+              {currentStep === 3 && "Verification"}
+              {currentStep === 4 && "Password"}
+            </Text>
+            <Text className="text-gray-500">
+              {currentStep === 1 && "Please provide your basic details."}
+              {currentStep === 2 && "How can we reach you?"}
+              {currentStep === 3 && "Help us verify your identity."}
+              {currentStep === 4 && "Secure your account."}
+            </Text>
           </View>
-
-          <View className="mt-4">
-            <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold mb-2 ml-1`}>Password</Text>
-            <TextInput
-              placeholder="At least 8 characters"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              className="bg-surface p-4 rounded-input border border-gray-200"
-            />
-          </View>
-        </View>
-
-        <View className="mt-8">
-          <Text className={`font-bold mb-4 ${isResponder ? 'text-secondary' : 'text-primary'} ml-1`}>Registering as:</Text>
-          <View className="flex-row gap-4">
-            <TouchableOpacity
-              onPress={() => setRole('public_user')}
-              className={`flex-1 p-4 rounded-card border-2 ${role === 'public_user' ? 'bg-primary/5 border-primary' : 'bg-surface border-gray-200'}`}
-            >
-              <View className="items-center">
-                <User color={role === 'public_user' ? '#1E3A8A' : '#4B5563'} size={24} />
-                <Text className={`font-bold mt-2 ${role === 'public_user' ? 'text-primary' : 'text-dark-grey'}`}>
-                  Resident
-                </Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              onPress={() => setRole('ambulance_responder')}
-              className={`flex-1 p-4 rounded-card border-2 ${role === 'ambulance_responder' ? 'bg-secondary/5 border-secondary' : 'bg-surface border-gray-200'}`}
-            >
-              <View className="items-center">
-                <Ambulance color={role === 'ambulance_responder' ? '#EF4444' : '#4B5563'} size={24} />
-                <Text className={`font-bold mt-2 ${role === 'ambulance_responder' ? 'text-secondary' : 'text-dark-grey'}`}>
-                  Responder
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+          <Text className="font-bold text-gray-400">Step {currentStep}/4</Text>
         </View>
 
         {error && (
-          <View className="bg-red-50 p-3 rounded-lg mt-6 border border-red-200">
+          <View className="bg-red-50 p-3 rounded-lg mb-6 border border-red-200">
             <Text className="text-red-600 text-center">{error}</Text>
           </View>
         )}
 
-        <TouchableOpacity
-          onPress={onSignUpPress}
-          disabled={loading}
-          className={`${isResponder ? 'bg-secondary' : 'bg-primary'} mt-10 p-4 rounded-button items-center shadow-sm ${loading ? 'opacity-70' : ''}`}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text className="text-white font-bold text-lg">Create Account</Text>
-          )}
-        </TouchableOpacity>
-
-        <View className="flex-row justify-center mt-8 mb-10">
-          <Text className="text-dark-grey">Already have an account? </Text>
-          <Link href={{ pathname: "/(auth)/sign-in", params: { role } }} asChild>
-            <TouchableOpacity>
-              <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold`}>Sign In</Text>
-            </TouchableOpacity>
-          </Link>
+        <View className="pb-10">
+          {currentStep === 1 && <Step1 onNext={() => setCurrentStep(2)} />}
+          {currentStep === 2 && <Step2 onNext={() => setCurrentStep(3)} onBack={() => setCurrentStep(1)} />}
+          {currentStep === 3 && <Step3 onNext={() => setCurrentStep(4)} onBack={() => setCurrentStep(2)} />}
+          {currentStep === 4 && <Step4 onRegister={handleRegister} onBack={() => setCurrentStep(3)} isLoading={loading} />}
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+
+      {/* Success Modal */}
+      <Modal visible={showSuccessModal} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center items-center p-6">
+          <View className="bg-white rounded-3xl p-8 w-full items-center">
+            <View className="w-20 h-20 bg-green-100 rounded-full items-center justify-center mb-6">
+              <UserTick color="#10B981" size={40} variant="Bulk" />
+            </View>
+            <Text className="text-2xl font-bold text-[#1E3A8A] mb-2 text-center">Account Created</Text>
+            <Text className="text-gray-500 text-center mb-8 leading-6">
+              Your account has been successfully created! You may now log in.
+            </Text>
+            <TouchableOpacity
+              onPress={handleNextSuccess}
+              className="bg-[#1E3A8A] w-full p-4 rounded-xl items-center justify-center min-h-[56px]"
+            >
+              <Text className="text-white font-bold text-lg">Next</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }

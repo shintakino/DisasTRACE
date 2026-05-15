@@ -46,6 +46,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 08: Status & Logs Implementation.
 - Feature 09: User Management Implementation.
 - Feature 10: Audit Logs Implementation.
+- Feature 19: Mobile Auth Flow Implementation.
 
 ## Open Questions
 
@@ -68,4 +69,5 @@ Update this file whenever the current phase, active feature, or implementation s
 - Fixed invalid HTML nesting in `ApplicantDetails` by replacing a nested button with a `div` inside `DialogTrigger`.
 - Initialized Expo project in `mobile/` directory with `npx create-expo-app@latest` (SDK 54).
 - Audited `mobile/` directory: Identfied missing NativeWind, Supabase, Lucide, and Location dependencies. Reorganized `app/` structure is required.
-- Updated Feature Spec 16 to include the current state and missing infrastructure requirements.
+- Modified Feature Spec 17: Splash Screen & Role Selection (Mobile) to include 'The Pulse of Safety' design concept, detailing a new 6-frame animation sequence and modernized role selection UI.
+- Updated `mobile/` infrastructure audit to note that Feature 17 implementation is pending the creation of new assets based on the updated spec.

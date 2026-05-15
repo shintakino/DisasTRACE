@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useSignUp, useClerk } from '@clerk/expo';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, Link, useLocalSearchParams } from 'expo-router';
 import { z } from 'zod';
-import { UserPlus, User, ShieldCheck } from 'lucide-react-native';
+import { UserPlus, User, ShieldCheck, Ambulance } from 'lucide-react-native';
 
 const SignUpSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
@@ -12,14 +12,21 @@ const SignUpSchema = z.object({
   role: z.enum(['public_user', 'ambulance_responder']),
 });
 
+const RoleSchema = z.enum(['public_user', 'ambulance_responder']).optional();
+
 export default function SignUpScreen() {
   const { signUp, fetchStatus } = useSignUp();
   const { loaded: isLoaded } = useClerk();
   const router = useRouter();
+  const params = useLocalSearchParams<{ role: string }>();
+  
+  const roleResult = RoleSchema.safeParse(params.role);
+  const initialRole = roleResult.success ? roleResult.data : 'public_user';
+
   const [fullName, setFullName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
-  const [role, setRole] = React.useState<'public_user' | 'ambulance_responder'>('public_user');
+  const [role, setRole] = React.useState<'public_user' | 'ambulance_responder'>(initialRole as any);
   const [pendingVerification, setPendingVerification] = React.useState(false);
   const [code, setCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -53,7 +60,7 @@ export default function SignUpScreen() {
         return;
       }
 
-      await signUp.verifications.sendEmailCode();
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingVerification(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign up failed';
@@ -68,21 +75,14 @@ export default function SignUpScreen() {
     setLoading(true);
 
     try {
-      const { error: verifyError } = await signUp.verifications.verifyEmailCode({
+      const result = await signUp.attemptEmailAddressVerification({
         code,
       });
 
-      if (verifyError) {
-        setError(verifyError.message);
-        setLoading(false);
-        return;
-      }
-
-      if (signUp.status === 'complete') {
-        await signUp.finalize();
+      if (result.status === 'complete') {
         router.replace('/');
       } else {
-        setError(`Sign up status: ${signUp.status}`);
+        setError(`Sign up status: ${result.status}`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Verification failed';
@@ -92,12 +92,14 @@ export default function SignUpScreen() {
     }
   };
 
+  const isResponder = role === 'ambulance_responder';
+
   if (pendingVerification) {
     return (
       <View className="flex-1 bg-background p-6 justify-center">
         <View className="items-center mb-8">
-          <ShieldCheck color="#1E3A8A" size={60} />
-          <Text className="text-2xl font-bold text-primary mt-4">Verify your email</Text>
+          <ShieldCheck color={isResponder ? '#EF4444' : '#1E3A8A'} size={60} />
+          <Text className={`text-2xl font-bold mt-4 ${isResponder ? 'text-secondary' : 'text-primary'}`}>Verify your email</Text>
           <Text className="text-dark-grey text-center mt-2">
             We've sent a 6-digit code to {email}
           </Text>
@@ -115,7 +117,7 @@ export default function SignUpScreen() {
         <TouchableOpacity
           onPress={onPressVerify}
           disabled={loading}
-          className={`bg-primary mt-6 p-4 rounded-button items-center ${loading ? 'opacity-70' : ''}`}
+          className={`${isResponder ? 'bg-secondary' : 'bg-primary'} mt-6 p-4 rounded-button items-center ${loading ? 'opacity-70' : ''}`}
         >
           {loading ? (
             <ActivityIndicator color="white" />
@@ -131,18 +133,26 @@ export default function SignUpScreen() {
     <ScrollView className="flex-1 bg-background p-6" showsVerticalScrollIndicator={false}>
       <View className="py-10">
         <View className="items-center mb-10">
-          <View className="bg-primary w-16 h-16 rounded-full items-center justify-center mb-4">
-            <UserPlus color="white" size={32} />
+          <View className={`${isResponder ? 'bg-secondary' : 'bg-primary'} w-16 h-16 rounded-full items-center justify-center mb-4`}>
+            {isResponder ? (
+              <Ambulance color="white" size={32} />
+            ) : (
+              <UserPlus color="white" size={32} />
+            )}
           </View>
-          <Text className="text-3xl font-bold text-primary">Create Account</Text>
+          <Text className={`text-3xl font-bold ${isResponder ? 'text-secondary' : 'text-primary'}`}>
+            {isResponder ? 'Responder Registration' : 'Create Account'}
+          </Text>
           <Text className="text-dark-grey text-center mt-2">
-            Join the DisasTRACE emergency network
+            {isResponder 
+              ? 'Join the Baliwag emergency response team.'
+              : 'Join the DisasTRACE emergency network.'}
           </Text>
         </View>
 
         <View className="space-y-4">
           <View>
-            <Text className="text-primary font-bold mb-2 ml-1">Full Name</Text>
+            <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold mb-2 ml-1`}>Full Name</Text>
             <TextInput
               placeholder="John Doe"
               value={fullName}
@@ -152,7 +162,7 @@ export default function SignUpScreen() {
           </View>
 
           <View className="mt-4">
-            <Text className="text-primary font-bold mb-2 ml-1">Email Address</Text>
+            <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold mb-2 ml-1`}>Email Address</Text>
             <TextInput
               placeholder="john@example.com"
               value={email}
@@ -164,7 +174,7 @@ export default function SignUpScreen() {
           </View>
 
           <View className="mt-4">
-            <Text className="text-primary font-bold mb-2 ml-1">Password</Text>
+            <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold mb-2 ml-1`}>Password</Text>
             <TextInput
               placeholder="At least 8 characters"
               value={password}
@@ -176,7 +186,7 @@ export default function SignUpScreen() {
         </View>
 
         <View className="mt-8">
-          <Text className="font-bold mb-4 text-primary ml-1">I am registering as:</Text>
+          <Text className={`font-bold mb-4 ${isResponder ? 'text-secondary' : 'text-primary'} ml-1`}>Registering as:</Text>
           <View className="flex-row gap-4">
             <TouchableOpacity
               onPress={() => setRole('public_user')}
@@ -185,18 +195,18 @@ export default function SignUpScreen() {
               <View className="items-center">
                 <User color={role === 'public_user' ? '#1E3A8A' : '#4B5563'} size={24} />
                 <Text className={`font-bold mt-2 ${role === 'public_user' ? 'text-primary' : 'text-dark-grey'}`}>
-                  Public User
+                  Resident
                 </Text>
               </View>
             </TouchableOpacity>
             
             <TouchableOpacity
               onPress={() => setRole('ambulance_responder')}
-              className={`flex-1 p-4 rounded-card border-2 ${role === 'ambulance_responder' ? 'bg-primary/5 border-primary' : 'bg-surface border-gray-200'}`}
+              className={`flex-1 p-4 rounded-card border-2 ${role === 'ambulance_responder' ? 'bg-secondary/5 border-secondary' : 'bg-surface border-gray-200'}`}
             >
               <View className="items-center">
-                <ShieldCheck color={role === 'ambulance_responder' ? '#1E3A8A' : '#4B5563'} size={24} />
-                <Text className={`font-bold mt-2 ${role === 'ambulance_responder' ? 'text-primary' : 'text-dark-grey'}`}>
+                <Ambulance color={role === 'ambulance_responder' ? '#EF4444' : '#4B5563'} size={24} />
+                <Text className={`font-bold mt-2 ${role === 'ambulance_responder' ? 'text-secondary' : 'text-dark-grey'}`}>
                   Responder
                 </Text>
               </View>
@@ -205,15 +215,15 @@ export default function SignUpScreen() {
         </View>
 
         {error && (
-          <View className="bg-secondary/10 p-3 rounded-lg mt-6 border border-secondary/20">
-            <Text className="text-secondary text-center">{error}</Text>
+          <View className="bg-red-50 p-3 rounded-lg mt-6 border border-red-200">
+            <Text className="text-red-600 text-center">{error}</Text>
           </View>
         )}
 
         <TouchableOpacity
           onPress={onSignUpPress}
           disabled={loading}
-          className={`bg-primary mt-10 p-4 rounded-button items-center shadow-sm ${loading ? 'opacity-70' : ''}`}
+          className={`${isResponder ? 'bg-secondary' : 'bg-primary'} mt-10 p-4 rounded-button items-center shadow-sm ${loading ? 'opacity-70' : ''}`}
         >
           {loading ? (
             <ActivityIndicator color="white" />
@@ -224,9 +234,9 @@ export default function SignUpScreen() {
 
         <View className="flex-row justify-center mt-8 mb-10">
           <Text className="text-dark-grey">Already have an account? </Text>
-          <Link href="/(auth)/sign-in" asChild>
+          <Link href={{ pathname: "/(auth)/sign-in", params: { role } }} asChild>
             <TouchableOpacity>
-              <Text className="text-primary font-bold">Sign In</Text>
+              <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold`}>Sign In</Text>
             </TouchableOpacity>
           </Link>
         </View>

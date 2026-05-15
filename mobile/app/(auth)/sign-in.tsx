@@ -1,19 +1,26 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useSignIn } from '@clerk/expo';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, Link, useLocalSearchParams } from 'expo-router';
 import { z } from 'zod';
-import { LogIn } from 'lucide-react-native';
+import { LogIn, Ambulance, User } from 'lucide-react-native';
 
 const SignInSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
+const RoleSchema = z.enum(['public_user', 'ambulance_responder']).optional();
+
 export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
   const isLoaded = fetchStatus === 'idle';
   const router = useRouter();
+  const params = useLocalSearchParams<{ role: string }>();
+  
+  const roleResult = RoleSchema.safeParse(params.role);
+  const role = roleResult.success ? roleResult.data : 'public_user';
+
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -32,7 +39,7 @@ export default function SignInScreen() {
         return;
       }
 
-      const { error: signInError } = await signIn.create({
+      const { createdSessionId, error: signInError } = await signIn.create({
         identifier: email,
         password,
       });
@@ -43,8 +50,7 @@ export default function SignInScreen() {
         return;
       }
 
-      if (signIn.status === 'complete') {
-        await signIn.finalize();
+      if (createdSessionId) {
         router.replace('/');
       } else {
         setError(`Sign in status: ${signIn.status}`);
@@ -57,21 +63,31 @@ export default function SignInScreen() {
     }
   };
 
+  const isResponder = role === 'ambulance_responder';
+
   return (
     <View className="flex-1 bg-background p-6 justify-center">
       <View className="items-center mb-10">
-        <View className="bg-primary w-20 h-20 rounded-full items-center justify-center mb-4">
-          <LogIn color="white" size={40} />
+        <View className={`${isResponder ? 'bg-secondary' : 'bg-primary'} w-20 h-20 rounded-full items-center justify-center mb-4`}>
+          {isResponder ? (
+            <Ambulance color="white" size={40} />
+          ) : (
+            <User color="white" size={40} />
+          )}
         </View>
-        <Text className="text-4xl font-bold text-primary">DisasTRACE</Text>
-        <Text className="text-dark-grey text-center mt-2">
-          Baliwag Incident Response & Management
+        <Text className={`text-3xl font-bold ${isResponder ? 'text-secondary' : 'text-primary'}`}>
+          {isResponder ? 'Responder Sign In' : 'Resident Sign In'}
+        </Text>
+        <Text className="text-dark-grey text-center mt-2 px-6">
+          {isResponder 
+            ? 'Access the emergency response coordination portal.'
+            : 'Report incidents and receive assistance in Baliwag.'}
         </Text>
       </View>
 
       <View className="space-y-4">
         <View>
-          <Text className="text-primary font-bold mb-2 ml-1">Email Address</Text>
+          <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold mb-2 ml-1`}>Email Address</Text>
           <TextInput
             placeholder="your@email.com"
             value={email}
@@ -83,7 +99,7 @@ export default function SignInScreen() {
         </View>
         
         <View className="mt-4">
-          <Text className="text-primary font-bold mb-2 ml-1">Password</Text>
+          <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold mb-2 ml-1`}>Password</Text>
           <TextInput
             placeholder="••••••••"
             value={password}
@@ -95,15 +111,15 @@ export default function SignInScreen() {
       </View>
 
       {error && (
-        <View className="bg-secondary/10 p-3 rounded-lg mt-4 border border-secondary/20">
-          <Text className="text-secondary text-center">{error}</Text>
+        <View className="bg-red-50 p-3 rounded-lg mt-4 border border-red-200">
+          <Text className="text-red-600 text-center">{error}</Text>
         </View>
       )}
 
       <TouchableOpacity
         onPress={onSignInPress}
         disabled={loading}
-        className={`bg-primary mt-8 p-4 rounded-button flex-row items-center justify-center ${loading ? 'opacity-70' : ''}`}
+        className={`${isResponder ? 'bg-secondary' : 'bg-primary'} mt-8 p-4 rounded-button flex-row items-center justify-center ${loading ? 'opacity-70' : ''}`}
       >
         {loading ? (
           <ActivityIndicator color="white" />
@@ -114,9 +130,9 @@ export default function SignInScreen() {
 
       <View className="flex-row justify-center mt-8">
         <Text className="text-dark-grey">Don't have an account? </Text>
-        <Link href="/(auth)/sign-up" asChild>
+        <Link href={{ pathname: "/(auth)/sign-up", params: { role } }} asChild>
           <TouchableOpacity>
-            <Text className="text-primary font-bold">Sign Up</Text>
+            <Text className={`${isResponder ? 'text-secondary' : 'text-primary'} font-bold`}>Sign Up</Text>
           </TouchableOpacity>
         </Link>
       </View>

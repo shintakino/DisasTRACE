@@ -1,11 +1,22 @@
 import { ClerkProvider, ClerkLoaded } from '@clerk/expo';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { LogBox } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 import tokenCache from '../lib/token-cache';
 import { useAuthStatus } from '../hooks/use-auth-status';
+import { SplashSequence } from '../components/splash-sequence';
 import "../global.css";
+
+// Ignore known React Native third-party warnings
+LogBox.ignoreLogs([
+  '`new NativeEventEmitter()` was called with a non-null argument without the required `addListener` method.',
+  '`new NativeEventEmitter()` was called with a non-null argument without the required `removeListeners` method.',
+]);
+
+// Prevent the native splash screen from auto-hiding.
+SplashScreen.preventAutoHideAsync();
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -17,49 +28,67 @@ function InitialLayout() {
   const { isLoaded, isSignedIn, verificationStatus } = useAuthStatus();
   const segments = useSegments();
   const router = useRouter();
+  const [isAppReady, setIsAppReady] = useState(false);
 
+  console.log('[InitialLayout] Rendered. isLoaded:', isLoaded, 'isSignedIn:', isSignedIn, 'verificationStatus:', verificationStatus);
+
+  // Mark app as ready once Clerk has initialized
   useEffect(() => {
-    if (!isLoaded) return;
+    if (isLoaded) {
+      SplashScreen.hideAsync();
+      setIsAppReady(true);
+    }
+  }, [isLoaded]);
 
-    const inAuthGroup = segments[0] === 'sign-in' || segments[0] === 'sign-up';
-    const inVerificationGroup = segments[0] === 'pending' || segments[0] === 'rejected';
+  // Handle routing ONLY after Clerk is ready
+  useEffect(() => {
+    if (!isAppReady) return;
+
+    // Segment routing evaluation
+    const rawSegments = segments as string[];
+    const inAuthGroup = rawSegments[0] === '(auth)';
+    const inVerificationGroup = rawSegments[0] === '(verification)';
+    const atRoot = rawSegments.length === 0 || (rawSegments.length === 1 && rawSegments[0] === '');
+
+    // Allow the EntryScreen in app/index.tsx to handle the splash sequence
+    // and route the user when the animation finishes.
+    if (atRoot) return;
 
     if (!isSignedIn) {
+      // Not signed in: allow root (for role selection), redirect otherwise
       if (!inAuthGroup) {
         router.replace('/(auth)/sign-in');
       }
     } else {
-      // User is signed in
+      // Signed in: route based on verification status
       if (verificationStatus === 'pending') {
-        if (segments[0] !== 'pending') {
+        if (!inVerificationGroup || rawSegments[1] !== 'pending') {
           router.replace('/(verification)/pending');
         }
       } else if (verificationStatus === 'rejected') {
-        if (segments[0] !== 'rejected') {
+        if (!inVerificationGroup || rawSegments[1] !== 'rejected') {
           router.replace('/(verification)/rejected');
         }
       } else if (verificationStatus === 'unauthorized_platform') {
-        if (segments[0] !== 'unauthorized') {
+        if (!inVerificationGroup || rawSegments[1] !== 'unauthorized') {
           router.replace('/(verification)/unauthorized');
         }
       } else if (verificationStatus === 'approved') {
+        // Only redirect approved users to tabs if they are trapped in auth or verification flows.
         if (inAuthGroup || inVerificationGroup) {
           router.replace('/(tabs)');
         }
       }
     }
-  }, [isSignedIn, isLoaded, verificationStatus, segments]);
+  }, [isSignedIn, isAppReady, verificationStatus, segments]);
 
-  if (!isLoaded) {
-    return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator size="large" color="#1E3A8A" />
-      </View>
-    );
+  if (!isAppReady) {
+    return null;
   }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(verification)" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -68,11 +97,12 @@ function InitialLayout() {
 }
 
 export default function RootLayout() {
+  console.log('[RootLayout] Rendered. Publishable key exists:', !!publishableKey);
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <ClerkLoaded>
-        <InitialLayout />
-        <StatusBar style="auto" />
+         <InitialLayout />
+         <StatusBar style="auto" />
       </ClerkLoaded>
     </ClerkProvider>
   );

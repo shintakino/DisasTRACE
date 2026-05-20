@@ -9,25 +9,18 @@ Perform a comprehensive audit of the project's environment variables and infrast
 Identify and document all required environment variables based on the `architecture-context.md`.
 
 #### 1. Web Application (`.env.local`)
-- **Clerk Authentication**:
-    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: (Exists, but needs verification against mobile)
-    - `CLERK_SECRET_KEY`: (Exists)
-    - `NEXT_PUBLIC_CLERK_SIGN_IN_URL`: (Exists)
-    - `NEXT_PUBLIC_CLERK_SIGN_UP_URL`: (Exists)
+- **Supabase Authentication**:
+    - `NEXT_PUBLIC_SUPABASE_URL`: Required for client-side storage/realtime/auth.
+    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Required for client-side storage/realtime/auth.
+    - `SUPABASE_SERVICE_ROLE_KEY`: Required for backend admin tasks (e.g., seeding, verification bypass).
 - **Database (PostgreSQL)**:
     - `DATABASE_URL`: (Exists - Pooled connection for Supabase)
-- **Supabase (Missing)**:
-    - `NEXT_PUBLIC_SUPABASE_URL`: Required for client-side storage/realtime.
-    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Required for client-side storage/realtime.
-    - `SUPABASE_SERVICE_ROLE_KEY`: Required for backend admin tasks (e.g., seeding, verification bypass).
 - **SMS Gateway (textbee.dev) (Missing)**:
     - `TEXTBEE_API_KEY`: Required for OTP delivery.
     - `TEXTBEE_DEVICE_ID`: Required for OTP delivery via linked Android device.
 
 #### 2. Mobile Application (`mobile/.env`)
-- **Clerk Authentication**:
-    - `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`: **CRITICAL**: Reconcile with web key. Currently mismatched.
-- **Supabase (Placeholders found)**:
+- **Supabase Authentication**:
     - `EXPO_PUBLIC_SUPABASE_URL`: Update with real project URL.
     - `EXPO_PUBLIC_SUPABASE_ANON_KEY`: Update with real anon key.
 - **API Configuration**:
@@ -42,7 +35,8 @@ Install missing core infrastructure dependencies in the root `package.json`.
 - `drizzle-kit`: (devDependency) For migrations and schema management.
 
 #### 2. Supabase Client
-- `@supabase/supabase-js`: Required for Realtime and Storage interactions in the web backend/frontend.
+- `@supabase/supabase-js`: Required for Auth, Realtime, and Storage interactions in the web backend/frontend and mobile app.
+- `@supabase/ssr`: Required for Next.js server-side session management.
 
 ### Infrastructure Configuration (Missing Files)
 - **`drizzle.config.ts`**: Root configuration for Drizzle migrations.
@@ -52,15 +46,14 @@ Install missing core infrastructure dependencies in the root `package.json`.
 
 ## Implementation Steps
 
-1. **Step 1: Dependency Sync**: Install `drizzle-orm`, `postgres`, and `@supabase/supabase-js` in the root project. Add `drizzle-kit` to devDependencies.
+1. **Step 1: Dependency Sync**: Install `drizzle-orm`, `postgres`, `@supabase/supabase-js`, and `@supabase/ssr` in the root project. Add `drizzle-kit` to devDependencies.
 2. **Step 2: Environment Reconciliation**: 
-    - Verify and sync `CLERK_PUBLISHABLE_KEY` between web and mobile.
     - Populate all Supabase and Textbee keys in both `.env.local` and `mobile/.env`.
 3. **Step 3: Database Foundation**:
     - Create `drizzle.config.ts`.
     - Initialize `db/index.ts` and the initial schema in `db/schema/`.
 4. **Step 4: Supabase Foundation**:
-    - Create `lib/supabase.ts` for the web app to interface with Storage and Realtime.
+    - Create `lib/supabase.ts` for the web app to interface with Auth, Storage, and Realtime.
 5. **Step 5: Progress Validation**: Update all API routes (e.g., `app/api/users/route.ts`) to import from `db` instead of using mock data.
 
 ## Design Alignment Checklist

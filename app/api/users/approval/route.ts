@@ -1,68 +1,57 @@
 import { NextResponse } from "next/server";
-import { Applicant } from "@/types/approval";
-
-const mockApplicants: Applicant[] = [
-  {
-    id: "user_1",
-    fullName: "Juan Dela Cruz",
-    email: "juan.dc@example.com",
-    phone: "09123456789",
-    address: "123 Street, Baliwag, Bulacan",
-    roleRequested: "public_user",
-    status: "PENDING",
-    identityDocument: {
-      type: "National ID",
-      imageUrl: "https://placehold.co/600x400/1e3a8a/white?text=National+ID+Juan+Dela+Cruz",
-      uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-    },
-    registeredAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  {
-    id: "user_2",
-    fullName: "Maria Clara",
-    email: "maria.clara@example.com",
-    phone: "09987654321",
-    address: "456 Avenue, Baliwag, Bulacan",
-    roleRequested: "ambulance_responder",
-    status: "PENDING",
-    identityDocument: {
-      type: "Driver's License",
-      imageUrl: "https://placehold.co/600x400/1e3a8a/white?text=Driver+License+Maria+Clara",
-      uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
-    },
-    registeredAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-  },
-  {
-    id: "user_3",
-    fullName: "Jose Rizal",
-    email: "jose.rizal@example.com",
-    phone: "09223334455",
-    address: "789 Blvd, Baliwag, Bulacan",
-    roleRequested: "public_user",
-    status: "PENDING",
-    identityDocument: {
-      type: "Passport",
-      imageUrl: "https://placehold.co/600x400/1e3a8a/white?text=Passport+Jose+Rizal",
-      uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 24 hours ago
-    },
-    registeredAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
-];
+import { createClient } from "@/lib/supabase-server";
+import { db } from "@/db";
+import { users } from "@/db/schema/users";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
-  // In a real app, we would check for pacc_admin or cdrrmo_super_admin role here
-  // const { sessionClaims } = await auth();
-  // if (sessionClaims?.metadata.role !== 'pacc_admin' && sessionClaims?.metadata.role !== 'cdrrmo_super_admin') {
-  //   return new NextResponse("Unauthorized", { status: 403 });
-  // }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  if (user?.app_metadata?.role !== 'cdrrmo_super_admin') {
+    return new NextResponse(JSON.stringify({ error: "Unauthorized" }), { status: 403 });
+  }
+
+  // Fetch pending applicants
+  const pendingUsers = await db
+    .select()
+    .from(users)
+    .where(eq(users.verificationStatus, 'PENDING'));
+
+  // Generate short-lived signed URLs (e.g., 60 seconds expiry)
+  const applicants = await Promise.all(
+    pendingUsers.map(async (u) => {
+      let signedUrl = "";
+      if (u.idImageUrl) {
+        const { data } = await supabase.storage
+          .from('user-ids')
+          .createSignedUrl(u.idImageUrl, 60);
+        signedUrl = data?.signedUrl || "";
+      }
+
+      return {
+        id: u.id,
+        fullName: u.fullName,
+        email: u.email,
+        phone: u.phone,
+        address: u.address,
+        roleRequested: u.role,
+        status: u.verificationStatus,
+        identityDocument: {
+          type: u.idType || "Unknown",
+          imageUrl: signedUrl,
+          uploadedAt: u.createdAt.toISOString(),
+        },
+        registeredAt: u.createdAt.toISOString(),
+      };
+    })
+  );
 
   return NextResponse.json({
-    applicants: mockApplicants,
+    applicants,
     summary: {
-      pending: mockApplicants.length,
-      reviewedToday: 12, // Mocked value
-    },
+      pending: applicants.length,
+      reviewedToday: 0, // In production, query audit/logs table
+    }
   });
 }

@@ -1,7 +1,7 @@
 import { pgTable, text, varchar, timestamp } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
-  id: varchar('id', { length: 255 }).primaryKey(), // Clerk ID
+  id: varchar('id', { length: 255 }).primaryKey(), // Supabase Auth ID (UUID)
   fullName: text('full_name').notNull(),
   email: text('email').notNull().unique(),
   phone: varchar('phone', { length: 20 }),

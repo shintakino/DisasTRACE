@@ -5,7 +5,8 @@ import { useAuthStatus } from '../../hooks/use-auth-status';
 
 export default function TabLayout() {
   const { user } = useAuthStatus();
-  const role = user?.publicMetadata?.role || 'public_user';
+  const role = (user?.app_metadata?.role as string) || 'public_user';
+
 
   return (
     <Tabs screenOptions={{

@@ -1,13 +1,18 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { useAuth, useUser } from '@clerk/expo';
+import { useAuthStatus } from '../../hooks/use-auth-status';
+import { supabase } from '../../lib/supabase';
 import { User, LogOut, ChevronRight, Settings, Shield } from 'lucide-react-native';
 
 export default function ProfileScreen() {
-  const { signOut } = useAuth();
-  const { user } = useUser();
+  const { user } = useAuthStatus();
 
-  const role = user?.publicMetadata?.role?.toString().replace('_', ' ') || 'PUBLIC USER';
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const role = (user?.app_metadata?.role as string)?.replace('_', ' ') || 'PUBLIC USER';
+  const fullName = user?.user_metadata?.full_name || user?.user_metadata?.first_name + " " + user?.user_metadata?.last_name || "User";
 
   return (
     <ScrollView className="flex-1 bg-background" showsVerticalScrollIndicator={false}>
@@ -15,8 +20,8 @@ export default function ProfileScreen() {
         <View className="bg-primary/10 w-24 h-24 rounded-full items-center justify-center mb-4">
           <User color="#1E3A8A" size={48} />
         </View>
-        <Text className="text-2xl font-bold text-primary">{user?.fullName || 'User'}</Text>
-        <Text className="text-dark-grey">{user?.emailAddresses[0].emailAddress}</Text>
+        <Text className="text-2xl font-bold text-primary">{fullName}</Text>
+        <Text className="text-dark-grey">{user?.email}</Text>
         <View className="bg-primary/10 px-4 py-1.5 rounded-full mt-3 flex-row items-center">
           <Shield color="#1E3A8A" size={14} />
           <Text className="text-primary text-xs font-bold uppercase ml-1.5">
@@ -40,7 +45,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            onPress={() => signOut()}
+            onPress={handleSignOut}
             className="bg-surface p-4 rounded-card flex-row items-center justify-between border border-secondary/20 shadow-sm mt-4"
           >
             <View className="flex-row items-center">

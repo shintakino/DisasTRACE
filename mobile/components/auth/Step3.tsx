@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { VerificationSchema, VerificationType } from '../../schemas/auth';
@@ -17,6 +18,7 @@ const ID_TYPES = ["National ID", "Passport", "Driver's License", "UMID", "Postal
 
 export default function Step3({ onNext, onBack }: Props) {
   const { data, updateData } = useSignUpStore();
+  const { role } = useLocalSearchParams<{ role: string }>();
   const [showIdTypeModal, setShowIdTypeModal] = useState(false);
   
   const { control, handleSubmit, formState: { errors }, setValue, watch } = useForm<VerificationType>({
@@ -24,7 +26,7 @@ export default function Step3({ onNext, onBack }: Props) {
     defaultValues: {
       idCardUri: data.idCardUri || '',
       idCardType: data.idCardType || '',
-      role: data.role || 'public_user',
+      role: (role as 'public_user' | 'ambulance_responder') || data.role || 'public_user',
     }
   });
 
@@ -85,30 +87,6 @@ export default function Step3({ onNext, onBack }: Props) {
           <ArrowDown2 color="#4B5563" size={20} />
         </TouchableOpacity>
         {errors.idCardType && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.idCardType.message}</Text>}
-      </View>
-
-      <View>
-        <Text className="text-gray-700 font-bold mb-2 ml-1 mt-2">Identify Your Role *</Text>
-        <Controller control={control} name="role" render={({ field: { onChange, value } }) => (
-          <View className="flex-row gap-4">
-            <TouchableOpacity
-              onPress={() => onChange('public_user')}
-              className={`flex-1 p-4 rounded-xl border-2 items-center justify-center min-h-[60px] ${value === 'public_user' ? 'bg-[#1E3A8A]/10 border-[#1E3A8A]' : 'bg-white border-gray-200'}`}
-            >
-              <Text className={`font-bold ${value === 'public_user' ? 'text-[#1E3A8A]' : 'text-gray-600'}`}>Public User</Text>
-              <Text className={`text-xs ${value === 'public_user' ? 'text-[#1E3A8A]/70' : 'text-gray-400'} text-center mt-1`}>Resident</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              onPress={() => onChange('ambulance_responder')}
-              className={`flex-1 p-4 rounded-xl border-2 items-center justify-center min-h-[60px] ${value === 'ambulance_responder' ? 'bg-[#EF4444]/10 border-[#EF4444]' : 'bg-white border-gray-200'}`}
-            >
-              <Text className={`font-bold ${value === 'ambulance_responder' ? 'text-[#EF4444]' : 'text-gray-600'}`}>Responder</Text>
-              <Text className={`text-xs ${value === 'ambulance_responder' ? 'text-[#EF4444]/70' : 'text-gray-400'} text-center mt-1`}>Ambulance</Text>
-            </TouchableOpacity>
-          </View>
-        )} />
-        {errors.role && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.role.message}</Text>}
       </View>
 
       <View className="flex-row gap-4 mt-6">

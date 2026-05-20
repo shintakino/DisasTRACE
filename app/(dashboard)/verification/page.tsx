@@ -81,7 +81,7 @@ export default function VerificationPage() {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Spinner size="lg" />
+        <Spinner className="size-12 text-[#1E3A8A]" />
       </div>
     )
   }

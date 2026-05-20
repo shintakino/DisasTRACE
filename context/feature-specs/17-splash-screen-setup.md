@@ -1,57 +1,52 @@
 # Feature Spec 17: Splash Screen & Role Selection (Mobile)
 
 ## Overview
-Implement the initial entry sequence for the **DisasTRACE** mobile application. This feature replaces the default template landing page with a high-fidelity, animated splash screen sequence that transitions into a role selection screen. Users are explicitly asked to identify their role (**Resident** or **Responder**) to streamline their respective onboarding and authentication paths.
+Implement the initial entry sequence for the **DisasTRACE** mobile application. This feature replaces the default template landing page with a high-fidelity, animated splash screen sequence that transitions into a role selection screen. The design is a custom, modernized evolution of the original concepts, focusing on professional emergency response aesthetics.
 
-## Current State (Post-Audit)
-- **Framework**: Expo SDK 54.0.33 initialized.
-- **Assets**: 7 splash screen images found in `context/design-image/SplashScreens/`.
-- **Missing Infrastructure**:
-    - **Animation**: `moti` and `framer-motion` are not installed.
-    - **Assets Location**: Images need to be moved to `mobile/assets/images/splash/`.
-    - **Entry Point**: The default `app/_layout.tsx` exists, but the logic for the initial sequence in `app/index.tsx` is missing.
+## Design Concept: "The Pulse of Safety"
+- **Theme**: Minimalist, high-contrast, and "alive" through subtle animations.
+- **Color Palette**:
+    - **Primary Background**: Deep Navy Blue (`#0F172A`) with a subtle radial gradient.
+    - **Accent**: Emergency Red (`#EF4444`) for the medical cross and "TRACE" highlights.
+    - **Neutral**: Pure White (`#FFFFFF`) for primary text and iconography.
+- **Typography**: `Inter` (Sans-serif) for its clean, authoritative look.
 
 ## Requirements
 
 ### Animated Splash Sequence
-- **Visuals**: Use the 6-frame sequence from `mobile/assets/images/splash/`:
-    - `splash_screen-1.png`
-    - `splash_screen-2.png`
-    - `splash_screen-3.png`
-    - `splash_screen-4.png`
-    - `splash_screen-5.png`
-    - `splash_screen6.png` (Note: normalize naming to use hyphens if possible).
+### Animated Splash Sequence
+- **Visuals**: A code-driven animation utilizing the official `DisasTRACELogo.png` along with vector elements to ensure a professional presentation.
+    - **Initial State**: Empty background with a subtle, horizontal "pulse" line (ECG style) starting from the center.
+    - **Phase 1**: The pulse line peaks and fades out.
+    - **Phase 2**: The official `DisasTRACELogo.png` scales up smoothly from the center of the screen.
+    - **Phase 3**: The logo settles into its final position with a soft glow effect.
+    - **Phase 4**: A tagline "Emergency Response Coordination" fades in below the logo in a clean, modern sans-serif font.
 - **Behavior**: 
-    - Smooth cross-fade or slide transitions between frames (approx. 800ms per frame).
-    - Final frame holds for 1s before sliding up to reveal Role Selection.
-- **Technology**: Use `moti` (powered by `react-native-reanimated`) for layout and opacity transitions.
+    - Smooth cross-fade, slide, and scale transitions between states (approx. 600ms per phase).
+    - Final state holds for 1.2s before a "slide up" transition reveals the Role Selection screen.
+- **Technology**: Use `react-native-reanimated` (already bundled with Expo 54) directly for all animated values, springs, and timing transitions. **Do not use `moti` or `framer-motion`** — they cause Metro bundler `tslib` resolution failures. The native launch screen should use the static logo configured in `app.json` to seamlessly bridge into the React Native animation.
 
 ### Role Selection Screen
-- **Core Question**: "Are you a Resident or a Responder?"
+- **Core Question**: "Identify Your Role"
 - **Options**:
-    1. **Resident**: Navigates to `(auth)/sign-in?role=public_user`.
-    2. **Responder**: Navigates to `(auth)/sign-in?role=ambulance_responder`.
+    1. **Resident**: "I need assistance or want to report an incident." (Navigates to `(auth)/sign-in?role=public_user`)
+    2. **Responder**: "I am part of the emergency response team." (Navigates to `(auth)/sign-in?role=ambulance_responder`)
 - **Design**:
-    - Large, white rounded cards (12px radius) with Navy Blue (`#1E3A8A`) icons.
-    - Background: Light Grey (`#F3F4F6`).
-
-### Persistence & Logic
-- **Storage**: Store the selection in `expo-secure-store` or a lightweight `Zustand` store.
-- **Auto-Navigation**:
-    - If Clerk `isSignedIn` is true, bypass this sequence and navigate to the respective home tab.
-    - If `isSignedIn` is false, always show the splash sequence on fresh app launch.
+    - Background: Subtle Navy-to-Grey gradient (`#1E293B` to `#F3F4F6`).
+    - Cards: Large, white rounded cards (16px radius) with soft drop shadows.
+    - Icons: Modern, thin-line icons for "Home/Person" and "Ambulance/Badge".
 
 ## Implementation Steps
 
-1. **Step 1: Assets**: Move and rename images to `mobile/assets/images/splash/`.
-2. **Step 2: Dependencies**: Install `moti` and `framer-motion` (ensuring compatibility with React 19).
-3. **Step 3: Entry Logic**: Create `app/index.tsx` as the root entry point.
-4. **Step 4: Animation**: Build the `SplashScreenSequence` component using `MotiView` for the cross-fade effect.
-5. **Step 5: Selection UI**: Build the `RoleSelection` view with the two primary role cards.
+1. **Step 1: Asset Setup**: Ensure `DisasTRACELogo.png` is placed in `mobile/assets/images/`. Update `app.json` to use a splash screen configuration that matches the background of the logo (or a clean white background, `#FFFFFF`, to match the logo's aesthetic).
+2. **Step 2: Dependencies**: `react-native-reanimated` is already included with Expo 54. No additional animation libraries are needed.
+3. **Step 3: Entry Logic**: Update `mobile/app/index.tsx` to hide the native splash screen once React Native is ready, and immediately trigger the code-driven animation sequence.
+4. **Step 4: Animation Engine**: Build the splash sequence using `react-native-reanimated` shared values, animated styles, and layout animations to orchestrate the phases (Pulse -> Logo Fade/Scale -> Tagline).
+5. **Step 5: Role Selection UI**: Build the selection view with the modernized card design and navigation logic to handle the transition at the end of the sequence.
 
 ## Design Alignment Checklist
-- [ ] Animations are fluid and match the "Welcome to DisasTRACE" vibe.
-- [ ] Role cards are highly legible with clear distinction between Resident and Responder.
-- [ ] Primary buttons use Navy Blue (`#1E3A8A`).
-- [ ] Typography uses `Inter` with appropriate weights for headings.
-- [ ] Safe areas are respected for all screen sizes (Android focus).
+- [ ] Transitions feel "urgent yet calm" (professional timing).
+- [ ] Red accent (`#EF4444`) is used sparingly but effectively for status and branding.
+- [ ] Typography uses `Inter` with weight `700` for "Disas" and `400` for tagline.
+- [ ] Icons are SVG-based for maximum clarity on high-DPI mobile screens.
+- [ ] Safe areas (notch/dynamic island) are accounted for in the slide-up transition.

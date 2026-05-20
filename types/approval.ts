@@ -12,7 +12,7 @@ export const IdentityDocumentSchema = z.object({
 export type IdentityDocument = z.infer<typeof IdentityDocumentSchema>;
 
 export const ApplicantSchema = z.object({
-  id: z.string(), // Clerk ID or DB ID
+  id: z.string(), // Supabase Auth ID (UUID)
   fullName: z.string(),
   email: z.string().email(),
   phone: z.string(),
@@ -23,3 +23,9 @@ export const ApplicantSchema = z.object({
   registeredAt: z.string(), // ISO timestamp
 });
 export type Applicant = z.infer<typeof ApplicantSchema>;
+
+export const VerificationActionSchema = z.object({
+  status: z.enum(["APPROVED", "REJECTED"]),
+  reason: z.string().optional(),
+});
+export type VerificationAction = z.infer<typeof VerificationActionSchema>;

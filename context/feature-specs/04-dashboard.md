@@ -81,7 +81,7 @@ A horizontal scrolling area showing active personnel status.
    - `GET /api/dashboard/responders`: Returns a list of responders who are currently on-duty.
 
 3. **Data Aggregation**:
-   - All endpoints must enforce `cdrrmo_super_admin` role checks via Clerk metadata.
+   - All endpoints must enforce `cdrrmo_super_admin` role checks via Supabase JWT claims.
    - Use Drizzle ORM for all database queries.
    - Return consistent JSON shapes: `{ data, error, message }`.
 

@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { useAuth } from '@clerk/expo';
+import { supabase } from '../../lib/supabase';
 import { Clock, ShieldAlert } from 'lucide-react-native';
 
 export default function PendingVerificationScreen() {
-  const { signOut } = useAuth();
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   return (
     <View className="flex-1 bg-background p-6 items-center justify-center">
@@ -33,7 +35,7 @@ export default function PendingVerificationScreen() {
       </View>
 
       <TouchableOpacity
-        onPress={() => signOut()}
+        onPress={handleSignOut}
         className="mt-12 p-4 w-full border border-primary rounded-button items-center"
       >
         <Text className="text-primary font-bold text-lg">Sign Out</Text>

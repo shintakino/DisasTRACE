@@ -1,16 +1,24 @@
 "use client"
 
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/use-auth";
+import { createClientBrowser } from "@/lib/supabase";
 import { ShieldAlert, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
 
 export default function UnauthorizedPlatformPage() {
-  const { signOut } = useAuth();
-  const { user } = useUser();
+  const { role } = useAuth();
+  const supabase = createClientBrowser();
+  const router = useRouter();
 
-  const role = user?.publicMetadata?.role as string;
-  const roleLabel = role?.replace('_', ' ') || 'User';
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/sign-in");
+    router.refresh();
+  };
+
+  const roleLabel = (role as string)?.replace('_', ' ') || 'User';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F3F4F6] p-4">
@@ -44,7 +52,7 @@ export default function UnauthorizedPlatformPage() {
           </div>
 
           <Button 
-            onClick={() => signOut()} 
+            onClick={handleSignOut} 
             className="w-full bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 h-11 text-lg font-bold"
           >
             Back to Sign In

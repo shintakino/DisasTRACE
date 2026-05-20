@@ -6,7 +6,7 @@
 | ------------------ | ------------------------------------- | ---------------------------------------------------------------------- |
 | Full-Stack Framework | Next.js + TypeScript                | Web dashboard (frontend + backend REST API)                            |
 | Mobile App         | Expo (React Native, Android only)     | Public User and Ambulance Responder mobile client                      |
-| Auth               | Clerk                                 | User identity, role-based access, route protection                     |
+| Auth               | Supabase Auth                         | User identity, role-based access (JWT claims), route protection        |
 | Database           | PostgreSQL (hosted by Supabase)       | Relational data: users, incidents, dispatches, reports, verifications  |
 | ORM                | Drizzle ORM                           | Type-safe database queries and schema management                       |
 | Real-Time Sync     | Supabase Realtime                     | Live dispatch notifications, incident updates, status changes          |
@@ -42,19 +42,23 @@
 
 ### Authentication
 
-- All users authenticate via Clerk (web and mobile).
-- Clerk manages user identity, sessions, and JWT tokens.
-- Role-based access control (RBAC) is enforced via Clerk user metadata:
-  - `public_user` — Public User
-  - `ambulance_responder` — Ambulance Responder
-  - `pacc_admin` — PACC Admin (Dispatcher)
-  - `cdrrmo_super_admin` — CDRRMO Super Admin
+- All users authenticate via Supabase Auth (web and mobile).
+- Supabase manages user identity, sessions, and JWT tokens.
+- Role-based access control (RBAC) is enforced via custom JWT claims:
+  - Roles are stored in the `public.users` table.
+  - A database trigger syncs the `role` to `auth.users` (`raw_app_meta_data`).
+  - Next.js middleware (`proxy.ts`) parses the JWT to enforce route protection.
+  - Roles:
+    - `public_user` — Public User
+    - `ambulance_responder` — Ambulance Responder
+    - `pacc_admin` — PACC Admin (Dispatcher)
+    - `cdrrmo_super_admin` — CDRRMO Super Admin
 
 ### Account Verification Gate
 
 - Mobile users (Public User, Ambulance Responder) must be verified before accessing any app functionality.
 - Verification status is stored in the database (`verification_status`: `pending`, `approved`, `rejected`).
-- Both **PACC Admin** and **CDRRMO Super Admin** can approve or reject pending registrations.
+- Only the **CDRRMO Super Admin** can approve or reject pending registrations. PACC Admins are excluded from registration approvals.
 - The mobile app checks verification status on every session — unverified users see only a pending-approval screen.
 - Rejection includes an optional reason; the user may re-submit.
 - Rejection notification is sent via textbee.dev SMS gateway.

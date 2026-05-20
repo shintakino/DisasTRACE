@@ -81,12 +81,11 @@ A high-density administrative table with bulk action support.
 1. **REST API Endpoints (`app/api/users/`)**:
    - `GET /api/users`: Paginated and filtered list of users (Role: `cdrrmo_super_admin` only).
    - `PATCH /api/users/[id]/status`: Update status with a required `reason` field.
-   - `PATCH /api/users/[id]/role`: Update the user's role in Clerk metadata.
-   - `DELETE /api/users/[id]`: Permanent deletion from both Clerk and the database.
+   - `PATCH /api/users/[id]/role`: Update the user's role in the database (syncs to JWT).
+   - `DELETE /api/users/[id]`: Permanent deletion from both Supabase Auth and the database.
 
-2. **Clerk Integration**:
-   - Use Clerk's Backend SDK to update `publicMetadata` for role changes.
-   - Sync status changes to a local `users` table for faster querying and reporting.
+   2. **Supabase Integration**:
+   - Update user roles in the `public.users` table; a trigger will sync to `auth.users`.   - Sync status changes to a local `users` table for faster querying and reporting.
 
 ## Design Alignment Checklist
 - [ ] Summary cards match the exact icons and color scheme from the design.

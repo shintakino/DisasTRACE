@@ -30,7 +30,7 @@ The PACC Admin Status & Logs page will leverage the existing components built fo
 ## Frontend Implementation
 
 1. **Page Component (`app/(dashboard)/logs/page.tsx`)**:
-   - Detect the current user's role using Clerk's `useUser()` hook or a shared context/utility.
+   - Detect the current user's role using the Supabase JWT claim or a shared context/utility.
    - Pass the role to the `LogsTable` (or a `hideActionColumn` boolean) to ensure the table renders correctly for the PACC Admin.
 
 ## Design Alignment Checklist

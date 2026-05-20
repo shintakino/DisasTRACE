@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/use-auth";
 import { UserRole } from "@/lib/navigation";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { IncidentTrends, IncidentDistribution } from "@/components/dashboard/incident-charts";
@@ -14,8 +14,7 @@ import { AlertCircle } from "lucide-react";
 import { DashboardData, DashboardDataSchema } from "@/types/dashboard";
 
 export default function DashboardPage() {
-  const { user } = useUser();
-  const role = user?.publicMetadata?.role as UserRole;
+  const { role } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,8 +70,10 @@ export default function DashboardPage() {
       }
     }
 
-    fetchDashboardData();
-  }, [period]);
+    if (role) {
+      fetchDashboardData();
+    }
+  }, [period, role]);
 
   if (loading) {
     return (
@@ -102,7 +103,7 @@ export default function DashboardPage() {
         <AlertDescription className="text-base mt-2">
           {error}
           <div className="mt-4 text-sm opacity-80">
-            Please ensure you are logged in with a Super Admin or PACC Admin account and your Clerk Session Token is configured to include public metadata.
+            Please ensure you are logged in with a Super Admin or PACC Admin account and your Supabase JWT is configured to include custom role claims.
           </div>
         </AlertDescription>
       </Alert>
@@ -171,7 +172,7 @@ export default function DashboardPage() {
         <KpiCards data={data.kpis} />
       </div>
       <div className="flex-1 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-3xl">
-        <p className="text-gray-400 font-medium">No layout defined for your role.</p>
+        <p className="text-gray-400 font-medium">No layout defined for your role ({role}).</p>
       </div>
     </div>
   );

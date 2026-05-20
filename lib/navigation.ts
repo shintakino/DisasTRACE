@@ -49,6 +49,11 @@ export const CDRRMO_NAV: NavItem[] = [
     icon: Users,
   },
   {
+    title: "Users Approval",
+    url: "/users/approval",
+    icon: UserPlus,
+  },
+  {
     title: "Responder Roster",
     url: "/roster",
     icon: UserCheck,
@@ -80,11 +85,6 @@ export const PACC_NAV: NavItem[] = [
     title: "Verification",
     url: "/verification",
     icon: ShieldCheck,
-  },
-  {
-    title: "Users Approval",
-    url: "/users/approval",
-    icon: UserPlus,
   },
 ]
 

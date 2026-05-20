@@ -1,12 +1,9 @@
-import { ClerkProvider, ClerkLoaded } from '@clerk/expo';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
-import tokenCache from '../lib/token-cache';
 import { useAuthStatus } from '../hooks/use-auth-status';
-import { SplashSequence } from '../components/splash-sequence';
 import "../global.css";
 
 // Ignore known React Native third-party warnings
@@ -18,12 +15,6 @@ LogBox.ignoreLogs([
 // Prevent the native splash screen from auto-hiding.
 SplashScreen.preventAutoHideAsync();
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
-
-if (!publishableKey) {
-  throw new Error('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY');
-}
-
 function InitialLayout() {
   const { isLoaded, isSignedIn, verificationStatus } = useAuthStatus();
   const segments = useSegments();
@@ -32,7 +23,7 @@ function InitialLayout() {
 
   console.log('[InitialLayout] Rendered. isLoaded:', isLoaded, 'isSignedIn:', isSignedIn, 'verificationStatus:', verificationStatus);
 
-  // Mark app as ready once Clerk has initialized
+  // Mark app as ready once Auth has initialized
   useEffect(() => {
     if (isLoaded) {
       SplashScreen.hideAsync();
@@ -40,7 +31,7 @@ function InitialLayout() {
     }
   }, [isLoaded]);
 
-  // Handle routing ONLY after Clerk is ready
+  // Handle routing ONLY after Auth is ready
   useEffect(() => {
     if (!isAppReady) return;
 
@@ -97,13 +88,10 @@ function InitialLayout() {
 }
 
 export default function RootLayout() {
-  console.log('[RootLayout] Rendered. Publishable key exists:', !!publishableKey);
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ClerkLoaded>
-         <InitialLayout />
-         <StatusBar style="auto" />
-      </ClerkLoaded>
-    </ClerkProvider>
+    <>
+      <InitialLayout />
+      <StatusBar style="auto" />
+    </>
   );
 }

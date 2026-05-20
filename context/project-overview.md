@@ -18,7 +18,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 
 1. User registers with personal details, contact info, and a government-issued ID photo.
 2. Phone number is verified via OTP (textbee.dev).
-3. Account enters "Pending Approval" — user is blocked from all features until a PACC Admin or CDRRMO Super Admin verifies the registration.
+3. Account enters "Pending Approval" — user is blocked from all features until a CDRRMO Super Admin verifies the registration (PACC Admins no longer perform user validations).
 4. Once verified, user can submit emergency or non-emergency incident reports with photos, GPS location, and a structured WH form.
 5. After dispatch, user tracks the assigned ambulance on a live map with ETA.
 6. User receives in-app notifications for report status updates.
@@ -26,7 +26,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 ### Ambulance Responder (Android — Expo)
 
 1. Responder registers with credentials and government ID.
-2. Account is pending until verified by a PACC Admin or CDRRMO Super Admin.
+2. Account is pending until verified by a CDRRMO Super Admin.
 3. Once verified, responder receives dispatch alerts with a countdown timer.
 4. Responder accepts, navigates to the scene via live GPS map, confirms arrival, and logs the outcome.
 5. Responder fills out an incident report form (pre-populated from the public user's submission).
@@ -34,8 +34,8 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 
 ### PACC Admin / CDRRMO Super Admin (Web — Next.js)
 
-1. Admin logs in via Clerk authentication.
-2. Admin reviews and verifies pending user/responder registrations (both PACC Admin and CDRRMO Super Admin can verify).
+1. Admin logs in via Supabase authentication.
+2. CDRRMO Super Admin reviews and verifies pending user/responder registrations (PACC Admin focuses strictly on emergency triage and dispatching, and no longer performs registration approvals).
 3. Admin monitors incoming incident reports, triages emergencies, and dispatches ambulances.
 4. Admin tracks all active incidents and ambulance positions on a real-time map.
 5. CDRRMO Super Admin accesses KPI dashboards, analytics, user management, account banning, and report exports.
@@ -44,11 +44,11 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 
 ### Authentication & Verification
 
-- Clerk-based authentication for all user types.
+- Supabase Auth for all user types.
 - Government ID upload and admin-reviewed verification for mobile users.
 - OTP phone verification via textbee.dev.
 - Verification gate: mobile users are blocked from all features until admin approval.
-- Both PACC Admin and CDRRMO Super Admin can approve/reject registrations.
+- Only CDRRMO Super Admin can approve/reject registrations.
 
 ### Incident Reporting & Dispatch
 
@@ -91,8 +91,8 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 
 - Android mobile app for Public Users and Ambulance Responders (Expo).
 - Next.js web dashboard for PACC Admin and CDRRMO Super Admin.
-- Clerk authentication with role-based access control.
-- Account verification gate for mobile users (PACC Admin + CDRRMO Super Admin can verify).
+- Supabase Auth with role-based access control.
+- Account verification gate for mobile users (only CDRRMO Super Admin can verify).
 - Incident reporting, triaging, and ambulance dispatch.
 - Real-time GPS tracking and mapping (OpenFreeMap + MapLibre).
 - Supabase PostgreSQL database with Drizzle ORM.
@@ -113,10 +113,11 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 ## Success Criteria
 
 1. A public user can register, get verified, and submit an incident report with GPS location.
-2. A PACC Admin or CDRRMO Super Admin can verify pending registrations.
+2. A CDRRMO Super Admin can verify pending registrations.
 3. Unverified mobile users are fully blocked from app functionality.
 4. A dispatcher can triage reports and dispatch the nearest ambulance.
 5. A public user can track a dispatched ambulance in real time with ETA.
 6. A responder can accept a dispatch, navigate, and submit an incident report.
 7. The CDRRMO Super Admin can view KPI dashboards, manage users, and export reports.
 8. All real-time sync works via Supabase Realtime without significant delay.
+nt delay.

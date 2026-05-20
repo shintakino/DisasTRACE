@@ -1,6 +1,6 @@
 "use client"
 
-import { useUser } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/use-auth";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { usePathname } from "next/navigation";
@@ -28,10 +28,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { user } = useUser();
+  const { role } = useAuth();
 
-  const role = user?.publicMetadata?.role as UserRole;
-  const navItems = getNavItems(role);
+  const navItems = getNavItems(role as UserRole);
 
   const getPageTitle = (path: string) => {
     const item = navItems.find((item) => item.url === path);
@@ -62,7 +61,7 @@ export default function DashboardLayout({
               <Bell className="size-7" />
               <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5 rounded-full bg-destructive border-2 border-white" />
             </button>
-            <UserMenu role={role} getRoleLabel={getRoleLabel} />
+            <UserMenu role={role as UserRole} getRoleLabel={getRoleLabel} />
           </div>
         </header>
         <main className="flex-1 overflow-hidden bg-[#F3F4F6] p-6">

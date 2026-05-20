@@ -1,6 +1,6 @@
 "use client";
 
-import { useSignIn } from "@clerk/nextjs";
+import { createClientBrowser } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState } from "react";
@@ -11,12 +11,13 @@ import { toast } from "sonner";
 import { motion } from "motion/react";
 
 export default function SignInPage() {
-  const { signIn, fetchStatus } = useSignIn();
+  const supabase = createClientBrowser();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,9 +27,11 @@ export default function SignInPage() {
       return;
     }
 
+    setIsLoading(true);
+
     try {
-      const { error } = await signIn.password({
-        identifier: email,
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
         password: password,
       });
 
@@ -37,16 +40,16 @@ export default function SignInPage() {
         return;
       }
 
-      if (signIn.status === "complete") {
-        await signIn.finalize({
-          navigate: ({ decorateUrl }) => {
-            router.push(decorateUrl("/dashboard"));
-          },
-        });
+      if (data.user) {
+        toast.success("Welcome back!");
+        router.push("/dashboard");
+        router.refresh();
       }
     } catch (err) {
       console.error("Sign in error:", err);
       toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -198,10 +201,10 @@ export default function SignInPage() {
               <div className="pt-6">
                 <Button
                   type="submit"
-                  disabled={fetchStatus === "fetching"}
+                  disabled={isLoading}
                   className="h-[60px] w-full rounded-xl bg-[#1a2b5a] text-lg font-bold text-white shadow-2xl hover:bg-[#111c3a] active:scale-[0.99] transition-all disabled:opacity-70"
                 >
-                  {fetchStatus === "fetching" ? (
+                  {isLoading ? (
                     <div className="flex items-center gap-3">
                       <Loader2 className="h-6 w-6 animate-spin" />
                       <span>Signing in...</span>

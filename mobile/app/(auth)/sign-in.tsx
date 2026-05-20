@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { useSignIn } from '@clerk/expo';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { supabase } from '../../lib/supabase';
 import { useRouter, Link, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LoginSchema, LoginType } from '../../schemas/auth';
 import { Eye, EyeSlash, ArrowLeft } from 'iconsax-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function SignInScreen() {
-  const { signIn, fetchStatus } = useSignIn();
-  const isLoaded = fetchStatus === 'idle';
   const router = useRouter();
   const { role } = useLocalSearchParams<{ role: string }>();
   const [showPassword, setShowPassword] = useState(false);
@@ -21,34 +20,22 @@ export default function SignInScreen() {
   });
 
   const onSubmit = async (data: LoginType) => {
-    if (!isLoaded || !signIn) return;
     setGlobalError(null);
 
     try {
-      const { error: signInError } = await signIn.password({
-        identifier: data.identifier,
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({
+        email: data.identifier, // Supabase identifier is email for password sign-in by default
         password: data.password,
       });
 
-      if (signInError) {
-        setGlobalError(signInError.message);
+      if (error) {
+        setGlobalError(error.message);
         return;
       }
 
-      if (signIn.status === 'complete') {
-        await signIn.finalize({
-          navigate: ({ decorateUrl }) => {
-            const url = decorateUrl('/');
-            if (url.startsWith('http')) {
-              // Should not happen in Expo normally, but good for safety
-              return;
-            } else {
-              router.replace(url as any);
-            }
-          },
-        });
-      } else {
-        setGlobalError(`Sign in status: ${signIn.status}`);
+      if (signInData.user) {
+        // Auth state change will handle routing in root layout
+        router.replace('/');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign in failed';
@@ -59,9 +46,10 @@ export default function SignInScreen() {
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-[#1E3A8A]"
+      className="flex-1"
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+      <LinearGradient colors={['#0A1332', '#15286A']} className="flex-1">
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View className="flex-1 p-6 justify-center mt-10">
           <TouchableOpacity 
             onPress={() => router.back()}
@@ -72,73 +60,81 @@ export default function SignInScreen() {
           </TouchableOpacity>
 
           <View className="mb-10 items-center">
-            {/* Placeholder for DisasTRACE Logo */}
-            <View className="w-24 h-24 bg-white/20 rounded-2xl items-center justify-center mb-6">
-              <Text className="text-white font-bold text-xl">LOGO</Text>
-            </View>
+            <Image 
+              source={require('../../assets/images/DisasTRACELogo.png')} 
+              className="w-24 h-24 mb-6" 
+              resizeMode="contain"
+            />
             <Text className="text-3xl font-bold text-white mb-2">Log In</Text>
             <Text className="text-white/80 text-center text-base">
               Hi! Welcome back, you've been missed.
             </Text>
           </View>
 
-          <View className="bg-white p-6 rounded-3xl space-y-4">
-            <View className="mb-4">
-              <Text className="text-[#1E3A8A] font-bold mb-2 ml-1">Email / Mobile</Text>
-              <Controller
-                control={control}
-                name="identifier"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <TextInput
-                    className={`bg-gray-50 p-4 rounded-xl border ${errors.identifier ? 'border-red-500' : 'border-gray-200'} text-gray-800 h-14`}
-                    placeholder="Enter your email or mobile"
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                  />
-                )}
-              />
-              {errors.identifier && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.identifier.message}</Text>}
-            </View>
-            
-            <View className="mb-2">
-              <Text className="text-[#1E3A8A] font-bold mb-2 ml-1">Password</Text>
-              <View className="relative justify-center">
+          <View className="bg-white rounded-3xl p-6 mt-4 shadow-sm">
+            <View className="space-y-4">
+              <View>
+                <Text className="text-gray-700 font-bold mb-2 ml-1">Email or Mobile Number</Text>
+                <Controller
+                  control={control}
+                  name="identifier"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      className={`bg-gray-50 p-4 rounded-xl border ${errors.identifier ? 'border-red-500' : 'border-gray-200'} text-gray-800`}
+                      placeholder="Enter email or mobile number"
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                    />
+                  )}
+                />
+                {errors.identifier && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.identifier.message}</Text>}
+              </View>
+
+              <View>
+                <Text className="text-gray-700 font-bold mb-2 ml-1">Password</Text>
                 <Controller
                   control={control}
                   name="password"
                   render={({ field: { onChange, onBlur, value } }) => (
-                    <TextInput
-                      className={`bg-gray-50 p-4 rounded-xl border ${errors.password ? 'border-red-500' : 'border-gray-200'} text-gray-800 h-14 pr-12`}
-                      placeholder="Enter your password"
-                      onBlur={onBlur}
-                      onChangeText={onChange}
-                      value={value}
-                      secureTextEntry={!showPassword}
-                    />
+                    <View className="relative">
+                      <TextInput
+                        className={`bg-gray-50 p-4 rounded-xl border ${errors.password ? 'border-red-500' : 'border-gray-200'} pr-12 text-gray-800`}
+                        placeholder="Enter your password"
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value}
+                        secureTextEntry={!showPassword}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-4"
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        {showPassword ? (
+                          <EyeSlash size={20} color="#9CA3AF" />
+                        ) : (
+                          <Eye size={20} color="#9CA3AF" />
+                        )}
+                      </TouchableOpacity>
+                    </View>
                   )}
                 />
-                <TouchableOpacity 
-                  className="absolute right-2 p-2 h-10 w-10 items-center justify-center"
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  {showPassword ? <Eye color="#4B5563" size={20} /> : <EyeSlash color="#4B5563" size={20} />}
-                </TouchableOpacity>
+                {errors.password && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.password.message}</Text>}
               </View>
-              {errors.password && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.password.message}</Text>}
             </View>
 
-            <View className="items-end mb-6">
-              <TouchableOpacity className="py-2" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Text className="text-[#1E3A8A] font-bold">Forgot password?</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity 
+              className="mt-4 items-end"
+              onPress={() => {/* TODO: Forgot Password */}}
+            >
+              <Text className="text-[#1E3A8A] font-medium">Forgot Password?</Text>
+            </TouchableOpacity>
 
             {globalError && (
-              <View className="bg-red-50 p-3 rounded-lg mb-4 border border-red-200">
+              <View className="bg-red-50 p-3 rounded-lg mb-4 mt-2 border border-red-200">
                 <Text className="text-red-600 text-center">{globalError}</Text>
               </View>
             )}
@@ -146,12 +142,12 @@ export default function SignInScreen() {
             <TouchableOpacity
               onPress={handleSubmit(onSubmit)}
               disabled={isSubmitting}
-              className={`bg-[#1E3A8A] rounded-xl items-center justify-center min-h-[56px] mt-2 ${isSubmitting ? 'opacity-70' : ''}`}
+              className={`mt-8 bg-[#15286A] p-4 rounded-xl items-center justify-center min-h-[56px] ${isSubmitting ? 'opacity-70' : ''}`}
             >
               {isSubmitting ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text className="text-white font-bold text-lg">Login</Text>
+                <Text className="text-white font-bold text-lg">Sign In</Text>
               )}
             </TouchableOpacity>
 
@@ -166,6 +162,7 @@ export default function SignInScreen() {
           </View>
         </View>
       </ScrollView>
+      </LinearGradient>
     </KeyboardAvoidingView>
   );
 }

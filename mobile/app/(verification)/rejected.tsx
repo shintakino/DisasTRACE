@@ -1,12 +1,17 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { useAuth } from '@clerk/expo';
+import { supabase } from '../../lib/supabase';
+import { useAuthStatus } from '../../hooks/use-auth-status';
 import { XCircle, AlertCircle } from 'lucide-react-native';
 
 export default function RejectedVerificationScreen() {
-  const { signOut } = useAuth();
-  // In a real app, we'd fetch the rejection reason from the API
-  const rejectionReason = "Incomplete identity documents. Please ensure the photo is clear and all details are visible.";
+  const { user } = useAuthStatus();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const rejectionReason = user?.app_metadata?.rejection_reason || "Incomplete identity documents. Please ensure the photo is clear and all details are visible.";
 
   return (
     <View className="flex-1 bg-background p-6 items-center justify-center">
@@ -39,7 +44,7 @@ export default function RejectedVerificationScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => signOut()}
+        onPress={handleSignOut}
         className="mt-4 p-4 w-full border border-gray-300 rounded-button items-center"
       >
         <Text className="text-dark-grey font-bold text-lg">Sign Out</Text>

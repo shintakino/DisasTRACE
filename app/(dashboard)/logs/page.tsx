@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { LogsHeader } from "@/components/logs/logs-header"
 import { LogsTable } from "@/components/logs/logs-table"
 import { StatusLogEntry, LogFilter } from "@/types/logs"
@@ -10,9 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 
 export default function LogsPage() {
-  const { user } = useUser()
-  const userRole = user?.publicMetadata?.role as string
-  const isPaccAdmin = userRole === "pacc_admin"
+  const { role } = useAuth()
+  const isPaccAdmin = role === "pacc_admin"
 
   const [logs, setLogs] = React.useState<StatusLogEntry[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -38,8 +37,10 @@ export default function LogsPage() {
   }, [filters])
 
   React.useEffect(() => {
-    fetchLogs()
-  }, [fetchLogs])
+    if (role) {
+      fetchLogs()
+    }
+  }, [fetchLogs, role])
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-50/50 min-h-screen">

@@ -5,7 +5,7 @@ import { Megaphone, Shield, AlertTriangle } from 'lucide-react-native';
 
 export default function HomeScreen() {
   const { user } = useAuthStatus();
-  const role = user?.publicMetadata?.role || 'public_user';
+  const role = (user?.app_metadata?.role as string) || 'public_user';
 
   if (role === 'ambulance_responder') {
     return (

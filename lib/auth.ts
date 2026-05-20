@@ -1,20 +1,22 @@
-import { auth } from "@clerk/nextjs/server";
-import { UserRole } from "@/types/clerk";
+import { createClient } from "./supabase-server";
+import { UserRole } from "@/types/users";
 
 /**
- * Get the current user's role from Clerk metadata.
+ * Get the current user's role from Supabase app_metadata.
  * Defaults to 'public_user' if no role is set.
  */
 export async function getUserRole(): Promise<UserRole> {
-  const { sessionClaims } = await auth();
-  
-  // The role is expected to be mapped from publicMetadata.role to metadata.role in the JWT template
-  const role = sessionClaims?.metadata?.role as UserRole | undefined;
-  
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    return 'public_user';
+  }
+
+  const role = user.app_metadata?.role as UserRole | undefined;
+
   if (!role) {
-    const metadataStr = sessionClaims?.metadata ? JSON.stringify(sessionClaims.metadata) : "none";
-    console.warn(`[Auth Warning] Role missing in JWT. Claims received: ${metadataStr}`);
-    console.info("[Auth Info] To fix: Go to Clerk Dashboard > Sessions > Edit JWT Template and add: { \"metadata\": \"{{user.public_metadata}}\" }");
+    console.warn(`[Auth Warning] Role missing in Supabase user app_metadata for user ${user.id}`);
     return 'public_user';
   }
 

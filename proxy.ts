@@ -1,36 +1,51 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { createClientMiddleware } from "./lib/supabase-middleware";
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-in/mobile"]);
+const PUBLIC_ROUTES = ["/sign-in", "/unauthorized-platform"];
 
-export const proxy = clerkMiddleware(async (auth, req) => {
-  const { userId, sessionClaims } = await auth();
+export async function proxy(request: NextRequest) {
+  const { supabase, response } = createClientMiddleware(request);
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const isPublicRoute = PUBLIC_ROUTES.some(route => 
+    request.nextUrl.pathname.startsWith(route)
+  );
 
   // Redirect unauthenticated users to sign-in if they are not on a public route
-  if (!userId && !isPublicRoute(req)) {
-    return NextResponse.redirect(new URL("/sign-in", req.url));
+  if (!user && !isPublicRoute) {
+    return NextResponse.redirect(new URL("/sign-in", request.url));
   }
 
   // If authenticated, check for platform restrictions
-  if (userId) {
-    const role = sessionClaims?.metadata?.role;
+  if (user) {
+    const role = user.app_metadata?.role;
     const isMobileOnlyRole = role === 'public_user' || role === 'ambulance_responder';
-    const isUnauthorizedPage = req.nextUrl.pathname === "/unauthorized-platform";
+    const isUnauthorizedPage = request.nextUrl.pathname === "/unauthorized-platform";
 
     if (isMobileOnlyRole && !isUnauthorizedPage) {
-      return NextResponse.redirect(new URL("/unauthorized-platform", req.url));
+      return NextResponse.redirect(new URL("/unauthorized-platform", request.url));
     }
 
     if (!isMobileOnlyRole && isUnauthorizedPage) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    // Role-based route protection for User Approval
+    if (request.nextUrl.pathname.startsWith("/users/approval")) {
+      if (role !== "cdrrmo_super_admin") {
+        return NextResponse.redirect(new URL("/unauthorized-platform", request.url));
+      }
     }
 
     // Redirect authenticated users from root or sign-in to dashboard
-    if (req.nextUrl.pathname === "/" || req.nextUrl.pathname.startsWith("/sign-in")) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+    if (request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/sign-in")) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
-});
+
+  return response;
+}
 
 export const config = {
   matcher: [

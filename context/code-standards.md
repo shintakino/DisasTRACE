@@ -22,7 +22,7 @@
 - Add `"use client"` only when the component needs browser interactivity, hooks, or real-time state.
 - Keep route handlers focused on a single responsibility.
 - All API routes live under `app/api/` and follow RESTful conventions.
-- Enforce Clerk auth and role checks in every API route handler before any mutation.
+- Enforce Supabase Auth and role checks in every API route handler before any mutation.
 - Verify account verification status for mobile user requests at the API level.
 
 ## Expo (Android Mobile App)
@@ -60,10 +60,10 @@
 - Web: MapLibre GL JS. Mobile: MapLibre React Native (or equivalent Expo-compatible library).
 - GPS coordinates are captured at the device level and validated before storage.
 
-## Authentication & Authorization (Clerk)
+## Authentication & Authorization (Supabase Auth)
 
-- All routes (API and page) are protected by Clerk middleware.
-- Roles are stored in Clerk user metadata: `public_user`, `ambulance_responder`, `pacc_admin`, `cdrrmo_super_admin`.
+- All routes (API and page) are protected by Supabase session middleware.
+- Roles are synced from `public.users` to `auth.users` JWT claims: `public_user`, `ambulance_responder`, `pacc_admin`, `cdrrmo_super_admin`.
 - Every API mutation checks both authentication (is the user logged in?) and authorization (does their role permit this action?).
 - Account verification status is checked for all mobile-user API requests — unverified users receive a 403.
 
@@ -76,7 +76,7 @@
 ## API Routes
 
 - Validate and parse request input with Zod before any logic runs.
-- Enforce Clerk auth and role-based permission checks before any mutation.
+- Enforce Supabase Auth and role-based permission checks before any mutation.
 - Return consistent, predictable JSON response shapes (`{ data, error, message }`).
 - Keep route handlers thin — push complexity into shared modules in `lib/`.
 - Use appropriate HTTP status codes (200, 201, 400, 401, 403, 404, 500).
@@ -98,3 +98,4 @@
 - `services/` — API client functions that call the Next.js REST API.
 - `stores/` — Local state management (offline drafts, cached data).
 - Name files after the responsibility they contain, not the technology.
+sibility they contain, not the technology.

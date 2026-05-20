@@ -5,10 +5,9 @@ Initialize and configure the **Expo (React Native)** mobile application for Andr
 
 ## Current State (Post-Audit)
 - **Framework**: Expo SDK 54.0.33 initialized in `mobile/`.
-- **Core Dependencies**: `@clerk/expo`, `expo-router`, `expo-secure-store`, `react-native-reanimated` are installed.
+- **Core Dependencies**: `@supabase/supabase-js`, `expo-router`, `expo-secure-store`, `react-native-reanimated` are installed.
 - **Missing Infrastructure**:
     - **NativeWind (Tailwind)**: Not yet configured for Expo SDK 54/React 19.
-    - **Supabase**: `@supabase/supabase-js` is not installed.
     - **Icons**: `lucide-react-native` is missing (preferred over default icons).
     - **Location**: `expo-location` for GPS tracking is missing.
     - **API Client**: `axios` or similar for REST consumption.
@@ -20,11 +19,11 @@ Initialize and configure the **Expo (React Native)** mobile application for Andr
 - **Framework**: Expo (SDK 54.0.0) with **TypeScript** and **Expo Router**.
 - **Platform**: Android only (as per `architecture-context.md`).
 
-### Authentication (Clerk)
-- Integrate `@clerk/expo` for identity management.
-- Configure `SecureStore` for token persistence.
+### Authentication (Supabase Auth)
+- Integrate `@supabase/supabase-js` for identity management.
+- Configure `SecureStore` for session persistence.
 - Implement the sign-in and registration flows (Public User/Responder selection during sign-up).
-- Ensure role-based metadata is accessible to drive navigation logic.
+- Ensure role-based metadata (JWT claims) is accessible to drive navigation logic.
 
 ### Verification Gate (Critical Invariant)
 - Implement a global "Verification Guard" that checks the user's `verification_status` via the REST API.
@@ -61,7 +60,7 @@ Initialize and configure the **Expo (React Native)** mobile application for Andr
 
 2. **API Client**:
    - Centralized service for Next.js REST API calls.
-   - Interceptor to attach Clerk JWT tokens to every request.
+   - Interceptor to attach Supabase JWT tokens to every request.
 
 ## Backend Architecture
 
@@ -91,7 +90,7 @@ Initialize and configure the **Expo (React Native)** mobile application for Andr
 ## Implementation Steps
 
 1. **Phase 1: Foundation Refinement**: Install missing dependencies (NativeWind, Supabase, Lucide, Location) and configure Tailwind.
-2. **Phase 2: Auth & Verification**: Implement Clerk sign-in/up and the Verification Gate logic.
+2. **Phase 2: Auth & Verification**: Implement Supabase sign-in/up and the Verification Gate logic.
 3. **Phase 3: Base Layout**: Create the Bottom Tab navigation and the core "Home" screens for both roles.
 4. **Phase 4: API & Realtime**: Set up the API client and Supabase Realtime listeners.
 5. **Phase 5: Refinement**: Apply styling refinements and ensure Android-specific optimizations (keyboard handling, safe areas).

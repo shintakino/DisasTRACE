@@ -1,6 +1,6 @@
 "use client";
 
-import { useSignIn } from "@clerk/nextjs";
+import { createClientBrowser } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -11,10 +11,11 @@ import { toast } from "sonner";
 import Link from "next/link";
 
 export default function MobileSignInPage() {
-  const { signIn, fetchStatus } = useSignIn();
+  const supabase = createClientBrowser();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,9 +25,11 @@ export default function MobileSignInPage() {
       return;
     }
 
+    setIsLoading(true);
+
     try {
-      const { error } = await signIn.password({
-        identifier: email,
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
         password: password,
       });
 
@@ -35,16 +38,16 @@ export default function MobileSignInPage() {
         return;
       }
 
-      if (signIn.status === "complete") {
-        await signIn.finalize({
-          navigate: ({ decorateUrl }) => {
-            router.push(decorateUrl("/dashboard"));
-          },
-        });
+      if (data.user) {
+        toast.success("Signed in successfully!");
+        router.push("/dashboard");
+        router.refresh();
       }
     } catch (err) {
       console.error("Mobile sign in error:", err);
       toast.error("An unexpected error occurred.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -80,10 +83,10 @@ export default function MobileSignInPage() {
 
           <Button
             type="submit"
-            disabled={fetchStatus === "fetching"}
+            disabled={isLoading}
             className="w-full h-12 rounded-xl"
           >
-            {fetchStatus === "fetching" ? <Loader2 className="animate-spin" /> : "Sign In"}
+            {isLoading ? <Loader2 className="animate-spin" /> : "Sign In"}
           </Button>
         </form>
 

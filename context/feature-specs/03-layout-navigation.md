@@ -49,7 +49,7 @@ Navigation items and branding adapt dynamically based on the user's role:
 - **Sidebar Trigger**: Custom 3-line hamburger menu icon (`Menu`).
 - **Actions**:
     - **Notifications**: Large bell icon (`size-7`) with a red badge.
-    - **User Profile**: Displays user's full name, role (PACC Admin/Super Admin), and a customized Clerk `UserButton` (44px size, navy border).
+    - **User Profile**: Displays user's full name, role (PACC Admin/Super Admin), and a custom user menu (44px size, navy border).
 
 ### Responsive Design
 - Sidebar collapses/hides on mobile, accessible via hamburger menu.
@@ -58,6 +58,6 @@ Navigation items and branding adapt dynamically based on the user's role:
 ## Implementation Details
 
 1. **`lib/navigation.ts`**: Centralized configuration for `CDRRMO_NAV` and `PACC_NAV` with a `getNavItems(role)` helper.
-2. **`components/app-sidebar.tsx`**: Dynamic sidebar using Clerk `useUser()` metadata to switch branding and menu items.
+2. **`components/app-sidebar.tsx`**: Dynamic sidebar using Supabase user metadata (JWT claims) to switch branding and menu items.
 3. **`app/(dashboard)/layout.tsx`**: Client-side layout for dynamic title rendering and header profile management.
 4. **`app/globals.css`**: Custom `bg-mesh-gradient` utility and `mesh-flow` keyframe animation.

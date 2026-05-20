@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { getNavItems, UserRole } from "@/lib/navigation"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { cn } from "@/lib/utils"
 
 import {
@@ -21,9 +21,8 @@ import {
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const { user } = useUser()
-  const role = user?.publicMetadata?.role as UserRole
-  const navItems = getNavItems(role)
+  const { role } = useAuth()
+  const navItems = getNavItems(role as UserRole)
 
   const getRoleLabel = (role: UserRole | string | undefined) => {
     switch (role) {
@@ -63,10 +62,10 @@ export function AppSidebar() {
             </span>
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] font-bold text-white uppercase tracking-[0.2em] leading-none">
-                {getOrgLabel(role)}
+                {getOrgLabel(role || 'public_user')}
               </span>
               <span className="text-[9px] font-medium text-white/60 uppercase tracking-[0.1em] leading-none">
-                {getRoleLabel(role)}
+                {getRoleLabel(role || 'public_user')}
               </span>
             </div>
           </div>
@@ -79,7 +78,15 @@ export function AppSidebar() {
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title} className="w-full flex justify-center group-data-[state=expanded]:justify-start px-4">
                   <SidebarMenuButton
-                    isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
+                    isActive={
+                      pathname === item.url || 
+                      (pathname.startsWith(item.url + "/") && 
+                       !navItems.some(other => 
+                         other.url !== item.url && 
+                         pathname.startsWith(other.url) && 
+                         other.url.length > item.url.length
+                       ))
+                    }
                     tooltip={item.title}
                     className="h-12 w-12 group-data-[state=expanded]:w-full flex items-center justify-center group-data-[state=expanded]:justify-start rounded-xl transition-all"
                     render={(props) => (

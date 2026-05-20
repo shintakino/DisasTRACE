@@ -6,7 +6,7 @@ export const PersonalInfoSchema = z.object({
   middleName: z.string().optional(),
   lastName: z.string().min(2, "Surname is required"),
   suffix: z.string().optional(),
-  gender: z.enum(["Male", "Female"], { required_error: "Gender is required" }),
+  gender: z.enum(["Male", "Female"]),
 });
 export type PersonalInfoType = z.infer<typeof PersonalInfoSchema>;
 
@@ -25,7 +25,7 @@ export type ContactDetailsType = z.infer<typeof ContactDetailsSchema>;
 export const VerificationSchema = z.object({
   idCardUri: z.string().min(1, "Identification card image is required"),
   idCardType: z.string().min(1, "ID type is required"),
-  role: z.enum(["public_user", "ambulance_responder"], { required_error: "Role is required" }),
+  role: z.enum(["public_user", "ambulance_responder"]),
 });
 export type VerificationType = z.infer<typeof VerificationSchema>;
 
@@ -33,7 +33,7 @@ export type VerificationType = z.infer<typeof VerificationSchema>;
 export const PasswordSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
-  termsAccepted: z.literal(true, { errorMap: () => ({ message: "You must accept the terms" }) }),
+  termsAccepted: z.boolean().refine(val => val === true, "You must accept the terms"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],

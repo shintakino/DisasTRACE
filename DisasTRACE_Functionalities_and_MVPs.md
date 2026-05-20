@@ -83,7 +83,7 @@ DisasTRACE is a centralized digital platform that connects public users, ambulan
 
 ### 3. PACC Admin (Dispatcher)
 
-- **Secure Web Login** — Access via Clerk authentication (email, employee ID) through the Next.js web dashboard.
+- **Secure Web Login** — Access via Supabase Auth authentication (email, employee ID) through the Next.js web dashboard.
 - **Automated Incident Triaging** — System automatically classifies incoming reports into emergency vs. non-emergency; non-emergencies are routed to the appropriate barangay office.
 - **Report Verification & Dispatching** — Review incoming emergency reports for authenticity and severity, then dispatch the nearest and most suitable ambulance unit.
 - **Real-Time Incident Map** — Monitor live positions of all dispatched ambulances and active incident locations (OpenFreeMap + MapLibre), filterable by status (new, ongoing, completed, standby).
@@ -98,7 +98,7 @@ DisasTRACE is a centralized digital platform that connects public users, ambulan
 
 ### 4. CDRRMO Super Admin
 
-- **Secure Web Login** — Access via Clerk authentication (email, employee ID).
+- **Secure Web Login** — Access via Supabase Auth authentication (email, employee ID).
 - **Central Dashboard with KPIs** — View key metrics including total incidents today, total responders, total resolved, and average response time; includes an incident summary chart and responder status overview.
 - **Real-Time Incident Map** — Full map view (OpenFreeMap + MapLibre) of all active incidents and ambulance positions with drill-down report details.
 - **Data Analytics & Visualization** — Auto-generated statistical charts (pie charts, graphs) categorizing daily incidents to support data-driven decision-making.
@@ -118,7 +118,7 @@ DisasTRACE is a centralized digital platform that connects public users, ambulan
 - **Usability** — Streamlined, low-cognitive-load interface optimized for high-stress emergency use by both general public and administrators.
 - **Performance / Quality** — Low-latency GPS tracking and data synchronization; real-time map updates without significant delay.
 - **Portability** — Mobile app supports Android 10+ (built with Expo); web dashboard accessible on Windows/MacOS via Chrome, Firefox, Edge, and Opera.
-- **Security** — Encrypted user credentials, government ID data, and sensitive medical reports; role-based access control (RBAC) limits data access by user type. Authentication handled by Clerk.
+- **Security** — Encrypted user credentials, government ID data, and sensitive medical reports; role-based access control (RBAC) limits data access by user type. Authentication handled by Supabase Auth.
 - **Maintainability** — Structured codebase to enable easy updates, modifications, and troubleshooting.
 - **Accessibility** — Available on any internet-connected device; desktop for command operations, mobile for field use.
 
@@ -130,7 +130,7 @@ DisasTRACE is a centralized digital platform that connects public users, ambulan
 |-----------|------------|
 | Full-Stack Framework | Next.js (Frontend + Backend REST API) |
 | Mobile App | Expo (Android only) |
-| Authentication | Clerk |
+| Authentication | Supabase Auth |
 | Database | PostgreSQL (hosted by Supabase) |
 | ORM | Drizzle ORM |
 | Storage (Buckets) | Supabase Storage |
@@ -139,7 +139,7 @@ DisasTRACE is a centralized digital platform that connects public users, ambulan
 | Mobile Verification (OTP) | textbee.dev (open-source SMS gateway) |
 | Notifications | In-App only (no push notifications / no external services) |
 | Architecture | Client-Server, Star Network Topology |
-| Security | Encrypted transmission, RBAC, Clerk-based authentication |
+| Security | Encrypted transmission, RBAC, Supabase Auth-based authentication |
 
 ---
 
@@ -149,7 +149,7 @@ DisasTRACE is a centralized digital platform that connects public users, ambulan
 - **GPS (Device-level)** — Automatic geo-tagging of incident reports and live ambulance positioning.
 - **Supabase Realtime** — Real-time data synchronization and live dispatch notifications via WebSockets.
 - **Supabase Storage** — Cloud storage buckets for government ID uploads, scene photos, and generated reports.
-- **Clerk** — Secure authentication with role-based access control for all user types.
+- **Supabase Auth** — Secure authentication with role-based access control for all user types.
 - **textbee.dev** — Open-source SMS gateway for phone number verification (OTP) during mobile registration.
 - **Government ID Verification** — Photo upload and admin-reviewed ID validation during account registration (verified by PACC Admin or CDRRMO Super Admin).
 
@@ -159,11 +159,11 @@ DisasTRACE is a centralized digital platform that connects public users, ambulan
 
 | Risk | Mitigation |
 |------|------------|
-| Data Breach | Encryption, Supabase RLS policies, Clerk auth, RBAC |
+| Data Breach | Encryption, Supabase RLS policies, Supabase Auth auth, RBAC |
 | Internet Connectivity Issues | Network redundancy; reports queued and retried when connection restores |
 | System Downtime | System monitoring, maintenance schedule, Supabase managed infrastructure |
 | GPS / Location Error | OpenFreeMap + MapLibre with manual location verification fallback |
-| Unauthorized Access | Clerk authentication, user verification, role-based permissions |
+| Unauthorized Access | Supabase Auth authentication, user verification, role-based permissions |
 | Data Loss / Corruption | Regular backups, Supabase managed PostgreSQL with point-in-time recovery |
 | Mobile App Failure | Regular testing, updates, and application maintenance |
 | Unverified User Access | Verification gate blocks all app functionality until admin approval |

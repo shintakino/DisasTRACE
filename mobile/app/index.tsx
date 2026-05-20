@@ -25,9 +25,11 @@ export default function EntryScreen() {
   const logoTranslate = useSharedValue(20);
   const cardTranslate = useSharedValue(120);
   const cardOpacity = useSharedValue(0);
+  const trackingTranslateX = useSharedValue(-width * 1.5);
+  const ambulanceDriveOffX = useSharedValue(0);
 
   useEffect(() => {
-    if (!isLoaded) return; // wait for clerk
+    if (!isLoaded) return; // wait for auth session
 
     async function prepare() {
       // Hide native splash once we start our animation
@@ -50,13 +52,28 @@ export default function EntryScreen() {
 
       logoTranslate.value = withDelay(
         700,
-        withTiming(0, {
+        withTiming(isSignedIn ? 0 : -220, {
           duration: 800,
           easing: Easing.out(Easing.exp),
         })
       );
 
-      // If signed in, we navigate away after the logo animation
+      trackingTranslateX.value = withDelay(
+        1100,
+        withTiming(0, {
+          duration: 1400,
+          easing: Easing.out(Easing.cubic),
+        })
+      );
+
+      ambulanceDriveOffX.value = withDelay(
+        2600,
+        withTiming(width, {
+          duration: 1000,
+          easing: Easing.in(Easing.cubic),
+        })
+      );
+
       if (isSignedIn) {
         setTimeout(() => {
           if (verificationStatus === 'approved') {
@@ -68,7 +85,7 @@ export default function EntryScreen() {
           } else {
             router.replace('/(verification)/unauthorized');
           }
-        }, 2500);
+        }, 3600);
       } else {
         // If not signed in, show the role selection card
         cardTranslate.value = withDelay(
@@ -111,6 +128,14 @@ export default function EntryScreen() {
     transform: [{ translateY: cardTranslate.value }],
   }));
 
+  const trackingStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: trackingTranslateX.value }],
+  }));
+
+  const ambulanceStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: ambulanceDriveOffX.value }],
+  }));
+
   if (!isLoaded) return null;
 
   return (
@@ -122,12 +147,30 @@ export default function EntryScreen() {
         />
       </Animated.View>
 
-      <Animated.View style={logoStyle}>
+      <Animated.View style={[logoStyle, { alignItems: 'center', width }]}>
         <Image
           source={require('../assets/images/DisasTRACELogo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
+        <Animated.View style={[styles.trackingContainer, trackingStyle]}>
+          <View style={{ maxWidth: '100%' }}>
+            <Text 
+              style={styles.tagline}
+              adjustsFontSizeToFit
+              numberOfLines={1}
+            >
+              SECONDS COUNT. LIVES MATTER.
+            </Text>
+            <Animated.View style={[styles.ambulanceWrapper, ambulanceStyle]}>
+              <Image
+                source={require('../assets/images/ambulance.png')}
+                style={{ width: 150, height: 90 }}
+                resizeMode="contain"
+              />
+            </Animated.View>
+          </View>
+        </Animated.View>
       </Animated.View>
 
       {!isSignedIn && (
@@ -192,8 +235,29 @@ const styles = StyleSheet.create({
     borderRadius: width,
   },
   logo: {
-    width: 220,
-    height: 120, // Maintain space roughly but allow contain to scale properly. We can use 220x120 for now.
+    width: 560,
+    height: 380,
+  },
+  tagline: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    letterSpacing: 0.5,
+    textAlign: 'right',
+  },
+  trackingContainer: {
+    position: 'absolute',
+    bottom: 85,
+    width: '100%',
+    paddingRight: 35,
+    alignItems: 'flex-end',
+  },
+  ambulanceWrapper: {
+    position: 'absolute',
+    right: -165,
+    top: -35,
+    zIndex: 10,
   },
   bottomCard: {
     position: 'absolute',

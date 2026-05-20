@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
+import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
@@ -10,37 +10,36 @@ const roleSchema = z.object({
 });
 
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
+  const supabaseClient = await createClient();
+  const { data: { user }, error } = await supabaseClient.auth.getUser();
 
-  const user = await currentUser();
-  if (!user) {
-    return new NextResponse("User not found", { status: 404 });
+  if (error || !user) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
   // Attempt to get additional data from our DB
   let dbUser = null;
   try {
-    const results = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    const results = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
     dbUser = results[0];
-  } catch (error) {
-    console.error("Database error fetching user:", error);
+  } catch (err) {
+    console.error("Database error fetching user:", err);
   }
 
   return NextResponse.json({
     id: user.id,
-    email: user.emailAddresses[0].emailAddress,
-    role: dbUser?.role || user.publicMetadata.role || 'public_user',
-    verification_status: dbUser?.verificationStatus || user.publicMetadata.verification_status || 'approved',
-    rejection_reason: dbUser?.rejectionReason || user.publicMetadata.rejection_reason,
+    email: user.email,
+    role: dbUser?.role || user.app_metadata?.role || 'public_user',
+    verification_status: dbUser?.verificationStatus || 'approved',
+    rejection_reason: dbUser?.rejectionReason,
   });
 }
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabaseClient = await createClient();
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+
+  if (authError || !user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -53,21 +52,19 @@ export async function POST(req: Request) {
     }
 
     const { role } = result.data;
-    const client = await clerkClient();
     
-    await client.users.updateUserMetadata(userId, {
-      publicMetadata: {
+    // Update public.users table. The trigger 'on_user_role_sync' will handle syncing to auth.users JWT.
+    await db.update(users)
+      .set({ 
         role,
-        // New users default to pending for responders, approved for residents (for MVP simplicity)
-        // or whatever the business logic dictates. 
-        // Spec 15 says responders need approval.
-        verification_status: role === 'ambulance_responder' ? 'pending' : 'approved',
-      },
-    });
+        verificationStatus: role === 'ambulance_responder' ? 'PENDING' : 'APPROVED',
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, user.id));
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error updating user metadata:", error);
+  } catch (err) {
+    console.error("Error updating user role:", err);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

@@ -14,7 +14,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 - Project context research.
 - Design system implementation (01-design-system.md).
-- Feature 02: Authentication & RBAC (Web) - Clerk setup, route protection, high-fidelity custom sign-in page, seeded test accounts (Admin, PACC, Responder, User), and temporary mobile testing page.
+- Feature 02: Authentication & RBAC (Web) - Supabase Auth setup, role-based route protection via JWT claims, high-fidelity custom sign-in page, and seeded test accounts (Admin, PACC, Responder, User).
 - Feature 03: Layout & Navigation - Shared dashboard layout and sidebar implemented, mirrored CDRRMO Super Admin design with dark navy sidebar, Baliwag seal, and custom header.
 - Feature 04: Dashboard Page Specification - Defined requirements for KPI cards, charts, and real-time updates based on design image.
 - Feature 04: Dashboard Page implementation - Replicated high-fidelity UI with KPI cards, charts (Trend & Distribution), Recent Reports, and Responder Status. Mirrored the CDRRMO Super Admin design image exactly.
@@ -34,19 +34,16 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 14: Verification (PACC Admin) Implementation - Implemented high-fidelity verification system with queue management, resident profiling, and triage actions. Mirrored the PACC Admin design exactly with strict Zod typing.
 - Feature 15: Users Approval (PACC Admin) Specification - Defined requirements for the manual registration review workflow, including identity document inspection and a master-detail approval queue.
 - Feature 15: Users Approval (PACC Admin) Implementation - Implemented manual registration review workflow with master-detail layout, identity document viewer, and role-based approval/rejection system.
-- Feature 16: Mobile App Setup (Expo) - Initialized Expo project, configured Clerk, NativeWind, Verification Gate, and base navigation.
+- Feature 16: Mobile App Setup (Expo) - Initialized Expo project, configured Supabase Auth, NativeWind, Verification Gate, and base navigation.
 - Feature 17: Splash Screen & Role Selection (Mobile) - Completed.
 - Feature 18: Infrastructure Setup & Environment Audit - Completed.
+- Feature 20: Supabase Auth Migration Specification - Completed.
+- Feature Spec 21: CDRRMO ID Validation & Storage - Completed. Defined secure private storage bucket configuration, RLS policies, reallocated verification workspace strictly to CDRRMO Super Admin, and implemented Next.js and Expo mobile upload/gate integrations.
+- Feature Spec 22: Dashboard Auth & Role Sync Fix - Completed. Fixed database triggers to solve UUID-varchar mismatch and verified successful role sync to Supabase Auth metadata.
 
 ## In Progress
 
 - Feature 05: Map Navigation Implementation.
-- Feature 06: Reports Management Implementation.
-- Feature 07: Responder Roster Implementation.
-- Feature 08: Status & Logs Implementation.
-- Feature 09: User Management Implementation.
-- Feature 10: Audit Logs Implementation.
-- Feature 19: Mobile Auth Flow Implementation.
 
 ## Open Questions
 
@@ -60,8 +57,8 @@ Update this file whenever the current phase, active feature, or implementation s
 ## Session Notes
 
 - Reverted MFA verification flow in the custom sign-in page.
-- Modified `scripts/seed-clerk.ts` to include `skipVerification: true` to Bypass Client Trust for seeded accounts.
-- Decision made to rely on pre-verified seeded accounts for development/testing instead of a custom MFA UI flow.
+- Created `scripts/seed-supabase.ts` to use Supabase Admin SDK for seeding pre-verified accounts.
+- Decision made to rely on pre-verified seeded accounts for development/testing.
 - Corrected Feature 06 status types to 'DRAFT' and 'SUBMITTED' only to align with the responder workflow.
 - Implemented Feature 13 (PACC Admin Status & Logs) by adding role-based column visibility to `LogsTable` and updating `LogsPage` and API security.
 - Fixed hydration mismatch in `DashboardLayout` by refactoring `UserMenu` into a client-side only component using `next/dynamic`.
@@ -71,3 +68,9 @@ Update this file whenever the current phase, active feature, or implementation s
 - Audited `mobile/` directory: Identfied missing NativeWind, Supabase, Lucide, and Location dependencies. Reorganized `app/` structure is required.
 - Modified Feature Spec 17: Splash Screen & Role Selection (Mobile) to include 'The Pulse of Safety' design concept, detailing a new 6-frame animation sequence and modernized role selection UI.
 - Updated `mobile/` infrastructure audit to note that Feature 17 implementation is pending the creation of new assets based on the updated spec.
+- Patched the database trigger function `public.handle_new_user_profile()` to explicitly cast `new.raw_user_meta_data` to `jsonb` (fixing a Postgres type resolution error where `text ->> unknown` operator did not exist). Updated `db/rbac-setup.sql` and successfully executed the `scripts/seed-supabase.ts` seeding script.
+- Resolved UUID-varchar type mismatch in `handle_update_user_role_and_status` trigger by adding explicit casting and regex validation. Successfully synced roles for all test accounts.
+- Resolved EAS Build failures:
+  1. Handled a case-sensitivity mismatch where local terminal casing was `Mobile` (Windows) while Git tracked `mobile` (lowercase). This caused EAS Linux builders to fail. Aligned shell paths and Git track casing.
+  2. Fixed a native build error (`assertWorkletsVersionTask FAILED`) caused by `react-native-reanimated@4.1.1` requiring `react-native-worklets: 0.5.x` instead of the project's installed `0.8.3`. Upgraded `react-native-reanimated` to `4.3.1`, which officially supports `react-native: 0.81.x` and `react-native-worklets: 0.8.x`.
+

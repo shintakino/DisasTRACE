@@ -38,9 +38,10 @@ export default function Step4({ onRegister, onBack, isLoading }: Props) {
         <View className="relative justify-center">
           <Controller control={control} name="password" render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
-              className={`bg-gray-50 p-4 rounded-xl border ${errors.password ? 'border-red-500' : 'border-gray-200'} h-14 pr-12`}
+              className={`bg-gray-50 p-4 rounded-xl border ${errors.password ? 'border-red-500' : 'border-gray-200'} h-14 pr-12 text-gray-800`}
               placeholder="At least 8 characters" onBlur={onBlur} onChangeText={onChange} value={value}
               secureTextEntry={!showPassword}
+              autoCapitalize="none"
             />
           )} />
           <TouchableOpacity 
@@ -59,9 +60,10 @@ export default function Step4({ onRegister, onBack, isLoading }: Props) {
         <View className="relative justify-center">
           <Controller control={control} name="confirmPassword" render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
-              className={`bg-gray-50 p-4 rounded-xl border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-200'} h-14 pr-12`}
+              className={`bg-gray-50 p-4 rounded-xl border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-200'} h-14 pr-12 text-gray-800`}
               placeholder="Re-enter password" onBlur={onBlur} onChangeText={onChange} value={value}
               secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
             />
           )} />
           <TouchableOpacity 

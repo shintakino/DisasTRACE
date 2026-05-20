@@ -24,7 +24,14 @@ export default function Step1({ onNext }: Props) {
   });
 
   const onSubmit = (stepData: PersonalInfoType) => {
-    updateData(stepData);
+    // Zod transform handles uppercase, but we force it here for immediate state update
+    updateData({
+      ...stepData,
+      firstName: stepData.firstName.toUpperCase(),
+      middleName: stepData.middleName?.toUpperCase(),
+      lastName: stepData.lastName.toUpperCase(),
+      suffix: stepData.suffix?.toUpperCase(),
+    });
     onNext();
   };
 
@@ -34,19 +41,25 @@ export default function Step1({ onNext }: Props) {
         <Text className="text-gray-700 font-bold mb-2 ml-1">First Name *</Text>
         <Controller control={control} name="firstName" render={({ field: { onChange, onBlur, value } }) => (
           <TextInput
-            className={`bg-gray-50 p-4 rounded-xl border ${errors.firstName ? 'border-red-500' : 'border-gray-200'} h-14`}
-            placeholder="Juan" onBlur={onBlur} onChangeText={onChange} value={value}
+            className={`bg-gray-50 p-4 rounded-xl border ${errors.firstName ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-800`}
+            placeholder="JUAN" onBlur={onBlur} 
+            onChangeText={(text) => onChange(text.toUpperCase())} 
+            value={value}
+            autoCapitalize="characters"
           />
         )} />
         {errors.firstName && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.firstName.message}</Text>}
       </View>
 
       <View>
-        <Text className="text-gray-700 font-bold mb-2 ml-1">Middle Name</Text>
+        <Text className="text-gray-700 font-bold mb-2 ml-1">Middle Name (Optional)</Text>
         <Controller control={control} name="middleName" render={({ field: { onChange, onBlur, value } }) => (
           <TextInput
-            className="bg-gray-50 p-4 rounded-xl border border-gray-200 h-14"
-            placeholder="Santos" onBlur={onBlur} onChangeText={onChange} value={value}
+            className="bg-gray-50 p-4 rounded-xl border border-gray-200 h-14 text-gray-800"
+            placeholder="SANTOS" onBlur={onBlur} 
+            onChangeText={(text) => onChange(text.toUpperCase())} 
+            value={value}
+            autoCapitalize="characters"
           />
         )} />
       </View>
@@ -55,19 +68,25 @@ export default function Step1({ onNext }: Props) {
         <Text className="text-gray-700 font-bold mb-2 ml-1">Surname *</Text>
         <Controller control={control} name="lastName" render={({ field: { onChange, onBlur, value } }) => (
           <TextInput
-            className={`bg-gray-50 p-4 rounded-xl border ${errors.lastName ? 'border-red-500' : 'border-gray-200'} h-14`}
-            placeholder="Dela Cruz" onBlur={onBlur} onChangeText={onChange} value={value}
+            className={`bg-gray-50 p-4 rounded-xl border ${errors.lastName ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-800`}
+            placeholder="DELA CRUZ" onBlur={onBlur} 
+            onChangeText={(text) => onChange(text.toUpperCase())} 
+            value={value}
+            autoCapitalize="characters"
           />
         )} />
         {errors.lastName && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.lastName.message}</Text>}
       </View>
 
       <View>
-        <Text className="text-gray-700 font-bold mb-2 ml-1">Suffix Name</Text>
+        <Text className="text-gray-700 font-bold mb-2 ml-1">Suffix Name (Optional)</Text>
         <Controller control={control} name="suffix" render={({ field: { onChange, onBlur, value } }) => (
           <TextInput
-            className="bg-gray-50 p-4 rounded-xl border border-gray-200 h-14"
-            placeholder="Jr., Sr., III" onBlur={onBlur} onChangeText={onChange} value={value}
+            className="bg-gray-50 p-4 rounded-xl border border-gray-200 h-14 text-gray-800"
+            placeholder="JR., SR., III" onBlur={onBlur} 
+            onChangeText={(text) => onChange(text.toUpperCase())} 
+            value={value}
+            autoCapitalize="characters"
           />
         )} />
       </View>

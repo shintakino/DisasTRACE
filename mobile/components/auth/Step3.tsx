@@ -37,11 +37,16 @@ export default function Step3({ onNext, onBack }: Props) {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      quality: 0.8, // Compress slightly
+      quality: 0.6, // Significant compression for 5-8MB images
+      allowsMultipleSelection: false,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setValue('idCardUri', result.assets[0].uri, { shouldValidate: true });
+      const asset = result.assets[0];
+      
+      // If image is still too large, we could use expo-image-manipulator here
+      // but 'quality: 0.6' in ImagePicker is usually enough to drop 8MB to < 1MB
+      setValue('idCardUri', asset.uri, { shouldValidate: true });
     }
   };
 

@@ -53,6 +53,7 @@ export function AppSidebar() {
               fill
               className="object-contain"
               priority
+              sizes="64px"
             />
           </div>
           <div className="flex flex-col group-data-[state=collapsed]:hidden">

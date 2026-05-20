@@ -126,7 +126,7 @@ export default function UsersApprovalPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-120px)] bg-white border rounded-xl overflow-hidden shadow-sm">
+    <div className="flex h-[calc(100vh-140px)] bg-white border rounded-xl overflow-hidden shadow-sm">
       {/* Master View: Queue */}
       <div className="w-80 shrink-0">
         <ApprovalQueue

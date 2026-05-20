@@ -67,13 +67,15 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
               <div className="relative aspect-video bg-slate-200 group">
                 {applicant.identityDocument.imageUrl ? (
                   <Dialog>
-                    <DialogTrigger asChild>
+                    <DialogTrigger asChild nativeButton={false}>
                       <div className="w-full h-full relative overflow-hidden cursor-pointer" role="button" tabIndex={0}>
                         <Image
                           src={applicant.identityDocument.imageUrl}
                           alt="Government ID"
                           fill
                           className="object-contain"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 400px"
+                          priority
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                           <div className="bg-white/90 px-4 py-2 rounded-full text-xs font-bold text-slate-900 flex items-center gap-2">
@@ -90,6 +92,7 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
                           alt="Government ID Full"
                           fill
                           className="object-contain"
+                          sizes="(max-width: 1280px) 100vw, 1024px"
                         />
                       </div>
                     </DialogContent>
@@ -104,50 +107,49 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
           </section>
 
           {/* Personal Information & Address */}
-          <section className="grid grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="bg-slate-100 p-1.5 rounded text-slate-600">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Residential Address
-                  </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-slate-100 p-1.5 rounded text-slate-600">
+                  <MapPin className="w-4 h-4" />
                 </div>
-                <p className="text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  {applicant.address}
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  Residential Address
+                </h2>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 min-h-[100px] flex flex-col justify-center">
+                <p className="text-slate-600 leading-relaxed font-medium">
+                  {applicant.address || "No residential address provided."}
                 </p>
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="bg-slate-100 p-1.5 rounded text-slate-600">
-                    <Calendar className="w-4 h-4" />
-                  </div>
-                  <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Registration Timeline
-                  </h2>
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-slate-100 p-1.5 rounded text-slate-600">
+                  <Calendar className="w-4 h-4" />
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">Registered on</span>
-                    <span className="font-bold text-slate-700">
-                      {format(new Date(applicant.registeredAt), "MMM d, yyyy")}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm mt-2 pt-2 border-t border-slate-200/60">
-                    <span className="text-slate-500">Wait time</span>
-                    <span className="font-bold text-[#1E3A8A]">
-                      {format(new Date(applicant.registeredAt), "h:mm a")}
-                    </span>
-                  </div>
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  Registration Timeline
+                </h2>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 font-medium">Application Date</span>
+                  <span className="font-bold text-slate-700">
+                    {format(new Date(applicant.registeredAt), "MMM d, yyyy")}
+                  </span>
+                </div>
+                <div className="h-px bg-slate-200/60 w-full" />
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 font-medium">Submission Time</span>
+                  <span className="font-bold text-[#1E3A8A]">
+                    {format(new Date(applicant.registeredAt), "h:mm a")}
+                  </span>
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
+          </div>
 
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex gap-4 items-start">
             <div className="bg-blue-200 p-1.5 rounded text-blue-700 mt-0.5">

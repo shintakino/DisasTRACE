@@ -73,7 +73,7 @@ export function IncidentPanel({
         />
         <SummaryCard
           label="STANDBY"
-          count={summary.yellow}
+          count={summary.standby}
           className="bg-amber-50 text-amber-700 border-amber-100"
           accent="bg-amber-500"
         />

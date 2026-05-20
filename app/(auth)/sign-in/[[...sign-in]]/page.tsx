@@ -94,6 +94,7 @@ export default function SignInPage() {
               fill
               className="object-contain scale-[2.2]" // Aggressive scale to compensate for asset padding
               priority
+              sizes="(max-width: 640px) 180px, (max-width: 768px) 280px, 350px"
             />
           </motion.div>
           
@@ -108,6 +109,7 @@ export default function SignInPage() {
               alt="X"
               fill
               className="object-contain"
+              sizes="(max-width: 768px) 40px, 56px"
             />
           </motion.div>
 
@@ -123,6 +125,7 @@ export default function SignInPage() {
               fill
               className="object-contain scale-[1.1]"
               priority
+              sizes="(max-width: 640px) 90px, (max-width: 768px) 130px, 180px"
             />
           </motion.div>
         </div>

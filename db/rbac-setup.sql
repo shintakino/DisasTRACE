@@ -40,7 +40,19 @@ begin
   -- We cast to jsonb explicitly for robustness
   user_role := coalesce((new.raw_user_meta_data::jsonb)->>'role', 'public_user');
 
-  insert into public.users (id, full_name, email, role, verification_status, status, created_at, updated_at)
+  insert into public.users (
+    id, 
+    full_name, 
+    email, 
+    role, 
+    verification_status, 
+    status, 
+    phone,
+    address,
+    id_type,
+    created_at, 
+    updated_at
+  )
   values (
     new.id::text,
     coalesce(
@@ -58,6 +70,9 @@ begin
       when user_role in ('public_user', 'ambulance_responder') then 'PENDING'
       else 'ACTIVE'
     end,
+    (new.raw_user_meta_data::jsonb)->>'phone',
+    (new.raw_user_meta_data::jsonb)->>'address',
+    (new.raw_user_meta_data::jsonb)->>'id_type',
     now(),
     now()
   );

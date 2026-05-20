@@ -38,7 +38,7 @@ async function inspectTriggers() {
 
     // 3. Inspect public.users table contents
     const publicUsers = await db.execute(sql`
-      SELECT id, email, role, status, verification_status FROM users;
+      SELECT * FROM users;
     `);
     console.log('\npublic.users contents:', JSON.stringify(publicUsers, null, 2));
 

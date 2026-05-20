@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -16,7 +16,7 @@ export async function PATCH(
     return new NextResponse(JSON.stringify({ error: "Unauthorized" }), { status: 403 });
   }
   
-  const id = params.id;
+  const { id } = await params;
   const body = await request.json();
   
   const result = VerificationActionSchema.safeParse(body);

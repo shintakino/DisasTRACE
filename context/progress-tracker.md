@@ -40,6 +40,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 20: Supabase Auth Migration Specification - Completed.
 - Feature Spec 21: CDRRMO ID Validation & Storage - Completed. Defined secure private storage bucket configuration, RLS policies, reallocated verification workspace strictly to CDRRMO Super Admin, and implemented Next.js and Expo mobile upload/gate integrations.
 - Feature Spec 22: Dashboard Auth & Role Sync Fix - Completed. Fixed database triggers to solve UUID-varchar mismatch and verified successful role sync to Supabase Auth metadata.
+- Feature Spec 23: Mobile Sign-Up Flow Fix - Completed. Downgraded Zod to v3 for compatibility, replaced inline uploads with centralized storage utilities, and normalized verification status handling.
 
 ## In Progress
 

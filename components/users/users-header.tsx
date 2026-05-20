@@ -38,8 +38,8 @@ export function UsersHeader({ onFilterChange, onExport }: UsersHeaderProps) {
     });
   };
 
-  const handleRoleChange = (val: string) => {
-    const newRole = val as UserRole | "all";
+  const handleRoleChange = (val: string | null) => {
+    const newRole = (val || "all") as UserRole | "all";
     setRole(newRole);
     onFilterChange({
       search: search || undefined,
@@ -48,8 +48,8 @@ export function UsersHeader({ onFilterChange, onExport }: UsersHeaderProps) {
     });
   };
 
-  const handleStatusChange = (val: string) => {
-    const newStatus = val as UserStatus | "all";
+  const handleStatusChange = (val: string | null) => {
+    const newStatus = (val || "all") as UserStatus | "all";
     setStatus(newStatus);
     onFilterChange({
       search: search || undefined,

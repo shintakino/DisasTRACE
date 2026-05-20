@@ -68,7 +68,7 @@ export function ManageUserDialog({ user, isOpen, onClose, onUpdate }: ManageUser
         <div className="grid gap-6 py-4">
           <div className="grid gap-2">
             <Label htmlFor="role" className="text-xs font-black text-slate-400 uppercase tracking-widest">System Role</Label>
-            <Select value={role} onValueChange={(val) => setRole(val as UserRole)}>
+            <Select value={role} onValueChange={(val) => val && setRole(val as UserRole)}>
               <SelectTrigger id="role" className="h-11 font-bold text-slate-700">
                 <SelectValue placeholder="Select Role" />
               </SelectTrigger>
@@ -83,7 +83,7 @@ export function ManageUserDialog({ user, isOpen, onClose, onUpdate }: ManageUser
 
           <div className="grid gap-2">
             <Label htmlFor="status" className="text-xs font-black text-slate-400 uppercase tracking-widest">Account Status</Label>
-            <Select value={status} onValueChange={(val) => setStatus(val as UserStatus)}>
+            <Select value={status} onValueChange={(val) => val && setStatus(val as UserStatus)}>
               <SelectTrigger id="status" className="h-11 font-bold text-slate-700">
                 <SelectValue placeholder="Select Status" />
               </SelectTrigger>

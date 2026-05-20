@@ -54,7 +54,7 @@ export function RosterFilter({ onFilterChange }: RosterFilterProps) {
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-[#64748B]">Department</label>
-              <Select value={department} onValueChange={setDepartment}>
+              <Select value={department} onValueChange={(val) => setDepartment(val || "all")}>
                 <SelectTrigger className="h-11 bg-[#F8FAFC] border-none rounded-xl text-sm font-semibold">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
@@ -68,7 +68,7 @@ export function RosterFilter({ onFilterChange }: RosterFilterProps) {
 
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-[#64748B]">Status</label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select value={status} onValueChange={(val) => setStatus(val || "all")}>
                 <SelectTrigger className="h-11 bg-[#F8FAFC] border-none rounded-xl text-sm font-semibold">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
@@ -100,7 +100,6 @@ export function RosterFilter({ onFilterChange }: RosterFilterProps) {
                     mode="single"
                     selected={date}
                     onSelect={setDate}
-                    initialFocus
                     className="rounded-2xl"
                   />
                 </PopoverContent>

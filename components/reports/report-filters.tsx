@@ -46,8 +46,7 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
       search: search || undefined,
       type: type === "all" ? undefined : type,
       status: status === "all" ? undefined : status,
-      dateFrom,
-      dateTo,
+      dateRange: (dateFrom || dateTo) ? { from: dateFrom, to: dateTo } : undefined,
     });
   };
 
@@ -74,7 +73,7 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
         </label>
         <Select
           value={type}
-          onValueChange={(val) => setType(val as IncidentType | "all")}
+          onValueChange={(val) => setType((val || "all") as IncidentType | "all")}
         >
           <SelectTrigger className="h-10">
             <SelectValue placeholder="All Types" />
@@ -84,7 +83,7 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
             <SelectItem value="Vehicular Collision">Vehicular Collision</SelectItem>
             <SelectItem value="Medical Emergency">Medical Emergency</SelectItem>
             <SelectItem value="Structural Failure">Structural Failure</SelectItem>
-            <SelectItem value="Fire/Explosion">Fire/Explosion</SelectItem>
+            <SelectItem value="Fire Emergency">Fire Emergency</SelectItem>
             <SelectItem value="Flood/Water">Flood/Water</SelectItem>
             <SelectItem value="Unknown Cause">Unknown Cause</SelectItem>
           </SelectContent>
@@ -97,17 +96,15 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
         </label>
         <Select
           value={status}
-          onValueChange={(val) => setStatus(val as ReportStatus | "all")}
+          onValueChange={(val) => setStatus((val || "all") as ReportStatus | "all")}
         >
           <SelectTrigger className="h-10">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="NEW">New</SelectItem>
-            <SelectItem value="ONGOING">Ongoing</SelectItem>
-            <SelectItem value="COMPLETED">Completed</SelectItem>
-            <SelectItem value="STANDBY">Standby</SelectItem>
+            <SelectItem value="DRAFT">Draft</SelectItem>
+            <SelectItem value="SUBMITTED">Submitted</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -133,7 +130,6 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
                 mode="single"
                 selected={dateFrom}
                 onSelect={setDateFrom}
-                initialFocus
               />
             </PopoverContent>
           </Popover>
@@ -158,7 +154,6 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
                 mode="single"
                 selected={dateTo}
                 onSelect={setDateTo}
-                initialFocus
               />
             </PopoverContent>
           </Popover>

@@ -35,8 +35,8 @@ export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
     });
   };
 
-  const handleStatusChange = (val: string) => {
-    const newStatus = val as LogStatus | "all";
+  const handleStatusChange = (val: string | null) => {
+    const newStatus = (val || "all") as LogStatus | "all";
     setStatus(newStatus);
     onFilterChange({
       search: search || undefined,

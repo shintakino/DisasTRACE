@@ -125,7 +125,7 @@ export default function DashboardPage() {
           <IncidentDistribution 
             data={data.distribution} 
             period={period}
-            onPeriodChange={setPeriod}
+            onPeriodChange={(val) => setPeriod(val || "monthly")}
           />
         </div>
 
@@ -153,7 +153,7 @@ export default function DashboardPage() {
             <IncidentDistribution 
               data={data.distribution} 
               period={period}
-              onPeriodChange={setPeriod}
+              onPeriodChange={(val) => setPeriod(val || "monthly")}
             />
           </div>
         </div>

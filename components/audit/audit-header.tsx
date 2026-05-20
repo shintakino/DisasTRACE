@@ -35,11 +35,12 @@ export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
     });
   };
 
-  const handleRoleChange = (val: string) => {
-    setRole(val);
+  const handleRoleChange = (val: string | null) => {
+    const value = val || "all";
+    setRole(value);
     onFilterChange({
       search: search || undefined,
-      userId: val === "all" ? undefined : val,
+      userId: value === "all" ? undefined : value,
     });
   };
 

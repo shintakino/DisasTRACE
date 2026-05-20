@@ -72,7 +72,7 @@ export function IncidentTrends({ data }: { data: IncidentTrend[] }) {
               content={
                 <ChartTooltipContent 
                   formatter={(value, name, item, index, payload) => {
-                    const total = Object.keys(chartConfig).reduce((acc, key) => acc + (payload[key] || 0), 0)
+                    const total = Object.keys(chartConfig).reduce((acc, key) => acc + ((payload as any)[key] || 0), 0)
                     const percentage = total > 0 ? ((value as number / total) * 100).toFixed(1) : "0.0"
                     return (
                       <div className="flex flex-1 justify-between items-center gap-2 min-w-[140px]">
@@ -148,7 +148,7 @@ export function IncidentDistribution({
 }: { 
   data: IncidentDistributionType[], 
   period?: string,
-  onPeriodChange?: (value: string) => void
+  onPeriodChange?: (value: string | null) => void
 }) {
   return (
     <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
@@ -197,12 +197,12 @@ export function IncidentDistribution({
                 outerRadius="100%"
                 stroke="none"
                 labelLine={false}
-                label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                label={({ cx, cy, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 }) => {
                   const RADIAN = Math.PI / 180;
                   // Position labels slightly further out (70%) for the larger chart
-                  const radius = innerRadius + (outerRadius - innerRadius) * 0.7;
-                  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                  const radius = (innerRadius as number) + ((outerRadius as number) - (innerRadius as number)) * 0.7;
+                  const x = (cx as number) + radius * Math.cos(-midAngle * RADIAN);
+                  const y = (cy as number) + radius * Math.sin(-midAngle * RADIAN);
 
                   if (percent < 0.04) return null;
 

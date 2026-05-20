@@ -38,8 +38,8 @@ export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) 
     });
   };
 
-  const handleTypeChange = (val: string) => {
-    const newType = val as IncidentType | "all";
+  const handleTypeChange = (val: string | null) => {
+    const newType = (val || "all") as IncidentType | "all";
     setType(newType);
     onFilterChange({
       search: search || undefined,
@@ -48,8 +48,8 @@ export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) 
     });
   };
 
-  const handleStatusChange = (val: string) => {
-    const newStatus = val as ReportStatus | "all";
+  const handleStatusChange = (val: string | null) => {
+    const newStatus = (val || "all") as ReportStatus | "all";
     setStatus(newStatus);
     onFilterChange({
       search: search || undefined,

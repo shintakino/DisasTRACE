@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
-
-const MOBILE_API_URL = process.env.EXPO_PUBLIC_MOBILE_API_URL;
 
 const VerificationStatusSchema = z.enum(['pending', 'approved', 'rejected']);
 type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
@@ -23,20 +20,17 @@ export function useAuthStatus() {
     }
 
     try {
-      const token = currentSession.access_token;
-      // Ensure we don't have double /api if the env var already includes it
-      const baseUrl = MOBILE_API_URL?.endsWith('/api') 
-        ? MOBILE_API_URL.slice(0, -4) 
-        : MOBILE_API_URL;
+      // Direct Supabase query is more robust than a separate API call for mobile
+      const { data: dbUser, error: dbError } = await supabase
+        .from('users')
+        .select('role, verification_status')
+        .eq('id', currentUser.id)
+        .single();
 
-      const response = await axios.get(`${baseUrl}/api/users/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      if (dbError) throw dbError;
       
-      const role = response.data.role;
-      const status = response.data.verification_status;
+      const role = dbUser.role;
+      const status = dbUser.verification_status;
 
       // Platform Restriction: Deny Web Admins on Mobile
       if (role === 'cdrrmo_super_admin' || role === 'pacc_admin') {
@@ -46,17 +40,20 @@ export function useAuthStatus() {
 
       setVerificationStatus(VerificationStatusSchema.parse(status.toLowerCase()));
     } catch (error) {
-      console.error('Error checking verification status:', error);
+      console.error('Error checking verification status via Supabase:', error);
       
-      // Fallback to JWT metadata if API fails
+      // Secondary fallback to JWT metadata if direct query fails
       const role = currentUser.app_metadata?.role;
       if (role === 'cdrrmo_super_admin' || role === 'pacc_admin') {
         setVerificationStatus('unauthorized_platform');
         return;
       }
 
-      const metaStatus = currentUser.app_metadata?.verification_status as VerificationStatus | undefined;
-      setVerificationStatus(metaStatus || 'pending');
+      const metaStatus = currentUser.app_metadata?.verification_status;
+      const normalizedStatus = typeof metaStatus === 'string'
+        ? metaStatus.toLowerCase() as VerificationStatus
+        : undefined;
+      setVerificationStatus(normalizedStatus || 'pending');
     }
   };
 

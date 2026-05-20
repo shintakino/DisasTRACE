@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { decode } from "base64-arraybuffer";
 import { supabase } from "./supabase";
 
@@ -11,20 +11,19 @@ import { supabase } from "./supabase";
  */
 export async function uploadGovernmentID(userId: string, imageUri: string): Promise<string> {
   try {
-    const fileInfo = await FileSystem.getInfoAsync(imageUri);
-    if (!fileInfo.exists) {
+    const file = new File(imageUri);
+    
+    if (!file.exists) {
       throw new Error("Image file does not exist.");
     }
 
     // Limit check: 25MB
-    if (fileInfo.size > 25 * 1024 * 1024) {
+    if (file.size > 25 * 1024 * 1024) {
       throw new Error("ID photo exceeds 25MB limit.");
     }
 
     // Convert local file to base64 and decode to ArrayBuffer
-    const base64 = await FileSystem.readAsStringAsync(imageUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    const base64 = await file.base64();
     const arrayBuffer = decode(base64);
 
     const filePath = `ids/${userId}/id-card.png`;

@@ -1,67 +1,57 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Map, Bell, User, ClipboardList } from 'lucide-react-native';
+import { Home, Map, User, ClipboardList } from 'lucide-react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 
 export default function TabLayout() {
   const { user } = useAuthStatus();
   const role = (user?.app_metadata?.role as string) || 'public_user';
 
-
   return (
     <Tabs screenOptions={{
-      tabBarActiveTintColor: '#1E3A8A',
-      tabBarInactiveTintColor: '#9CA3AF',
+      tabBarActiveTintColor: '#FFFFFF',
+      tabBarInactiveTintColor: '#94A3B8',
       tabBarStyle: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#020617', // Deep navy blue (blue-950)
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-        height: 60,
-        paddingBottom: 10,
-        paddingTop: 5,
+        borderTopColor: '#1E293B', // border-blue-900
+        height: 80,
+        paddingBottom: 25,
+        paddingTop: 10,
+        elevation: 0,
+        shadowOpacity: 0,
       },
-      headerShown: true,
-      headerStyle: {
-        backgroundColor: '#1E3A8A',
+      tabBarLabelStyle: {
+        fontSize: 10,
+        fontWeight: '500',
+        marginTop: 4,
       },
-      headerTintColor: '#FFFFFF',
-      headerTitleStyle: {
-        fontWeight: 'bold',
-      },
+      headerShown: false, // Dashboard handles its own header
     }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: role === 'ambulance_responder' ? 'Responder' : 'Home',
+          title: 'Home',
           tabBarIcon: ({ color }) => <Home size={24} color={color} />,
         }}
       />
       
       <Tabs.Screen
+        name="reports"
+        options={{
+          title: 'Reports',
+          tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
         name="map"
         options={{
           title: 'Map',
           tabBarIcon: ({ color }) => <Map size={24} color={color} />,
-          href: role === 'ambulance_responder' ? null : '/(tabs)/map',
         }}
       />
 
-      <Tabs.Screen
-        name="logs"
-        options={{
-          title: 'Logs',
-          tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} />,
-          href: role === 'ambulance_responder' ? '/(tabs)/logs' : null,
-        }}
-      />
-
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          title: 'Alerts',
-          tabBarIcon: ({ color }) => <Bell size={24} color={color} />,
-        }}
-      />
       <Tabs.Screen
         name="profile"
         options={{

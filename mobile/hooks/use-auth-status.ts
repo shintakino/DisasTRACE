@@ -11,6 +11,7 @@ export function useAuthStatus() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | 'loading' | 'unauthorized_platform'>('loading');
+  const [profile, setProfile] = useState<{ fullName: string; address: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const checkVerification = async (currentUser: User, currentSession: Session) => {
@@ -23,7 +24,7 @@ export function useAuthStatus() {
       // Direct Supabase query is more robust than a separate API call for mobile
       const { data: dbUser, error: dbError } = await supabase
         .from('users')
-        .select('role, verification_status')
+        .select('role, verification_status, full_name, address')
         .eq('id', currentUser.id)
         .single();
 
@@ -39,6 +40,10 @@ export function useAuthStatus() {
       }
 
       setVerificationStatus(VerificationStatusSchema.parse(status.toLowerCase()));
+      setProfile({
+        fullName: dbUser.full_name,
+        address: dbUser.address || '',
+      });
     } catch (error) {
       console.error('Error checking verification status via Supabase:', error);
       
@@ -86,6 +91,53 @@ export function useAuthStatus() {
     };
   }, []);
 
+  // Real-time status synchronizer
+  useEffect(() => {
+    if (!user) return;
+
+    // Use a unique channel name per hook instance to avoid collisions
+    // when multiple components use useAuthStatus()
+    const instanceId = Math.random().toString(36).substring(7);
+    const channel = supabase
+      .channel(`status_sync_${user.id}_${instanceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Real-time profile update received:', payload.new);
+          const newStatus = payload.new.verification_status;
+          const newRole = payload.new.role;
+
+          // Platform Restriction: Deny Web Admins on Mobile
+          if (newRole === 'cdrrmo_super_admin' || newRole === 'pacc_admin') {
+            setVerificationStatus('unauthorized_platform');
+            return;
+          }
+
+          if (newStatus) {
+            setVerificationStatus(VerificationStatusSchema.parse(newStatus.toLowerCase()));
+          }
+          
+          if (payload.new.full_name || payload.new.address) {
+            setProfile({
+              fullName: payload.new.full_name,
+              address: payload.new.address || '',
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   // Update isLoaded once verification check completes
   useEffect(() => {
     if (user && verificationStatus !== 'loading') {
@@ -97,6 +149,7 @@ export function useAuthStatus() {
     isSignedIn: !!user,
     isLoaded,
     verificationStatus,
+    profile,
     user,
     refreshStatus: async () => {
       if (user && session) {

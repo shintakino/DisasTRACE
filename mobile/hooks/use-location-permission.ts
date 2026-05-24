@@ -42,6 +42,31 @@ export function useLocationPermission() {
     }
   }, []);
 
+  const requestPermissions = useCallback(async () => {
+    try {
+      // 1. Request foreground permissions first
+      const { status: fgStatus, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+      setStatus(fgStatus);
+
+      if (fgStatus !== 'granted') {
+        return { success: false, canAskAgain };
+      }
+
+      // 2. If foreground is granted, request background
+      const { status: bgStatus, canAskAgain: bgCanAskAgain } = await Location.requestBackgroundPermissionsAsync();
+      
+      if (bgStatus === 'granted') {
+        setIsLocationGateActive(false);
+        return { success: true, canAskAgain: true };
+      }
+
+      return { success: false, canAskAgain: bgCanAskAgain };
+    } catch (error) {
+      console.error('Error requesting location permissions:', error);
+      return { success: false, canAskAgain: true };
+    }
+  }, []);
+
   useEffect(() => {
     checkPermissions();
 
@@ -62,5 +87,6 @@ export function useLocationPermission() {
     status,
     servicesEnabled,
     checkPermissions,
+    requestPermissions,
   };
 }

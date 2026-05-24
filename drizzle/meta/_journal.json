@@ -1,0 +1,13 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1779617948617,
+      "tag": "0000_abnormal_caretaker",
+      "breakpoints": true
+    }
+  ]
+}

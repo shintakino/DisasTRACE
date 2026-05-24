@@ -7,10 +7,12 @@ import { LocationPermissionDrawer } from '../../components/dashboard/LocationPer
 import { HelpButton } from '../../components/dashboard/HelpButton';
 import { MapPin, HelpCircle, Bell, Shield, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { user, profile } = useAuthStatus();
-  const { isLocationGateActive } = useLocationPermission();
+  const { isLocationGateActive, requestPermissions } = useLocationPermission();
   
   const role = (user?.app_metadata?.role as string) || 'public_user';
 
@@ -98,7 +100,7 @@ export default function HomeScreen() {
         </Text>
 
         <View className="flex-1 items-center pt-2">
-          <HelpButton onPress={() => console.log('Emergency Reported')} />
+          <HelpButton onPress={() => router.push('/help/camera')} />
           
           <View className="mt-14 px-4">
             <Text className="text-slate-500 text-center text-sm leading-relaxed">
@@ -138,7 +140,10 @@ export default function HomeScreen() {
       </View>
 
       {/* Location Gate Overlay */}
-      <LocationPermissionDrawer isVisible={isLocationGateActive} />
+      <LocationPermissionDrawer 
+        isVisible={isLocationGateActive} 
+        onRequestPermission={requestPermissions}
+      />
     </View>
   );
 }

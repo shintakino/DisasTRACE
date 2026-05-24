@@ -42,6 +42,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature Spec 22: Dashboard Auth & Role Sync Fix - Completed. Fixed database triggers to solve UUID-varchar mismatch and verified successful role sync to Supabase Auth metadata.
 - Feature Spec 23: Mobile Sign-Up Flow Fix - Completed. Downgraded Zod to v3 for compatibility, replaced inline uploads with centralized storage utilities, and normalized verification status handling.
 - Feature Spec 24: Resident-Side Dashboard Implementation - Completed. High-fidelity UI with pulsing animation, location permission gate, and real-time profile syncing.
+- Feature 25: Resident Help Flow & Incident Reporting Implementation - Completed. Implemented 4-phase incident reporting UI (Camera, Review, Holding, Tracking, Resolution) with state management, PostGIS distance queries, Drizzle migrations, and API endpoints.
+- Feature 26: Resident Reports UI & Navigation - Completed. Implemented high-fidelity "My Reports" and "Incident Detail" screens replicating exact designs, with dynamic active-state tab navigation using Iconsax variants.
 
 ## In Progress
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Map, User, ClipboardList } from 'lucide-react-native';
+import { Home2, FolderOpen, Map, User } from 'iconsax-react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 
 export default function TabLayout() {
@@ -32,7 +32,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Home size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Home2 size={24} color={color} variant={focused ? 'Bold' : 'Linear'} />,
         }}
       />
       
@@ -40,7 +40,7 @@ export default function TabLayout() {
         name="reports"
         options={{
           title: 'Reports',
-          tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => <FolderOpen size={24} color={color} variant={focused ? 'Bold' : 'Linear'} />,
         }}
       />
 
@@ -48,7 +48,7 @@ export default function TabLayout() {
         name="map"
         options={{
           title: 'Map',
-          tabBarIcon: ({ color }) => <Map size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Map size={24} color={color} variant={focused ? 'Bold' : 'Linear'} />,
         }}
       />
 
@@ -56,7 +56,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => <User size={24} color={color} variant={focused ? 'Bold' : 'Linear'} />,
         }}
       />
     </Tabs>

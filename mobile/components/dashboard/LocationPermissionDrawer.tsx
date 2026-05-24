@@ -4,11 +4,21 @@ import { MapPin, ChevronRight, Check } from 'lucide-react-native';
 
 interface LocationPermissionDrawerProps {
   isVisible: boolean;
+  onRequestPermission?: () => Promise<{ success: boolean; canAskAgain: boolean }>;
 }
 
-export function LocationPermissionDrawer({ isVisible }: LocationPermissionDrawerProps) {
-  const handleOpenSettings = () => {
-    Linking.openSettings();
+export function LocationPermissionDrawer({ isVisible, onRequestPermission }: LocationPermissionDrawerProps) {
+  const [canAskAgain, setCanAskAgain] = React.useState(true);
+
+  const handleAction = async () => {
+    if (onRequestPermission && canAskAgain) {
+      const result = await onRequestPermission();
+      if (!result.success && !result.canAskAgain) {
+        setCanAskAgain(false);
+      }
+    } else {
+      Linking.openSettings();
+    }
   };
 
   return (
@@ -57,10 +67,12 @@ export function LocationPermissionDrawer({ isVisible }: LocationPermissionDrawer
 
           <View className="flex-1 justify-end pb-8">
             <TouchableOpacity 
-              onPress={handleOpenSettings}
+              onPress={handleAction}
               className="bg-blue-900 rounded-2xl p-5 w-full items-center active:bg-blue-800 shadow-xl shadow-blue-900/30"
             >
-              <Text className="text-white font-black text-lg">Go to Settings</Text>
+              <Text className="text-white font-black text-lg">
+                {canAskAgain ? "Allow Location Access" : "Go to Settings"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -56,8 +56,8 @@ export default function SignUpScreen() {
       // 1. Create user in Supabase Auth
       // Role and names are passed in user_metadata for the trigger to pick up
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: currentData.email,
-        password: currentData.password,
+        email: currentData.email || '',
+        password: currentData.password || '',
         options: {
           data: {
             first_name: currentData.firstName,

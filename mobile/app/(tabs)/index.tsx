@@ -59,7 +59,11 @@ export default function HomeScreen() {
             <TouchableOpacity className="p-2" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <HelpCircle size={24} color="white" />
             </TouchableOpacity>
-            <TouchableOpacity className="p-2" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity 
+              className="p-2" 
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={() => router.push('/notifications')}
+            >
               <Bell size={24} color="white" />
             </TouchableOpacity>
           </View>

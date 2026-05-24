@@ -8,6 +8,7 @@ import { HelpButton } from '../../components/dashboard/HelpButton';
 import { MapPin, HelpCircle, Bell, Shield, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { ResponderHome } from '../../components/responder/ResponderHome';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -29,15 +30,7 @@ export default function HomeScreen() {
   const initials = profile?.fullName ? getInitials(profile.fullName) : '??';
 
   if (role === 'ambulance_responder') {
-    return (
-      <View className="flex-1 bg-white p-6 justify-center items-center">
-        <Shield size={64} color="#1E3A8A" />
-        <Text className="text-2xl font-bold text-[#1E3A8A] mt-4">Responder Dashboard</Text>
-        <Text className="text-slate-500 text-center mt-2">
-          Your specialized dashboard is under construction.
-        </Text>
-      </View>
-    );
+    return <ResponderHome />;
   }
 
   return (

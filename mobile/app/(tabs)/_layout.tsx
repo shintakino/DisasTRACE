@@ -1,11 +1,13 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home2, FolderOpen, Map, User } from 'iconsax-react-native';
+import { Home2, FolderOpen, Map, User, CalendarAdd } from 'iconsax-react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 
 export default function TabLayout() {
   const { user } = useAuthStatus();
   const role = (user?.app_metadata?.role as string) || 'public_user';
+
+  const isResponder = role === 'ambulance_responder';
 
   return (
     <Tabs screenOptions={{
@@ -48,7 +50,17 @@ export default function TabLayout() {
         name="map"
         options={{
           title: 'Map',
+          href: isResponder ? null : '/(tabs)/map',
           tabBarIcon: ({ color, focused }) => <Map size={24} color={color} variant={focused ? 'Bold' : 'Linear'} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="forms"
+        options={{
+          title: 'Forms',
+          href: isResponder ? '/(tabs)/forms' : null,
+          tabBarIcon: ({ color, focused }) => <CalendarAdd size={24} color={color} variant={focused ? 'Bold' : 'Linear'} />,
         }}
       />
 

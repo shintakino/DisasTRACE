@@ -16,15 +16,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { UserRole, UserStatus, UserFilter } from "@/types/users";
 import { cn } from "@/lib/utils";
 
 interface UsersHeaderProps {
   onFilterChange: (filters: UserFilter) => void;
   onExport: () => void;
+  onCreateAccount?: (role: UserRole) => void;
 }
 
-export function UsersHeader({ onFilterChange, onExport }: UsersHeaderProps) {
+export function UsersHeader({ onFilterChange, onExport, onCreateAccount }: UsersHeaderProps) {
   const [search, setSearch] = React.useState("");
   const [role, setRole] = React.useState<UserRole | "all">("all");
   const [status, setStatus] = React.useState<UserStatus | "all">("all");
@@ -122,6 +129,24 @@ export function UsersHeader({ onFilterChange, onExport }: UsersHeaderProps) {
           <FileDown className="h-4 w-4" />
           EXPORT PDF
         </Button>
+        
+        {onCreateAccount && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm border border-blue-500">
+                CREATE ACCOUNT
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => onCreateAccount("cdrrmo_super_admin")} className="font-medium cursor-pointer">
+                CDRRMO Admin
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onCreateAccount("pacc_admin")} className="font-medium cursor-pointer">
+                PACC Admin
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );

@@ -2,28 +2,14 @@
 
 import * as React from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { DetailedIncidentReport } from "@/types/reports";
-import {
-  Clock,
-  MapPin,
-  User,
-  FileText,
-  Camera,
-  History,
-  Users,
-  AlertCircle,
-  Shield,
-  Activity,
-} from "lucide-react";
+import { Truck, MoreVertical, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ReportDetailSheetProps {
@@ -39,6 +25,8 @@ export function ReportDetailSheet({
 }: ReportDetailSheetProps) {
   const [report, setReport] = React.useState<DetailedIncidentReport | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<"incident" | "resident">("resident");
+  const [expandedImage, setExpandedImage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (reportId && isOpen) {
@@ -59,188 +47,226 @@ export function ReportDetailSheet({
   }, [reportId, isOpen]);
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-xl p-0 flex flex-col h-full overflow-hidden border-l-0 shadow-2xl">
-        <SheetHeader className="p-8 bg-[#1E3A8A] text-white shrink-0">
-          <div className="flex items-center justify-between mb-4">
-            <Badge variant="outline" className="text-blue-100 border-blue-400/50 font-mono tracking-wider">
-              {report?.id || "LOADING..."}
-            </Badge>
-            {report && (
-              <Badge
-                className={cn(
-                  "font-black text-[10px] tracking-widest px-3 py-1 border-none shadow-sm",
-                  report.status === "SUBMITTED" ? "bg-green-500 text-white" :
-                  report.status === "DRAFT" ? "bg-yellow-500 text-white" :
-                  "bg-slate-400 text-white"
-                )}
-              >
-                {report.status}
-              </Badge>
-            )}
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent showCloseButton={false} className="sm:max-w-md p-0 overflow-hidden bg-white border-none shadow-2xl rounded-[32px] gap-0 h-[85vh] flex flex-col">
+        {/* Hidden title for screen readers to avoid DialogTitle warning */}
+        <DialogTitle className="sr-only">Report Details</DialogTitle>
+        
+        {loading ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1E3A8A] mb-4"></div>
+            <span className="font-bold uppercase tracking-widest text-[10px]">Loading...</span>
           </div>
-          <SheetTitle className="text-3xl font-black text-white leading-tight uppercase tracking-tight">
-            {report?.type || "Incident Report"}
-          </SheetTitle>
-          <SheetDescription className="text-blue-200 flex items-center gap-2 font-medium mt-2">
-            <Clock className="h-4 w-4" />
-            {report ? `${report.date} • ${report.time}` : "Gathering information..."}
-          </SheetDescription>
-        </SheetHeader>
-
-        <ScrollArea className="flex-1 min-h-0 bg-slate-50">
-          {loading ? (
-            <div className="p-12 flex flex-col items-center justify-center text-slate-400">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1E3A8A] mb-4"></div>
-              <span className="font-bold uppercase tracking-widest text-[10px]">Accessing Database...</span>
-            </div>
-          ) : report ? (
-            <div className="p-8 space-y-10 pb-20">
-              {/* Metadata Cards */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-4 rounded-xl border shadow-sm space-y-1">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <User className="h-3 w-3" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">Responder</p>
+        ) : report ? (
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="p-6 flex flex-col items-center">
+              {/* Header: Responders and Close Button */}
+              <div className="w-full flex justify-between items-start mb-6">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-[#1A237E] text-white flex items-center justify-center font-bold text-sm">
+                      RB
+                    </div>
+                    <div>
+                      <p className="font-bold text-[#1A237E] text-sm leading-tight">Renzy Bastes</p>
+                      <p className="text-[#1A237E]/70 text-[10px] font-bold uppercase tracking-wider">Responder</p>
+                    </div>
                   </div>
-                  <p className="text-sm font-bold text-slate-800">{report.responderName}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-[#1A237E] text-white flex items-center justify-center font-bold text-sm">
+                      CG
+                    </div>
+                    <div>
+                      <p className="font-bold text-[#1A237E] text-sm leading-tight">Christopher Guanzing</p>
+                      <p className="text-[#1A237E]/70 text-[10px] font-bold uppercase tracking-wider">Responder</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl border shadow-sm space-y-1">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Shield className="h-3 w-3" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">Vehicle ID</p>
-                  </div>
-                  <p className="text-sm font-bold text-slate-800">{report.vehicleId}</p>
+                <button 
+                  onClick={onClose}
+                  className="h-8 w-8 rounded-full bg-[#E8EAF6] flex items-center justify-center text-[#1A237E] hover:bg-[#C5CAE9] transition-colors shrink-0"
+                >
+                  <X className="h-4 w-4 stroke-[3]" />
+                </button>
+              </div>
+
+              {/* Vehicle Icon */}
+              <div className="relative mb-3">
+                <div className="h-20 w-20 rounded-full bg-[#E8EAF6] flex items-center justify-center relative overflow-hidden">
+                   {/* Decorative circle shapes inside to mimic the design */}
+                   <div className="absolute top-[20%] -left-[10%] w-10 h-10 rounded-full bg-slate-300/40 mix-blend-multiply" />
+                   <div className="absolute bottom-[10%] -right-[10%] w-12 h-12 rounded-full bg-slate-300/40 mix-blend-multiply" />
+                   <Truck className="h-10 w-10 text-[#1A237E] relative z-10 fill-[#1A237E]" />
                 </div>
               </div>
 
-              {/* Location */}
-              <section className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <MapPin className="h-4 w-4 text-[#1E3A8A]" />
-                  </div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Incident Location</h3>
-                </div>
-                <div className="bg-white p-5 rounded-xl border shadow-sm flex items-center gap-4">
-                  <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                  <p className="text-sm font-bold text-slate-700 leading-tight">{report.location}</p>
-                </div>
-              </section>
+              {/* ID and Vehicle Name */}
+              <h2 className="text-[#1A237E] text-[22px] font-black tracking-tight mb-1">{report.id}</h2>
+              <p className="text-[#1A237E]/80 font-bold text-[10px] mb-8 tracking-wider">{report.vehicleId}</p>
 
-              {/* Photos */}
-              {report.scenePhotos.length > 0 && (
-                <section className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <Camera className="h-4 w-4 text-[#1E3A8A]" />
-                    </div>
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Scene Photos</h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {report.scenePhotos.map((photo, i) => (
-                      <div key={i} className="group relative aspect-video rounded-xl overflow-hidden border-2 border-white shadow-md bg-slate-200">
-                        <img
-                          src={photo}
-                          alt={`Scene photo ${i + 1}`}
-                          className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500"
-                        />
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
+              {/* Tabs */}
+              <div className="flex items-center gap-1 mb-8 text-[11px] font-black w-full max-w-[320px] mx-auto uppercase tracking-wide">
+                <button
+                  onClick={() => setActiveTab("incident")}
+                  className={cn(
+                    "flex-1 py-2.5 px-2 text-center rounded-full transition-colors",
+                    activeTab === "incident" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Incident Information
+                </button>
+                <button
+                  onClick={() => setActiveTab("resident")}
+                  className={cn(
+                    "flex-1 py-2.5 px-2 text-center rounded-full transition-colors",
+                    activeTab === "resident" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  From Resident
+                </button>
+              </div>
+
+              {/* Tab Content */}
+              {activeTab === "resident" && (
+                <div className="w-full space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                  {/* Resident's Report */}
+                  <div>
+                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Resident's Report</h3>
+                    <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
+                      <div className="space-y-4 mb-4">
+                        <div className="flex justify-between items-center text-[13px]">
+                          <span className="text-slate-500 font-medium">Nature of Call</span>
+                          <span className="font-bold text-[#1A237E]">{report.natureOfCall || "Emergency"}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[13px]">
+                          <span className="text-slate-500 font-medium">Type of Emergency</span>
+                          <span className="font-bold text-[#1A237E]">{report.type}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[13px]">
+                          <span className="text-slate-500 font-medium">Severity Level</span>
+                          <span className="font-bold text-[#1A237E]">{report.severityLevel || "Critical"}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[13px]">
+                          <span className="text-slate-500 font-medium">People Involved</span>
+                          <span className="font-bold text-[#1A237E]">{report.peopleInvolved || 3}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[13px] pt-1">
+                          <span className="text-slate-500 font-medium self-start">Location</span>
+                          <span className="font-bold text-[#1A237E] text-right max-w-[65%] leading-tight">{report.location}</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </section>
-              )}
 
-              {/* Logs */}
-              <section className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <History className="h-4 w-4 text-[#1E3A8A]" />
-                  </div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Response Timeline</h3>
-                </div>
-                <div className="space-y-0 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-200">
-                  {report.logs.map((log, i) => (
-                    <div key={i} className="flex gap-6 relative py-3">
-                      <div className={cn(
-                        "h-10 w-10 rounded-full bg-white border-2 flex items-center justify-center shrink-0 z-10 shadow-sm",
-                        i === 0 ? "border-blue-500" : "border-slate-200"
-                      )}>
-                        <div className={cn(
-                          "h-2.5 w-2.5 rounded-full",
-                          i === 0 ? "bg-blue-500" : "bg-slate-300"
-                        )} />
-                      </div>
-                      <div className="flex flex-col gap-1 pt-1">
-                        <p className={cn(
-                          "text-sm font-black uppercase tracking-tight",
-                          i === 0 ? "text-blue-600" : "text-slate-700"
-                        )}>{log.action}</p>
-                        <p className="text-[10px] font-bold text-slate-400 tracking-widest">{log.time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* Narrative */}
-              <section className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <FileText className="h-4 w-4 text-[#1E3A8A]" />
-                  </div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Responder Narrative</h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl border shadow-sm italic text-slate-600 text-sm leading-relaxed border-l-4 border-l-[#1E3A8A]">
-                  "{report.description || "No narrative findings submitted for this incident."}"
-                </div>
-              </section>
-
-              {/* Participants */}
-              {report.participants && report.participants.length > 0 && (
-                <section className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <Users className="h-4 w-4 text-[#1E3A8A]" />
-                    </div>
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Involved Parties</h3>
-                  </div>
-                  <div className="grid gap-3">
-                    {report.participants.map((person, i) => (
-                      <div key={i} className="p-4 rounded-xl border bg-white shadow-sm flex items-center justify-between group hover:border-[#1E3A8A]/30 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 rounded-full bg-slate-50 flex items-center justify-center border group-hover:bg-blue-50 transition-colors">
-                            <User className="h-5 w-5 text-slate-400 group-hover:text-[#1E3A8A]" />
+                      {/* Photo attached */}
+                      {report.scenePhotos && report.scenePhotos.length > 0 && (
+                        <button 
+                          type="button"
+                          onClick={() => setExpandedImage(report.scenePhotos[0])}
+                          className="relative rounded-[20px] overflow-hidden h-[140px] w-full mt-5 bg-slate-100 group block text-left"
+                        >
+                          <img 
+                            src={report.scenePhotos[0]} 
+                            alt="Scene photo" 
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-12 pb-3 px-4 flex justify-between items-end">
+                            <span className="text-white text-xs font-medium tracking-wide">IMG_7904.jpg</span>
+                            <div className="text-white bg-white/20 p-1 rounded-full group-hover:bg-white/30 transition-colors">
+                              <MoreVertical className="h-4 w-4" />
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{person.name}</p>
-                            <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">{person.contact}</p>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Crew's Actual Findings */}
+                  {report.status !== "RESPONDING" && (
+                    <div className="animate-in slide-in-from-top-4 fade-in duration-300">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-[#1A237E]/60 font-black text-[11px] uppercase tracking-wider">
+                          Crew's Actual Findings
+                        </h3>
+                        {report.status === "ONGOING" && (
+                          <Badge className="bg-[#E8EAF6] text-[#1A237E] font-black text-[10px] uppercase tracking-widest shadow-none border-none px-2 py-0.5">
+                            Draft
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <h4 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Nature of Call</h4>
+                      <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center text-[13px]">
+                            <span className="text-slate-500 font-medium">Nature of Call</span>
+                            <span className="font-bold text-[#1A237E]">{report.natureOfCall || "Emergency"}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[13px]">
+                            <span className="text-slate-500 font-medium">Type of Emergency</span>
+                            <span className="font-bold text-[#1A237E]">{report.type}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[13px]">
+                            <span className="text-slate-500 font-medium">Severity Level</span>
+                            <span className="font-bold text-[#1A237E]">{report.severityLevel || "Critical"}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[13px]">
+                            <span className="text-slate-500 font-medium">People Involved</span>
+                            <span className="font-bold text-[#1A237E]">{report.peopleInvolved || 3}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[13px] pt-1">
+                            <span className="text-slate-500 font-medium self-start">Location</span>
+                            <span className="font-bold text-[#1A237E] text-right max-w-[65%] leading-tight">{report.location}</span>
                           </div>
                         </div>
-                        <Badge
-                          className={cn(
-                            "text-[10px] font-black tracking-widest px-3 py-1 shadow-none",
-                            person.triageStatus === "Red" && "bg-red-500 text-white",
-                            person.triageStatus === "Yellow" && "bg-yellow-500 text-white",
-                            person.triageStatus === "Green" && "bg-green-500 text-white"
-                          )}
-                        >
-                          {person.triageStatus.toUpperCase()}
-                        </Badge>
                       </div>
-                    ))}
+                    </div>
+                  )}
+
+                  {/* Scroll Up indicator */}
+                  <div className="text-center pt-8 pb-4 opacity-50 hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer">
+                      Scroll Up
+                    </span>
                   </div>
-                </section>
+                </div>
+              )}
+
+              {activeTab === "incident" && (
+                <div className="w-full text-center text-sm text-slate-500 py-10 animate-in fade-in zoom-in-95 duration-200">
+                  <p className="font-medium text-[#1A237E]">Incident Information content goes here</p>
+                </div>
               )}
             </div>
-          ) : (
-            <div className="p-12 text-center text-slate-400">
-              Select an incident to view details.
-            </div>
-          )}
-        </ScrollArea>
-      </SheetContent>
-    </Sheet>
+          </ScrollArea>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-slate-400">
+            No report selected.
+          </div>
+        )}
+      </DialogContent>
+
+      {/* Expanded Image Overlay */}
+      {expandedImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-200 cursor-zoom-out backdrop-blur-sm"
+          onClick={() => setExpandedImage(null)}
+        >
+          <div className="absolute top-6 right-6">
+            <button 
+              type="button"
+              onClick={() => setExpandedImage(null)}
+              className="p-2.5 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <img 
+            src={expandedImage} 
+            alt="Expanded view" 
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-xl shadow-2xl animate-in zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()} 
+          />
+        </div>
+      )}
+    </Dialog>
   );
 }

@@ -24,7 +24,6 @@ import { cn } from "@/lib/utils";
 
 interface LogsTableProps {
   data: StatusLogEntry[];
-  hideActionColumn?: boolean;
 }
 
 const StatusBadge = ({ status }: { status: LogStatus }) => {
@@ -42,25 +41,7 @@ const StatusBadge = ({ status }: { status: LogStatus }) => {
   );
 };
 
-const ActionBadge = ({ action }: { action: LogAction }) => {
-  if (action === "NONE") return <span className="text-slate-300">—</span>;
-
-  const styles: Record<Exclude<LogAction, "NONE">, string> = {
-    DISPATCHED: "bg-blue-500 text-white border-transparent",
-    COMPLETED: "bg-green-500 text-white border-transparent",
-    ARRIVED: "bg-amber-500 text-white border-transparent",
-    STARTED: "bg-emerald-500 text-white border-transparent",
-    ENDED: "bg-slate-500 text-white border-transparent",
-  };
-
-  return (
-    <Badge className={cn("px-2 py-0.5 font-black text-[9px] tracking-widest", styles[action])}>
-      {action}
-    </Badge>
-  );
-};
-
-export function LogsTable({ data, hideActionColumn = false }: LogsTableProps) {
+export function LogsTable({ data }: LogsTableProps) {
   const columns: ColumnDef<StatusLogEntry>[] = [
     {
       id: "dateTime",
@@ -110,15 +91,6 @@ export function LogsTable({ data, hideActionColumn = false }: LogsTableProps) {
       cell: ({ row }) => <StatusBadge status={row.getValue("status") as LogStatus} />,
     },
   ];
-
-  // Only add action column if not hidden
-  if (!hideActionColumn) {
-    columns.push({
-      accessorKey: "action",
-      header: "ACTION",
-      cell: ({ row }) => <ActionBadge action={row.getValue("action") as LogAction} />,
-    });
-  }
 
   const table = useReactTable({
     data,

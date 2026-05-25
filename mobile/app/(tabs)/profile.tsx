@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, StatusBar, Modal, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, StatusBar, Modal, Image, Alert } from 'react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { supabase } from '../../lib/supabase';
 import { Edit2, Logout, User, FolderOpen, Notification, MessageQuestion, Lock1, ArrowLeft2 } from 'iconsax-react-native';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   const { user, role } = useAuthStatus();
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const router = useRouter();
   const isResponder = role === 'ambulance_responder';
 
   const handleSignOut = async () => {
@@ -14,8 +16,12 @@ export default function ProfileScreen() {
     await supabase.auth.signOut();
   };
 
-  const renderPillRow = (Icon: any, title: string, subtitle: string) => (
-    <TouchableOpacity className="bg-[#1E3A8A] rounded-3xl p-5 mb-4 flex-row items-center">
+  const renderPillRow = (Icon: any, title: string, subtitle: string, onPress?: () => void) => (
+    <TouchableOpacity 
+      className="bg-[#1E3A8A] rounded-3xl p-5 mb-4 flex-row items-center"
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View className="bg-white w-12 h-12 rounded-2xl items-center justify-center mr-4">
         <Icon size={24} color="#1E3A8A" variant="Bold" />
       </View>
@@ -33,7 +39,10 @@ export default function ProfileScreen() {
         <View className="flex-row justify-between items-center mb-8">
           <Text className="text-2xl font-bold text-white">My Profile</Text>
           <View className="flex-row">
-            <TouchableOpacity className="bg-white/20 w-10 h-10 rounded-xl items-center justify-center mr-3">
+            <TouchableOpacity 
+              className="bg-white/20 w-10 h-10 rounded-xl items-center justify-center mr-3"
+              onPress={() => router.push('/personal-info')}
+            >
               <Edit2 size={20} color="#FFFFFF" variant="Bold" />
             </TouchableOpacity>
             <TouchableOpacity 
@@ -88,13 +97,13 @@ export default function ProfileScreen() {
 
       <ScrollView className="flex-1 px-6 pt-8" showsVerticalScrollIndicator={false}>
         <Text className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-4">ACCOUNT</Text>
-        {renderPillRow(User, 'Personal Information', 'Name, contact, emergency details...')}
-        {renderPillRow(FolderOpen, 'My Reports', isResponder ? '12 total · 1 active' : '3 total · 1 active')}
+        {renderPillRow(User, 'Personal Information', 'Name, contact, emergency details...', () => router.push('/personal-info'))}
+        {renderPillRow(FolderOpen, 'My Reports', isResponder ? '12 total · 1 active' : '3 total · 1 active', () => router.push('/(tabs)/reports'))}
         
         <Text className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-4 mt-6">SETTINGS</Text>
-        {renderPillRow(Notification, 'Notifications', 'Alerts, emergency updates')}
-        {renderPillRow(MessageQuestion, 'Help & Support', 'FAQs, contact CDRRMO Baliwag')}
-        {renderPillRow(Lock1, 'Privacy & Security', 'Password, data sharing')}
+        {renderPillRow(Notification, 'Notifications', 'Alerts, emergency updates', () => router.push('/notification-settings'))}
+        {renderPillRow(MessageQuestion, 'Help & Support', 'FAQs, contact CDRRMO Baliwag', () => router.push('/support'))}
+        {renderPillRow(Lock1, 'Privacy & Security', 'Password, data sharing', () => router.push('/privacy-security'))}
         
         <View className="h-24" />
       </ScrollView>

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { getNavItems, UserRole } from "@/lib/navigation";
 import { Bell } from "lucide-react";
 import dynamic from "next/dynamic";
+import { NotificationDropdown } from "@/components/dashboard/notification-dropdown";
 
 const UserMenu = dynamic(() => import("@/components/dashboard/user-menu"), { 
   ssr: false,
@@ -57,10 +58,7 @@ export default function DashboardLayout({
             </h1>
           </div>
           <div className="flex items-center gap-8">
-            <button className="relative p-2.5 text-[#64748B] hover:text-[#1E3A8A] transition-colors">
-              <Bell className="size-7" />
-              <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5 rounded-full bg-destructive border-2 border-white" />
-            </button>
+            <NotificationDropdown />
             <UserMenu role={role as UserRole} getRoleLabel={getRoleLabel} />
           </div>
         </header>

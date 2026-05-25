@@ -8,7 +8,7 @@ import {
   useReactTable,
   getPaginationRowModel,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, UserMinus, ShieldAlert, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, UserMinus, Ban, Trash2, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,7 +26,8 @@ import { cn } from "@/lib/utils";
 interface UsersTableProps {
   data: UserManagementEntry[];
   onManageStatus: (user: UserManagementEntry) => void;
-  onDelete: (id: string) => void;
+  onBan: (user: UserManagementEntry) => void;
+  onDelete: (user: UserManagementEntry) => void;
 }
 
 const StatusBadge = ({ status }: { status: UserStatus }) => {
@@ -55,7 +56,7 @@ const RoleLabel = ({ role }: { role: UserRole }) => {
   return <span className="text-[10px] font-black text-slate-500 tracking-wider">{labels[role]}</span>;
 };
 
-export function UsersTable({ data, onManageStatus, onDelete }: UsersTableProps) {
+export function UsersTable({ data, onManageStatus, onBan, onDelete }: UsersTableProps) {
   const [rowSelection, setRowSelection] = React.useState({});
 
   const columns: ColumnDef<UserManagementEntry>[] = [
@@ -127,8 +128,17 @@ export function UsersTable({ data, onManageStatus, onDelete }: UsersTableProps) 
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => onDelete(row.original.id)}
-            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+            onClick={() => onBan(row.original)}
+            className="h-8 w-8 text-[#1E3A8A] hover:text-blue-900 hover:bg-blue-50"
+            title="Ban User"
+          >
+            <Ban className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onDelete(row.original)}
+            className="h-8 w-8 text-[#1E3A8A] hover:text-blue-900 hover:bg-blue-50"
             title="Delete User"
           >
             <Trash2 className="h-4 w-4" />

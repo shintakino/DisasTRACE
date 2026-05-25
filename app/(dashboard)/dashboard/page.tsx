@@ -14,7 +14,7 @@ import { AlertCircle } from "lucide-react";
 import { DashboardData, DashboardDataSchema } from "@/types/dashboard";
 
 export default function DashboardPage() {
-  const { role } = useAuth();
+  const { role, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,10 +70,16 @@ export default function DashboardPage() {
       }
     }
 
-    if (role) {
-      fetchDashboardData();
+    if (!authLoading) {
+      const normalizedRole = role?.toLowerCase();
+      if (normalizedRole === 'cdrrmo_super_admin' || normalizedRole === 'pacc_admin') {
+        fetchDashboardData();
+      } else {
+        setLoading(false);
+        setError("You do not have permission to view this dashboard.");
+      }
     }
-  }, [period, role]);
+  }, [period, role, authLoading]);
 
   if (loading) {
     return (
@@ -103,7 +109,9 @@ export default function DashboardPage() {
         <AlertDescription className="text-base mt-2">
           {error}
           <div className="mt-4 text-sm opacity-80">
-            Please ensure you are logged in with a Super Admin or PACC Admin account and your Supabase JWT is configured to include custom role claims.
+            Current Detected Role: <strong>{String(role)}</strong>
+            <br />
+            Please ensure you are logged in with a Super Admin or PACC Admin account. If you just changed your role, try logging out and logging back in.
           </div>
         </AlertDescription>
       </Alert>
@@ -113,7 +121,7 @@ export default function DashboardPage() {
   if (!data) return null;
 
   // Render CDRRMO Super Admin Layout
-  if (role === 'cdrrmo_super_admin') {
+  if (role?.toLowerCase() === 'cdrrmo_super_admin') {
     return (
       <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 min-h-0">
         <div className="shrink-0">
@@ -138,7 +146,7 @@ export default function DashboardPage() {
   }
 
   // Render PACC Admin Layout
-  if (role === 'pacc_admin') {
+  if (role?.toLowerCase() === 'pacc_admin') {
     return (
       <div className="h-full overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:scrollbar-default">
         <div className="shrink-0">

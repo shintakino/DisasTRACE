@@ -65,7 +65,7 @@ export default function LogsPage() {
             <Skeleton className="h-16 w-full" />
           </div>
         ) : (
-          <LogsTable data={logs} hideActionColumn={isPaccAdmin} />
+          <LogsTable data={logs} />
         )}
       </Card>
     </div>

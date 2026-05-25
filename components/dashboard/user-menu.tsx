@@ -2,9 +2,20 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { createClientBrowser } from "@/lib/supabase";
-import { ChevronDown, LogOut, User } from "lucide-react";
+import { ChevronDown, LogOut, User, Settings, ShieldCheck, FileText } from "lucide-react";
 import { UserRole } from "@/lib/navigation";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import Link from "next/link";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +36,7 @@ export default function UserMenu({ role, getRoleLabel }: UserMenuProps) {
   const { user } = useAuth();
   const supabase = createClientBrowser();
   const router = useRouter();
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -68,20 +80,73 @@ export default function UserMenu({ role, getRoleLabel }: UserMenuProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer">
+            <DropdownMenuItem onClick={() => router.push("/account?tab=profile")} className="cursor-pointer">
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/account?tab=settings")} className="cursor-pointer">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Account Settings</span>
+            </DropdownMenuItem>
           </DropdownMenuGroup>
+          
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
+          
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">Help</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/help?tab=privacy")} className="cursor-pointer">
+              <ShieldCheck className="mr-2 h-4 w-4" />
+              <span>Privacy Policy</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/help?tab=terms")} className="cursor-pointer">
+              <FileText className="mr-2 h-4 w-4" />
+              <span>Terms & Conditions</span>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+
+          <DropdownMenuSeparator />
+          
+          <DropdownMenuItem 
+            onClick={() => setIsLogoutOpen(true)} 
+            className="cursor-pointer text-[#1E3A8A] focus:text-[#1E3A8A] font-medium"
+          >
             <LogOut className="mr-2 h-4 w-4" />
-            <span>Log out</span>
+            <span>Log Out</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
+        <DialogContent className="sm:max-w-md text-center flex flex-col items-center pt-8 pb-6">
+          <div className="bg-[#1E3A8A] text-white p-4 rounded-xl mb-2">
+            <LogOut className="h-8 w-8" />
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-center">Log Out</DialogTitle>
+            <DialogDescription className="text-center text-sm mt-2 mb-4">
+              Are you sure you want to log out your account?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 w-full mt-4">
+            <Button 
+              variant="outline" 
+              className="flex-1 bg-[#F1F5F9] border-none text-[#64748B] hover:bg-[#E2E8F0] hover:text-[#1E293B]" 
+              onClick={() => setIsLogoutOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="flex-1 bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 text-white" 
+              onClick={handleSignOut}
+            >
+              Log Out
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

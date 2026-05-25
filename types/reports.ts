@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ReportStatusSchema = z.enum(["DRAFT", "SUBMITTED"]);
+export const ReportStatusSchema = z.enum(["COMPLETED", "ONGOING", "RESPONDING"]);
 export type ReportStatus = z.infer<typeof ReportStatusSchema>;
 
 export const IncidentTypeSchema = z.enum([
@@ -44,7 +44,12 @@ export const DetailedIncidentReportSchema = z.object({
   date: z.string(),
   time: z.string(),
   location: z.string(),
-  description: z.string().optional(),
+  description: z.string().optional(), // keeping for backward compatibility if needed
+  residentReportDescription: z.string().optional(),
+  crewFindings: z.string().optional(),
+  natureOfCall: z.string().optional(),
+  severityLevel: z.string().optional(),
+  peopleInvolved: z.number().optional(),
   scenePhotos: z.array(z.string()), // URLs to Supabase Storage
   logs: z.array(
     z.object({

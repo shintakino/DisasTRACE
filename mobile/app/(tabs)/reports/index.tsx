@@ -31,7 +31,7 @@ const mockReports = {
       id: 'DR-2026-0842',
       type: 'Vehicular Accident',
       date: 'MAR 15, 2026',
-      status: 'RESOLVED',
+      status: 'COMPLETED',
       location: 'Brgy. Paitan, Baliwag City',
       response: 'AMB-002 dispatched',
       icon: CarFront,
@@ -71,7 +71,7 @@ export default function MyReportsScreen() {
   const renderReportCard = (report: any) => {
     const Icon = report.icon;
     
-    let statusBgColor = 'bg-[#1E3A8A]'; // COMPLETED / RESOLVED / default
+    let statusBgColor = 'bg-[#1E3A8A]'; // COMPLETED / default
     if (report.status === 'RESPONDING') statusBgColor = 'bg-[#10B981]'; // Green 500 equivalent
     if (report.status === 'ONGOING') statusBgColor = 'bg-[#F59E0B]'; // Amber 500 equivalent
     
@@ -132,7 +132,7 @@ export default function MyReportsScreen() {
         <Text className="text-2xl font-bold text-white mb-6">My Reports</Text>
         
         <View className="flex-row bg-[#0F172A]/30 rounded-2xl p-1">
-          {['All', 'Active', 'Resolved'].map((tab) => {
+          {['All', 'Active', 'Completed'].map((tab) => {
             const isActive = activeTab === tab;
             return (
               <TouchableOpacity

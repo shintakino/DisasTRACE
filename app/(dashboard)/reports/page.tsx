@@ -4,10 +4,11 @@ import * as React from "react";
 import { ReportsHeader } from "@/components/reports/reports-header";
 import { ReportsTable } from "@/components/reports/reports-table";
 import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
-import { ReportEntry, ReportFilter } from "@/types/reports";
+import { ReportEntry, ReportFilter, ReportStatus } from "@/types/reports";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function ReportsPage() {
   const [data, setData] = React.useState<ReportEntry[]>([]);
@@ -15,6 +16,26 @@ export default function ReportsPage() {
   const [filters, setFilters] = React.useState<ReportFilter>({});
   const [selectedReportId, setSelectedReportId] = React.useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<"all" | ReportStatus>("all");
+
+  const handleFilterChange = React.useCallback((newFilters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => {
+    setFilters((prev) => {
+      const resolved = typeof newFilters === 'function' ? newFilters(prev) : newFilters;
+      // Preserve the status from activeTab
+      return {
+        ...resolved,
+        status: activeTab === "all" ? undefined : activeTab,
+      };
+    });
+  }, [activeTab]);
+
+  const handleTabChange = (tab: "all" | ReportStatus) => {
+    setActiveTab(tab);
+    setFilters(prev => ({
+      ...prev,
+      status: tab === "all" ? undefined : tab
+    }));
+  };
 
   const fetchReports = React.useCallback(async () => {
     setLoading(true);
@@ -62,9 +83,37 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <Card className="rounded-xl shadow-xl border-none overflow-hidden">
-        <ReportsHeader onFilterChange={setFilters} onExport={handleExportPDF} />
+      <Card className="rounded-xl shadow-xl border-none overflow-hidden bg-white">
+        <ReportsHeader onFilterChange={handleFilterChange} onExport={handleExportPDF} />
         
+        <div className="px-6 py-4 border-b border-slate-100 bg-white">
+          <div className="flex bg-slate-100/80 rounded-xl p-1 gap-1">
+            {(["all", "RESPONDING", "ONGOING", "COMPLETED"] as const).map((tab) => {
+              const isActive = activeTab === tab;
+              const getBgColor = (t: string) => {
+                if (t === "RESPONDING") return "bg-[#10B981]";
+                if (t === "ONGOING") return "bg-[#F59E0B]";
+                return "bg-[#1E3A8A]";
+              };
+              
+              return (
+                <button
+                  key={tab}
+                  onClick={() => handleTabChange(tab)}
+                  className={cn(
+                    "flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200",
+                    isActive 
+                      ? `${getBgColor(tab)} text-white shadow-sm` 
+                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                  )}
+                >
+                  {tab === "all" ? "All Reports" : tab}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {loading ? (
           <div className="p-8 space-y-4 bg-white">
             <Skeleton className="h-12 w-full" />

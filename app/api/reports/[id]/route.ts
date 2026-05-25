@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DetailedIncidentReport } from "@/types/reports";
+import { DetailedIncidentReport, ReportStatus } from "@/types/reports";
 
-const mockDetailedReports: Record<string, DetailedIncidentReport> = {
-  "DR-2026-0047": {
-    id: "DR-2026-0047",
+// Helper function to dynamically generate mock data
+const generateMockReport = (id: string, status?: ReportStatus): DetailedIncidentReport => {
+  const baseReport = {
+    id: id,
     responderName: "Bastes, Renzy",
     vehicleId: "AMB-001",
-    type: "Fire Emergency",
-    status: "SUBMITTED",
+    type: "Fire Emergency" as const,
+    status: status || "COMPLETED",
     date: "21 March 2026",
     time: "09:43 AM",
     location: "Brgy. Sabang, Baliwag City",
-    description: "Fire reported in a residential area. Preliminary assessment indicates a kitchen fire that spread to the living room.",
+    residentReportDescription: "Saw a huge smoke coming out from the neighbor's kitchen. We need help immediately!",
+    crewFindings: "Fire reported in a residential area. Preliminary assessment indicates a kitchen fire that spread to the living room.",
+    natureOfCall: "Emergency",
+    severityLevel: "Critical",
+    peopleInvolved: 3,
     scenePhotos: [
       "https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&fit=crop&q=80&w=400",
       "https://images.unsplash.com/photo-1563911892437-1feda0179e1b?auto=format&fit=crop&q=80&w=400",
@@ -24,7 +29,8 @@ const mockDetailedReports: Record<string, DetailedIncidentReport> = {
     participants: [
       { name: "Juan Dela Cruz", contact: "09123456789", triageStatus: "Green" },
     ],
-  },
+  };
+  return baseReport;
 };
 
 export async function GET(
@@ -32,25 +38,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const report = mockDetailedReports[id];
+  
+  // For demo, infer status based on ID from the mock list if it matches
+  let status: ReportStatus = "COMPLETED";
+  if (id === "DR-2026-0046" || id === "DR-2026-0043") status = "ONGOING";
+  if (id === "DR-2026-0045") status = "RESPONDING";
 
-  if (!report) {
-    // Fallback for demo purposes if ID doesn't exist in mockDetailedReports
-    return NextResponse.json({
-      id: id,
-      responderName: "Demo Responder",
-      vehicleId: "AMB-999",
-      type: "Medical Emergency",
-      status: "SUBMITTED",
-      date: "21 March 2026",
-      time: "10:00 AM",
-      location: "Baliuag, Bulacan",
-      description: "Demo report details for Case " + id,
-      scenePhotos: ["https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?auto=format&fit=crop&q=80&w=400"],
-      logs: [{ action: "Report Generated", time: "10:00 AM" }],
-      participants: [],
-    });
-  }
-
-  return NextResponse.json(report);
+  return NextResponse.json(generateMockReport(id, status));
 }

@@ -103,8 +103,9 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="DRAFT">Draft</SelectItem>
-            <SelectItem value="SUBMITTED">Submitted</SelectItem>
+            <SelectItem value="COMPLETED">Completed</SelectItem>
+            <SelectItem value="ONGOING">Ongoing</SelectItem>
+            <SelectItem value="RESPONDING">Responding</SelectItem>
           </SelectContent>
         </Select>
       </div>

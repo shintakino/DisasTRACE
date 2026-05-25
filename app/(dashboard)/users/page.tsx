@@ -4,7 +4,7 @@ import * as React from "react";
 import { UserSummaryCards } from "@/components/users/user-summary-cards";
 import { UsersHeader } from "@/components/users/users-header";
 import { UsersTable } from "@/components/users/users-table";
-import { ManageUserDialog, DeleteUserDialog } from "@/components/users/user-action-dialogs";
+import { BanUserDialog, DeleteUserDialog, CreateUserDialog, ManageUserDialog } from "@/components/users/user-action-dialogs";
 import { UserManagementEntry, UserFilter, UserStatus, UserRole } from "@/types/users";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,9 +20,12 @@ export default function UsersPage() {
     deactivated: 0,
   });
 
+  const [banUser, setBanUser] = React.useState<UserManagementEntry | null>(null);
+  const [deleteUser, setDeleteUser] = React.useState<UserManagementEntry | null>(null);
   const [selectedUser, setSelectedUser] = React.useState<UserManagementEntry | null>(null);
   const [isManageOpen, setIsManageOpen] = React.useState(false);
-  const [deleteUserId, setDeleteUserId] = React.useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [createRole, setCreateRole] = React.useState<UserRole | undefined>(undefined);
 
   const fetchData = async () => {
     setLoading(true);
@@ -85,6 +88,12 @@ export default function UsersPage() {
     });
   };
 
+  const handleBanUser = (id: string, reason: string) => {
+    // Implement ban logic here, such as updating user status to SUSPENDED
+    // with the reason provided.
+    console.log(`Banned user ${id} for: ${reason}`);
+  };
+
   const handleDeleteUser = async (id: string) => {
     // In a real app, this would be an API call
     toast.success("User deleted successfully");
@@ -105,6 +114,27 @@ export default function UsersPage() {
     toast.info("Exporting user list to PDF...");
   };
 
+  const handleCreateUser = (newUser: { fullName: string; email: string; role: UserRole }) => {
+    toast.success(`Account for ${newUser.fullName} created successfully`);
+    
+    const userEntry: UserManagementEntry = {
+      id: Math.random().toString(36).substr(2, 9),
+      ...newUser,
+      status: "ACTIVE",
+      joinedDate: new Date().toISOString().split("T")[0],
+      lastActive: "Just now",
+    };
+
+    setUsers(prev => [userEntry, ...prev]);
+    setFilteredUsers(prev => [userEntry, ...prev]);
+    
+    setSummary(prev => ({
+      ...prev,
+      total: prev.total + 1,
+      active: prev.active + 1,
+    }));
+  };
+
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
@@ -123,7 +153,14 @@ export default function UsersPage() {
       )}
 
       <div className="space-y-0">
-        <UsersHeader onFilterChange={handleFilterChange} onExport={handleExport} />
+        <UsersHeader 
+          onFilterChange={handleFilterChange} 
+          onExport={handleExport}
+          onCreateAccount={(role) => {
+            setCreateRole(role);
+            setIsCreateOpen(true);
+          }}
+        />
         {loading ? (
           <div className="bg-white border-x border-b p-8 rounded-b-xl">
             <Skeleton className="h-[400px] w-full" />
@@ -135,10 +172,20 @@ export default function UsersPage() {
               setSelectedUser(user);
               setIsManageOpen(true);
             }}
-            onDelete={(id) => setDeleteUserId(id)}
+            onBan={(user) => {
+              setBanUser(user);
+            }}
+            onDelete={(user) => setDeleteUser(user)}
           />
         )}
       </div>
+
+      <CreateUserDialog
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        defaultRole={createRole}
+        onCreate={handleCreateUser}
+      />
 
       <ManageUserDialog
         user={selectedUser}
@@ -147,10 +194,17 @@ export default function UsersPage() {
         onUpdate={handleUpdateUser}
       />
 
+      <BanUserDialog
+        user={banUser}
+        isOpen={!!banUser}
+        onClose={() => setBanUser(null)}
+        onConfirm={handleBanUser}
+      />
+
       <DeleteUserDialog
-        userId={deleteUserId}
-        isOpen={!!deleteUserId}
-        onClose={() => setDeleteUserId(null)}
+        user={deleteUser}
+        isOpen={!!deleteUser}
+        onClose={() => setDeleteUser(null)}
         onConfirm={handleDeleteUser}
       />
     </div>

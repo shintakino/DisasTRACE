@@ -5,8 +5,8 @@ import {
   ColumnDef,
   flexRender,
   getCoreRowModel,
-  useReactTable,
   getPaginationRowModel,
+  useReactTable,
 } from "@tanstack/react-table"
 import {
   Table,
@@ -16,88 +16,96 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, UserX, Trash2 } from "lucide-react"
 import { RosterEntry, RosterStatus } from "@/types/roster"
 import { cn } from "@/lib/utils"
 
 const statusConfig: Record<RosterStatus, { label: string, className: string }> = {
-  PRESENT: { 
-    label: "PRESENT", 
-    className: "bg-green-100 text-green-700 hover:bg-green-100/80 border-none" 
+  ACTIVE: { 
+    label: "ACTIVE", 
+    className: "bg-[#E6F4EA] text-[#1E8E3E] hover:bg-[#E6F4EA]/80 border-none px-4" 
   },
-  ABSENT: { 
-    label: "ABSENT", 
-    className: "bg-red-100 text-red-700 hover:bg-red-100/80 border-none" 
+  DEACTIVATED: { 
+    label: "DEACTIVATED", 
+    className: "bg-[#FCE8E6] text-[#D93025] hover:bg-[#FCE8E6]/80 border-none px-4" 
   },
-  "ON-LEAVE": { 
-    label: "ON-LEAVE", 
-    className: "bg-amber-100 text-amber-700 hover:bg-amber-100/80 border-none" 
-  },
-  "ON-DUTY": { 
-    label: "ON-DUTY", 
-    className: "bg-blue-100 text-blue-700 hover:bg-blue-100/80 border-none" 
+  SUSPENDED: { 
+    label: "SUSPENDED", 
+    className: "bg-[#FEF7E0] text-[#E37400] hover:bg-[#FEF7E0]/80 border-none px-4" 
   },
 }
-
-const columns: ColumnDef<RosterEntry>[] = [
-  {
-    accessorKey: "fullName",
-    header: "Full Name",
-    cell: ({ row }) => (
-      <div className="font-bold text-[#1E293B]">{row.getValue("fullName")}</div>
-    ),
-  },
-  {
-    accessorKey: "department",
-    header: "Department",
-    cell: ({ row }) => (
-      <div className="font-medium text-[#64748B]">{row.getValue("department")}</div>
-    ),
-  },
-  {
-    accessorKey: "checkIn",
-    header: "Check In Time",
-    cell: ({ row }) => (
-      <div className="font-medium text-[#1E293B]">{row.getValue("checkIn") || "--:-- --"}</div>
-    ),
-  },
-  {
-    accessorKey: "checkOut",
-    header: "Check Out Time",
-    cell: ({ row }) => (
-      <div className="font-medium text-[#1E293B]">{row.getValue("checkOut") || "--:-- --"}</div>
-    ),
-  },
-  {
-    accessorKey: "logHours",
-    header: "Log Hours",
-    cell: ({ row }) => (
-      <div className="font-mono font-medium text-[#64748B]">{row.getValue("logHours") || "00:00:00"}</div>
-    ),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const status = row.getValue("status") as RosterStatus
-      const config = statusConfig[status]
-      return (
-        <Badge className={cn("px-3 py-1 text-[10px] font-bold tracking-wider rounded-full", config.className)}>
-          {config.label}
-        </Badge>
-      )
-    },
-  },
-]
 
 interface RosterTableProps {
   data: RosterEntry[]
+  searchComponent?: React.ReactNode
+  filterComponent?: React.ReactNode
+  onManage?: (id: string) => void
+  onDelete?: (id: string) => void
 }
 
-export function RosterTable({ data }: RosterTableProps) {
+export function RosterTable({ data, searchComponent, filterComponent, onManage, onDelete }: RosterTableProps) {
+  const columns = React.useMemo<ColumnDef<RosterEntry>[]>(() => [
+    {
+      accessorKey: "fullName",
+      header: "FULL NAME",
+      cell: ({ row }) => (
+        <div className="font-medium text-[#111827]">{row.getValue("fullName")}</div>
+      ),
+    },
+    {
+      accessorKey: "email",
+      header: "EMAIL ADDRESS",
+      cell: ({ row }) => (
+        <div className="font-medium text-[#111827]">{row.getValue("email")}</div>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "STATUS",
+      cell: ({ row }) => {
+        const status = row.getValue("status") as RosterStatus
+        const config = statusConfig[status]
+        return (
+          <Badge className={cn("py-1 text-[11px] font-bold tracking-wider rounded-full uppercase", config.className)}>
+            {config.label}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: "role",
+      header: "ROLE",
+      cell: ({ row }) => (
+        <div className="font-medium text-[#111827] uppercase">{row.getValue("role")}</div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "ACTION",
+      cell: ({ row }) => {
+        return (
+          <div className="flex items-center gap-3">
+            <button 
+              className="text-gray-500 hover:text-gray-900 transition-colors"
+              onClick={() => onManage?.(row.original.id)}
+            >
+              <UserX className="size-5" />
+            </button>
+            <button 
+              className="text-gray-500 hover:text-red-600 transition-colors"
+              onClick={() => onDelete?.(row.original.id)}
+            >
+              <Trash2 className="size-5" />
+            </button>
+          </div>
+        )
+      },
+    },
+  ], [onManage, onDelete])
+
   const table = useReactTable({
     data,
     columns,
@@ -111,22 +119,21 @@ export function RosterTable({ data }: RosterTableProps) {
   })
 
   return (
-    <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white">
-      <CardHeader className="bg-[#1E3A8A] text-white p-6">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-bold tracking-tight">Responder Attendance Roster</CardTitle>
-          <div className="text-sm font-medium opacity-80 uppercase tracking-widest">
-            {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-          </div>
+    <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-white">
+      <div className="bg-[#2B4C9B] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h2 className="text-xl font-semibold text-white tracking-wide">Users</h2>
+        <div className="flex items-center gap-3">
+          {searchComponent}
+          {filterComponent}
         </div>
-      </CardHeader>
+      </div>
       <CardContent className="p-0">
         <Table>
-          <TableHeader className="bg-[#F8FAFC]">
+          <TableHeader className="bg-white border-b border-gray-100">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="hover:bg-transparent border-b-[#E2E8F0]">
+              <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="h-12 text-[#64748B] font-bold text-[11px] uppercase tracking-wider px-6">
+                  <TableHead key={header.id} className="h-14 text-black font-bold text-xs uppercase tracking-widest px-6">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -143,10 +150,10 @@ export function RosterTable({ data }: RosterTableProps) {
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="hover:bg-[#F1F5F9]/50 border-b-[#E2E8F0] transition-colors"
+                  className="hover:bg-gray-50 border-b border-gray-100 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-6 py-4">
+                    <TableCell key={cell.id} className="px-6 py-5">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -154,51 +161,56 @@ export function RosterTable({ data }: RosterTableProps) {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-[#64748B]">
-                  No responders found.
+                <TableCell colSpan={columns.length} className="h-32 text-center text-gray-500">
+                  No users found.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
         
-        {/* Custom Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-[#E2E8F0]">
-          <div className="text-xs font-medium text-[#64748B]">
-            Showing <span className="text-[#1E293B]">{table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}</span> to <span className="text-[#1E293B]">{Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, data.length)}</span> of <span className="text-[#1E293B]">{data.length}</span> responders
-          </div>
+        {/* Custom Pagination matching the design */}
+        <div className="flex justify-end px-6 py-6 border-t border-gray-100">
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="icon"
-              className="size-8 rounded-full border-[#E2E8F0] hover:bg-[#F1F5F9] text-[#64748B]"
+              className="size-8 rounded-full border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
             >
               <ChevronLeft className="size-4" />
             </Button>
             
-            {Array.from({ length: table.getPageCount() }, (_, i) => i).map((page) => (
-              <Button
-                key={page}
-                variant={table.getState().pagination.pageIndex === page ? "default" : "outline"}
-                size="icon"
-                className={cn(
-                  "size-8 rounded-full text-xs font-bold transition-all duration-200",
-                  table.getState().pagination.pageIndex === page 
-                    ? "bg-[#1E3A8A] text-white hover:bg-[#1E3A8A]/90 shadow-md scale-110" 
-                    : "border-[#E2E8F0] hover:bg-[#F1F5F9] text-[#64748B]"
-                )}
-                onClick={() => table.setPageIndex(page)}
-              >
-                {page + 1}
-              </Button>
-            ))}
+            {Array.from({ length: table.getPageCount() || 10 }, (_, i) => i).map((page) => {
+              // Just a simplified pagination rendering to match the "1 2 3 ... 10" look for the mock
+              if (page > 2 && page < 9) {
+                if (page === 3) return <span key={page} className="px-1 text-gray-400">...</span>
+                return null;
+              }
+              const isSelected = table.getState().pagination.pageIndex === page;
+              return (
+                <Button
+                  key={page}
+                  variant={isSelected ? "default" : "ghost"}
+                  size="icon"
+                  className={cn(
+                    "size-8 rounded-full text-sm font-medium",
+                    isSelected
+                      ? "bg-[#2B4C9B] text-white hover:bg-[#2B4C9B]/90 shadow-sm"
+                      : "text-gray-600 hover:bg-gray-100"
+                  )}
+                  onClick={() => table.setPageIndex(page)}
+                >
+                  {page + 1}
+                </Button>
+              )
+            })}
 
             <Button
               variant="outline"
               size="icon"
-              className="size-8 rounded-full border-[#E2E8F0] hover:bg-[#F1F5F9] text-[#64748B]"
+              className="size-8 rounded-full border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
             >

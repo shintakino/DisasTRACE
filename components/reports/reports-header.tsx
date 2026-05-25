@@ -16,46 +16,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { IncidentType, ReportStatus, ReportFilter } from "@/types/reports";
+import { IncidentType, ReportFilter } from "@/types/reports";
 import { cn } from "@/lib/utils";
 
 interface ReportsHeaderProps {
-  onFilterChange: (filters: ReportFilter) => void;
+  onFilterChange: (filters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => void;
   onExport: () => void;
 }
 
 export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) {
   const [search, setSearch] = React.useState("");
   const [type, setType] = React.useState<IncidentType | "all">("all");
-  const [status, setStatus] = React.useState<ReportStatus | "all">("all");
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
-    onFilterChange({
+    onFilterChange((prev: ReportFilter) => ({
+      ...prev,
       search: val || undefined,
       type: type === "all" ? undefined : type,
-      status: status === "all" ? undefined : status,
-    });
+    }));
   };
 
   const handleTypeChange = (val: string | null) => {
     const newType = (val || "all") as IncidentType | "all";
     setType(newType);
-    onFilterChange({
+    onFilterChange((prev: ReportFilter) => ({
+      ...prev,
       search: search || undefined,
       type: newType === "all" ? undefined : newType,
-      status: status === "all" ? undefined : status,
-    });
-  };
-
-  const handleStatusChange = (val: string | null) => {
-    const newStatus = (val || "all") as ReportStatus | "all";
-    setStatus(newStatus);
-    onFilterChange({
-      search: search || undefined,
-      type: type === "all" ? undefined : type,
-      status: newStatus === "all" ? undefined : newStatus,
-    });
+    }));
   };
 
   return (
@@ -97,20 +86,6 @@ export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) 
                     <SelectItem value="Structural Failure">Structural Failure</SelectItem>
                     <SelectItem value="Flood/Water">Flood/Water</SelectItem>
                     <SelectItem value="Unknown Cause">Unknown Cause</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</label>
-                <Select value={status} onValueChange={handleStatusChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="DRAFT">Draft</SelectItem>
-                    <SelectItem value="SUBMITTED">Submitted</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

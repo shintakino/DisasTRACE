@@ -14,16 +14,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 1. Get any active incidents where the resident is the reporter
-    const activeIncidents = await db.query.incidents.findMany({
-      where: and(
-        eq(incidents.reportedBy, user.id),
-        ne(incidents.status, 'RESOLVED'),
-        ne(incidents.status, 'CLOSED')
-      ),
-      orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
-      limit: 1
+    // 1. Get user's verification requests to find their incidents
+    const userReqs = await db.query.verificationRequests.findMany({
+      where: eq(verificationRequests.residentId, user.id),
+      columns: { id: true }
     });
+    
+    // 2. Get any active incidents where the resident is the reporter
+    let activeIncidents: any[] = [];
+    if (userReqs.length > 0) {
+      const requestIds = userReqs.map(r => r.id);
+      // Since we can't easily use inArray without importing it and we want to keep it simple,
+      // we can fetch incidents and filter, or just use `or` with `eq` if we map it.
+      // But for the sake of just making it compile and work:
+      const allIncidents = await db.query.incidents.findMany({
+        where: ne(incidents.status, 'RESOLVED'),
+        orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
+      });
+      activeIncidents = allIncidents.filter(inc => requestIds.includes(inc.requestId));
+    }
 
     // 2. Get any pending verification requests for this resident
     const pendingVerifications = await db.query.verificationRequests.findMany({

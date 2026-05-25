@@ -33,11 +33,7 @@ export const CDRRMO_NAV: NavItem[] = [
     url: "/logs",
     icon: Folder,
   },
-  {
-    title: "Verification",
-    url: "/verification",
-    icon: ShieldCheck,
-  },
+
   {
     title: "Reports",
     url: "/reports",

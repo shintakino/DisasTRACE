@@ -1,0 +1,1 @@
+ALTER TABLE "verification_requests" ADD COLUMN "severity" text DEFAULT 'Medium' NOT NULL;

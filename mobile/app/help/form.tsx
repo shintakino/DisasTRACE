@@ -6,7 +6,15 @@ import { ChevronLeft, ChevronDown, ChevronUp, Image as ImageIcon, CheckCircle, M
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 
 const NATURE_OPTIONS = ["Emergency", "Non-emergency"];
-const EMERGENCY_TYPES = ["Medical", "Trauma", "Transfer Incident"];
+const EMERGENCY_TYPES = [
+  "Fire Emergency",
+  "Vehicular Collision",
+  "Medical Emergency",
+  "Structural Failure",
+  "Flood/Water",
+  "Unknown Cause"
+];
+const SEVERITY_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
 
 const CustomDropdown = ({ label, options, selected, onSelect, placeholder }: any) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -39,6 +47,7 @@ export default function FormScreen() {
   
   const [nature, setNature] = useState<string>("");
   const [emergencyType, setEmergencyType] = useState<string>("");
+  const [severity, setSeverity] = useState<string>("");
   const [people, setPeople] = useState<number>(0);
   const [location, setLocation] = useState<{ latitude: number, longitude: number } | null>(
     report.latitude && report.longitude ? { latitude: report.latitude, longitude: report.longitude } : null
@@ -113,6 +122,7 @@ export default function FormScreen() {
       peopleInvolved: people === 0 ? "None" : (people >= 6 ? "6+ Persons" : `${people} Person${people > 1 ? 's' : ''}`) as any,
       latitude: location.latitude,
       longitude: location.longitude,
+      severity: severity as any,
     });
     
     router.push('/help/details');
@@ -163,6 +173,14 @@ export default function FormScreen() {
               options={EMERGENCY_TYPES} 
               selected={emergencyType} 
               onSelect={setEmergencyType} 
+            />
+
+            <Text style={styles.sectionTitle}>SEVERITY LEVEL <Text style={styles.asterisk}>*</Text></Text>
+            <CustomDropdown 
+              placeholder="Select severity level" 
+              options={SEVERITY_LEVELS} 
+              selected={severity} 
+              onSelect={setSeverity} 
             />
           </>
         )}

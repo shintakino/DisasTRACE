@@ -19,6 +19,7 @@ export const EmergencyReportSchema = z.object({
   landmarks: z.string().max(150, "Description must not exceed 150 characters").optional(),
   latitude: z.number(),
   longitude: z.number(),
+  severity: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
 });
 
 export type EmergencyReportType = z.infer<typeof EmergencyReportSchema>;

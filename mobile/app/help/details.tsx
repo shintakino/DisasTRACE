@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal,
 import { useRouter } from 'expo-router';
 import { ChevronLeft, CheckCircle, X } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
-
+import { supabase } from '../../lib/supabase';
 const WHAT_OPTIONS = [
   "Conscious and stable",
   "Conscious and Unstable",
@@ -69,6 +69,7 @@ const RadioGroup = ({ options, selected, onSelect, otherText, setOtherText }: an
 
 export default function DetailsScreen() {
   const router = useRouter();
+  const { report } = useEmergencyReportStore();
   
   const [what, setWhat] = useState<string>('');
   const [whatOther, setWhatOther] = useState<string>('');
@@ -84,27 +85,72 @@ export default function DetailsScreen() {
   const [showAnalyzing, setShowAnalyzing] = useState(false);
   const [showSubmitted, setShowSubmitted] = useState(false);
   const [analyzingStep, setAnalyzingStep] = useState(0);
+  const [isAutoDispatched, setIsAutoDispatched] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!what || !where || !when || !how) return;
+
     // Show analyzing modal
     setShowAnalyzing(true);
     
+    // Combine local form data with global store
+    const localDescription = `Condition: ${what}\nAccess: ${where}\nTime: ${when}\nCause: ${how}\nOther: ${whatOther} ${whereOther} ${howOther}`;
+    
+    const payload = {
+      incidentType: report.incidentType || 'Unknown Cause',
+      peopleInvolved: report.peopleInvolved || 'None',
+      landmarks: localDescription,
+      latitude: report.latitude,
+      longitude: report.longitude,
+      severity: report.severity || 'Medium',
+      nature: report.severity ? 'EMERGENCY' : 'NON-EMERGENCY',
+      imageUrl: report.photoUri,
+    };
+
     // Simulate analyzing steps
     setTimeout(() => setAnalyzingStep(1), 800);
     setTimeout(() => setAnalyzingStep(2), 1600);
     setTimeout(() => setAnalyzingStep(3), 2400);
     setTimeout(() => setAnalyzingStep(4), 3200);
     
-    // Transition to Submitted modal
-    setTimeout(() => {
-      setShowAnalyzing(false);
-      setShowSubmitted(true);
-    }, 4500);
+    try {
+      const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(`${apiUrl}/verification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      
+      // Wait for animations
+      setTimeout(() => {
+        setShowAnalyzing(false);
+        setIsAutoDispatched(data.autoDispatched);
+        setShowSubmitted(true);
+      }, 4500);
+
+    } catch (error) {
+      console.error("Submission error:", error);
+      setTimeout(() => {
+        setShowAnalyzing(false);
+        setShowSubmitted(true);
+      }, 4500);
+    }
   };
 
   const handleFinish = () => {
     setShowSubmitted(false);
-    router.push('/help/pending');
+    if (isAutoDispatched) {
+      router.push('/help/tracking');
+    } else {
+      router.push('/help/pending');
+    }
   };
 
   return (

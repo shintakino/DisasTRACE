@@ -138,10 +138,9 @@ export default function TrackingScreen() {
         attribution={true}
       >
         <Camera
-          initialViewState={{
-            center: [region.longitude, region.latitude],
-            zoom: 14,
-          }}
+          center={[region.longitude, region.latitude]}
+          zoom={14}
+          duration={1000}
         />
         
         {/* Ambulance Location */}

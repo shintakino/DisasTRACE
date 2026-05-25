@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
       latitude,
       longitude,
       imageUrl,
+      severity,
+      nature,
     } = body;
 
     if (!incidentType || !latitude || !longitude) {
@@ -58,23 +60,45 @@ export async function POST(req: NextRequest) {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const requestIdStr = `REQ-${year}-${randomNum}`;
 
+    // Determine initial status based on request nature (we will try to auto-dispatch first if critical)
+    const severityLevel = severity || 'Medium';
+    const requestNature = nature || 'EMERGENCY';
+
     // Insert into database
     const [newRequest] = await db.insert(verificationRequests).values({
       id: crypto.randomUUID(),
       requestId: requestIdStr,
       residentId: user.id,
       status: 'PENDING',
-      nature: 'EMERGENCY',
+      nature: requestNature,
       type: incidentType,
+      peopleInvolved: peopleInvolved || 'None',
+      severity: severityLevel,
       locationDescription: landmarks || null,
       latitude,
       longitude,
       imageUrl: imageUrl || null,
     }).returning();
 
+    // Auto Dispatch Logic
+    if (severityLevel === 'Critical' || severityLevel === 'Emergency' || requestNature === 'EMERGENCY') {
+      const { autoDispatchIncident } = await import('@/lib/dispatch-engine');
+      const incident = await autoDispatchIncident(newRequest.id, user.id, latitude, longitude);
+      
+      if (incident) {
+        return NextResponse.json({ 
+          success: true, 
+          request: { ...newRequest, status: 'VERIFIED' },
+          incident,
+          autoDispatched: true
+        });
+      }
+    }
+
     return NextResponse.json({ 
       success: true, 
-      request: newRequest 
+      request: newRequest,
+      autoDispatched: false
     });
   } catch (error) {
     console.error('Error in POST /api/verification:', error);

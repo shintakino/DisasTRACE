@@ -11,6 +11,7 @@ export function useAuthStatus() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | 'loading' | 'unauthorized_platform'>('loading');
+  const [role, setRole] = useState<string>('public_user');
   const [profile, setProfile] = useState<{ fullName: string; address: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -39,6 +40,7 @@ export function useAuthStatus() {
         return;
       }
 
+      setRole(role);
       setVerificationStatus(VerificationStatusSchema.parse(status.toLowerCase()));
       setProfile({
         fullName: dbUser.full_name,
@@ -49,6 +51,8 @@ export function useAuthStatus() {
       
       // Secondary fallback to JWT metadata if direct query fails
       const role = currentUser.app_metadata?.role;
+      if (role) setRole(role);
+      
       if (role === 'cdrrmo_super_admin' || role === 'pacc_admin') {
         setVerificationStatus('unauthorized_platform');
         return;
@@ -119,6 +123,10 @@ export function useAuthStatus() {
             return;
           }
 
+          if (newRole) {
+            setRole(newRole);
+          }
+
           if (newStatus) {
             setVerificationStatus(VerificationStatusSchema.parse(newStatus.toLowerCase()));
           }
@@ -149,6 +157,7 @@ export function useAuthStatus() {
     isSignedIn: !!user,
     isLoaded,
     verificationStatus,
+    role,
     profile,
     user,
     refreshStatus: async () => {

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Platform, StatusBar, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, User } from 'lucide-react-native';
-
+import { ArrowLeft, User, X, Truck } from 'lucide-react-native';
+import { Image } from 'react-native';
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -23,6 +23,7 @@ export default function IncidentDetailScreen() {
       </TouchableOpacity>
     );
   };
+
 
   return (
     <View className="flex-1 bg-slate-50">

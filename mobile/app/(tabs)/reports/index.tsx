@@ -2,17 +2,28 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Flame, CarFront, Activity, AlertTriangle, MapPin } from 'lucide-react-native';
+import { useAuthStatus } from '../../../hooks/use-auth-status';
+import { ReportDetailModal } from '../../../components/responder/ReportDetailModal';
 
 const mockReports = {
   today: [
     {
       id: 'DR-2026-0847',
-      type: 'Fire / Explosion',
+      type: 'Vehicular Accident',
+      date: 'MAR 16, 2026',
+      status: 'ONGOING',
+      location: 'Brgy. Sabang, Baliwag City',
+      response: 'AMB-001 dispatched',
+      icon: CarFront,
+    },
+    {
+      id: 'DR-2026-0847',
+      type: 'Vehicular Accident',
       date: 'MAR 16, 2026',
       status: 'RESPONDING',
       location: 'Brgy. Sabang, Baliwag City',
       response: 'AMB-001 dispatched',
-      icon: Flame,
+      icon: CarFront,
     }
   ],
   yesterday: [
@@ -31,8 +42,8 @@ const mockReports = {
       id: 'DR-2026-0841',
       type: 'Medical Emergency',
       date: 'MAR 10, 2026',
-      status: 'RESOLVED',
-      location: 'Brgy. Tarcan, Baliwag City',
+      status: 'COMPLETED',
+      location: 'Brgy. Tarcan, Baliwag',
       response: '34 min response',
       icon: Activity,
     },
@@ -40,7 +51,7 @@ const mockReports = {
       id: 'DR-2026-0830',
       type: 'Disaster-Related',
       date: 'MAR 01, 2026',
-      status: 'RESOLVED',
+      status: 'COMPLETED',
       location: 'Brgy. Tangos, Baliwag',
       response: '9 min response',
       icon: AlertTriangle,
@@ -51,16 +62,30 @@ const mockReports = {
 export default function MyReportsScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('All');
+  const [selectedReport, setSelectedReport] = useState<any>(null);
+  const { role } = useAuthStatus();
+  const isResponder = role?.includes('responder');
+
+  const flatReports = [...mockReports.today, ...mockReports.yesterday, ...mockReports.lastWeek];
 
   const renderReportCard = (report: any) => {
     const Icon = report.icon;
-    const isResponding = report.status === 'RESPONDING';
+    
+    let statusBgColor = 'bg-[#1E3A8A]'; // COMPLETED / RESOLVED / default
+    if (report.status === 'RESPONDING') statusBgColor = 'bg-[#10B981]'; // Green 500 equivalent
+    if (report.status === 'ONGOING') statusBgColor = 'bg-[#F59E0B]'; // Amber 500 equivalent
     
     return (
       <TouchableOpacity 
-        key={report.id}
+        key={`${report.id}-${report.status}`}
         activeOpacity={0.7}
-        onPress={() => router.push(`/reports/${report.id}`)}
+        onPress={() => {
+          if (isResponder) {
+            setSelectedReport(report);
+          } else {
+            router.push(`/reports/${report.id}`);
+          }
+        }}
         className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100"
       >
         <View className="flex-row justify-between items-start mb-4">
@@ -75,7 +100,7 @@ export default function MyReportsScreen() {
           </View>
           <View className="items-end justify-between h-14 py-1">
             <Text className="text-xs font-medium text-slate-400 uppercase tracking-wider">{report.date}</Text>
-            <View className={`px-3 py-1 rounded-full ${isResponding ? 'bg-green-500' : 'bg-[#1E3A8A]'}`}>
+            <View className={`px-3 py-1 rounded-full ${statusBgColor}`}>
               <Text className="text-xs font-bold text-white uppercase">{report.status}</Text>
             </View>
           </View>
@@ -125,11 +150,24 @@ export default function MyReportsScreen() {
       </View>
 
       <ScrollView className="flex-1 px-6 pt-6 bg-slate-50" showsVerticalScrollIndicator={false}>
-        {renderSection('TODAY', mockReports.today)}
-        {renderSection('YESTERDAY', mockReports.yesterday)}
-        {renderSection('LAST WEEK', mockReports.lastWeek)}
+        {isResponder ? (
+          <>
+            {flatReports.map(renderReportCard)}
+          </>
+        ) : (
+          <>
+            {renderSection('TODAY', mockReports.today)}
+            {renderSection('YESTERDAY', mockReports.yesterday)}
+            {renderSection('LAST WEEK', mockReports.lastWeek)}
+          </>
+        )}
         <View className="h-24" />
       </ScrollView>
+      <ReportDetailModal 
+        visible={!!selectedReport}
+        report={selectedReport}
+        onClose={() => setSelectedReport(null)}
+      />
     </View>
   );
 }

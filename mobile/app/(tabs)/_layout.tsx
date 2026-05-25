@@ -4,8 +4,7 @@ import { Home2, FolderOpen, Map, User, CalendarAdd } from 'iconsax-react-native'
 import { useAuthStatus } from '../../hooks/use-auth-status';
 
 export default function TabLayout() {
-  const { user } = useAuthStatus();
-  const role = (user?.app_metadata?.role as string) || 'public_user';
+  const { user, role } = useAuthStatus();
 
   const isResponder = role === 'ambulance_responder';
 

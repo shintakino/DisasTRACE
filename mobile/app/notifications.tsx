@@ -2,10 +2,13 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Truck, ShieldCheck } from 'lucide-react-native';
+import { ChevronLeft, Truck, ShieldCheck, Siren, Activity } from 'lucide-react-native';
+import { useAuthStatus } from '../hooks/use-auth-status';
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { role } = useAuthStatus();
+  const isResponder = role === 'ambulance_responder';
 
   return (
     <View className="flex-1 bg-[#1E3A8A]">
@@ -31,43 +34,86 @@ export default function NotificationsScreen() {
         <View className="px-6 pt-8 pb-4">
           <Text className="text-slate-900 font-bold text-sm tracking-wider uppercase mb-5">Today</Text>
           
-          {/* Notification Item 1 */}
-          <View className="bg-white rounded-3xl border border-[#E2E8F0] p-5 mb-4 flex-row">
-            <View className="bg-[#EEF2FF] w-14 h-14 rounded-2xl items-center justify-center mr-4">
-              <Truck size={24} color="#1E3A8A" />
-            </View>
-            <View className="flex-1 justify-center">
-              <View className="flex-row justify-between items-start mb-1.5">
-                <Text className="font-bold text-[17px] text-slate-900 flex-1 pr-2">AMB-001 Dispatched</Text>
-                <View className="w-2.5 h-2.5 rounded-full bg-[#B91C1C] mt-1.5" />
+          {isResponder ? (
+            <>
+              {/* Responder Notification 1 */}
+              <View className="bg-white rounded-3xl border border-[#E2E8F0] p-5 mb-4 flex-row">
+                <View className="bg-[#EEF2FF] w-14 h-14 rounded-2xl items-center justify-center mr-4">
+                  <Siren size={24} color="#1E3A8A" />
+                </View>
+                <View className="flex-1 justify-center">
+                  <View className="flex-row justify-between items-start mb-1.5">
+                    <Text className="font-bold text-[17px] text-slate-900 flex-1 pr-2">New Dispatch Assignment</Text>
+                    <View className="w-2.5 h-2.5 rounded-full bg-[#B91C1C] mt-1.5" />
+                  </View>
+                  <Text className="text-slate-600 text-[13px] leading-[18px] mb-3">
+                    You have been assigned to DR-2024-0847 (Vehicular Collision) at Brgy. Sabang. Respond immediately.
+                  </Text>
+                  <Text className="text-[#1E3A8A]/60 font-medium text-[11px]">
+                    09:44 AM · 27 min ago
+                  </Text>
+                </View>
               </View>
-              <Text className="text-slate-600 text-[13px] leading-[18px] mb-3">
-                Ambulance is on the way. ETA approx. 8 minutes. Driver: Bastes, R., Paramedic: Guanzing, C.
-              </Text>
-              <Text className="text-[#1E3A8A]/60 font-medium text-[11px]">
-                09:46 AM · 25 min ago
-              </Text>
-            </View>
-          </View>
 
-          {/* Notification Item 2 */}
-          <View className="bg-white rounded-3xl border border-[#E2E8F0] p-5 mb-4 flex-row">
-            <View className="bg-[#EEF2FF] w-14 h-14 rounded-2xl items-center justify-center mr-4">
-              <ShieldCheck size={24} color="#1E3A8A" />
-            </View>
-            <View className="flex-1 justify-center">
-              <View className="flex-row justify-between items-start mb-1.5">
-                <Text className="font-bold text-[17px] text-slate-900 flex-1 pr-2">Report Verified</Text>
-                <View className="w-2.5 h-2.5 rounded-full bg-[#B91C1C] mt-1.5" />
+              {/* Responder Notification 2 */}
+              <View className="bg-white rounded-3xl border border-[#E2E8F0] p-5 mb-4 flex-row">
+                <View className="bg-slate-50 w-14 h-14 rounded-2xl items-center justify-center mr-4">
+                  <Activity size={24} color="#64748B" />
+                </View>
+                <View className="flex-1 justify-center">
+                  <View className="flex-row justify-between items-start mb-1.5">
+                    <Text className="font-bold text-[17px] text-slate-900 flex-1 pr-2">Unit Status Update</Text>
+                  </View>
+                  <Text className="text-slate-600 text-[13px] leading-[18px] mb-3">
+                    Your unit AMB-001 is currently marked as Available.
+                  </Text>
+                  <Text className="text-[#1E3A8A]/60 font-medium text-[11px]">
+                    08:00 AM · 3 hrs ago
+                  </Text>
+                </View>
               </View>
-              <Text className="text-slate-600 text-[13px] leading-[18px] mb-3">
-                DR-2024-0847 has been verified by CDRRMO. Classified as Emergency. Dispatch initiated.
-              </Text>
-              <Text className="text-[#1E3A8A]/60 font-medium text-[11px]">
-                09:45 AM · 26 min ago
-              </Text>
-            </View>
-          </View>
+            </>
+          ) : (
+            <>
+              {/* Resident Notification 1 */}
+              <View className="bg-white rounded-3xl border border-[#E2E8F0] p-5 mb-4 flex-row">
+                <View className="bg-[#EEF2FF] w-14 h-14 rounded-2xl items-center justify-center mr-4">
+                  <Truck size={24} color="#1E3A8A" />
+                </View>
+                <View className="flex-1 justify-center">
+                  <View className="flex-row justify-between items-start mb-1.5">
+                    <Text className="font-bold text-[17px] text-slate-900 flex-1 pr-2">AMB-001 Dispatched</Text>
+                    <View className="w-2.5 h-2.5 rounded-full bg-[#B91C1C] mt-1.5" />
+                  </View>
+                  <Text className="text-slate-600 text-[13px] leading-[18px] mb-3">
+                    Ambulance is on the way. ETA approx. 8 minutes. Driver: Bastes, R., Paramedic: Guanzing, C.
+                  </Text>
+                  <Text className="text-[#1E3A8A]/60 font-medium text-[11px]">
+                    09:46 AM · 25 min ago
+                  </Text>
+                </View>
+              </View>
+
+              {/* Resident Notification 2 */}
+              <View className="bg-white rounded-3xl border border-[#E2E8F0] p-5 mb-4 flex-row">
+                <View className="bg-[#EEF2FF] w-14 h-14 rounded-2xl items-center justify-center mr-4">
+                  <ShieldCheck size={24} color="#1E3A8A" />
+                </View>
+                <View className="flex-1 justify-center">
+                  <View className="flex-row justify-between items-start mb-1.5">
+                    <Text className="font-bold text-[17px] text-slate-900 flex-1 pr-2">Report Verified</Text>
+                    <View className="w-2.5 h-2.5 rounded-full bg-[#B91C1C] mt-1.5" />
+                  </View>
+                  <Text className="text-slate-600 text-[13px] leading-[18px] mb-3">
+                    DR-2024-0847 has been verified by CDRRMO. Classified as Emergency. Dispatch initiated.
+                  </Text>
+                  <Text className="text-[#1E3A8A]/60 font-medium text-[11px]">
+                    09:45 AM · 26 min ago
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
 
         {/* YESTERDAY SECTION */}

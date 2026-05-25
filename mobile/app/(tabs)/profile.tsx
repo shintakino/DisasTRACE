@@ -5,8 +5,9 @@ import { supabase } from '../../lib/supabase';
 import { Edit2, Logout, User, FolderOpen, Notification, MessageQuestion, Lock1, ArrowLeft2 } from 'iconsax-react-native';
 
 export default function ProfileScreen() {
-  const { user } = useAuthStatus();
+  const { user, role } = useAuthStatus();
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const isResponder = role === 'ambulance_responder';
 
   const handleSignOut = async () => {
     setLogoutVisible(false);
@@ -46,17 +47,34 @@ export default function ProfileScreen() {
 
         <View className="flex-row items-center relative z-10">
           <View className="w-24 h-24 rounded-full border border-white items-center justify-center mr-5">
-            <Text className="text-white text-3xl font-bold">EG</Text>
+            <Text className="text-white text-3xl font-bold">{isResponder ? 'CJ' : 'EG'}</Text>
             <View className="absolute top-1 right-1 w-6 h-6 bg-white rounded-full items-center justify-center">
               <View className="w-4 h-4 bg-[#1E3A8A] rounded-full" />
             </View>
           </View>
-          <View>
-            <Text className="text-2xl font-bold text-white mb-2">Eloisa Guibani</Text>
-            <Text className="text-sm text-blue-200">Barangay</Text>
-            <Text className="text-base font-bold text-white mb-2">Paitan</Text>
-            <Text className="text-sm text-blue-200">Date Joined</Text>
-            <Text className="text-base font-bold text-white">March 27, 2025</Text>
+          <View className="flex-1 pr-4">
+            <Text className="text-2xl font-bold text-white mb-2" numberOfLines={1}>{isResponder ? 'Christopher Jan' : 'Eloisa Guibani'}</Text>
+            {isResponder ? (
+              <View className="mt-1">
+                <View className="flex-row items-center mb-2">
+                  <Text className="text-sm text-blue-200 mr-2">Assigned Unit:</Text>
+                  <Text className="text-base font-bold text-white">AMB-001</Text>
+                </View>
+                <View className="flex-row">
+                  <View className="bg-green-500/20 px-2 py-1 rounded border border-green-400 flex-row items-center">
+                    <View className="w-2 h-2 rounded-full bg-green-400 mr-1.5" />
+                    <Text className="text-green-400 text-[10px] font-bold uppercase tracking-wider">On Duty</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <>
+                <Text className="text-sm text-blue-200">Barangay</Text>
+                <Text className="text-base font-bold text-white mb-2">Paitan</Text>
+                <Text className="text-sm text-blue-200">Date Joined</Text>
+                <Text className="text-base font-bold text-white">March 27, 2025</Text>
+              </>
+            )}
           </View>
         </View>
 
@@ -70,8 +88,8 @@ export default function ProfileScreen() {
 
       <ScrollView className="flex-1 px-6 pt-8" showsVerticalScrollIndicator={false}>
         <Text className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-4">ACCOUNT</Text>
-        {renderPillRow(User, 'Personal Information', 'Name, address, contact...')}
-        {renderPillRow(FolderOpen, 'My Reports', '3 total · 1 active')}
+        {renderPillRow(User, 'Personal Information', 'Name, contact, emergency details...')}
+        {renderPillRow(FolderOpen, 'My Reports', isResponder ? '12 total · 1 active' : '3 total · 1 active')}
         
         <Text className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-4 mt-6">SETTINGS</Text>
         {renderPillRow(Notification, 'Notifications', 'Alerts, emergency updates')}

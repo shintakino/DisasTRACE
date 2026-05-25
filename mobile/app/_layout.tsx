@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStatus } from '../hooks/use-auth-status';
 import "../global.css";
 
@@ -92,9 +93,9 @@ function InitialLayout() {
 
 export default function RootLayout() {
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <InitialLayout />
       <StatusBar style="auto" />
-    </>
+    </GestureHandlerRootView>
   );
 }

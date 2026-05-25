@@ -7,16 +7,15 @@ import { LocationPermissionDrawer } from '../../components/dashboard/LocationPer
 import { HelpButton } from '../../components/dashboard/HelpButton';
 import { MapPin, HelpCircle, Bell, Shield, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, Tabs } from 'expo-router';
 import { ResponderHome } from '../../components/responder/ResponderHome';
+import { useResponderStore } from '../../stores/useResponderStore';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, profile } = useAuthStatus();
+  const { profile, verificationStatus, role } = useAuthStatus();
   const { isLocationGateActive, requestPermissions } = useLocationPermission();
   
-  const role = (user?.app_metadata?.role as string) || 'public_user';
-
   // Fallback for initials
   const getInitials = (name: string) => {
     return name
@@ -29,8 +28,26 @@ export default function HomeScreen() {
 
   const initials = profile?.fullName ? getInitials(profile.fullName) : '??';
 
+  const { status } = useResponderStore();
+
   if (role === 'ambulance_responder') {
-    return <ResponderHome />;
+    return (
+      <>
+        <Tabs.Screen options={{ 
+          tabBarStyle: status === 'idle' ? {
+            backgroundColor: '#020617',
+            borderTopWidth: 1,
+            borderTopColor: '#1E293B',
+            height: 80,
+            paddingBottom: 25,
+            paddingTop: 10,
+            elevation: 0,
+            shadowOpacity: 0,
+          } : { display: 'none' } 
+        }} />
+        <ResponderHome />
+      </>
+    );
   }
 
   return (

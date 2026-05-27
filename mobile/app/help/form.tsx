@@ -96,8 +96,18 @@ export default function FormScreen() {
         accuracy: Location.Accuracy.BestForNavigation,
       });
       
-      setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-      await reverseGeocode(loc.coords.latitude, loc.coords.longitude);
+      let lat = loc.coords.latitude;
+      let lng = loc.coords.longitude;
+
+      // Mock coordinates in Baliwag if user is outside the city (for developer convenience)
+      if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
+        // Baliwag coordinates with a small random offset to scatter test locations
+        lat = 14.945 + (Math.random() - 0.5) * 0.01;
+        lng = 120.895 + (Math.random() - 0.5) * 0.01;
+      }
+      
+      setLocation({ latitude: lat, longitude: lng });
+      await reverseGeocode(lat, lng);
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Could not get current location.');

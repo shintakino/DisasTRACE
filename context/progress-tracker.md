@@ -32,6 +32,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 13: PACC Admin Status & Logs Implementation - Reused high-fidelity log components with role-based column visibility (hidden Action column) and API security checks.
 - Feature 14: Verification (PACC Admin) Specification - Defined requirements for the incident triage system, including queue management and report verification.
 - Feature 14: Verification (PACC Admin) Implementation - Implemented high-fidelity verification system with queue management, resident profiling, and triage actions. Mirrored the PACC Admin design exactly with strict Zod typing.
+- Feature 14.1: Manual Dispatch Modal (PACC Verification) - Seeded design mockup responders, built `/api/verification/available-responders` and `/api/verification/[id]/dispatch` API endpoints, and integrated the high-fidelity multi-tab Manual Dispatch modal matching 14.png and 15.png.
 - Feature 15: Users Approval (PACC Admin) Specification - Defined requirements for the manual registration review workflow, including identity document inspection and a master-detail approval queue.
 - Feature 15: Users Approval (PACC Admin) Implementation - Implemented manual registration review workflow with master-detail layout, identity document viewer, and role-based approval/rejection system.
 - Feature 16: Mobile App Setup (Expo) - Initialized Expo project, configured Supabase Auth, NativeWind, Verification Gate, and base navigation.
@@ -84,4 +85,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Resolved EAS Build failures:
   1. Handled a case-sensitivity mismatch where local terminal casing was `Mobile` (Windows) while Git tracked `mobile` (lowercase). This caused EAS Linux builders to fail. Aligned shell paths and Git track casing.
   2. Fixed a native build error (`assertWorkletsVersionTask FAILED`) caused by `react-native-reanimated@4.1.1` requiring `react-native-worklets: 0.5.x` instead of the project's installed `0.8.3`. Upgraded `react-native-reanimated` to `4.3.1`, which officially supports `react-native: 0.81.x` and `react-native-worklets: 0.8.x`.
+- Enabled Supabase Realtime in the database for `verification_requests` and `incidents` tables.
+- Increased the mobile countdown timer for manual dispatch offers from 5 seconds to 30 seconds in `DispatchSheet.tsx` to match the backend offer duration and allow sufficient time for testing.
+- Implemented Realistic Route Simulation for Developer Testing: Added a dynamic driving simulation button and trigger in `ResponderHome.tsx`. Integrated route-walking using OSRM geometry coordinates, dynamic trigonometrical bearing/heading calculations, real-time Supabase Realtime L2 telemetry broadcast sync, and PostgreSQL REST keep-alive updates. Configured Location tracker and broadcast trackers to automatically yield to simulated runs while active, ensuring off-site verification testing matches production street-navigation behaviors.
+
 

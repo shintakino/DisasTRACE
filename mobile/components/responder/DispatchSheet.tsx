@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase';
 
 export function DispatchSheet() {
   const { status, activeDispatch, acceptDispatch, completeIncident } = useResponderStore();
+  const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds || 30;
   const insets = useSafeAreaInsets();
   const progress = useSharedValue(100);
   
@@ -31,7 +32,7 @@ export function DispatchSheet() {
 
       // Reset and animate the progress bar
       progress.value = 100;
-      progress.value = withTiming(0, { duration: 5000, easing: Easing.linear });
+      progress.value = withTiming(0, { duration: offerDurationSeconds * 1000, easing: Easing.linear });
 
       // Auto-dismiss timeout
       const timeoutId = setTimeout(async () => {
@@ -57,7 +58,7 @@ export function DispatchSheet() {
           }
           completeIncident(); // Dismiss
         }
-      }, 5000);
+      }, offerDurationSeconds * 1000);
 
       return () => clearTimeout(timeoutId);
     } else {
@@ -65,7 +66,7 @@ export function DispatchSheet() {
       translateY.value = withTiming(-800, { duration: 300, easing: Easing.out(Easing.cubic) });
       progress.value = 100;
     }
-  }, [status, insets.top]);
+  }, [status, insets.top, offerDurationSeconds]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -95,7 +96,7 @@ export function DispatchSheet() {
           <View className="items-center z-10 flex-row">
             <View className="w-4 h-4 border-2 border-[#1E3A8A] border-t-transparent rounded-full mr-3 animate-spin" />
             <View>
-              <Text className="text-[#1E3A8A] font-bold text-[13px] mb-0.5">Respond within 5 seconds</Text>
+              <Text className="text-[#1E3A8A] font-bold text-[13px] mb-0.5">Respond within {offerDurationSeconds} seconds</Text>
               <Text className="text-[#475569] text-[11px] font-medium">Auto-dismissed passed to next available unit</Text>
             </View>
           </View>

@@ -112,10 +112,7 @@ export default function PendingScreen() {
     return `${m}:${s}`;
   };
 
-  // Temporarily simulate accepted event for testing flow
-  const triggerAccepted = () => {
-    setIsAccepted(true);
-  };
+
 
   return (
     <View style={styles.container}>
@@ -140,10 +137,7 @@ export default function PendingScreen() {
             <Text style={styles.safetyInstruction}>• Keep your phone nearby to track ambulance arrival.</Text>
           </View>
 
-          {/* Dev helper to trigger flow */}
-          <TouchableOpacity style={styles.devTrigger} onPress={triggerAccepted}>
-            <Text style={styles.devTriggerText}>[Simulate PACC Acceptance]</Text>
-          </TouchableOpacity>
+
 
           <View style={{ flex: 1 }} />
 

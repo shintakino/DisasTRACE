@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, Platform, StatusBar, TouchableOpacity } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
-import { MapPin, HelpCircle, Bell, ChevronRight, Check } from 'lucide-react-native';
+import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Play, Pause } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { useAuthStatus } from '../../hooks/use-auth-status';
@@ -16,11 +16,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FolderDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import * as Location from 'expo-location';
+import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
 
 export function ResponderHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { status, activeDispatch, targetHospital, setTargetHospital, simulateIncomingDispatch } = useResponderStore();
+  const { status, activeDispatch, targetHospital, setTargetHospital } = useResponderStore();
   const { profile, user, role } = useAuthStatus();
   
   // Mock initials
@@ -29,11 +31,128 @@ export function ResponderHome() {
 
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number]>([120.895, 14.945]);
+  const [heading, setHeading] = useState<number>(0);
   const [isSearchingHospital, setIsSearchingHospital] = useState(false);
   const [searchStatus, setSearchStatus] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<any>(null);
   const [routeBounds, setRouteBounds] = useState<any>(null);
+  const [cameraMode, setCameraMode] = useState<'follow' | 'overview'>('follow');
   const isMarkerPress = useRef(false);
+
+  // Simulated Drive Telemetry properties
+  const [isSimulating, setIsSimulating] = useState(false);
+  const isSimulatingRef = useRef(false);
+  const simIntervalRef = useRef<any>(null);
+  const simIndexRef = useRef<number>(0);
+
+  const startSimulation = (coords: [number, number][]) => {
+    if (coords.length < 2) return;
+    setIsSimulating(true);
+    isSimulatingRef.current = true;
+    simIndexRef.current = 0;
+    
+    // Complete the path in approximately 15 steps (~45 seconds)
+    const stepSize = Math.max(1, Math.floor(coords.length / 15));
+    
+    // Connect to the resident telemetry channel
+    const telemetryChannel = supabase.channel(`incident-tracking:${activeDispatch?.id}`);
+    telemetryChannel.subscribe();
+
+    simIntervalRef.current = setInterval(async () => {
+      let nextIdx = simIndexRef.current + stepSize;
+      if (nextIdx >= coords.length - 1) {
+        nextIdx = coords.length - 1;
+        clearInterval(simIntervalRef.current);
+        setIsSimulating(false);
+        isSimulatingRef.current = false;
+        
+        // Auto Arrive at scene when en route simulation completes!
+        if (status === 'en_route') {
+          console.log('[Simulation] Simulation reached incident location. Auto arriving...');
+          useResponderStore.getState().arriveAtScene();
+        } else if (status === 'to_hospital') {
+          console.log('[Simulation] Simulation reached hospital. Auto arriving...');
+          useResponderStore.getState().startReport();
+        }
+      }
+
+      const prevCoord = coords[simIndexRef.current];
+      const currentCoord = coords[nextIdx];
+      simIndexRef.current = nextIdx;
+
+      // Calculate bearing angle from previous step to current step
+      const dy = currentCoord[1] - prevCoord[1];
+      const dx = Math.cos((prevCoord[1] * Math.PI) / 180) * (currentCoord[0] - prevCoord[0]);
+      let angle = Math.atan2(dx, dy) * (180 / Math.PI);
+      if (angle < 0) angle += 360;
+
+      // Update state coordinates and heading
+      setCurrentLocation(currentCoord);
+      setHeading(angle);
+
+      // 1. Broadcast telemetry to the resident
+      telemetryChannel.send({
+        type: 'broadcast',
+        event: 'telemetry',
+        payload: {
+          latitude: currentCoord[1],
+          longitude: currentCoord[0],
+          heading: angle,
+          speedKph: 50,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      // 2. Sync to central DB cache
+      const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+      const { data: { session } } = await supabase.auth.getSession();
+      const reqHeaders: any = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      fetch(`${apiUrl}/responder/location`, {
+        method: 'POST',
+        headers: reqHeaders,
+        body: JSON.stringify({
+          latitude: currentCoord[1],
+          longitude: currentCoord[0]
+        })
+      }).catch(err => console.log('[Simulation] Telemetry DB sync failed:', err));
+
+    }, 3000);
+  };
+
+  const stopSimulation = () => {
+    if (simIntervalRef.current) {
+      clearInterval(simIntervalRef.current);
+    }
+    setIsSimulating(false);
+    isSimulatingRef.current = false;
+  };
+
+  const toggleSimulation = () => {
+    if (isSimulating) {
+      stopSimulation();
+    } else if (routeCoords && routeCoords.length >= 2) {
+      startSimulation(routeCoords);
+    }
+  };
+
+  // Clean up simulation on unmount
+  useEffect(() => {
+    return () => {
+      if (simIntervalRef.current) {
+        clearInterval(simIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Auto-stop simulation if status changes to non-driving states
+  useEffect(() => {
+    if (status !== 'en_route' && status !== 'to_hospital') {
+      stopSimulation();
+    }
+  }, [status]);
 
   // Resume active incident on mount
   useEffect(() => {
@@ -59,6 +178,8 @@ export function ResponderHome() {
           let locationName = 'Baliwag City';
           let typeOfEmergency = 'Medical Emergency';
           let peopleInvolved = 1;
+          let incidentLat = 14.9538;
+          let incidentLng = 120.9029;
 
           const { data: vReq } = await supabase
             .from('verification_requests')
@@ -69,6 +190,8 @@ export function ResponderHome() {
           if (vReq) {
             locationName = vReq.location_description || vReq.address || 'Baliwag City';
             typeOfEmergency = vReq.type || 'Emergency';
+            incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
+            incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
             
             if (vReq.people_involved) {
               const matched = vReq.people_involved.match(/\d+/);
@@ -109,12 +232,89 @@ export function ResponderHome() {
                 minute: '2-digit'
               }),
               coordinates: {
-                latitude: activeInc.latitude || 14.9538,
-                longitude: activeInc.longitude || 120.9029,
+                latitude: incidentLat,
+                longitude: incidentLng,
               },
               typeOfEmergency,
+              assignedAmbulance: activeInc.assigned_ambulance || 'AMB-001',
             }
           });
+        } else {
+          // If no accepted incident, check for pending dispatch offers
+          console.log('[ResponderHome] Checking for pending dispatch offers in DB for responder:', user.id);
+          const { data: offerInc, error: offerError } = await supabase
+            .from('incidents')
+            .select('*')
+            .eq('current_offer_responder_id', user.id)
+            .eq('status', 'DISPATCHED')
+            .maybeSingle();
+
+          if (!offerError && offerInc) {
+            console.log('[ResponderHome] Found active offer in DB to resume:', offerInc);
+            
+            let reporterName = 'Resident';
+            let reporterInitials = 'R';
+            let locationName = 'Baliwag City';
+            let typeOfEmergency = 'Medical Emergency';
+            let peopleInvolved = 1;
+            let incidentLat = 14.9538;
+            let incidentLng = 120.9029;
+
+            const { data: vReq } = await supabase
+              .from('verification_requests')
+              .select('*')
+              .eq('id', offerInc.request_id)
+              .single();
+
+            if (vReq) {
+              locationName = vReq.location_description || vReq.address || 'Baliwag City';
+              typeOfEmergency = vReq.type || 'Emergency';
+              incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
+              incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
+              
+              if (vReq.people_involved) {
+                const matched = vReq.people_involved.match(/\d+/);
+                peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
+              }
+
+              const { data: resUser } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', vReq.resident_id)
+                .single();
+
+              if (resUser) {
+                reporterName = resUser.full_name || 'Resident';
+                reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
+              }
+            }
+
+             useResponderStore.setState({
+              status: 'dispatch_offered',
+              activeDispatch: {
+                id: offerInc.id,
+                type: typeOfEmergency,
+                locationName,
+                distance: '1.5 km',
+                natureOfCall: 'Emergency',
+                peopleInvolved,
+                eta: offerInc.eta_minutes ? `~${offerInc.eta_minutes} min` : '~8 min',
+                reporterName,
+                reporterInitials,
+                timestamp: new Date(offerInc.created_at).toLocaleTimeString("en-US", {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }),
+                coordinates: {
+                  latitude: incidentLat,
+                  longitude: incidentLng,
+                },
+                typeOfEmergency,
+                dispatchOfferDurationSeconds: offerInc.dispatch_offer_duration_seconds || 30,
+                assignedAmbulance: offerInc.assigned_ambulance || 'AMB-001',
+              }
+            });
+          }
         }
       } catch (err) {
         console.error('[ResponderHome] Error resuming active incident:', err);
@@ -150,6 +350,8 @@ export function ResponderHome() {
             let locationName = 'Baliwag City';
             let typeOfEmergency = 'Medical Emergency';
             let peopleInvolved = 1;
+            let incidentLat = 14.9538;
+            let incidentLng = 120.9029;
 
             try {
               const { data: vReq, error: vReqError } = await supabase
@@ -161,6 +363,8 @@ export function ResponderHome() {
               if (!vReqError && vReq) {
                 locationName = vReq.location_description || vReq.address || 'Baliwag City';
                 typeOfEmergency = vReq.type || 'Emergency';
+                incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
+                incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
                 
                 if (vReq.people_involved) {
                   const matched = vReq.people_involved.match(/\d+/);
@@ -182,7 +386,7 @@ export function ResponderHome() {
               console.error('Error fetching verification request details for dispatch offer:', err);
             }
 
-            useResponderStore.setState({
+             useResponderStore.setState({
               status: 'dispatch_offered',
               activeDispatch: {
                 id: inc.id,
@@ -199,10 +403,12 @@ export function ResponderHome() {
                   minute: '2-digit'
                 }),
                 coordinates: {
-                  latitude: inc.latitude || 14.9538,
-                  longitude: inc.longitude || 120.9029,
+                  latitude: incidentLat,
+                  longitude: incidentLng,
                 },
                 typeOfEmergency,
+                dispatchOfferDurationSeconds: inc.dispatch_offer_duration_seconds || 30,
+                assignedAmbulance: inc.assigned_ambulance || 'AMB-001',
               }
             });
           }
@@ -234,99 +440,124 @@ export function ResponderHome() {
     }
   ];
 
+  // 1. Activate live GPS telemetry tracking
+  useBroadcastTracker(
+    activeDispatch?.id || null,
+    (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') && !isSimulating
+  );
+
+  // 2. Track current location of the responder via GPS
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-
-    const fetchRouteAndAnimate = async (start: [number, number], end: [number, number]) => {
+    let subscription: any;
+    
+    const startTracking = async () => {
       try {
-        const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson`);
-        const data = await response.json();
-        
-        if (data.routes && data.routes[0]) {
-          const coords = data.routes[0].geometry.coordinates;
-          setRouteCoords(coords);
-          setCurrentLocation(coords[0]);
-          
-          // Calculate bounds for the entire route so map can zoom to fit it
-          let minLng = coords[0][0];
-          let maxLng = coords[0][0];
-          let minLat = coords[0][1];
-          let maxLat = coords[0][1];
-
-          coords.forEach((coord: number[]) => {
-            if (coord[0] < minLng) minLng = coord[0];
-            if (coord[0] > maxLng) maxLng = coord[0];
-            if (coord[1] < minLat) minLat = coord[1];
-            if (coord[1] > maxLat) maxLat = coord[1];
-          });
-          
-          // [west/minLng, south/minLat, east/maxLng, north/maxLat]
-          setRouteBounds([minLng, minLat, maxLng, maxLat]);
-          
-          let index = 0;
-          // Calculate interval based on number of points to keep animation roughly 5-10 seconds
-          // Max out at 50ms per point minimum to look smooth
-          const msPerPoint = Math.max(50, Math.min(300, 5000 / coords.length));
-          
-          interval = setInterval(() => {
-            if (index < coords.length - 1) {
-              index++;
-              setCurrentLocation(coords[index]);
-              setRouteCoords(coords.slice(index));
-            } else {
-              clearInterval(interval);
-            }
-          }, msPerPoint);
+        const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+        if (fgStatus !== 'granted') {
+          console.warn('[ResponderHome] Location permission not granted.');
+          return;
         }
+        
+        subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 4000,
+            distanceInterval: 5,
+          },
+          (loc) => {
+            if (isSimulatingRef.current) return;
+            let lat = loc.coords.latitude;
+            let lng = loc.coords.longitude;
+            
+            // Mock coordinates in Baliwag if user is outside the city (for developer convenience)
+            if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
+              lat = 14.954;
+              lng = 120.902;
+            }
+            
+            setCurrentLocation([lng, lat]);
+            if (loc.coords.heading !== null && loc.coords.heading !== undefined) {
+              setHeading(loc.coords.heading);
+            }
+          }
+        );
       } catch (err) {
-        console.error("Failed to fetch route", err);
+        console.error('[ResponderHome] Error tracking position:', err);
       }
     };
+    
+    if (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') {
+      startTracking();
+    } else {
+      // Idle or offered: stay at default Baliwag base
+      setCurrentLocation([120.895, 14.945]);
+      setHeading(0);
+    }
+    
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, [status]);
 
-    if (status === 'en_route') {
-      fetchRouteAndAnimate([120.895, 14.945], [120.9029, 14.9538]);
-    } else if (status === 'to_hospital') {
-      const simulateHospitalSearch = async () => {
-        setIsSearchingHospital(true);
-        setSearchStatus('Locating nearest hospital...');
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        const nearest = MOCK_HOSPITALS[0];
-        setSearchStatus(`Contacting ${nearest.name}...`);
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        if (!nearest.caters) {
-          setSearchStatus(`${nearest.name} is at full capacity. Rerouting...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          const alternative = MOCK_HOSPITALS[1];
-          setSearchStatus(`Confirmed with ${alternative.name}`);
-          setTargetHospital(alternative);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          setIsSearchingHospital(false);
-          fetchRouteAndAnimate([120.9029, 14.9538], [alternative.coordinates.longitude, alternative.coordinates.latitude]);
-        } else {
-          setTargetHospital(nearest);
-          setIsSearchingHospital(false);
-          fetchRouteAndAnimate([120.9029, 14.9538], [nearest.coordinates.longitude, nearest.coordinates.latitude]);
+  // 3. Dynamic Real-Time OSRM route calculation
+  useEffect(() => {
+    if (status === 'en_route' && activeDispatch) {
+      const fetchRoute = async () => {
+        try {
+          const url = `https://router.project-osrm.org/route/v1/driving/${currentLocation[0]},${currentLocation[1]};${activeDispatch.coordinates.longitude},${activeDispatch.coordinates.latitude}?overview=full&geometries=geojson`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.routes && data.routes[0]) {
+            const coords = data.routes[0].geometry.coordinates;
+            setRouteCoords(coords);
+            
+            // Calculate map view bounds for OSRM route
+            let minLng = coords[0][0], maxLng = coords[0][0], minLat = coords[0][1], maxLat = coords[0][1];
+            coords.forEach((coord: number[]) => {
+              if (coord[0] < minLng) minLng = coord[0];
+              if (coord[0] > maxLng) maxLng = coord[0];
+              if (coord[1] < minLat) minLat = coord[1];
+              if (coord[1] > maxLat) maxLat = coord[1];
+            });
+            setRouteBounds([minLng, minLat, maxLng, maxLat]);
+          }
+        } catch (err) {
+          console.error('[ResponderHome] Error fetching en route route:', err);
         }
       };
-      
-      simulateHospitalSearch();
-    } else if (status === 'on_scene') {
-      setCurrentLocation([120.9029, 14.9538]);
-      setRouteCoords(null);
-      setRouteBounds(null);
-    } else if (status === 'idle') {
-      setCurrentLocation([120.895, 14.945]);
+      fetchRoute();
+    } else if (status === 'to_hospital' && targetHospital) {
+      const fetchRoute = async () => {
+        try {
+          const url = `https://router.project-osrm.org/route/v1/driving/${currentLocation[0]},${currentLocation[1]};${targetHospital.coordinates.longitude},${targetHospital.coordinates.latitude}?overview=full&geometries=geojson`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.routes && data.routes[0]) {
+            const coords = data.routes[0].geometry.coordinates;
+            setRouteCoords(coords);
+            
+            // Calculate map view bounds for OSRM route
+            let minLng = coords[0][0], maxLng = coords[0][0], minLat = coords[0][1], maxLat = coords[0][1];
+            coords.forEach((coord: number[]) => {
+              if (coord[0] < minLng) minLng = coord[0];
+              if (coord[0] > maxLng) maxLng = coord[0];
+              if (coord[1] < minLat) minLat = coord[1];
+              if (coord[1] > maxLat) maxLat = coord[1];
+            });
+            setRouteBounds([minLng, minLat, maxLng, maxLat]);
+          }
+        } catch (err) {
+          console.error('[ResponderHome] Error fetching hospital route:', err);
+        }
+      };
+      fetchRoute();
+    } else {
       setRouteCoords(null);
       setRouteBounds(null);
     }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [status]);
+  }, [status, currentLocation, activeDispatch, targetHospital]);
 
   // Mock route coordinates from responder to incident
   const routeGeoJSON = {
@@ -358,7 +589,14 @@ export function ResponderHome() {
           setSelectedHospital(null);
         }}
       >
-        {routeBounds ? (
+        {(status === 'en_route' || status === 'to_hospital') && cameraMode === 'follow' ? (
+          <Camera
+            center={currentLocation}
+            zoom={16.5}
+            bearing={heading} // Follow phone's compass/heading orientation dynamically!
+            duration={1000}
+          />
+        ) : routeBounds ? (
           <Camera
             bounds={routeBounds}
             padding={{ top: 120, bottom: 400, left: 40, right: 40 }}
@@ -391,9 +629,17 @@ export function ResponderHome() {
         {/* Responder Marker */}
         <Marker id="responderLocation" lngLat={currentLocation}>
           <View className="items-center justify-center relative">
-            <View className="absolute w-12 h-12 rounded-full bg-blue-500/20" />
-            <View className="p-1.5 rounded-full border-2 border-white bg-blue-600 shadow-md">
-              <View className="w-2.5 h-2.5 rounded-full bg-white" />
+            {/* Pulsing Aura */}
+            <View className="absolute w-14 h-14 rounded-full bg-blue-500/20" />
+            
+            {/* Floating Vehicle Pill Identifier */}
+            <View className="flex-row items-center bg-white py-1 px-2.5 rounded-full border border-blue-200 shadow-lg">
+              <View className="w-6 h-6 rounded-full items-center justify-center bg-blue-600">
+                <Truck color="white" size={11} fill="white" />
+              </View>
+              <Text className="ml-1.5 text-[9px] font-extrabold text-blue-900 uppercase tracking-wider">
+                {activeDispatch?.assignedAmbulance || 'AMB-001'}
+              </Text>
             </View>
           </View>
         </Marker>
@@ -431,6 +677,18 @@ export function ResponderHome() {
                     <Text className="text-xs font-medium text-slate-500 mb-1">{hospital.address}</Text>
                     <Text className="text-xs font-medium text-slate-500">{hospital.phone}</Text>
                     
+                    {status === 'to_hospital' && !targetHospital && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setTargetHospital(hospital);
+                          setSelectedHospital(null);
+                        }}
+                        className="mt-3 bg-blue-600 rounded-lg p-2 items-center"
+                      >
+                        <Text className="text-white text-xs font-bold">Select Hospital</Text>
+                      </TouchableOpacity>
+                    )}
+
                     {/* Tooltip Triangle Pointer */}
                     <View className="absolute -bottom-2 left-1/2 -ml-2 w-4 h-4 bg-white border-b border-r border-slate-200" style={{ transform: [{ rotate: '45deg' }] }} />
                   </View>
@@ -488,10 +746,44 @@ export function ResponderHome() {
           </View>
         </View>
 
-        {isSearchingHospital && (
+        {/* Floating Camera Mode Toggle Button */}
+        {(status === 'en_route' || status === 'to_hospital') && (
+          <View className="absolute right-6 top-[84px] pointer-events-auto" style={{ zIndex: 999 }}>
+            <TouchableOpacity
+              onPress={() => setCameraMode(prev => prev === 'follow' ? 'overview' : 'follow')}
+              activeOpacity={0.85}
+              className="w-11 h-11 bg-white/95 rounded-full shadow-lg border border-slate-200 items-center justify-center"
+            >
+              {cameraMode === 'follow' ? (
+                <Compass size={20} color="#1E3A8A" strokeWidth={2.5} />
+              ) : (
+                <Eye size={20} color="#1E3A8A" strokeWidth={2.5} />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Floating Simulation Button */}
+        {(status === 'en_route' || status === 'to_hospital') && (
+          <View className="absolute right-6 top-[140px] pointer-events-auto" style={{ zIndex: 999 }}>
+            <TouchableOpacity
+              onPress={toggleSimulation}
+              activeOpacity={0.85}
+              className={`w-11 h-11 rounded-full shadow-lg border items-center justify-center ${isSimulating ? 'bg-orange-500 border-orange-400' : 'bg-white/95 border-slate-200'}`}
+            >
+              {isSimulating ? (
+                <Pause size={20} color="white" fill="white" />
+              ) : (
+                <Play size={20} color="#1E3A8A" fill="transparent" />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {status === 'to_hospital' && !targetHospital && (
           <View className="px-6 mt-4 pointer-events-auto">
-            <View className="bg-orange-500/90 p-3 rounded-xl backdrop-blur-md border border-orange-400 shadow-sm">
-              <Text className="text-white font-bold text-xs">{searchStatus}</Text>
+            <View className="bg-orange-500/90 p-3.5 rounded-xl backdrop-blur-md border border-orange-400 shadow-lg shadow-black/10">
+              <Text className="text-white font-bold text-xs text-center">Tap a hospital marker on the map to select destination</Text>
             </View>
           </View>
         )}
@@ -521,14 +813,7 @@ export function ResponderHome() {
           )}
 
           {/* DEV ONLY: Manual dispatch trigger */}
-          {status === 'idle' && (
-            <TouchableOpacity 
-              onPress={simulateIncomingDispatch}
-              className="mt-4 bg-blue-600/90 rounded-xl p-3 items-center backdrop-blur-md border border-blue-500/50"
-            >
-              <Text className="text-white font-bold text-sm">TEST: Trigger Dispatch</Text>
-            </TouchableOpacity>
-          )}
+
 
           {status !== 'idle' && activeDispatch && (
             <View className="flex-row items-center justify-between bg-transparent">

@@ -82,7 +82,42 @@ async function seed() {
       if (existingAuthUser || existingPublicUser) {
         console.log(`User ${account.email} already exists. Cleaning up...`);
         
-        // Delete from public.users first
+        const targetUserId = existingAuthUser?.id || existingPublicUser?.id;
+        
+        if (targetUserId) {
+          // 1. Delete referencing incidents and verification requests first to bypass foreign key constraints
+          const { data: reqs } = await supabase
+            .from('verification_requests')
+            .select('id')
+            .eq('resident_id', targetUserId);
+          
+          if (reqs && reqs.length > 0) {
+            const reqIds = reqs.map(r => r.id);
+            console.log(`Cleaning up ${reqs.length} related verification requests for ${account.email}...`);
+            
+            // Delete related incidents
+            const { error: incDeleteError } = await supabase
+              .from('incidents')
+              .delete()
+              .in('request_id', reqIds);
+            
+            if (incDeleteError) {
+              console.warn(`Warning: Could not delete incidents for requests:`, incDeleteError);
+            }
+
+            // Delete verification requests
+            const { error: reqDeleteError } = await supabase
+              .from('verification_requests')
+              .delete()
+              .eq('resident_id', targetUserId);
+            
+            if (reqDeleteError) {
+              console.warn(`Warning: Could not delete verification requests:`, reqDeleteError);
+            }
+          }
+        }
+
+        // 2. Delete from public.users
         const { error: publicDeleteError } = await supabase
           .from('users')
           .delete()
@@ -128,6 +163,7 @@ async function seed() {
           role: account.role,
           status: 'ACTIVE',
           verification_status: 'APPROVED',
+          duty_status: account.role === 'ambulance_responder' ? 'ON_DUTY' : 'OFF_DUTY',
           updated_at: new Date().toISOString()
         });
 
@@ -140,6 +176,22 @@ async function seed() {
     } catch (error: unknown) {
       console.error(`Error seeding ${account.email}:`, error);
     }
+  }
+
+  // 4. Seed system settings
+  try {
+    console.log('Seeding default system settings...');
+    const { error: settingsError } = await supabase
+      .from('system_settings')
+      .upsert({
+        id: 'current',
+        dispatch_offer_timeout_seconds: 30,
+        updated_at: new Date().toISOString()
+      });
+    if (settingsError) throw settingsError;
+    console.log('✅ Default system settings seeded.');
+  } catch (err) {
+    console.warn('Warning: Could not seed system settings:', err);
   }
 
   console.log('--- Seeding Complete ---');

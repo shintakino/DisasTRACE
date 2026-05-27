@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { VerificationQueue } from "@/components/verification/verification-queue"
 import { VerificationDetails } from "@/components/verification/verification-details"
 import { ResidentPanel } from "@/components/verification/resident-panel"
+import { ManualDispatchModal } from "@/components/verification/manual-dispatch-modal"
 import { VerificationRequest, VerificationStatus } from "@/types/verification"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
@@ -14,6 +15,11 @@ export default function VerificationPage() {
   const [filter, setFilter] = useState<VerificationStatus>("PENDING")
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
+
+  // Manual Dispatch States
+  const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false)
+  const [dispatchReqId, setDispatchReqId] = useState<string | null>(null)
+  const [dispatchReqNum, setDispatchReqNum] = useState<string | null>(null)
 
   const fetchRequests = async () => {
     setIsLoading(true)
@@ -76,6 +82,15 @@ export default function VerificationPage() {
     }
   }
 
+  const handleAccept = (id: string) => {
+    const req = requests.find((r) => r.id === id)
+    if (req) {
+      setDispatchReqId(id)
+      setDispatchReqNum(req.requestId)
+      setIsDispatchModalOpen(true)
+    }
+  }
+
   const selectedRequest = requests.find((r) => r.id === selectedId) || null
 
   if (isLoading) {
@@ -98,9 +113,20 @@ export default function VerificationPage() {
       <VerificationDetails request={selectedRequest} />
       <ResidentPanel
         request={selectedRequest}
-        onAccept={(id) => handleUpdateStatus(id, "VERIFIED")}
+        onAccept={handleAccept}
         onReject={(id) => handleUpdateStatus(id, "REJECTED")}
         isProcessing={isProcessing}
+      />
+      <ManualDispatchModal
+        isOpen={isDispatchModalOpen}
+        onClose={() => {
+          setIsDispatchModalOpen(false)
+          setDispatchReqId(null)
+          setDispatchReqNum(null)
+        }}
+        requestId={dispatchReqId}
+        requestNum={dispatchReqNum}
+        onSuccess={fetchRequests}
       />
     </div>
   )

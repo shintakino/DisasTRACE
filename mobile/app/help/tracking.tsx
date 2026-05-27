@@ -27,9 +27,9 @@ export default function TrackingScreen() {
 
   const [eta, setEta] = useState(8);
   const [distance, setDistance] = useState(1.7);
-  const [elapsed, setElapsed] = useState(310); // 5 mins 10 secs
+  const [elapsed, setElapsed] = useState(0); // Natural elapsed time starting from 0
   const [isArrived, setIsArrived] = useState(false);
-  const [progressPercent, setProgressPercent] = useState(85);
+  const [progressPercent, setProgressPercent] = useState(0); // Starts at 0% and climbs dynamically
   
   const [routeCoords, setRouteCoords] = useState<number[][] | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
@@ -73,10 +73,10 @@ export default function TrackingScreen() {
           
           if (incident.responder) {
             const resp = incident.responder;
-            if (resp.lastLatitude && resp.lastLongitude) {
+            if (resp.last_latitude && resp.last_longitude) {
               setAmbulanceLocation({
-                latitude: resp.lastLatitude,
-                longitude: resp.lastLongitude
+                latitude: Number(resp.last_latitude),
+                longitude: Number(resp.last_longitude)
               });
             }
           }
@@ -131,67 +131,44 @@ export default function TrackingScreen() {
     };
   }, [report.incidentId]);
 
+  // Natural elapsed time incrementer
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval>;
-    
-    async function fetchRoute() {
+    let interval: ReturnType<typeof setInterval>;
+    if (!isArrived) {
+      interval = setInterval(() => {
+        setElapsed((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isArrived]);
+
+  // Fetch real OSRM route from live moving ambulance location to incident coordinates
+  useEffect(() => {
+    async function updateRoute() {
       try {
-        const startLng = targetLocation.longitude - 0.02;
-        const startLat = targetLocation.latitude + 0.015;
-        const endLng = targetLocation.longitude;
-        const endLat = targetLocation.latitude;
-        
-        // OSRM Public Free API
-        const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${ambulanceLocation.longitude},${ambulanceLocation.latitude};${targetLocation.longitude},${targetLocation.latitude}?overview=full&geometries=geojson`;
         const res = await fetch(url);
         const data = await res.json();
         
-        if (data.routes && data.routes.length > 0) {
-          const coords = data.routes[0].geometry.coordinates; // [lng, lat][]
-          setRouteCoords(coords);
-          setAmbulanceLocation({ latitude: coords[0][1], longitude: coords[0][0] });
+        if (data.routes && data.routes[0]) {
+          const route = data.routes[0];
+          setRouteCoords(route.geometry.coordinates);
+          setDistance(route.distance / 1000);
+          setEta(Math.ceil(route.duration / 60));
           
-          const steps = coords.length;
-          const totalDuration = 10000; // 10 seconds simulation
-          const intervalTime = totalDuration / steps;
-          const distStep = 1.7 / steps;
-          const progStep = (100 - 85) / steps;
-          
-          let step = 0;
-          let elapsedSecs = 310;
-          
-          timer = setInterval(() => {
-            step++;
-            
-            if (step % Math.ceil(1000 / intervalTime) === 0) {
-              elapsedSecs++;
-              setElapsed(elapsedSecs);
-            }
-            
-            if (step < steps) {
-              setCurrentStep(step);
-              setAmbulanceLocation({
-                longitude: coords[step][0],
-                latitude: coords[step][1],
-              });
-              setDistance(prev => Math.max(0, prev - distStep));
-              setProgressPercent(prev => Math.min(100, prev + progStep));
-              setEta(Math.ceil(8 * (1 - step / steps)));
-            } else {
-              setIsArrived(true);
-              clearInterval(timer);
-            }
-          }, intervalTime);
+          // Calculate progress percentage dynamically relative to a baseline distance (e.g. 3.5 km initial gap)
+          const initialDist = 3.5;
+          const currentDist = route.distance / 1000;
+          const progress = Math.max(0, Math.min(100, Math.round(((initialDist - currentDist) / initialDist) * 100)));
+          setProgressPercent(progress);
         }
       } catch (err) {
-        console.error("OSRM Route Error", err);
+        console.error("OSRM Dynamic Route Error", err);
       }
     }
     
-    fetchRoute();
-    
-    return () => clearInterval(timer);
-  }, []);
+    updateRoute();
+  }, [ambulanceLocation.latitude, ambulanceLocation.longitude]);
 
   // Format Elapsed Time
   const formatTime = (totalSeconds: number) => {
@@ -255,7 +232,7 @@ export default function TrackingScreen() {
             geometry: {
               type: 'LineString',
               coordinates: routeCoords && routeCoords.length > 0 
-                ? (currentStep >= routeCoords.length - 1 ? routeCoords.slice(-2) : routeCoords.slice(currentStep)) 
+                ? routeCoords
                 : [
                     [ambulanceLocation.longitude, ambulanceLocation.latitude],
                     [targetLocation.longitude, targetLocation.latitude],

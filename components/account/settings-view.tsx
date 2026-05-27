@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { Mail } from "lucide-react";
+import { Mail, Clock } from "lucide-react";
+import { toast } from "sonner";
 import { createClientBrowser } from "@/lib/supabase";
 
 export function SettingsView() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const supabase = createClientBrowser();
 
   const [newEmail, setNewEmail] = useState("");
@@ -25,6 +26,59 @@ export function SettingsView() {
   
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [passwordError, setPasswordError] = useState("");
+
+  const [dispatchTimeout, setDispatchTimeout] = useState<number>(30);
+  const [dispatchLoading, setDispatchLoading] = useState(false);
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await fetch("/api/settings");
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      const data = await response.json();
+      if (data.success && data.settings) {
+        setDispatchTimeout(data.settings.dispatchOfferTimeoutSeconds);
+      }
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+    } finally {
+      setHasLoadedSettings(true);
+    }
+  };
+
+  useEffect(() => {
+    if (user && (role === "cdrrmo_super_admin" || role === "pacc_admin")) {
+      fetchSettings();
+    }
+  }, [user, role]);
+
+  const handleUpdateDispatchSettings = async () => {
+    if (dispatchTimeout < 10 || dispatchTimeout > 120) {
+      toast.error("Manual dispatch countdown must be between 10 and 120 seconds.");
+      return;
+    }
+    setDispatchLoading(true);
+
+    try {
+      const response = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispatchOfferTimeoutSeconds: dispatchTimeout }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update settings");
+      const data = await response.json();
+      if (data.success) {
+        toast.success("Dispatch configuration saved successfully!");
+      } else {
+        throw new Error(data.error || "Failed to update settings");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update settings.");
+    } finally {
+      setDispatchLoading(false);
+    }
+  };
 
   const handleUpdateEmail = async () => {
     if (!newEmail) return;
@@ -77,6 +131,14 @@ export function SettingsView() {
             >
               Sign-in
             </TabsTrigger>
+            {(role === "cdrrmo_super_admin" || role === "pacc_admin") && (
+              <TabsTrigger 
+                value="dispatch"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A8A] data-[state=active]:bg-transparent px-2 py-3 text-base"
+              >
+                Dispatch Settings
+              </TabsTrigger>
+            )}
             <TabsTrigger 
               value="system"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A8A] data-[state=active]:bg-transparent px-2 py-3 text-base text-muted-foreground"
@@ -182,7 +244,62 @@ export function SettingsView() {
             </div>
           </div>
         </TabsContent>
-        
+
+        {(role === "cdrrmo_super_admin" || role === "pacc_admin") && (
+          <TabsContent value="dispatch" className="max-w-xl mx-auto outline-none mt-0">
+            <div className="space-y-8">
+              <div>
+                <div className="text-xs font-bold uppercase text-[#1E293B] mb-3">Incident Dispatch Configuration</div>
+                <div className="p-5 rounded-2xl border border-blue-100 bg-blue-50/20 flex gap-4">
+                  <div className="bg-[#1E3A8A]/10 text-[#1E3A8A] p-2 rounded-xl flex items-center justify-center w-12 h-12 shrink-0">
+                    <Clock className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-[#1E3A8A] text-sm">Real-time Negotiation Offer</h4>
+                    <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
+                      Configure the total duration a responder unit has to review and accept a manual dispatch offer before it automatically auto-declines and gets routed back into the triage queue.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="dispatchTimeout" className="text-sm font-semibold text-[#1E293B]">
+                    Manual Offer Timeout (Seconds)
+                  </Label>
+                  <div className="flex gap-3">
+                    <Input 
+                      id="dispatchTimeout" 
+                      type="number"
+                      min={10}
+                      max={120}
+                      value={dispatchTimeout}
+                      onChange={(e) => setDispatchTimeout(parseInt(e.target.value) || 30)}
+                      placeholder="Enter timeout duration in seconds" 
+                      className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white" 
+                    />
+                    <div className="bg-slate-100 border border-slate-200 text-[#475569] font-bold px-4 rounded-xl flex items-center justify-center text-sm shrink-0">
+                      seconds
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-[#64748B] font-medium leading-normal">
+                    Must be a value between 10 seconds (minimum required for basic device notification delay) and 120 seconds.
+                  </p>
+                </div>
+
+                <Button 
+                  onClick={handleUpdateDispatchSettings}
+                  disabled={dispatchLoading || !hasLoadedSettings}
+                  className="w-full h-12 bg-[#1E3A8A] text-white hover:bg-blue-900 font-semibold rounded-xl transition-all shadow-md active:scale-[0.99]"
+                >
+                  {dispatchLoading ? "Saving Configuration..." : "Save Configuration"}
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+        )}
+
         <TabsContent value="system" className="max-w-xl mx-auto outline-none mt-0">
           <div className="text-xs font-bold uppercase text-[#1E293B] mb-3">System</div>
           

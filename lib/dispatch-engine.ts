@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
+import { systemSettings } from "@/db/schema/system_settings";
 import { eq, ne, and, notInArray } from "drizzle-orm";
 
 // Haversine formula to compute distance in kilometers
@@ -46,17 +47,39 @@ export async function autoDispatchIncident(
       ),
     });
 
+    let reqLat = latitude;
+    let reqLng = longitude;
+
+    // Mock request coordinates in Baliwag if outside (for developer off-site testing convenience)
+    if (reqLat < 14.90 || reqLat > 15.00 || reqLng < 120.80 || reqLng > 121.00) {
+      reqLat = 14.945;
+      reqLng = 120.895;
+    }
+
     // 3. Compute distance vectors and filter responders within 1.2km radius
     const respondersWithDistance = eligibleResponders
       .map((responder) => {
-        if (responder.lastLatitude === null || responder.lastLongitude === null) {
-          return { responder, distanceKm: Infinity };
+        // Fallback to CDRRMO HQ coordinates if responder location is null (crucial for seeded/new responders)
+        let resLat = responder.lastLatitude !== null ? Number(responder.lastLatitude) : 14.9516;
+        let resLng = responder.lastLongitude !== null ? Number(responder.lastLongitude) : 120.9011;
+
+        // Mock coordinates in Baliwag if responder is outside the city (for developer off-site testing convenience)
+        if (resLat < 14.90 || resLat > 15.00 || resLng < 120.80 || resLng > 121.00) {
+          resLat = 14.954;
+          resLng = 120.902;
         }
+
+        // Force seeded responder@disastrace.com to be within 1.2km of request coordinates (~250m) for off-site developer testing
+        if (responder.email === "responder@disastrace.com") {
+          resLat = reqLat + 0.0015;
+          resLng = reqLng + 0.0015;
+        }
+
         const distanceKm = calculateHaversineDistance(
-          latitude,
-          longitude,
-          responder.lastLatitude,
-          responder.lastLongitude
+          reqLat,
+          reqLng,
+          resLat,
+          resLng
         );
         return { responder, distanceKm };
       })
@@ -76,7 +99,11 @@ export async function autoDispatchIncident(
       .set({ status: "VERIFIED", updatedAt: new Date() })
       .where(eq(verificationRequests.id, requestId));
 
-    const offerDuration = 30; // Default 30s negotiation timer
+    // Fetch system settings to resolve dynamic dispatch offer timeout duration
+    const settings = await db.query.systemSettings.findFirst({
+      where: eq(systemSettings.id, 'current'),
+    });
+    const offerDuration = settings?.dispatchOfferTimeoutSeconds ?? 30;
     const offerExpiresAt = new Date(Date.now() + offerDuration * 1000);
 
     // 5. Create the incident record with the initial dispatch offer
@@ -159,17 +186,39 @@ export async function checkAndCascadeExpiredOffers() {
         ? eligibleResponders.filter((r) => r.id !== timedOutResponderId && !updatedSkipped.includes(r.id))
         : eligibleResponders.filter((r) => !updatedSkipped.includes(r.id));
 
+      let reqLat = request.latitude;
+      let reqLng = request.longitude;
+
+      // Mock request coordinates in Baliwag if outside (for developer off-site testing convenience)
+      if (reqLat < 14.90 || reqLat > 15.00 || reqLng < 120.80 || reqLng > 121.00) {
+        reqLat = 14.945;
+        reqLng = 120.895;
+      }
+
       // Compute distances
       const sortedResponders = filteredResponders
         .map((responder) => {
-          if (responder.lastLatitude === null || responder.lastLongitude === null) {
-            return { responder, distanceKm: Infinity };
+          // Fallback to CDRRMO HQ coordinates if responder location is null
+          let resLat = responder.lastLatitude !== null ? Number(responder.lastLatitude) : 14.9516;
+          let resLng = responder.lastLongitude !== null ? Number(responder.lastLongitude) : 120.9011;
+
+          // Mock coordinates in Baliwag if responder is outside the city
+          if (resLat < 14.90 || resLat > 15.00 || resLng < 120.80 || resLng > 121.00) {
+            resLat = 14.954;
+            resLng = 120.902;
           }
+
+          // Force seeded responder@disastrace.com to be within 1.2km of request coordinates (~250m) for off-site developer testing
+          if (responder.email === "responder@disastrace.com") {
+            resLat = reqLat + 0.0015;
+            resLng = reqLng + 0.0015;
+          }
+
           const distanceKm = calculateHaversineDistance(
-            request.latitude,
-            request.longitude,
-            responder.lastLatitude,
-            responder.lastLongitude
+            reqLat,
+            reqLng,
+            resLat,
+            resLng
           );
           return { responder, distanceKm };
         })

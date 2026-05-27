@@ -36,6 +36,8 @@ async function inspect() {
     console.log(`  Role: ${u.role}`);
     console.log(`  Status: ${u.status}`);
     console.log(`  Verification: ${u.verification_status}`);
+    console.log(`  Duty Status: ${u.duty_status}`);
+    console.log(`  Coordinates: (${u.last_latitude}, ${u.last_longitude})`);
   }
 }
 

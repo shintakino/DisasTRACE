@@ -27,6 +27,8 @@ export interface DispatchDetails {
   };
   attachmentUrl?: string; // Mock URL
   typeOfEmergency?: string; // e.g. "Medical"
+  dispatchOfferDurationSeconds?: number; // Configurable duration in seconds
+  assignedAmbulance?: string; // e.g. "AMB-001"
 }
 
 export interface DraftForm {
@@ -58,8 +60,7 @@ interface ResponderState {
   incrementElapsedTime: () => void;
   resetTimer: () => void;
   
-  // Mock triggers
-  simulateIncomingDispatch: () => void;
+  // Actions
   acceptDispatch: () => void;
   confirmArrival: () => void;
   hideArrivalConfirm: () => void;
@@ -75,25 +76,6 @@ interface ResponderState {
   openFormForIncident: (incident: DispatchDetails) => void;
 }
 
-const mockDispatch: DispatchDetails = {
-  id: 'DR-2026-0847',
-  type: 'Vehicular Collision',
-  locationName: 'Brgy. Sabang, Baliwag City',
-  distance: '1.7 km',
-  natureOfCall: 'Emergency',
-  peopleInvolved: 3,
-  eta: '~8 min',
-  reporterName: 'Eloisa Guibani',
-  reporterInitials: 'EG',
-  timestamp: '09:43 PM',
-  coordinates: {
-    latitude: 14.9538,
-    longitude: 120.9029,
-  },
-  typeOfEmergency: 'Medical',
-  attachmentUrl: 'https://placehold.co/600x400/1e3a8a/FFF?text=IMG_7904.jpg',
-};
-
 export const useResponderStore = create<ResponderState>((set) => ({
   status: 'idle',
   activeDispatch: null,
@@ -103,16 +85,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
   isArrivalConfirmVisible: false,
   isSubmittingReport: false,
   showReportSuccess: false,
-  drafts: [
-    {
-      id: 'df-1',
-      incidentId: 'DR-2026-0847',
-      incidentType: 'Fire Emergency',
-      lastSaved: 'Unsent - Auto-save active',
-      formData: {}
-    }
-  ],
-  submittedIncidentIds: ['DR-2026-0841', 'DR-2026-0830', 'DR-2026-0842'], // Based on mock completed/resolved reports
+  drafts: [],
+  submittedIncidentIds: [],
 
   setStatus: (status) => set({ status }),
   setActiveDispatch: (activeDispatch) => set({ activeDispatch }),
@@ -120,11 +94,6 @@ export const useResponderStore = create<ResponderState>((set) => ({
   incrementSceneTime: () => set((state) => ({ sceneTimeSeconds: state.sceneTimeSeconds + 1 })),
   incrementElapsedTime: () => set((state) => ({ elapsedTimeSeconds: state.elapsedTimeSeconds + 1 })),
   resetTimer: () => set({ sceneTimeSeconds: 0, elapsedTimeSeconds: 0 }),
-
-  simulateIncomingDispatch: () => set({ 
-    status: 'dispatch_offered', 
-    activeDispatch: mockDispatch 
-  }),
 
   acceptDispatch: () => set({ 
     status: 'en_route',

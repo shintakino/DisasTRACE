@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getUserRole } from '@/lib/auth';
 import { RosterEntrySchema } from '@/types/roster';
+import { db } from '@/db';
+import { users } from '@/db/schema/users';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 export async function GET() {
@@ -14,53 +17,44 @@ export async function GET() {
     }, { status: 403 });
   }
 
-  // Mock data for Roster Entries matching the new design
-  const rosterData = [
-    {
-      id: '1',
-      fullName: 'Bastes, Renzy',
-      email: 'bastesrenzy@gmail.com',
-      role: 'RESPONDER',
-      status: 'ACTIVE',
-    },
-    {
-      id: '2',
-      fullName: 'Bastes, Renzy',
-      email: 'bastesrenzy@gmail.com',
-      role: 'RESPONDER',
-      status: 'DEACTIVATED',
-    },
-    {
-      id: '3',
-      fullName: 'Bastes, Renzy',
-      email: 'bastesrenzy@gmail.com',
-      role: 'RESPONDER',
-      status: 'ACTIVE',
-    },
-    {
-      id: '4',
-      fullName: 'Bastes, Renzy',
-      email: 'bastesrenzy@gmail.com',
-      role: 'RESPONDER',
-      status: 'SUSPENDED',
-    },
-    {
-      id: '5',
-      fullName: 'Bastes, Renzy',
-      email: 'bastesrenzy@gmail.com',
-      role: 'RESPONDER',
-      status: 'ACTIVE',
-    },
-    {
-      id: '6',
-      fullName: 'Bastes, Renzy',
-      email: 'bastesrenzy@gmail.com',
-      role: 'RESPONDER',
-      status: 'ACTIVE',
-    },
-  ];
+  try {
+    // Query users that are ambulance responders
+    const dbResponders = await db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+      })
+      .from(users)
+      .where(eq(users.role, "ambulance_responder"));
 
-  const validatedData = z.array(RosterEntrySchema).parse(rosterData);
+    const mapped = dbResponders.map((r) => {
+      // Map user status ("ACTIVE", "SUSPENDED", "DEACTIVATED", "PENDING") to RosterStatusSchema ("ACTIVE", "DEACTIVATED", "SUSPENDED")
+      let mappedStatus: "ACTIVE" | "DEACTIVATED" | "SUSPENDED" = "DEACTIVATED";
+      if (r.status === "ACTIVE") {
+        mappedStatus = "ACTIVE";
+      } else if (r.status === "SUSPENDED") {
+        mappedStatus = "SUSPENDED";
+      }
 
-  return NextResponse.json({ data: validatedData });
+      return {
+        id: r.id,
+        fullName: r.fullName,
+        email: r.email,
+        role: "RESPONDER",
+        status: mappedStatus,
+      };
+    });
+
+    const validatedData = z.array(RosterEntrySchema).parse(mapped);
+
+    return NextResponse.json({ data: validatedData });
+  } catch (error) {
+    console.error("Error in GET /api/roster:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
 }
+export const dynamic = 'force-dynamic';
+

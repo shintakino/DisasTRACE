@@ -4,6 +4,7 @@ import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-re
 import { useRouter } from 'expo-router';
 import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPin, CheckCircle2, Truck, Navigation } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { supabase } from '../../lib/supabase';
 
 const { height, width } = Dimensions.get('window');
 const COLLAPSED_HEIGHT = 220;
@@ -48,6 +49,87 @@ export default function TrackingScreen() {
     }).start();
     setDrawerExpanded(nextExpand);
   };
+
+  // Real-time telemetry receiver
+  useEffect(() => {
+    const incidentId = report.incidentId;
+    if (!incidentId) return;
+
+    console.log('[TrackingScreen] Subscribing to telemetry channel for incident:', incidentId);
+
+    // 1. Fetch initial responder coordinates from database
+    const fetchInitialResponderLocation = async () => {
+      try {
+        const { data: incident, error } = await supabase
+          .from('incidents')
+          .select('*, responder:users(*)')
+          .eq('id', incidentId)
+          .single();
+
+        if (!error && incident) {
+          if (incident.status === 'ARRIVED') {
+            setIsArrived(true);
+          }
+          
+          if (incident.responder) {
+            const resp = incident.responder;
+            if (resp.lastLatitude && resp.lastLongitude) {
+              setAmbulanceLocation({
+                latitude: resp.lastLatitude,
+                longitude: resp.lastLongitude
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching initial responder telemetry:', err);
+      }
+    };
+
+    fetchInitialResponderLocation();
+
+    // 2. Subscribe to realtime telemetry broadcasts
+    const channel = supabase.channel(`incident-tracking:${incidentId}`);
+    const sub = channel
+      .on('broadcast', { event: 'telemetry' }, ({ payload }) => {
+        console.log('[TrackingScreen] Real-time telemetry broadcast received:', payload);
+        if (payload && payload.latitude && payload.longitude) {
+          setAmbulanceLocation({
+            latitude: payload.latitude,
+            longitude: payload.longitude
+          });
+        }
+      })
+      .subscribe();
+
+    // 3. Listen to incident status changes (e.g. ARRIVED or RESOLVED)
+    const dbChannel = supabase
+      .channel(`incident-status-${incidentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'incidents',
+          filter: `id=eq.${incidentId}`,
+        },
+        (payload) => {
+          console.log('[TrackingScreen] Real-time incident status update:', payload.new);
+          if (payload.new && payload.new.status === 'ARRIVED') {
+            setIsArrived(true);
+          }
+          if (payload.new && payload.new.status === 'RESOLVED') {
+            router.replace('/help/resolution');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(dbChannel);
+    };
+  }, [report.incidentId]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
@@ -426,7 +508,7 @@ export default function TrackingScreen() {
             {/* Proceed Button */}
             <TouchableOpacity
               style={styles.proceedButton}
-              onPress={() => router.replace('/(tabs)')}
+              onPress={() => router.replace('/help/resolution')}
             >
               <Text style={styles.proceedButtonText}>Proceed</Text>
             </TouchableOpacity>

@@ -1,14 +1,70 @@
 "use client";
 
+import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { Mail } from "lucide-react";
+import { createClientBrowser } from "@/lib/supabase";
 
 export function SettingsView() {
   const { user } = useAuth();
+  const supabase = createClientBrowser();
+
+  const [newEmail, setNewEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const [emailSuccess, setEmailSuccess] = useState("");
+  const [emailError, setEmailError] = useState("");
+  
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
+  const handleUpdateEmail = async () => {
+    if (!newEmail) return;
+    setEmailLoading(true);
+    setEmailSuccess("");
+    setEmailError("");
+
+    try {
+      const { error } = await supabase.auth.updateUser({ email: newEmail });
+      if (error) throw error;
+      
+      setEmailSuccess("Confirmation links sent to both your current and new email addresses.");
+      setNewEmail("");
+    } catch (err: any) {
+      setEmailError(err.message || "Failed to update email address.");
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!newPassword) return;
+    setPasswordLoading(true);
+    setPasswordSuccess("");
+    setPasswordError("");
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+
+      setPasswordSuccess("Password updated successfully.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setTimeout(() => setPasswordSuccess(""), 3000);
+    } catch (err: any) {
+      setPasswordError(err.message || "Failed to update password.");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   return (
     <div className="w-full" key={user?.id || "loading"}>
@@ -48,12 +104,33 @@ export function SettingsView() {
             <div>
               <div className="text-xs font-bold uppercase text-[#1E293B] mb-3">Change Email Address</div>
               <div className="space-y-4">
+                {emailSuccess && (
+                  <div className="p-3 bg-green-50 text-green-700 text-sm font-semibold rounded-xl border border-green-200">
+                    {emailSuccess}
+                  </div>
+                )}
+                {emailError && (
+                  <div className="p-3 bg-red-50 text-red-700 text-sm font-semibold rounded-xl border border-red-200">
+                    {emailError}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="newEmail" className="text-sm font-semibold text-[#1E293B]">New Email Address</Label>
-                  <Input id="newEmail" defaultValue={user?.email || ""} className="h-12 border-[#CBD5E1] rounded-xl text-base px-4" />
+                  <Input 
+                    id="newEmail" 
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="Enter new email address" 
+                    className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white" 
+                  />
                 </div>
-                <Button className="w-full h-12 bg-[#E2E8F0] text-[#1E3A8A] hover:bg-[#CBD5E1] font-semibold rounded-xl">
-                  Update Email
+                <Button 
+                  onClick={handleUpdateEmail}
+                  disabled={emailLoading || !newEmail}
+                  className="w-full h-12 bg-[#1E3A8A] text-white hover:bg-blue-900 font-semibold rounded-xl transition-all"
+                >
+                  {emailLoading ? "Updating..." : "Update Email"}
                 </Button>
               </div>
             </div>
@@ -61,16 +138,45 @@ export function SettingsView() {
             <div>
               <div className="text-xs font-bold uppercase text-[#1E293B] mb-3">Change Password</div>
               <div className="space-y-4">
+                {passwordSuccess && (
+                  <div className="p-3 bg-green-50 text-green-700 text-sm font-semibold rounded-xl border border-green-200">
+                    {passwordSuccess}
+                  </div>
+                )}
+                {passwordError && (
+                  <div className="p-3 bg-red-50 text-red-700 text-sm font-semibold rounded-xl border border-red-200">
+                    {passwordError}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="currentPassword" className="text-sm font-semibold text-[#1E293B]">Current Password</Label>
-                  <Input id="currentPassword" type="password" placeholder="Enter current password" className="h-12 border-[#CBD5E1] rounded-xl text-base px-4" />
+                  <Input 
+                    id="currentPassword" 
+                    type="password" 
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password (for safety)" 
+                    className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="newPassword" className="text-sm font-semibold text-[#1E293B]">New Password</Label>
-                  <Input id="newPassword" type="password" placeholder="Enter new password" className="h-12 border-[#CBD5E1] rounded-xl text-base px-4" />
+                  <Input 
+                    id="newPassword" 
+                    type="password" 
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password" 
+                    className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white" 
+                  />
                 </div>
-                <Button className="w-full h-12 bg-[#E2E8F0] text-[#1E3A8A] hover:bg-[#CBD5E1] font-semibold rounded-xl">
-                  Update Password
+                <Button 
+                  onClick={handleUpdatePassword}
+                  disabled={passwordLoading || !newPassword}
+                  className="w-full h-12 bg-[#1E3A8A] text-white hover:bg-blue-900 font-semibold rounded-xl transition-all"
+                >
+                  {passwordLoading ? "Updating..." : "Update Password"}
                 </Button>
               </div>
             </div>

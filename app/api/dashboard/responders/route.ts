@@ -1,27 +1,71 @@
 import { NextResponse } from 'next/server';
-import { getUserRole } from '@/lib/auth';
-import { ResponderSchema } from '@/types/dashboard';
-import { z } from 'zod';
+import { db } from "@/db";
+import { users } from "@/db/schema/users";
+import { eq, and } from "drizzle-orm";
+import { createClient } from "@/lib/supabase-server";
+
+// Helper function to extract initials from full name
+function getInitials(name: string): string {
+  if (!name) return "JD";
+  
+  if (name.includes(",")) {
+    const parts = name.split(",").map(p => p.trim());
+    const last = parts[0] || "";
+    const first = parts[1] || "";
+    return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+  }
+  
+  const tokens = name.split(/\s+/).filter(Boolean);
+  if (tokens.length === 1) return tokens[0].substring(0, 2).toUpperCase();
+  if (tokens.length > 1) {
+    return `${tokens[0].charAt(0)}${tokens[tokens.length - 1].charAt(0)}`.toUpperCase();
+  }
+  return "JD";
+}
 
 export async function GET() {
-  const role = await getUserRole();
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (role !== 'cdrrmo_super_admin' && role !== 'pacc_admin') {
-    return NextResponse.json({ 
-      error: 'Unauthorized', 
-      message: `Access denied. This dashboard requires Admin privileges, but your session has "${role}".`,
-      currentRole: role 
-    }, { status: 403 });
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const role = user.app_metadata?.role;
+    if (role !== 'cdrrmo_super_admin' && role !== 'pacc_admin') {
+      return NextResponse.json({ 
+        error: 'Unauthorized', 
+        message: `Access denied. Dashboard requires Admin privileges.`,
+        currentRole: role 
+      }, { status: 403 });
+    }
+
+    // Fetch live active responders from database
+    const dbResponders = await db.query.users.findMany({
+      where: and(
+        eq(users.role, "ambulance_responder"),
+        eq(users.status, "ACTIVE")
+      ),
+    });
+
+    const mapped = dbResponders.map((r) => {
+      let statusMapped: 'DISPATCHED' | 'STANDBY' | 'OFF DUTY' = 'OFF DUTY';
+      if (r.dutyStatus === 'ACTIVE_DISPATCH') statusMapped = 'DISPATCHED';
+      else if (r.dutyStatus === 'ON_DUTY') statusMapped = 'STANDBY';
+
+      return {
+        id: r.id,
+        name: r.fullName,
+        status: statusMapped,
+        initials: getInitials(r.fullName),
+      };
+    });
+
+    return NextResponse.json({ data: mapped });
+  } catch (error) {
+    console.error("Error in GET /api/dashboard/responders:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-
-  // Mock data for responders
-  const responders = z.array(ResponderSchema).parse([
-    { id: '1', name: 'Eloisa Guibani', status: 'DISPATCHED', initials: 'EG' },
-    { id: '2', name: 'Kyla Mae Sanchez', status: 'STANDBY', initials: 'KM' },
-    { id: '3', name: 'Juan Dela Cruz', status: 'OFF DUTY', initials: 'JD' },
-    { id: '4', name: 'Maria Santos', status: 'DISPATCHED', initials: 'MS' },
-    { id: '5', name: 'Ricardo Dalisay', status: 'STANDBY', initials: 'RD' },
-  ]);
-
-  return NextResponse.json({ data: responders });
 }
+export const dynamic = 'force-dynamic';

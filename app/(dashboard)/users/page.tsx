@@ -71,69 +71,105 @@ export default function UsersPage() {
   };
 
   const handleUpdateUser = async (id: string, updates: { status?: UserStatus; role?: UserRole; reason?: string }) => {
-    // In a real app, this would be an API call
-    toast.success(`User updated successfully`);
-    
-    // Optimistic update
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
-    setFilteredUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
-    
-    // Re-calculate summary
-    const newUsers = users.map(u => u.id === id ? { ...u, ...updates } : u);
-    setSummary({
-      total: newUsers.length,
-      active: newUsers.filter(u => u.status === "ACTIVE").length,
-      suspended: newUsers.filter(u => u.status === "SUSPENDED").length,
-      deactivated: newUsers.filter(u => u.status === "DEACTIVATED").length,
-    });
+    try {
+      const response = await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          status: updates.status,
+          role: updates.role,
+          rejectionReason: updates.reason
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`User updated successfully`);
+        fetchData();
+      } else {
+        const err = await response.json();
+        toast.error(err.error || "Failed to update user");
+      }
+    } catch (err) {
+      console.error("Failed to update user:", err);
+      toast.error("Failed to update user");
+    }
   };
 
-  const handleBanUser = (id: string, reason: string) => {
-    // Implement ban logic here, such as updating user status to SUSPENDED
-    // with the reason provided.
-    console.log(`Banned user ${id} for: ${reason}`);
+  const handleBanUser = async (id: string, reason: string) => {
+    try {
+      const response = await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          status: "SUSPENDED",
+          rejectionReason: reason
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`User banned successfully`);
+        fetchData();
+      } else {
+        const err = await response.json();
+        toast.error(err.error || "Failed to ban user");
+      }
+    } catch (err) {
+      console.error("Failed to ban user:", err);
+      toast.error("Failed to ban user");
+    }
   };
 
   const handleDeleteUser = async (id: string) => {
-    // In a real app, this would be an API call
-    toast.success("User deleted successfully");
-    
-    // Optimistic update
-    const newUsers = users.filter(u => u.id !== id);
-    setUsers(newUsers);
-    setFilteredUsers(newUsers);
-    setSummary({
-      total: newUsers.length,
-      active: newUsers.filter(u => u.status === "ACTIVE").length,
-      suspended: newUsers.filter(u => u.status === "SUSPENDED").length,
-      deactivated: newUsers.filter(u => u.status === "DEACTIVATED").length,
-    });
+    try {
+      const response = await fetch(`/api/users?id=${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        toast.success("User deleted successfully");
+        fetchData();
+      } else {
+        const err = await response.json();
+        toast.error(err.error || "Failed to delete user");
+      }
+    } catch (err) {
+      console.error("Failed to delete user:", err);
+      toast.error("Failed to delete user");
+    }
   };
 
   const handleExport = () => {
     toast.info("Exporting user list to PDF...");
   };
 
-  const handleCreateUser = (newUser: { fullName: string; email: string; role: UserRole }) => {
-    toast.success(`Account for ${newUser.fullName} created successfully`);
-    
-    const userEntry: UserManagementEntry = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...newUser,
-      status: "ACTIVE",
-      joinedDate: new Date().toISOString().split("T")[0],
-      lastActive: "Just now",
-    };
+  const handleCreateUser = async (newUser: { fullName: string; email: string; role: UserRole; password?: string }) => {
+    try {
+      const response = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: newUser.fullName,
+          email: newUser.email,
+          role: newUser.role,
+          password: newUser.password || "DisasTRACE_Default_2026!",
+        }),
+      });
 
-    setUsers(prev => [userEntry, ...prev]);
-    setFilteredUsers(prev => [userEntry, ...prev]);
-    
-    setSummary(prev => ({
-      ...prev,
-      total: prev.total + 1,
-      active: prev.active + 1,
-    }));
+      if (response.ok) {
+        toast.success(`Account for ${newUser.fullName} created successfully`);
+        fetchData();
+      } else {
+        const err = await response.json();
+        toast.error(err.error || "Failed to create user account");
+      }
+    } catch (err) {
+      console.error("Failed to create user:", err);
+      toast.error("Failed to create user account");
+    }
   };
+
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">

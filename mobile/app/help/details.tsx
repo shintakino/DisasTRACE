@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, CheckCircle, X } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
+import { uploadIncidentPhoto } from '../../lib/storage';
 const WHAT_OPTIONS = [
   "Conscious and stable",
   "Conscious and Unstable",
@@ -93,27 +94,35 @@ export default function DetailsScreen() {
     // Show analyzing modal
     setShowAnalyzing(true);
     
-    // Combine local form data with global store
-    const localDescription = `Condition: ${what}\nAccess: ${where}\nTime: ${when}\nCause: ${how}\nOther: ${whatOther} ${whereOther} ${howOther}`;
-    
-    const payload = {
-      incidentType: report.incidentType || 'Unknown Cause',
-      peopleInvolved: report.peopleInvolved || 'None',
-      landmarks: localDescription,
-      latitude: report.latitude,
-      longitude: report.longitude,
-      severity: report.severity || 'Medium',
-      nature: report.severity ? 'EMERGENCY' : 'NON-EMERGENCY',
-      imageUrl: report.photoUri,
-    };
-
     // Simulate analyzing steps
     setTimeout(() => setAnalyzingStep(1), 800);
     setTimeout(() => setAnalyzingStep(2), 1600);
     setTimeout(() => setAnalyzingStep(3), 2400);
     setTimeout(() => setAnalyzingStep(4), 3200);
-    
+
     try {
+      let uploadedUrl = null;
+      if (report.photoUri) {
+        const uniqueId = Date.now().toString() + Math.random().toString(36).substring(7);
+        console.log('[DetailsScreen] Uploading incident scene photo to Supabase storage with ID:', uniqueId);
+        uploadedUrl = await uploadIncidentPhoto(uniqueId, report.photoUri);
+        console.log('[DetailsScreen] Uploaded incident scene photo successfully. Public URL:', uploadedUrl);
+      }
+
+      // Combine local form data with global store
+      const localDescription = `Condition: ${what}\nAccess: ${where}\nTime: ${when}\nCause: ${how}\nOther: ${whatOther} ${whereOther} ${howOther}`;
+      
+      const payload = {
+        incidentType: report.incidentType || 'Unknown Cause',
+        peopleInvolved: report.peopleInvolved || 'None',
+        landmarks: localDescription,
+        latitude: report.latitude,
+        longitude: report.longitude,
+        severity: report.severity || 'Medium',
+        nature: report.severity ? 'EMERGENCY' : 'NON-EMERGENCY',
+        imageUrl: uploadedUrl,
+      };
+
       const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -127,6 +136,17 @@ export default function DetailsScreen() {
       });
       
       const data = await response.json();
+      
+      if (data.success && data.request) {
+        useEmergencyReportStore.setState((state) => ({
+          report: {
+            ...state.report,
+            id: data.request.id,
+            requestId: data.request.requestId,
+            incidentId: data.incident?.id,
+          }
+        }));
+      }
       
       // Wait for animations
       setTimeout(() => {

@@ -106,7 +106,14 @@ export function IncidentReportForm() {
 
   const handleSubmit = () => {
     if (activeDispatch) {
-      submitReport(activeDispatch.id);
+      const formData = {
+        natureOfCall,
+        typeOfEmergency,
+        severityLevel,
+        patients,
+        description: `Crew findings on scene: ${natureOfCall} call. Emergency type identified as ${typeOfEmergency}. Severity level: ${severityLevel}. Treated ${patients.length} patient(s) on scene.`,
+      };
+      submitReport(activeDispatch.id, formData);
     }
   };
 

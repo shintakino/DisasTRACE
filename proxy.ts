@@ -12,13 +12,15 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith(route)
   );
 
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api/');
+
   // Redirect unauthenticated users to sign-in if they are not on a public route
-  if (!user && !isPublicRoute) {
+  if (!user && !isPublicRoute && !isApiRoute) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
   }
 
   // If authenticated, check for platform restrictions
-  if (user) {
+  if (user && !isApiRoute) {
     const role = user.app_metadata?.role;
     const isMobileOnlyRole = role === 'public_user' || role === 'ambulance_responder';
     const isUnauthorizedPage = request.nextUrl.pathname === "/unauthorized-platform";

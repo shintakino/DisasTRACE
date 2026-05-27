@@ -2,67 +2,263 @@ import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
-import { eq, ne, and, inArray, notInArray } from "drizzle-orm";
+import { eq, ne, and, notInArray } from "drizzle-orm";
 
-export async function autoDispatchIncident(requestId: string, residentId: string, latitude: number, longitude: number) {
+// Haversine formula to compute distance in kilometers
+function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
+
+export async function autoDispatchIncident(
+  requestId: string,
+  residentId: string,
+  latitude: number,
+  longitude: number
+) {
   try {
-    // 1. Find an available ambulance_responder
-    // An available responder is one with role = 'ambulance_responder'
-    // AND who is NOT currently assigned to an active incident (status in ['DISPATCHED', 'EN_ROUTE', 'ARRIVED'])
-    // AND is ACTIVE
-    
-    const activeIncidents = await db.query.incidents.findMany({
-      where: inArray(incidents.status, ['DISPATCHED', 'EN_ROUTE', 'ARRIVED']),
-      columns: {
-        currentOfferResponderId: true,
-      }
-    });
-    
-    const busyResponderIds = activeIncidents
-      .map(i => i.currentOfferResponderId)
-      .filter(Boolean) as string[];
-
-    // Fetch available responders
-    let availableRespondersQuery = db.query.users.findMany({
-      where: and(
-        eq(users.role, 'ambulance_responder'),
-        eq(users.status, 'ACTIVE')
-      ),
-      limit: 10
+    // 1. Fetch the verification request to inspect details
+    const request = await db.query.verificationRequests.findFirst({
+      where: eq(verificationRequests.id, requestId),
     });
 
-    const potentialResponders = await availableRespondersQuery;
-    const availableResponders = potentialResponders.filter(r => !busyResponderIds.includes(r.id));
-
-    if (availableResponders.length === 0) {
-      // No available responders found
+    if (!request) {
+      console.error(`Verification request ${requestId} not found during auto-dispatch`);
       return null;
     }
 
-    // Assign the first available responder (for now)
-    const assignedResponder = availableResponders[0];
+    // 2. Fetch all clocked-in responders
+    // Clocked-in means: role = 'ambulance_responder', status = 'ACTIVE', dutyStatus = 'ON_DUTY'
+    const eligibleResponders = await db.query.users.findMany({
+      where: and(
+        eq(users.role, "ambulance_responder"),
+        eq(users.status, "ACTIVE"),
+        eq(users.dutyStatus, "ON_DUTY")
+      ),
+    });
 
-    // 2. Update the verification request to VERIFIED
-    const [updatedReq] = await db.update(verificationRequests)
-      .set({ status: 'VERIFIED' })
-      .where(eq(verificationRequests.id, requestId))
-      .returning();
+    // 3. Compute distance vectors and filter responders within 1.2km radius
+    const respondersWithDistance = eligibleResponders
+      .map((responder) => {
+        if (responder.lastLatitude === null || responder.lastLongitude === null) {
+          return { responder, distanceKm: Infinity };
+        }
+        const distanceKm = calculateHaversineDistance(
+          latitude,
+          longitude,
+          responder.lastLatitude,
+          responder.lastLongitude
+        );
+        return { responder, distanceKm };
+      })
+      .filter((item) => item.distanceKm <= 1.2) // Only within 1.2km radius
+      .sort((a, b) => a.distanceKm - b.distanceKm); // Sort nearest first
 
-    // 3. Create the incident record
+    if (respondersWithDistance.length === 0) {
+      console.log(`No eligible responders within 1.2km found for request ${requestId}`);
+      return null;
+    }
+
+    const assignedItem = respondersWithDistance[0];
+    const assignedResponder = assignedItem.responder;
+
+    // 4. Update the verification request to VERIFIED
+    await db.update(verificationRequests)
+      .set({ status: "VERIFIED", updatedAt: new Date() })
+      .where(eq(verificationRequests.id, requestId));
+
+    const offerDuration = 30; // Default 30s negotiation timer
+    const offerExpiresAt = new Date(Date.now() + offerDuration * 1000);
+
+    // 5. Create the incident record with the initial dispatch offer
     const [newIncident] = await db.insert(incidents).values({
       id: crypto.randomUUID(),
-      requestId: updatedReq.id,
-      responderId: null, // Null initially while offering, or we could set it to assignedResponder.id if it's direct dispatch
+      requestId,
+      responderId: null, // Null during negotiation offer
       currentOfferResponderId: assignedResponder.id,
-      status: 'DISPATCHED',
-      dispatchMethod: 'AUTO_1KM',
-      assignedAmbulance: 'Ambulance Unit ' + Math.floor(Math.random() * 5 + 1), // Mock assigned ambulance unit
-      etaMinutes: Math.floor(Math.random() * 10) + 5, // Mock ETA 5-15 mins
+      status: "DISPATCHED",
+      dispatchMethod: "AUTO_1KM",
+      assignedAmbulance: "Ambulance Unit " + Math.floor(Math.random() * 5 + 1),
+      etaMinutes: Math.max(2, Math.round(assignedItem.distanceKm * 5)), // Approximate ETA based on distance
+      offerExpiresAt,
+      dispatchOfferDurationSeconds: offerDuration,
+      skippedResponderIds: [],
     }).returning();
+
+    // 6. Set responder's dutyStatus to ACTIVE_DISPATCH (reserved for countdown)
+    await db.update(users)
+      .set({ dutyStatus: "ACTIVE_DISPATCH" })
+      .where(eq(users.id, assignedResponder.id));
 
     return newIncident;
   } catch (error) {
-    console.error('Error in autoDispatchIncident:', error);
+    console.error("Error in autoDispatchIncident:", error);
     return null;
+  }
+}
+
+export async function checkAndCascadeExpiredOffers() {
+  try {
+    const now = new Date();
+
+    // 1. Find all active incidents in DISPATCHED state where the offer expired
+    const expiredIncidents = await db.query.incidents.findMany({
+      where: eq(incidents.status, "DISPATCHED"),
+      with: {
+        resident: false,
+      },
+    });
+
+    for (const incident of expiredIncidents) {
+      if (!incident.offerExpiresAt || incident.offerExpiresAt > now) {
+        continue;
+      }
+
+      // Found expired offer: Cascade to next responder
+      console.log(`Cascade: Dispatch offer for incident ${incident.id} expired. Routing to next responder.`);
+
+      const request = await db.query.verificationRequests.findFirst({
+        where: eq(verificationRequests.id, incident.requestId),
+      });
+
+      if (!request) continue;
+
+      // Mark the timed-out responder as skipped
+      const timedOutResponderId = incident.currentOfferResponderId;
+      const currentSkipped = incident.skippedResponderIds || [];
+      const updatedSkipped = timedOutResponderId 
+        ? [...currentSkipped, timedOutResponderId]
+        : currentSkipped;
+
+      if (timedOutResponderId) {
+        // Reset timed-out responder back to ON_DUTY so they can take other runs
+        await db.update(users)
+          .set({ dutyStatus: "ON_DUTY" })
+          .where(eq(users.id, timedOutResponderId));
+      }
+
+      // Fetch clocked-in responders who are not in the skipped list
+      const eligibleResponders = await db.query.users.findMany({
+        where: and(
+          eq(users.role, "ambulance_responder"),
+          eq(users.status, "ACTIVE"),
+          eq(users.dutyStatus, "ON_DUTY")
+        ),
+      });
+
+      const filteredResponders = timedOutResponderId
+        ? eligibleResponders.filter((r) => r.id !== timedOutResponderId && !updatedSkipped.includes(r.id))
+        : eligibleResponders.filter((r) => !updatedSkipped.includes(r.id));
+
+      // Compute distances
+      const sortedResponders = filteredResponders
+        .map((responder) => {
+          if (responder.lastLatitude === null || responder.lastLongitude === null) {
+            return { responder, distanceKm: Infinity };
+          }
+          const distanceKm = calculateHaversineDistance(
+            request.latitude,
+            request.longitude,
+            responder.lastLatitude,
+            responder.lastLongitude
+          );
+          return { responder, distanceKm };
+        })
+        .filter((item) => item.distanceKm <= 1.2)
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+
+      if (sortedResponders.length > 0) {
+        // Option A: Cascade offer to the next nearest unit
+        const nextItem = sortedResponders[0];
+        const nextResponder = nextItem.responder;
+
+        const nextOfferDuration = incident.dispatchOfferDurationSeconds || 30;
+        const nextOfferExpiresAt = new Date(Date.now() + nextOfferDuration * 1000);
+
+        await db.update(incidents)
+          .set({
+            currentOfferResponderId: nextResponder.id,
+            offerExpiresAt: nextOfferExpiresAt,
+            skippedResponderIds: updatedSkipped,
+            etaMinutes: Math.max(2, Math.round(nextItem.distanceKm * 5)),
+          })
+          .where(eq(incidents.id, incident.id));
+
+        // Reserve new responder
+        await db.update(users)
+          .set({ dutyStatus: "ACTIVE_DISPATCH" })
+          .where(eq(users.id, nextResponder.id));
+
+        console.log(`Cascade successfully completed. Transmitted offer to responder ${nextResponder.fullName}.`);
+      } else {
+        // No more responders left in range: Trigger PACC Manual Override Fallback!
+        console.log(`Cascade exhausted: No remaining available responders within 1.2km for incident ${incident.id}. Alerting PACC dispatcher.`);
+        
+        await db.update(incidents)
+          .set({
+            currentOfferResponderId: null,
+            offerExpiresAt: null,
+            skippedResponderIds: updatedSkipped,
+            dispatchMethod: "PACC_MANUAL",
+          })
+          .where(eq(incidents.id, incident.id));
+
+        // Trigger Option B Background Recycle Queue Fallback
+        // (If PACC admins do not manual force-dispatch within 120 seconds, the incident automatically reverts to PENDING)
+        // We calculate override timeout relative to NOW
+        const manualOverrideRecycleTimer = new Date(Date.now() + 120 * 1000);
+        
+        // Save override expiration to incidents using `offerExpiresAt` slot or custom metadata
+        await db.update(incidents)
+          .set({
+            offerExpiresAt: manualOverrideRecycleTimer // 120s recycling countdown
+          })
+          .where(eq(incidents.id, incident.id));
+      }
+    }
+  } catch (error) {
+    console.error("Error in checkAndCascadeExpiredOffers:", error);
+  }
+}
+
+// Background scheduler method to automatically recycle expired manual overrides back to general triage queue (Option B)
+export async function checkAndRecycleManualOverrides() {
+  try {
+    const now = new Date();
+
+    const manualIncidents = await db.query.incidents.findMany({
+      where: and(
+        eq(incidents.status, "DISPATCHED"),
+        eq(incidents.dispatchMethod, "PACC_MANUAL")
+      ),
+    });
+
+    for (const incident of manualIncidents) {
+      if (incident.offerExpiresAt && incident.offerExpiresAt <= now) {
+        console.log(`Manual Override Timeout: Incident ${incident.id} was not force-dispatched by PACC dispatcher within 120 seconds. Recycling to general triage queue.`);
+
+        // 1. Delete/Resolve incident entry since we revert to triage PENDING status
+        await db.delete(incidents).where(eq(incidents.id, incident.id));
+
+        // 2. Revert request status back to PENDING so it re-enters the PACC triage queue
+        await db.update(verificationRequests)
+          .set({
+            status: "PENDING",
+            updatedAt: new Date()
+          })
+          .where(eq(verificationRequests.id, incident.requestId));
+      }
+    }
+  } catch (error) {
+    console.error("Error in checkAndRecycleManualOverrides:", error);
   }
 }

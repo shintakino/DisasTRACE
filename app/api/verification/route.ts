@@ -9,9 +9,10 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Check for PACC Admin role (mocking check by requiring user for now)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check for PACC Admin or CDRRMO Super Admin role
+    const role = user?.app_metadata?.role;
+    if (role !== "pacc_admin" && role !== "cdrrmo_super_admin") {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Fetch from database
@@ -19,11 +20,41 @@ export async function GET(req: NextRequest) {
       orderBy: [desc(verificationRequests.createdAt)],
       limit: 50,
       with: {
-        resident: true, // Assuming relation exists in schema
+        resident: true,
       }
     });
 
-    return NextResponse.json(requests);
+    const mappedRequests = requests.map((r) => {
+      // Convert peopleInvolved enum string to a number
+      let peopleCount = 0;
+      if (r.peopleInvolved === '1-2 Persons') peopleCount = 2;
+      else if (r.peopleInvolved === '3-5 Persons') peopleCount = 4;
+      else if (r.peopleInvolved === '6+ Persons') peopleCount = 6;
+
+      const imageUrlStr = r.imageUrl || undefined;
+
+      return {
+        id: r.id,
+        requestId: r.requestId,
+        status: r.status,
+        nature: r.nature,
+        type: r.type,
+        location: r.locationDescription || "Baliwag City",
+        peopleInvolved: peopleCount,
+        imageUrl: imageUrlStr,
+        receivedAt: r.createdAt.toISOString(),
+        resident: {
+          id: r.resident.id,
+          fullName: r.resident.fullName,
+          phone: r.resident.phone || "No phone provided",
+          address: r.resident.address || "No address recorded",
+          priorReports: 3, // Mock/Default standing score since not stored in DB
+          isVerified: r.resident.verificationStatus === 'APPROVED',
+        }
+      };
+    });
+
+    return NextResponse.json(mappedRequests);
   } catch (error) {
     console.error('Error fetching verification requests:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

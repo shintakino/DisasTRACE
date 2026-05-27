@@ -15,12 +15,13 @@ import { IncidentReportForm } from './IncidentReportForm';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FolderDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { supabase } from '../../lib/supabase';
 
 export function ResponderHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { status, activeDispatch, targetHospital, setTargetHospital, simulateIncomingDispatch } = useResponderStore();
-  const { profile } = useAuthStatus();
+  const { profile, user, role } = useAuthStatus();
   
   // Mock initials
   const initials = profile?.fullName ? profile.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'RB';
@@ -33,6 +34,186 @@ export function ResponderHome() {
   const [selectedHospital, setSelectedHospital] = useState<any>(null);
   const [routeBounds, setRouteBounds] = useState<any>(null);
   const isMarkerPress = useRef(false);
+
+  // Resume active incident on mount
+  useEffect(() => {
+    if (!profile || role !== 'ambulance_responder' || !user?.id) return;
+
+    const resumeActiveIncident = async () => {
+      try {
+        console.log('[ResponderHome] Checking for active dispatch in database for responder:', user.id);
+        const { data: activeInc, error } = await supabase
+          .from('incidents')
+          .select('*')
+          .eq('responder_id', user.id)
+          .neq('status', 'RESOLVED')
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (activeInc) {
+          console.log('[ResponderHome] Found active incident in DB to resume:', activeInc);
+          
+          let reporterName = 'Resident';
+          let reporterInitials = 'R';
+          let locationName = 'Baliwag City';
+          let typeOfEmergency = 'Medical Emergency';
+          let peopleInvolved = 1;
+
+          const { data: vReq } = await supabase
+            .from('verification_requests')
+            .select('*')
+            .eq('id', activeInc.request_id)
+            .single();
+
+          if (vReq) {
+            locationName = vReq.location_description || vReq.address || 'Baliwag City';
+            typeOfEmergency = vReq.type || 'Emergency';
+            
+            if (vReq.people_involved) {
+              const matched = vReq.people_involved.match(/\d+/);
+              peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
+            }
+
+            const { data: resUser } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', vReq.resident_id)
+              .single();
+
+            if (resUser) {
+              reporterName = resUser.full_name || 'Resident';
+              reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
+            }
+          }
+
+          let storeStatus: any = 'en_route';
+          if (activeInc.status === 'ARRIVED') {
+            storeStatus = 'on_scene';
+          }
+
+          useResponderStore.setState({
+            status: storeStatus,
+            activeDispatch: {
+              id: activeInc.id,
+              type: typeOfEmergency,
+              locationName,
+              distance: '1.5 km',
+              natureOfCall: 'Emergency',
+              peopleInvolved,
+              eta: activeInc.eta_minutes ? `~${activeInc.eta_minutes} min` : '~8 min',
+              reporterName,
+              reporterInitials,
+              timestamp: new Date(activeInc.created_at).toLocaleTimeString("en-US", {
+                hour: '2-digit',
+                minute: '2-digit'
+              }),
+              coordinates: {
+                latitude: activeInc.latitude || 14.9538,
+                longitude: activeInc.longitude || 120.9029,
+              },
+              typeOfEmergency,
+            }
+          });
+        }
+      } catch (err) {
+        console.error('[ResponderHome] Error resuming active incident:', err);
+      }
+    };
+
+    resumeActiveIncident();
+  }, [profile, role, user?.id]);
+
+  // Real-time incident dispatch listener
+  useEffect(() => {
+    if (!profile || role !== 'ambulance_responder' || status !== 'idle' || !user?.id) return;
+
+    console.log('[ResponderHome] Setting up real-time dispatch listener for responder ID:', user.id);
+
+    const channel = supabase
+      .channel('incoming-dispatches')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT and UPDATE
+          schema: 'public',
+          table: 'incidents',
+        },
+        async (payload) => {
+          console.log('[ResponderHome] Postgres change received on incidents table:', payload);
+          const inc = payload.new as any;
+          if (inc && inc.current_offer_responder_id === user.id && inc.status === 'DISPATCHED') {
+            console.log('[ResponderHome] Active dispatch offer received for this responder!', inc);
+            
+            let reporterName = 'Resident';
+            let reporterInitials = 'R';
+            let locationName = 'Baliwag City';
+            let typeOfEmergency = 'Medical Emergency';
+            let peopleInvolved = 1;
+
+            try {
+              const { data: vReq, error: vReqError } = await supabase
+                .from('verification_requests')
+                .select('*')
+                .eq('id', inc.request_id)
+                .single();
+
+              if (!vReqError && vReq) {
+                locationName = vReq.location_description || vReq.address || 'Baliwag City';
+                typeOfEmergency = vReq.type || 'Emergency';
+                
+                if (vReq.people_involved) {
+                  const matched = vReq.people_involved.match(/\d+/);
+                  peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
+                }
+
+                const { data: resUser } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('id', vReq.resident_id)
+                  .single();
+
+                if (resUser) {
+                  reporterName = resUser.full_name || 'Resident';
+                  reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching verification request details for dispatch offer:', err);
+            }
+
+            useResponderStore.setState({
+              status: 'dispatch_offered',
+              activeDispatch: {
+                id: inc.id,
+                type: typeOfEmergency,
+                locationName,
+                distance: '1.5 km',
+                natureOfCall: 'Emergency',
+                peopleInvolved,
+                eta: '~8 min',
+                reporterName,
+                reporterInitials,
+                timestamp: new Date(inc.created_at).toLocaleTimeString("en-US", {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }),
+                coordinates: {
+                  latitude: inc.latitude || 14.9538,
+                  longitude: inc.longitude || 120.9029,
+                },
+                typeOfEmergency,
+              }
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile, role, status, user?.id]);
 
   const MOCK_HOSPITALS = [
     {

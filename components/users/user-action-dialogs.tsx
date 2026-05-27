@@ -286,7 +286,7 @@ interface CreateUserDialogProps {
   isOpen: boolean;
   onClose: () => void;
   defaultRole?: UserRole;
-  onCreate: (user: { fullName: string; email: string; role: UserRole }) => void;
+  onCreate: (user: { fullName: string; email: string; role: UserRole; password?: string }) => void;
 }
 
 export function CreateUserDialog({ isOpen, onClose, defaultRole, onCreate }: CreateUserDialogProps) {
@@ -311,9 +311,11 @@ export function CreateUserDialog({ isOpen, onClose, defaultRole, onCreate }: Cre
       fullName,
       email,
       role,
+      password,
     });
     onClose();
   };
+
 
   const isFormValid = fullName && email && password && confirmPassword && password === confirmPassword;
 

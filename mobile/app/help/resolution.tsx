@@ -3,16 +3,39 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-nativ
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Star } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { supabase } from '../../lib/supabase';
 
 export default function ResolutionScreen() {
   const router = useRouter();
+  const report = useEmergencyReportStore((state) => state.report);
   const resetReport = useEmergencyReportStore((state) => state.resetReport);
   
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
-
-  const handleReturnHome = () => {
-    // In a real app, submit the rating/feedback to Supabase here
+ 
+  const handleReturnHome = async () => {
+    try {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const { data: { session } } = await supabase.auth.getSession();
+      const reqHeaders: any = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+      }
+ 
+      await fetch(`${apiUrl}/api/incidents/feedback`, {
+        method: 'POST',
+        headers: reqHeaders,
+        body: JSON.stringify({
+          incidentId: report.incidentId || undefined,
+          requestId: report.id || undefined,
+          rating,
+          feedback: feedback || undefined,
+        })
+      });
+    } catch (err) {
+      console.log('Feedback submission failed, returning home anyway:', err);
+    }
+    
     resetReport();
     router.replace('/(tabs)');
   };
@@ -33,12 +56,12 @@ export default function ResolutionScreen() {
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Report ID</Text>
-            <Text style={styles.summaryValue}>REQ-2026-0047</Text>
+            <Text style={styles.summaryValue}>{report.requestId || 'REQ-2026-0047'}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Dispatched Unit</Text>
-            <Text style={styles.summaryValue}>Ambulance Unit 3</Text>
+            <Text style={styles.summaryValue}>{report.incidentId ? 'AMB-001 (Dispatched)' : 'Ambulance Unit 3'}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryRow}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useLocationPermission } from '../../hooks/use-location-permission';
@@ -13,7 +13,7 @@ import { useResponderStore } from '../../stores/useResponderStore';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { profile, verificationStatus, role } = useAuthStatus();
+  const { profile, verificationStatus, role, user } = useAuthStatus();
   const { isLocationGateActive, requestPermissions } = useLocationPermission();
   
   // Fallback for initials
@@ -83,13 +83,21 @@ export default function HomeScreen() {
         <View className="px-6 pb-8 flex-row items-center justify-between">
           <View className="flex-row items-center">
             <View className="relative">
-              <View className="w-14 h-14 rounded-full border border-white/40 items-center justify-center bg-[#1E3A8A]">
-                <Text className="text-white font-black text-xl tracking-tighter">{initials}</Text>
+              <View className="w-14 h-14 rounded-full border border-white/40 items-center justify-center bg-[#1E3A8A] overflow-hidden">
+                {user?.user_metadata?.avatar_url ? (
+                  <Image 
+                    source={{ uri: user.user_metadata.avatar_url }} 
+                    style={{ width: '100%', height: '100%', borderRadius: 28 }} 
+                  />
+                ) : (
+                  <Text className="text-white font-black text-xl tracking-tighter">{initials}</Text>
+                )}
               </View>
               <View className="absolute top-0 -right-1 bg-white rounded-full p-0.5 shadow-sm">
                 <Check size={8} color="#1E3A8A" strokeWidth={5} />
               </View>
             </View>
+
             
             <View className="ml-4">
               <Text className="text-white text-lg font-bold leading-tight tracking-tight">

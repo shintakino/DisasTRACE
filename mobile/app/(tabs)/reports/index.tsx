@@ -1,72 +1,107 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Flame, CarFront, Activity, AlertTriangle, MapPin } from 'lucide-react-native';
 import { useAuthStatus } from '../../../hooks/use-auth-status';
 import { ReportDetailModal } from '../../../components/responder/ReportDetailModal';
-
-const mockReports = {
-  today: [
-    {
-      id: 'DR-2026-0847',
-      type: 'Vehicular Accident',
-      date: 'MAR 16, 2026',
-      status: 'ONGOING',
-      location: 'Brgy. Sabang, Baliwag City',
-      response: 'AMB-001 dispatched',
-      icon: CarFront,
-    },
-    {
-      id: 'DR-2026-0847',
-      type: 'Vehicular Accident',
-      date: 'MAR 16, 2026',
-      status: 'RESPONDING',
-      location: 'Brgy. Sabang, Baliwag City',
-      response: 'AMB-001 dispatched',
-      icon: CarFront,
-    }
-  ],
-  yesterday: [
-    {
-      id: 'DR-2026-0842',
-      type: 'Vehicular Accident',
-      date: 'MAR 15, 2026',
-      status: 'COMPLETED',
-      location: 'Brgy. Paitan, Baliwag City',
-      response: 'AMB-002 dispatched',
-      icon: CarFront,
-    }
-  ],
-  lastWeek: [
-    {
-      id: 'DR-2026-0841',
-      type: 'Medical Emergency',
-      date: 'MAR 10, 2026',
-      status: 'COMPLETED',
-      location: 'Brgy. Tarcan, Baliwag',
-      response: '34 min response',
-      icon: Activity,
-    },
-    {
-      id: 'DR-2026-0830',
-      type: 'Disaster-Related',
-      date: 'MAR 01, 2026',
-      status: 'COMPLETED',
-      location: 'Brgy. Tangos, Baliwag',
-      response: '9 min response',
-      icon: AlertTriangle,
-    }
-  ]
-};
+import { supabase } from '../../../lib/supabase';
 
 export default function MyReportsScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('All');
   const [selectedReport, setSelectedReport] = useState<any>(null);
+  const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { role } = useAuthStatus();
   const isResponder = role?.includes('responder');
 
-  const flatReports = [...mockReports.today, ...mockReports.yesterday, ...mockReports.lastWeek];
+  const fetchReports = async () => {
+    try {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const { data: { session } } = await supabase.auth.getSession();
+      const reqHeaders: any = {};
+      if (session?.access_token) {
+        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch(`${apiUrl}/api/reports`, {
+        headers: reqHeaders,
+      });
+      const result = await response.json();
+      
+      if (result.data) {
+        const mappedReports = result.data.map((r: any) => {
+          let icon = AlertTriangle;
+          if (r.type?.toLowerCase().includes('vehicular') || r.type?.toLowerCase().includes('collision') || r.type?.toLowerCase().includes('accident')) {
+            icon = CarFront;
+          } else if (r.type?.toLowerCase().includes('medical') || r.type?.toLowerCase().includes('emergency')) {
+            icon = Activity;
+          } else if (r.type?.toLowerCase().includes('fire')) {
+            icon = Flame;
+          }
+
+          return {
+            id: r.id,
+            type: r.type || 'Incident',
+            date: r.date || 'Today',
+            status: r.status || 'COMPLETED',
+            location: r.location || 'Baliwag City',
+            response: r.responderName ? `AMB-${r.responderName.slice(0, 3).toUpperCase()} Dispatched` : 'Dispatched',
+            icon,
+          };
+        });
+        setReports(mappedReports);
+      }
+    } catch (error) {
+      console.error('Error fetching reports on mobile:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchReports();
+  };
+
+  const filteredReports = reports.filter((r) => {
+    if (activeTab === 'All') return true;
+    if (activeTab === 'Active') return r.status === 'ONGOING' || r.status === 'RESPONDING';
+    return r.status === 'COMPLETED';
+  });
+
+  // Group reports for resident view
+  const today: any[] = [];
+  const yesterday: any[] = [];
+  const older: any[] = [];
+
+  const now = new Date();
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  filteredReports.forEach((r) => {
+    // Parse r.date e.g., "March 21, 2026"
+    try {
+      const rDate = new Date(r.date);
+      const diffTime = Math.abs(now.getTime() - rDate.getTime());
+      const diffDays = Math.round(diffTime / oneDay);
+      
+      if (diffDays === 0 || r.date === 'Today') {
+        today.push(r);
+      } else if (diffDays === 1) {
+        yesterday.push(r);
+      } else {
+        older.push(r);
+      }
+    } catch {
+      today.push(r);
+    }
+  });
 
   const renderReportCard = (report: any) => {
     const Icon = report.icon;
@@ -149,16 +184,30 @@ export default function MyReportsScreen() {
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-6 pt-6 bg-slate-50" showsVerticalScrollIndicator={false}>
-        {isResponder ? (
+      <ScrollView 
+        className="flex-1 px-6 pt-6 bg-slate-50" 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E3A8A']} />
+        }
+      >
+        {loading ? (
+          <View className="flex-1 justify-center items-center py-20">
+            <ActivityIndicator size="large" color="#1E3A8A" />
+          </View>
+        ) : filteredReports.length === 0 ? (
+          <View className="flex-1 justify-center items-center py-20">
+            <Text className="text-slate-400 font-bold">No reports found</Text>
+          </View>
+        ) : isResponder ? (
           <>
-            {flatReports.map(renderReportCard)}
+            {filteredReports.map(renderReportCard)}
           </>
         ) : (
           <>
-            {renderSection('TODAY', mockReports.today)}
-            {renderSection('YESTERDAY', mockReports.yesterday)}
-            {renderSection('LAST WEEK', mockReports.lastWeek)}
+            {today.length > 0 && renderSection('TODAY', today)}
+            {yesterday.length > 0 && renderSection('YESTERDAY', yesterday)}
+            {older.length > 0 && renderSection('OLDER', older)}
           </>
         )}
         <View className="h-24" />

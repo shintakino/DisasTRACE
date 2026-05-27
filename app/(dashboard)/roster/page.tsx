@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 
+import { toast } from "sonner"
+
 export default function RosterPage() {
   const [data, setData] = React.useState<RosterEntry[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -52,27 +54,27 @@ export default function RosterPage() {
     "Tangos", "Tarcan", "Tiaong", "Tibag", "Virgen delas Flores"
   ]
 
-  React.useEffect(() => {
-    async function fetchRosterData() {
-      try {
-        const response = await fetch('/api/roster')
-        const json = await response.json()
+  const fetchRosterData = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/roster')
+      const json = await response.json()
 
-        if (response.ok) {
-          setData(json.data)
-        } else {
-          setError(json.message || "Failed to fetch roster data")
-        }
-      } catch (err) {
-        console.error("Failed to fetch roster data:", err)
-        setError("A network error occurred while loading roster data.")
-      } finally {
-        setLoading(false)
+      if (response.ok) {
+        setData(json.data)
+      } else {
+        setError(json.message || "Failed to fetch roster data")
       }
+    } catch (err) {
+      console.error("Failed to fetch roster data:", err)
+      setError("A network error occurred while loading roster data.")
+    } finally {
+      setLoading(false)
     }
-
-    fetchRosterData()
   }, [])
+
+  React.useEffect(() => {
+    fetchRosterData()
+  }, [fetchRosterData])
 
   const filteredData = React.useMemo(() => {
     let result = [...data]
@@ -109,27 +111,58 @@ export default function RosterPage() {
     }
   }, [data])
 
-  const confirmDelete = () => {
-    if (userToDelete) {
-      setData((prev) => prev.filter((item) => item.id !== userToDelete.id))
+  const confirmDelete = async () => {
+    if (!userToDelete) return
+    try {
+      const response = await fetch(`/api/users?id=${userToDelete.id}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        toast.success(`Responder ${userToDelete.fullName} deleted successfully`)
+        fetchRosterData()
+      } else {
+        const err = await response.json()
+        toast.error(err.error || "Failed to delete responder")
+      }
+    } catch (err) {
+      console.error("Failed to delete responder:", err)
+      toast.error("Failed to delete responder")
+    } finally {
       setUserToDelete(null)
     }
   }
 
-  const confirmBan = () => {
-    if (userToBan) {
-      setData((prev) => prev.map((item) => {
-        if (item.id === userToBan.id) {
-          return { ...item, status: banAction }
-        }
-        return item
-      }))
+  const confirmBan = async () => {
+    if (!userToBan) return
+    try {
+      const response = await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: userToBan.id,
+          status: banAction,
+          rejectionReason: "Administrative action on responder roster",
+        }),
+      })
+
+      if (response.ok) {
+        toast.success(`Responder ${userToBan.fullName} updated to ${banAction}`)
+        fetchRosterData()
+      } else {
+        const err = await response.json()
+        toast.error(err.error || "Failed to update responder status")
+      }
+    } catch (err) {
+      console.error("Failed to update responder status:", err)
+      toast.error("Failed to update responder status")
+    } finally {
       setUserToBan(null)
       setBanAction('SUSPENDED')
     }
   }
 
-  const handleAddResponder = (e: React.FormEvent) => {
+  const handleAddResponder = async (e: React.FormEvent) => {
     e.preventDefault()
     setAddError('')
     
@@ -144,24 +177,39 @@ export default function RosterPage() {
     }
     
     const fullName = `${newResponder.surname}, ${newResponder.firstName}${newResponder.middleName ? ' ' + newResponder.middleName : ''}${newResponder.suffixName ? ' ' + newResponder.suffixName : ''}`
+    const fullAddress = `${newResponder.street}, ${newResponder.barangay}, ${newResponder.city}, ${newResponder.province}`
 
-    const newEntry: RosterEntry = {
-      id: Math.random().toString(36).substr(2, 9),
-      fullName: fullName,
-      email: newResponder.email,
-      status: 'ACTIVE',
-      role: 'RESPONDER',
-      joinedDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      lastActive: 'Active now'
+    try {
+      const response = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName,
+          email: newResponder.email,
+          password: newResponder.password,
+          role: "ambulance_responder",
+          phone: newResponder.mobileNumber,
+          address: fullAddress,
+        }),
+      })
+
+      if (response.ok) {
+        toast.success(`Responder account for ${fullName} registered successfully.`)
+        fetchRosterData()
+        setIsAddModalOpen(false)
+        setNewResponder({
+          firstName: '', middleName: '', surname: '', suffixName: '', gender: '',
+          email: '', mobileNumber: '', province: 'Bulacan', city: 'Baliwag City',
+          barangay: '', street: '', password: '', confirmPassword: ''
+        })
+      } else {
+        const err = await response.json()
+        setAddError(err.error || "Failed to create responder account.")
+      }
+    } catch (err) {
+      console.error("Failed to add responder:", err)
+      setAddError("A network error occurred while registering responder.")
     }
-    
-    setData((prev) => [newEntry, ...prev])
-    setIsAddModalOpen(false)
-    setNewResponder({
-      firstName: '', middleName: '', surname: '', suffixName: '', gender: '',
-      email: '', mobileNumber: '', province: 'Bulacan', city: 'Baliwag City',
-      barangay: '', street: '', password: '', confirmPassword: ''
-    })
   }
 
   if (loading) {
@@ -266,7 +314,7 @@ export default function RosterPage() {
             
             <div className="w-full text-left mb-6">
               <p className="text-[#1e1b4b] font-semibold text-sm mb-2 tracking-tight">Action</p>
-              <Select value={banAction} onValueChange={(v: 'SUSPENDED' | 'DEACTIVATED') => setBanAction(v)}>
+              <Select value={banAction} onValueChange={(v: 'SUSPENDED' | 'DEACTIVATED' | null) => { if (v) setBanAction(v); }}>
                 <SelectTrigger className="w-full h-12 rounded-xl border-2 border-[#1e1b4b] focus:ring-[#1e1b4b]">
                   <SelectValue placeholder="Select an action" />
                 </SelectTrigger>
@@ -384,7 +432,7 @@ export default function RosterPage() {
                   </div>
                   <div className="col-span-2">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Gender <span className="text-red-500">*</span></label>
-                    <Select value={newResponder.gender} onValueChange={(v) => setNewResponder({ ...newResponder, gender: v })}>
+                    <Select value={newResponder.gender} onValueChange={(v) => setNewResponder({ ...newResponder, gender: v || '' })}>
                       <SelectTrigger className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 focus:ring-[#2B4C9B] focus:bg-white transition-colors px-4">
                         <SelectValue placeholder="Select Gender" />
                       </SelectTrigger>
@@ -444,7 +492,7 @@ export default function RosterPage() {
 
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Barangay <span className="text-red-500">*</span></label>
-                    <Select value={newResponder.barangay} onValueChange={(v) => setNewResponder({ ...newResponder, barangay: v })}>
+                    <Select value={newResponder.barangay} onValueChange={(v) => setNewResponder({ ...newResponder, barangay: v || '' })}>
                       <SelectTrigger className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 focus:ring-[#2B4C9B] focus:bg-white transition-colors px-4">
                         <SelectValue placeholder="Select Barangay" />
                       </SelectTrigger>

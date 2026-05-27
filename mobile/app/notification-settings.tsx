@@ -1,16 +1,54 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Switch } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft2, NotificationBing, Danger, InfoCircle } from 'iconsax-react-native';
+import { useAuthStatus } from '../hooks/use-auth-status';
+import { supabase } from '../lib/supabase';
 
 export default function NotificationSettingsScreen() {
   const router = useRouter();
+  const { user } = useAuthStatus();
   
-  const [alerts, setAlerts] = React.useState({
+  const [alerts, setAlerts] = useState({
     emergencies: true,
     updates: true,
     system: false
   });
+  const [loading, setLoading] = useState(false);
+
+  // Load preferences from user metadata
+  useEffect(() => {
+    if (user?.user_metadata?.notification_preferences) {
+      const prefs = user.user_metadata.notification_preferences;
+      setAlerts({
+        emergencies: prefs.emergencies ?? true,
+        updates: prefs.updates ?? true,
+        system: prefs.system ?? false,
+      });
+    }
+  }, [user]);
+
+  const handleToggle = async (key: 'emergencies' | 'updates' | 'system', value: boolean) => {
+    if (!user) return;
+    
+    const newAlerts = { ...alerts, [key]: value };
+    setAlerts(newAlerts);
+    setLoading(true);
+
+    try {
+      const currentMeta = user.user_metadata || {};
+      await supabase.auth.updateUser({
+        data: {
+          ...currentMeta,
+          notification_preferences: newAlerts,
+        }
+      });
+    } catch (err) {
+      console.error('[NotificationSettings] Failed to save preference:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-[#F8FAFC]">
@@ -27,9 +65,12 @@ export default function NotificationSettingsScreen() {
       </View>
 
       <ScrollView className="flex-1 px-6 pt-6" showsVerticalScrollIndicator={false}>
-        <Text className="text-sm text-slate-500 mb-6 leading-relaxed">
-          Manage how you receive alerts and updates from the CDRRMO DisasTRACE system.
-        </Text>
+        <View className="flex-row justify-between items-center mb-6">
+          <Text className="text-sm text-slate-500 flex-1 leading-relaxed mr-4">
+            Manage how you receive alerts and updates from the CDRRMO DisasTRACE system.
+          </Text>
+          {loading && <ActivityIndicator color="#1E3A8A" size="small" />}
+        </View>
         
         <View className="bg-white rounded-3xl p-2 shadow-sm border border-slate-100 mb-8">
           
@@ -45,7 +86,7 @@ export default function NotificationSettingsScreen() {
             </View>
             <Switch 
               value={alerts.emergencies} 
-              onValueChange={(val) => setAlerts({...alerts, emergencies: val})}
+              onValueChange={(val) => handleToggle('emergencies', val)}
               trackColor={{ false: '#CBD5E1', true: '#1E3A8A' }}
               thumbColor="#FFFFFF"
             />
@@ -63,7 +104,7 @@ export default function NotificationSettingsScreen() {
             </View>
             <Switch 
               value={alerts.updates} 
-              onValueChange={(val) => setAlerts({...alerts, updates: val})}
+              onValueChange={(val) => handleToggle('updates', val)}
               trackColor={{ false: '#CBD5E1', true: '#1E3A8A' }}
               thumbColor="#FFFFFF"
             />
@@ -81,7 +122,7 @@ export default function NotificationSettingsScreen() {
             </View>
             <Switch 
               value={alerts.system} 
-              onValueChange={(val) => setAlerts({...alerts, system: val})}
+              onValueChange={(val) => handleToggle('system', val)}
               trackColor={{ false: '#CBD5E1', true: '#1E3A8A' }}
               thumbColor="#FFFFFF"
             />

@@ -6,7 +6,7 @@ import { Edit2, Logout, User, FolderOpen, Notification, MessageQuestion, Lock1, 
 import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
-  const { user, role } = useAuthStatus();
+  const { user, role, profile } = useAuthStatus();
   const [logoutVisible, setLogoutVisible] = useState(false);
   const router = useRouter();
   const isResponder = role === 'ambulance_responder';
@@ -15,6 +15,19 @@ export default function ProfileScreen() {
     setLogoutVisible(false);
     await supabase.auth.signOut();
   };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const initials = profile?.fullName ? getInitials(profile.fullName) : (isResponder ? 'RB' : 'EG');
+  const displayName = profile?.fullName || (isResponder ? 'Renzy Bastes' : 'Eloisa Guibani');
+  const barangayName = profile?.address?.split(',')[1]?.trim() || (profile?.address || 'Paitan');
 
   const renderPillRow = (Icon: any, title: string, subtitle: string, onPress?: () => void) => (
     <TouchableOpacity 
@@ -55,14 +68,22 @@ export default function ProfileScreen() {
         </View>
 
         <View className="flex-row items-center relative z-10">
-          <View className="w-24 h-24 rounded-full border border-white items-center justify-center mr-5">
-            <Text className="text-white text-3xl font-bold">{isResponder ? 'CJ' : 'EG'}</Text>
+          <View className="w-24 h-24 rounded-full border border-white items-center justify-center mr-5 overflow-hidden">
+            {user?.user_metadata?.avatar_url ? (
+              <Image 
+                source={{ uri: user.user_metadata.avatar_url }} 
+                style={{ width: '100%', height: '100%', borderRadius: 48 }} 
+              />
+            ) : (
+              <Text className="text-white text-3xl font-bold">{initials}</Text>
+            )}
             <View className="absolute top-1 right-1 w-6 h-6 bg-white rounded-full items-center justify-center">
               <View className="w-4 h-4 bg-[#1E3A8A] rounded-full" />
             </View>
           </View>
+
           <View className="flex-1 pr-4">
-            <Text className="text-2xl font-bold text-white mb-2" numberOfLines={1}>{isResponder ? 'Christopher Jan' : 'Eloisa Guibani'}</Text>
+            <Text className="text-2xl font-bold text-white mb-2" numberOfLines={1}>{displayName}</Text>
             {isResponder ? (
               <View className="mt-1">
                 <View className="flex-row items-center mb-2">
@@ -79,7 +100,7 @@ export default function ProfileScreen() {
             ) : (
               <>
                 <Text className="text-sm text-blue-200">Barangay</Text>
-                <Text className="text-base font-bold text-white mb-2">Paitan</Text>
+                <Text className="text-base font-bold text-white mb-2">{barangayName}</Text>
                 <Text className="text-sm text-blue-200">Date Joined</Text>
                 <Text className="text-base font-bold text-white">March 27, 2025</Text>
               </>

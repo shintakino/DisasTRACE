@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 export const KpiDataSchema = z.object({
-  totalIncidentsToday: z.number(),
-  totalResponders: z.number(),
-  totalResolvedToday: z.number(),
+  totalIncidentsToday: z.coerce.number(),
+  totalResponders: z.coerce.number(),
+  totalResolvedToday: z.coerce.number(),
   avgResponseTime: z.string(),
 });
 
@@ -11,19 +11,19 @@ export type KpiData = z.infer<typeof KpiDataSchema>;
 
 export const IncidentTrendSchema = z.object({
   month: z.string(),
-  vehicular: z.number(),
-  medical: z.number(),
-  structural: z.number(),
-  fire: z.number(),
-  water: z.number(),
-  unknown: z.number(),
+  vehicular: z.coerce.number(),
+  medical: z.coerce.number(),
+  structural: z.coerce.number(),
+  fire: z.coerce.number(),
+  water: z.coerce.number(),
+  unknown: z.coerce.number(),
 });
 
 export type IncidentTrend = z.infer<typeof IncidentTrendSchema>;
 
 export const IncidentDistributionSchema = z.object({
   name: z.string(),
-  value: z.number(),
+  value: z.coerce.number(),
   fill: z.string(),
 });
 

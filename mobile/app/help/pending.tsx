@@ -1,17 +1,69 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ShieldAlert, CheckCircle, Navigation } from 'lucide-react-native';
 import { TransmissionLoader } from '../../components/help/TransmissionLoader';
+import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { supabase } from '../../lib/supabase';
 
 export default function PendingScreen() {
   const router = useRouter();
+  const report = useEmergencyReportStore((state) => state.report);
   
   const [isTransmitting, setIsTransmitting] = useState(true);
   const [transmissionStatus, setTransmissionStatus] = useState('Uploading incident media...');
   
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isAccepted, setIsAccepted] = useState(false); // Simulate acceptance
+
+  // Real-time verification request listener
+  useEffect(() => {
+    const requestId = report.id;
+    if (!requestId) return;
+
+    console.log('[PendingScreen] Subscribing to status changes for request ID:', requestId);
+
+    const channel = supabase
+      .channel(`pending-request-${requestId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'verification_requests',
+          filter: `id=eq.${requestId}`,
+        },
+        async (payload) => {
+          console.log('[PendingScreen] Verification request update received:', payload.new);
+          if (payload.new && payload.new.status === 'VERIFIED') {
+            try {
+              const { data: incident } = await supabase
+                .from('incidents')
+                .select('*')
+                .eq('request_id', requestId)
+                .maybeSingle();
+
+              if (incident) {
+                useEmergencyReportStore.setState((state) => ({
+                  report: {
+                    ...state.report,
+                    incidentId: incident.id
+                  }
+                }));
+              }
+            } catch (err) {
+              console.error('Error fetching incident for verified request:', err);
+            }
+            setIsAccepted(true);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [report.id]);
 
   useEffect(() => {
     // Simulate Transmission
@@ -95,9 +147,17 @@ export default function PendingScreen() {
 
           <View style={{ flex: 1 }} />
 
-          {elapsedSeconds < 60 && (
+          {elapsedSeconds < 60 ? (
             <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} activeOpacity={0.7}>
               <Text style={styles.cancelButtonText}>CANCEL REPORT</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity 
+              style={[styles.cancelButton, { backgroundColor: '#1E3A8A' }]} 
+              onPress={() => Linking.openURL('tel:09436018271')} 
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelButtonText}>CALL PACC COMMAND CENTER</Text>
             </TouchableOpacity>
           )}
         </View>

@@ -3,6 +3,8 @@ import { View, Text, Platform, StatusBar, TouchableOpacity } from 'react-native'
 import { Map, Camera, Marker } from '@maplibre/maplibre-react-native';
 import { MapPin } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
+import { useAuthStatus } from '../../hooks/use-auth-status';
+import { useResponderStore } from '../../stores/useResponderStore';
 
 const hospitals = [
   { id: 1, name: 'Baliuag District Hospital', address: '1669 Pearl St', phone: '0943 601 8271', lat: 14.954, lng: 120.902 },
@@ -11,8 +13,23 @@ const hospitals = [
 ];
 
 export default function MapScreen() {
+  const { profile, role } = useAuthStatus();
+  const { activeDispatch, status } = useResponderStore();
   const [selectedHospital, setSelectedHospital] = useState<any>(null);
   const isMarkerPress = useRef(false);
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const initials = profile?.fullName ? getInitials(profile.fullName) : 'RB';
+  const displayName = profile?.fullName || 'Renzy Bastes';
+  const address = profile?.address || 'Baliwag City, Bulacan';
 
   return (
     <View className="flex-1 bg-[#16203A]">
@@ -91,18 +108,32 @@ export default function MapScreen() {
                 <Text className="text-sm font-medium text-[#1E3A8A]">{selectedHospital.address} · {selectedHospital.phone}</Text>
               </View>
             </React.Fragment>
-          ) : (
+          ) : activeDispatch ? (
             <React.Fragment>
-              <View className="w-16 h-16 bg-[#1E3A8A] rounded-full items-center justify-center mr-4 relative">
-                <Text className="text-white text-xl font-bold">EG</Text>
+              <View className="w-16 h-16 bg-[#EF4444] rounded-full items-center justify-center mr-4 relative">
+                <Text className="text-white text-xl font-black">{activeDispatch.reporterInitials || 'R'}</Text>
                 <View className="absolute top-0 right-0 w-5 h-5 bg-white rounded-full items-center justify-center">
-                  <View className="w-3.5 h-3.5 bg-blue-600 rounded-full" />
+                  <View className="w-3.5 h-3.5 bg-[#EF4444] rounded-full" />
                 </View>
               </View>
               <View className="flex-1 pt-1">
-                <Text className="text-lg font-bold text-[#1E3A8A]">Eloisa Guibani</Text>
-                <Text className="text-sm font-medium text-[#1E3A8A] mt-1">Tangos, Baliwag City, Bulacan</Text>
-                <Text className="text-xs font-bold text-[#1E3A8A] mt-1">Since 05:50 pm</Text>
+                <Text className="text-lg font-bold text-[#EF4444]">{activeDispatch.type}</Text>
+                <Text className="text-sm font-medium text-slate-700 mt-1" numberOfLines={1}>{activeDispatch.locationName}</Text>
+                <Text className="text-xs font-bold text-slate-500 mt-1">Active Incident: {activeDispatch.id}</Text>
+              </View>
+            </React.Fragment>
+          ) : (
+            <React.Fragment>
+              <View className="w-16 h-16 bg-[#1E3A8A] rounded-full items-center justify-center mr-4 relative">
+                <Text className="text-white text-xl font-bold">{initials}</Text>
+                <View className="absolute top-0 right-0 w-5 h-5 bg-white rounded-full items-center justify-center">
+                  <View className="w-3.5 h-3.5 bg-green-500 rounded-full" />
+                </View>
+              </View>
+              <View className="flex-1 pt-1">
+                <Text className="text-lg font-bold text-[#1E3A8A]">{displayName}</Text>
+                <Text className="text-sm font-medium text-slate-500 mt-1" numberOfLines={1}>{address}</Text>
+                <Text className="text-xs font-bold text-[#1E3A8A] mt-1">Responder Status: On Duty</Text>
               </View>
             </React.Fragment>
           )}

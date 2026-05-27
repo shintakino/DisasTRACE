@@ -10,6 +10,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../../lib/supabase';
 
 export function DispatchSheet() {
   const { status, activeDispatch, acceptDispatch, completeIncident } = useResponderStore();
@@ -33,8 +34,27 @@ export function DispatchSheet() {
       progress.value = withTiming(0, { duration: 5000, easing: Easing.linear });
 
       // Auto-dismiss timeout
-      const timeoutId = setTimeout(() => {
+      const timeoutId = setTimeout(async () => {
         if (useResponderStore.getState().status === 'dispatch_offered') {
+          // Reject dispatch automatically if timer expires
+          try {
+            const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+            const { data: { session } } = await supabase.auth.getSession();
+            const reqHeaders: any = { 'Content-Type': 'application/json' };
+            if (session?.access_token) {
+              reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+            }
+            await fetch(`${apiUrl}/api/incidents/respond`, {
+              method: 'POST',
+              headers: reqHeaders,
+              body: JSON.stringify({
+                incidentId: activeDispatch?.id,
+                action: 'REJECT'
+              })
+            });
+          } catch (e) {
+            console.log('Auto-reject failed:', e);
+          }
           completeIncident(); // Dismiss
         }
       }, 5000);
@@ -126,9 +146,35 @@ export function DispatchSheet() {
         {/* Accept Button */}
         <TouchableOpacity 
           className="bg-[#B91C1C] rounded-[20px] py-4 items-center shadow-lg shadow-[#B91C1C]/30 active:bg-red-800"
-          onPress={() => {
+          onPress={async () => {
             progress.value = 100; // Cancel animation
-            acceptDispatch();
+            try {
+              const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+              const { data: { session } } = await supabase.auth.getSession();
+              const reqHeaders: any = { 'Content-Type': 'application/json' };
+              if (session?.access_token) {
+                reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+              }
+
+              const response = await fetch(`${apiUrl}/api/incidents/respond`, {
+                method: 'POST',
+                headers: reqHeaders,
+                body: JSON.stringify({
+                  incidentId: activeDispatch?.id,
+                  action: 'ACCEPT'
+                })
+              });
+              const res = await response.json();
+              if (res.success) {
+                acceptDispatch();
+              } else {
+                alert(res.error || "Failed to accept dispatch.");
+              }
+            } catch (err) {
+              console.error("Failed to accept dispatch offer:", err);
+              // Fallback to local state so UX remains intact during dev
+              acceptDispatch();
+            }
           }}
         >
           <Text className="text-white font-bold text-[16px] tracking-wide">Accept Dispatch</Text>

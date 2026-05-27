@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { VerificationStatusSchema } from "@/types/verification";
+import { db } from "@/db";
+import { verificationRequests } from "@/db/schema/verification_requests";
+import { eq } from "drizzle-orm";
+import { createClient } from "@/lib/supabase-server";
+import { autoDispatchIncident } from "@/lib/dispatch-engine";
 
 export async function PATCH(
   req: NextRequest,
@@ -12,13 +17,90 @@ export async function PATCH(
 
     const validatedStatus = VerificationStatusSchema.parse(status);
 
-    // In a real app, update DB here.
-    // If validatedStatus === "VERIFIED", also create a record in incidents table.
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // 1. Fetch the request to verify existence and check details
+    const existingReq = await db.query.verificationRequests.findFirst({
+      where: eq(verificationRequests.id, id),
+    });
+
+    if (!existingReq) {
+      return NextResponse.json({ error: "Request not found" }, { status: 404 });
+    }
+
+    // 2. Update status in database
+    const [updatedReq] = await db.update(verificationRequests)
+      .set({ 
+        status: validatedStatus,
+        updatedAt: new Date()
+      })
+      .where(eq(verificationRequests.id, id))
+      .returning();
+
+    let incident = null;
+    let autoDispatched = false;
+
+    // 3. If verified and it's an emergency, trigger auto-dispatch engine
+    if (validatedStatus === "VERIFIED") {
+      incident = await autoDispatchIncident(
+        id,
+        existingReq.residentId,
+        existingReq.latitude,
+        existingReq.longitude
+      );
+      if (incident) {
+        autoDispatched = true;
+      }
+    }
+
+    // Fetch the updated request with resident relation to return fully mapped conformant object
+    const finalReq = await db.query.verificationRequests.findFirst({
+      where: eq(verificationRequests.id, id),
+      with: {
+        resident: true,
+      }
+    });
+
+    let mappedReq = null;
+    if (finalReq) {
+      let peopleCount = 0;
+      if (finalReq.peopleInvolved === '1-2 Persons') peopleCount = 2;
+      else if (finalReq.peopleInvolved === '3-5 Persons') peopleCount = 4;
+      else if (finalReq.peopleInvolved === '6+ Persons') peopleCount = 6;
+
+      mappedReq = {
+        id: finalReq.id,
+        requestId: finalReq.requestId,
+        status: finalReq.status,
+        nature: finalReq.nature,
+        type: finalReq.type,
+        location: finalReq.locationDescription || "Baliwag City",
+        peopleInvolved: peopleCount,
+        imageUrl: finalReq.imageUrl || undefined,
+        receivedAt: finalReq.createdAt.toISOString(),
+        resident: {
+          id: finalReq.resident.id,
+          fullName: finalReq.resident.fullName,
+          phone: finalReq.resident.phone || "No phone provided",
+          address: finalReq.resident.address || "No address recorded",
+          priorReports: 3,
+          isVerified: finalReq.resident.verificationStatus === 'APPROVED',
+        }
+      };
+    }
 
     return NextResponse.json({
       success: true,
       id,
       status: validatedStatus,
+      request: mappedReq,
+      incident,
+      autoDispatched,
       message: `Verification request ${id} marked as ${validatedStatus}`,
     });
   } catch (error) {

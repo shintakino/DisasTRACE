@@ -17,4 +17,5 @@ export const incidents = pgTable('incidents', {
   skippedResponderIds: uuid('skipped_responder_ids').array().default([]),
   offerExpiresAt: timestamp('offer_expires_at', { withTimezone: true }),
   dispatchMethod: varchar('dispatch_method', { length: 20, enum: ['AUTO_1KM', 'PACC_MANUAL'] }),
+  dispatchOfferDurationSeconds: integer('dispatch_offer_duration_seconds').default(30).notNull(),
 });

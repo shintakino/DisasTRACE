@@ -4,6 +4,8 @@ import { create } from 'zustand';
 // Strictly typed report validation schema
 export const EmergencyReportSchema = z.object({
   id: z.string().optional(), // Server-generated Request ID
+  requestId: z.string().optional(), // Human-readable Request ID (e.g., REQ-2026-XXXX)
+  incidentId: z.string().optional(), // Server-generated Incident ID
   photoUri: z.string().min(1, "Live photo is required"),
   incidentType: z.enum([
     "Medical Emergency",

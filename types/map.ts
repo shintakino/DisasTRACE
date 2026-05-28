@@ -46,5 +46,7 @@ export const MapHospitalSchema = z.object({
   address: z.string(),
   lat: z.number(),
   lng: z.number(),
+  caters: z.boolean().default(true).optional(),
+  phone: z.string().optional().nullable(),
 });
 export type MapHospital = z.infer<typeof MapHospitalSchema>;

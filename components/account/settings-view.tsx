@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { Mail, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { createClientBrowser } from "@/lib/supabase";
+import { HospitalSettings } from "./hospital-settings";
+
 
 export function SettingsView() {
   const { user, role } = useAuth();
@@ -124,7 +126,7 @@ export function SettingsView() {
     <div className="w-full" key={user?.id || "loading"}>
       <Tabs defaultValue="signin" className="w-full">
         <div className="flex justify-center mb-10">
-          <TabsList className="bg-transparent border-b border-[#E2E8F0] w-full max-w-md justify-start rounded-none h-auto p-0 gap-6">
+          <TabsList className="bg-transparent border-b border-[#E2E8F0] w-full max-w-2xl justify-start rounded-none h-auto p-0 gap-6">
             <TabsTrigger 
               value="signin"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A8A] data-[state=active]:bg-transparent px-2 py-3 text-base"
@@ -137,6 +139,14 @@ export function SettingsView() {
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A8A] data-[state=active]:bg-transparent px-2 py-3 text-base"
               >
                 Dispatch Settings
+              </TabsTrigger>
+            )}
+            {role === "cdrrmo_super_admin" && (
+              <TabsTrigger 
+                value="hospitals"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A8A] data-[state=active]:bg-transparent px-2 py-3 text-base"
+              >
+                Hospital Management
               </TabsTrigger>
             )}
             <TabsTrigger 
@@ -323,6 +333,12 @@ export function SettingsView() {
             </div>
           </div>
         </TabsContent>
+
+        {role === "cdrrmo_super_admin" && (
+          <TabsContent value="hospitals" className="w-full outline-none mt-0">
+            <HospitalSettings />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

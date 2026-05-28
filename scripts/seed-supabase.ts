@@ -194,6 +194,74 @@ async function seed() {
     console.warn('Warning: Could not seed system settings:', err);
   }
 
+  // 5. Seed default actual Baliwag hospitals
+  try {
+    console.log('Seeding default actual Baliwag hospitals...');
+    const defaultHospitals = [
+      {
+        id: 'hosp-1',
+        name: 'Allied Care Experts (ACE) Medical Center-Baliwag',
+        address: 'Doña Remedios Trinidad Hwy, Pinagbarilan, Baliwag',
+        lat: 14.9664,
+        lng: 120.9145,
+        caters: true,
+        phone: '(044) 795 3000',
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'hosp-2',
+        name: 'Castro Maternity Hospital & General Hospital',
+        address: 'M. Ponce Street, Tibag, Baliwag',
+        lat: 14.9578,
+        lng: 120.9037,
+        caters: true,
+        phone: '(044) 766 1462',
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'hosp-3',
+        name: 'Rugay General Hospital',
+        address: 'M. Cruz Street, Carpa Village, Sabang, Baliwag',
+        lat: 14.9531,
+        lng: 120.9022,
+        caters: true,
+        phone: '(044) 766 3457',
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'hosp-4',
+        name: 'De Jesus General Hospital',
+        address: '5 B. Aquino Ave, Bagong Nayon, Baliwag',
+        lat: 14.9490,
+        lng: 120.8895,
+        caters: true,
+        phone: '(044) 766 2314',
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'hosp-5',
+        name: 'Baliuag District Hospital',
+        address: 'Carpa Village, Sabang, Baliwag',
+        lat: 14.9576,
+        lng: 120.8942,
+        caters: true,
+        phone: '(044) 766 2516',
+        updated_at: new Date().toISOString()
+      }
+    ];
+
+    for (const hosp of defaultHospitals) {
+      const { error: hospError } = await supabase
+        .from('hospitals')
+        .upsert(hosp);
+      if (hospError) throw hospError;
+    }
+    console.log('✅ Default hospitals seeded.');
+  } catch (err) {
+    console.warn('Warning: Could not seed default hospitals:', err);
+  }
+
+
   console.log('--- Seeding Complete ---');
 }
 

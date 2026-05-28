@@ -38,6 +38,8 @@ export function ResponderHome() {
   const [routeBounds, setRouteBounds] = useState<any>(null);
   const [cameraMode, setCameraMode] = useState<'follow' | 'overview'>('follow');
   const isMarkerPress = useRef(false);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+
 
   // Simulated Drive Telemetry properties
   const [isSimulating, setIsSimulating] = useState(false);
@@ -421,24 +423,42 @@ export function ResponderHome() {
     };
   }, [profile, role, status, user?.id]);
 
-  const MOCK_HOSPITALS = [
-    {
-      id: 'hosp-1',
-      name: 'Jose B. Lingad Memorial Hospital',
-      coordinates: { latitude: 14.954, longitude: 120.902 },
-      caters: false, // Simulates hospital being unable to cater
-      address: '1669 Pearl St',
-      phone: '0943 601 8271'
-    },
-    {
-      id: 'hosp-2',
-      name: 'Baliwag District Hospital',
-      coordinates: { latitude: 14.960, longitude: 120.910 },
-      caters: true, // Alternative hospital
-      address: 'Carpa Rd, Baliwag',
-      phone: '(044) 766 3457'
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const reqHeaders: any = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000';
+        const res = await fetch(`${baseUrl}/api/map/hospitals`, {
+          headers: reqHeaders
+        });
+        if (!res.ok) throw new Error("Failed to fetch hospitals");
+        const data = await res.json();
+        
+        // Map to coordinates format expected by Responder client
+        const mapped = data.map((h: any) => ({
+          id: h.id,
+          name: h.name,
+          address: h.address,
+          coordinates: { latitude: h.lat, longitude: h.lng },
+          caters: h.caters !== false,
+          phone: h.phone || ''
+        }));
+        
+        setHospitals(mapped);
+      } catch (err) {
+        console.error("Error fetching mobile map hospitals:", err);
+      }
+    };
+    
+    if (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') {
+      fetchHospitals();
     }
-  ];
+  }, [status]);
+
 
   // 1. Activate live GPS telemetry tracking
   useBroadcastTracker(
@@ -659,7 +679,7 @@ export function ResponderHome() {
         )}
 
         {/* All Hospitals Markers */}
-        {MOCK_HOSPITALS.map((hospital) => {
+        {hospitals.map((hospital) => {
           const isTarget = status === 'to_hospital' && targetHospital?.id === hospital.id;
           const isSelected = selectedHospital?.id === hospital.id;
           return (

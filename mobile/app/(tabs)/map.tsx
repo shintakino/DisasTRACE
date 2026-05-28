@@ -1,22 +1,42 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Platform, StatusBar, TouchableOpacity } from 'react-native';
 import { Map, Camera, Marker } from '@maplibre/maplibre-react-native';
 import { MapPin } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useResponderStore } from '../../stores/useResponderStore';
+import { supabase } from '../../lib/supabase';
 
-const hospitals = [
-  { id: 1, name: 'Baliuag District Hospital', address: '1669 Pearl St', phone: '0943 601 8271', lat: 14.954, lng: 120.902 },
-  { id: 2, name: 'Carpa Hospital', address: 'Baliwag, Bulacan', phone: '0943 601 8271', lat: 14.945, lng: 120.890 },
-  { id: 3, name: 'Rugay General Hospital', address: 'Carpa Rd', phone: '(044) 766 3457', lat: 14.935, lng: 120.910 },
-];
 
 export default function MapScreen() {
   const { profile, role } = useAuthStatus();
   const { activeDispatch, status } = useResponderStore();
   const [selectedHospital, setSelectedHospital] = useState<any>(null);
   const isMarkerPress = useRef(false);
+
+  const [hospitals, setHospitals] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const reqHeaders: any = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000';
+        const res = await fetch(`${baseUrl}/api/map/hospitals`, {
+          headers: reqHeaders
+        });
+        if (!res.ok) throw new Error("Failed to fetch hospitals");
+        const data = await res.json();
+        setHospitals(data);
+      } catch (err) {
+        console.error("Error fetching mobile map hospitals:", err);
+      }
+    };
+    fetchHospitals();
+  }, []);
 
   const getInitials = (name: string) => {
     return name

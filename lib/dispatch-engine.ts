@@ -43,7 +43,8 @@ export async function autoDispatchIncident(
       where: and(
         eq(users.role, "ambulance_responder"),
         eq(users.status, "ACTIVE"),
-        eq(users.dutyStatus, "ON_DUTY")
+        eq(users.dutyStatus, "ON_DUTY"),
+        eq(users.email, "responder@disastrace.com") // Temp restriction to only allow specific responder
       ),
     });
 
@@ -133,6 +134,133 @@ export async function autoDispatchIncident(
   }
 }
 
+export async function cascadeIncident(incidentId: string, timedOutResponderId: string | null) {
+  try {
+    const incident = await db.query.incidents.findFirst({
+      where: eq(incidents.id, incidentId),
+    });
+
+    if (!incident) {
+      console.error(`Incident ${incidentId} not found during cascade.`);
+      return;
+    }
+
+    const request = await db.query.verificationRequests.findFirst({
+      where: eq(verificationRequests.id, incident.requestId),
+    });
+
+    if (!request) {
+      console.error(`Verification request for incident ${incidentId} not found during cascade.`);
+      return;
+    }
+
+    // Mark the timed-out/rejecting responder as skipped
+    const currentSkipped = incident.skippedResponderIds || [];
+    const updatedSkipped = timedOutResponderId 
+      ? (currentSkipped.includes(timedOutResponderId) ? currentSkipped : [...currentSkipped, timedOutResponderId])
+      : currentSkipped;
+
+    if (timedOutResponderId) {
+      // Reset timed-out responder back to ON_DUTY so they can take other runs
+      await db.update(users)
+        .set({ dutyStatus: "ON_DUTY" })
+        .where(eq(users.id, timedOutResponderId));
+    }
+
+    // Fetch clocked-in responders who are not in the skipped list
+    const eligibleResponders = await db.query.users.findMany({
+      where: and(
+        eq(users.role, "ambulance_responder"),
+        eq(users.status, "ACTIVE"),
+        eq(users.dutyStatus, "ON_DUTY"),
+        eq(users.email, "responder@disastrace.com") // Temp restriction to only allow specific responder
+      ),
+    });
+
+    const filteredResponders = eligibleResponders.filter((r) => !updatedSkipped.includes(r.id));
+
+    let reqLat = request.latitude;
+    let reqLng = request.longitude;
+
+    // Mock request coordinates in Baliwag if outside (for developer off-site testing convenience)
+    if (reqLat < 14.90 || reqLat > 15.00 || reqLng < 120.80 || reqLng > 121.00) {
+      reqLat = 14.945;
+      reqLng = 120.895;
+    }
+
+    // Compute distances
+    const sortedResponders = filteredResponders
+      .map((responder) => {
+        // Fallback to CDRRMO HQ coordinates if responder location is null
+        let resLat = responder.lastLatitude !== null ? Number(responder.lastLatitude) : 14.9516;
+        let resLng = responder.lastLongitude !== null ? Number(responder.lastLongitude) : 120.9011;
+
+        // Mock coordinates in Baliwag if responder is outside the city
+        if (resLat < 14.90 || resLat > 15.00 || resLng < 120.80 || resLng > 121.00) {
+          resLat = 14.954;
+          resLng = 120.902;
+        }
+
+        // Force seeded responder@disastrace.com to be within 1.2km of request coordinates (~250m) for off-site developer testing
+        if (responder.email === "responder@disastrace.com") {
+          resLat = reqLat + 0.0015;
+          resLng = reqLng + 0.0015;
+        }
+
+        const distanceKm = calculateHaversineDistance(
+          reqLat,
+          reqLng,
+          resLat,
+          resLng
+        );
+        return { responder, distanceKm };
+      })
+      .filter((item) => item.distanceKm <= 1.2)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    if (sortedResponders.length > 0) {
+      // Option A: Cascade offer to the next nearest unit
+      const nextItem = sortedResponders[0];
+      const nextResponder = nextItem.responder;
+
+      const nextOfferDuration = incident.dispatchOfferDurationSeconds || 30;
+      const nextOfferExpiresAt = new Date(Date.now() + nextOfferDuration * 1000);
+
+      await db.update(incidents)
+        .set({
+          currentOfferResponderId: nextResponder.id,
+          offerExpiresAt: nextOfferExpiresAt,
+          skippedResponderIds: updatedSkipped,
+          etaMinutes: Math.max(2, Math.round(nextItem.distanceKm * 5)),
+        })
+        .where(eq(incidents.id, incident.id));
+
+      // Reserve new responder
+      await db.update(users)
+        .set({ dutyStatus: "ACTIVE_DISPATCH" })
+        .where(eq(users.id, nextResponder.id));
+
+      console.log(`Cascade successfully completed. Transmitted offer to responder ${nextResponder.fullName}.`);
+    } else {
+      // No more responders left in range: Revert immediately back to PENDING triage!
+      console.log(`Cascade exhausted: No remaining available responders within 1.2km for incident ${incident.id}. Reverting verification request to PENDING immediately.`);
+      
+      // 1. Delete the incident
+      await db.delete(incidents).where(eq(incidents.id, incident.id));
+
+      // 2. Revert request status back to PENDING so it re-enters the PACC triage queue
+      await db.update(verificationRequests)
+        .set({
+          status: "PENDING",
+          updatedAt: new Date()
+        })
+        .where(eq(verificationRequests.id, incident.requestId));
+    }
+  } catch (error) {
+    console.error("Error in cascadeIncident:", error);
+  }
+}
+
 export async function checkAndCascadeExpiredOffers() {
   try {
     const now = new Date();
@@ -140,9 +268,6 @@ export async function checkAndCascadeExpiredOffers() {
     // 1. Find all active incidents in DISPATCHED state where the offer expired
     const expiredIncidents = await db.query.incidents.findMany({
       where: eq(incidents.status, "DISPATCHED"),
-      with: {
-        resident: false,
-      },
     });
 
     for (const incident of expiredIncidents) {
@@ -152,127 +277,7 @@ export async function checkAndCascadeExpiredOffers() {
 
       // Found expired offer: Cascade to next responder
       console.log(`Cascade: Dispatch offer for incident ${incident.id} expired. Routing to next responder.`);
-
-      const request = await db.query.verificationRequests.findFirst({
-        where: eq(verificationRequests.id, incident.requestId),
-      });
-
-      if (!request) continue;
-
-      // Mark the timed-out responder as skipped
-      const timedOutResponderId = incident.currentOfferResponderId;
-      const currentSkipped = incident.skippedResponderIds || [];
-      const updatedSkipped = timedOutResponderId 
-        ? [...currentSkipped, timedOutResponderId]
-        : currentSkipped;
-
-      if (timedOutResponderId) {
-        // Reset timed-out responder back to ON_DUTY so they can take other runs
-        await db.update(users)
-          .set({ dutyStatus: "ON_DUTY" })
-          .where(eq(users.id, timedOutResponderId));
-      }
-
-      // Fetch clocked-in responders who are not in the skipped list
-      const eligibleResponders = await db.query.users.findMany({
-        where: and(
-          eq(users.role, "ambulance_responder"),
-          eq(users.status, "ACTIVE"),
-          eq(users.dutyStatus, "ON_DUTY")
-        ),
-      });
-
-      const filteredResponders = timedOutResponderId
-        ? eligibleResponders.filter((r) => r.id !== timedOutResponderId && !updatedSkipped.includes(r.id))
-        : eligibleResponders.filter((r) => !updatedSkipped.includes(r.id));
-
-      let reqLat = request.latitude;
-      let reqLng = request.longitude;
-
-      // Mock request coordinates in Baliwag if outside (for developer off-site testing convenience)
-      if (reqLat < 14.90 || reqLat > 15.00 || reqLng < 120.80 || reqLng > 121.00) {
-        reqLat = 14.945;
-        reqLng = 120.895;
-      }
-
-      // Compute distances
-      const sortedResponders = filteredResponders
-        .map((responder) => {
-          // Fallback to CDRRMO HQ coordinates if responder location is null
-          let resLat = responder.lastLatitude !== null ? Number(responder.lastLatitude) : 14.9516;
-          let resLng = responder.lastLongitude !== null ? Number(responder.lastLongitude) : 120.9011;
-
-          // Mock coordinates in Baliwag if responder is outside the city
-          if (resLat < 14.90 || resLat > 15.00 || resLng < 120.80 || resLng > 121.00) {
-            resLat = 14.954;
-            resLng = 120.902;
-          }
-
-          // Force seeded responder@disastrace.com to be within 1.2km of request coordinates (~250m) for off-site developer testing
-          if (responder.email === "responder@disastrace.com") {
-            resLat = reqLat + 0.0015;
-            resLng = reqLng + 0.0015;
-          }
-
-          const distanceKm = calculateHaversineDistance(
-            reqLat,
-            reqLng,
-            resLat,
-            resLng
-          );
-          return { responder, distanceKm };
-        })
-        .filter((item) => item.distanceKm <= 1.2)
-        .sort((a, b) => a.distanceKm - b.distanceKm);
-
-      if (sortedResponders.length > 0) {
-        // Option A: Cascade offer to the next nearest unit
-        const nextItem = sortedResponders[0];
-        const nextResponder = nextItem.responder;
-
-        const nextOfferDuration = incident.dispatchOfferDurationSeconds || 30;
-        const nextOfferExpiresAt = new Date(Date.now() + nextOfferDuration * 1000);
-
-        await db.update(incidents)
-          .set({
-            currentOfferResponderId: nextResponder.id,
-            offerExpiresAt: nextOfferExpiresAt,
-            skippedResponderIds: updatedSkipped,
-            etaMinutes: Math.max(2, Math.round(nextItem.distanceKm * 5)),
-          })
-          .where(eq(incidents.id, incident.id));
-
-        // Reserve new responder
-        await db.update(users)
-          .set({ dutyStatus: "ACTIVE_DISPATCH" })
-          .where(eq(users.id, nextResponder.id));
-
-        console.log(`Cascade successfully completed. Transmitted offer to responder ${nextResponder.fullName}.`);
-      } else {
-        // No more responders left in range: Trigger PACC Manual Override Fallback!
-        console.log(`Cascade exhausted: No remaining available responders within 1.2km for incident ${incident.id}. Alerting PACC dispatcher.`);
-        
-        await db.update(incidents)
-          .set({
-            currentOfferResponderId: null,
-            offerExpiresAt: null,
-            skippedResponderIds: updatedSkipped,
-            dispatchMethod: "PACC_MANUAL",
-          })
-          .where(eq(incidents.id, incident.id));
-
-        // Trigger Option B Background Recycle Queue Fallback
-        // (If PACC admins do not manual force-dispatch within 120 seconds, the incident automatically reverts to PENDING)
-        // We calculate override timeout relative to NOW
-        const manualOverrideRecycleTimer = new Date(Date.now() + 120 * 1000);
-        
-        // Save override expiration to incidents using `offerExpiresAt` slot or custom metadata
-        await db.update(incidents)
-          .set({
-            offerExpiresAt: manualOverrideRecycleTimer // 120s recycling countdown
-          })
-          .where(eq(incidents.id, incident.id));
-      }
+      await cascadeIncident(incident.id, incident.currentOfferResponderId);
     }
   } catch (error) {
     console.error("Error in checkAndCascadeExpiredOffers:", error);

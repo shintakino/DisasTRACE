@@ -235,6 +235,41 @@ export default function TrackingScreen() {
     };
   }, [report.incidentId]);
 
+  // Listen for the verification request status to revert back to 'PENDING' (cascade exhaustion fallback)
+  useEffect(() => {
+    const requestId = report.id;
+    if (!requestId) return;
+
+    console.log('[TrackingScreen] Subscribing to status changes for request ID:', requestId);
+
+    const channel = supabase
+      .channel(`tracking-request-${requestId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'verification_requests',
+          filter: `id=eq.${requestId}`,
+        },
+        (payload) => {
+          console.log('[TrackingScreen] Real-time request status updated:', payload.new);
+          if (payload.new && payload.new.status === 'PENDING') {
+            // Trigger physical warning haptic vibration
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            
+            // Revert back to the pending screen
+            router.replace('/help/pending');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [report.id]);
+
   // Natural elapsed time incrementer
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;

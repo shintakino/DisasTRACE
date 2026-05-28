@@ -5,6 +5,7 @@ import { users } from "@/db/schema/users";
 import { eq, and } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
+import { cascadeIncident } from "@/lib/dispatch-engine";
 
 const RespondSchema = z.object({
   incidentId: z.string().uuid(),
@@ -75,28 +76,14 @@ export async function POST(req: NextRequest) {
         message: "Dispatch offer accepted.",
       });
     } else {
-      // REJECT: Decline offer, append to skipped array
-      const currentSkipped = incident.skippedResponderIds || [];
-      const updatedSkipped = [...currentSkipped, user.id];
-
-      const [updatedIncident] = await db.update(incidents)
-        .set({
-          currentOfferResponderId: null,
-          offerExpiresAt: null,
-          skippedResponderIds: updatedSkipped,
-        })
-        .where(eq(incidents.id, incidentId))
-        .returning();
-
-      // Ensure responder status remains ON_DUTY
-      await db.update(users)
-        .set({ dutyStatus: 'ON_DUTY' })
-        .where(eq(users.id, user.id));
+      // REJECT: Decline offer, trigger cascade/reversion engine immediately
+      console.log(`Responder ${dbUser.fullName} declined incident offer ${incidentId}. Cascading/reverting immediately...`);
+      
+      await cascadeIncident(incidentId, user.id);
 
       return NextResponse.json({
         success: true,
-        incident: updatedIncident,
-        message: "Dispatch offer declined.",
+        message: "Dispatch offer declined and cascaded/reverted.",
       });
     }
   } catch (error) {

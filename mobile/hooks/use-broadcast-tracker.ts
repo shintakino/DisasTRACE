@@ -2,7 +2,12 @@ import { useEffect } from 'react';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 
-export function useBroadcastTracker(incidentId: string | null, active: boolean) {
+export function useBroadcastTracker(
+  incidentId: string | null,
+  active: boolean,
+  responderStatus?: string,
+  targetHospital?: any
+) {
   useEffect(() => {
     let channel: any = null;
 
@@ -83,7 +88,9 @@ export function useBroadcastTracker(incidentId: string | null, active: boolean) 
             longitude: lng,
             heading: pos.heading,
             speedKph: Math.max(0, Math.round(pos.speed * 3.6)),
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            responderStatus,
+            targetHospital
           };
 
           // 1. Emit L2 broadcast event for sub-second smooth map updates
@@ -162,5 +169,5 @@ export function useBroadcastTracker(incidentId: string | null, active: boolean) 
         channel.unsubscribe();
       }
     };
-  }, [incidentId, active]);
+  }, [incidentId, active, responderStatus, targetHospital]);
 }

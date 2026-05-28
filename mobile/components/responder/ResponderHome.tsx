@@ -102,7 +102,9 @@ export function ResponderHome() {
           longitude: currentCoord[0],
           heading: angle,
           speedKph: 50,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          responderStatus: status,
+          targetHospital: targetHospital
         }
       });
 
@@ -364,7 +366,9 @@ export function ResponderHome() {
   // 1. Activate live GPS telemetry tracking
   useBroadcastTracker(
     activeDispatch?.id || null,
-    (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') && !isSimulating
+    (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') && !isSimulating,
+    status,
+    targetHospital
   );
 
   // 2. Track current location of the responder via GPS

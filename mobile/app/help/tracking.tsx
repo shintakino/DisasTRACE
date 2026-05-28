@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollV
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { useRouter } from 'expo-router';
 import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPin, CheckCircle2, Truck, Navigation } from 'lucide-react-native';
+import { Hospital } from 'iconsax-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
 import * as Haptics from 'expo-haptics';
@@ -42,6 +43,8 @@ export default function TrackingScreen() {
 
   const [assignedResponder, setAssignedResponder] = useState<any>(null);
   const [isFindingAmbulance, setIsFindingAmbulance] = useState(true);
+  const [liveResponderStatus, setLiveResponderStatus] = useState<string | null>(null);
+  const [liveTargetHospital, setLiveTargetHospital] = useState<any | null>(null);
 
   // Pulse animation values for radar holding screen
   const pulseAnim1 = useRef(new Animated.Value(0)).current;
@@ -335,11 +338,19 @@ export default function TrackingScreen() {
     const sub = channel
       .on('broadcast', { event: 'telemetry' }, ({ payload }) => {
         console.log('[TrackingScreen] Real-time telemetry broadcast received:', payload);
-        if (payload && payload.latitude && payload.longitude) {
-          setAmbulanceLocation({
-            latitude: payload.latitude,
-            longitude: payload.longitude
-          });
+        if (payload) {
+          if (payload.latitude && payload.longitude) {
+            setAmbulanceLocation({
+              latitude: payload.latitude,
+              longitude: payload.longitude
+            });
+          }
+          if (payload.responderStatus) {
+            setLiveResponderStatus(payload.responderStatus);
+          }
+          if (payload.targetHospital) {
+            setLiveTargetHospital(payload.targetHospital);
+          }
         }
       })
       .subscribe();
@@ -360,11 +371,15 @@ export default function TrackingScreen() {
     return () => clearInterval(interval);
   }, [isArrived]);
 
+  const isTransporting = liveResponderStatus === 'to_hospital' && liveTargetHospital;
+  const destLng = isTransporting ? liveTargetHospital.coordinates.longitude : targetLocation.longitude;
+  const destLat = isTransporting ? liveTargetHospital.coordinates.latitude : targetLocation.latitude;
+
   // Fetch real OSRM route from live moving ambulance location to incident coordinates
   useEffect(() => {
     async function updateRoute() {
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${ambulanceLocation.longitude},${ambulanceLocation.latitude};${targetLocation.longitude},${targetLocation.latitude}?overview=full&geometries=geojson`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${ambulanceLocation.longitude},${ambulanceLocation.latitude};${destLng},${destLat}?overview=full&geometries=geojson`;
         const res = await fetch(url);
         const data = await res.json();
         
@@ -386,7 +401,7 @@ export default function TrackingScreen() {
     }
     
     updateRoute();
-  }, [ambulanceLocation.latitude, ambulanceLocation.longitude]);
+  }, [ambulanceLocation.latitude, ambulanceLocation.longitude, isTransporting, destLng, destLat]);
 
   // Format Elapsed Time
   const formatTime = (totalSeconds: number) => {
@@ -396,11 +411,9 @@ export default function TrackingScreen() {
     return `${h}:${m}:${s}`;
   };
 
-
-
   const region = {
-    latitude: (ambulanceLocation.latitude + targetLocation.latitude) / 2,
-    longitude: (ambulanceLocation.longitude + targetLocation.longitude) / 2,
+    latitude: (ambulanceLocation.latitude + destLat) / 2,
+    longitude: (ambulanceLocation.longitude + destLng) / 2,
     latitudeDelta: 0.04,
     longitudeDelta: 0.04,
   };
@@ -589,6 +602,18 @@ export default function TrackingScreen() {
           </View>
         </Marker>
 
+        {/* Hospital Destination */}
+        {isTransporting && (
+          <Marker id="hospitalMarker" lngLat={[liveTargetHospital.coordinates.longitude, liveTargetHospital.coordinates.latitude]}>
+            <View className="items-center justify-center relative">
+              <View className="absolute w-12 h-12 rounded-full bg-emerald-500/20 animate-pulse" />
+              <View className="p-2 rounded-full border-2 border-emerald-200 bg-emerald-600 shadow-lg">
+                <Hospital color="white" size={16} variant="Bold" />
+              </View>
+            </View>
+          </Marker>
+        )}
+
         {/* Route Line */}
         <GeoJSONSource
           id="routeSource"
@@ -600,7 +625,7 @@ export default function TrackingScreen() {
                 ? routeCoords
                 : [
                     [ambulanceLocation.longitude, ambulanceLocation.latitude],
-                    [targetLocation.longitude, targetLocation.latitude],
+                    [destLng, destLat],
                   ],
             },
             properties: {}
@@ -610,7 +635,7 @@ export default function TrackingScreen() {
             id="routeFill"
             type="line"
             paint={{
-              'line-color': '#3B82F6',
+              'line-color': isTransporting ? '#10B981' : '#3B82F6',
               'line-width': 3,
             }}
           />
@@ -620,7 +645,9 @@ export default function TrackingScreen() {
       {/* Top Header Overlay */}
       <View style={styles.topHeader}>
         <Text style={styles.title}>Ambulance Tracker</Text>
-        <Text style={styles.subtitle}>DR-2026-0847 · Help is on the way</Text>
+        <Text style={styles.subtitle}>
+          {isTransporting ? `Transporting to ${liveTargetHospital.name}` : "DR-2026-0847 · Help is on the way"}
+        </Text>
         
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
@@ -628,7 +655,7 @@ export default function TrackingScreen() {
             <Text style={styles.statValue}>{formatTime(elapsed)}</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statLabel}>Distance</Text>
+            <Text style={styles.statLabel}>{isTransporting ? "Distance to Hosp" : "Distance"}</Text>
             <Text style={styles.statValue}>{distance.toFixed(1)} km</Text>
           </View>
         </View>
@@ -658,21 +685,25 @@ export default function TrackingScreen() {
         <View>
           {/* Main Ambulance Pill */}
           <View style={styles.ambulancePillRow}>
-            <View style={styles.ambulancePill}>
-              <View style={styles.ambulanceIconBox}>
-                <Truck color="#991B1B" size={18} />
+            <View style={[styles.ambulancePill, isTransporting && { backgroundColor: '#D1FAE5', borderColor: '#34D399' }]}>
+              <View style={[styles.ambulanceIconBox, isTransporting && { backgroundColor: '#6EE7B7' }]}>
+                <Truck color={isTransporting ? '#065F46' : '#991B1B'} size={18} />
               </View>
               <View style={styles.ambulancePillText}>
-                <Text style={styles.ambulanceUnitText}>
+                <Text style={[styles.ambulanceUnitText, isTransporting && { color: '#065F46' }]}>
                   {assignedResponder?.fullName ? `AMB-${assignedResponder.fullName.split(',')[0].toUpperCase()}` : "AMB-001"}
                 </Text>
-                <Text style={styles.ambulanceStatusText}>
-                  {isArrived ? "Arrived at your location" : "En route to your location"}
+                <Text style={[styles.ambulanceStatusText, isTransporting && { color: '#047857' }]}>
+                  {isTransporting 
+                    ? `Transporting to ${liveTargetHospital.name}` 
+                    : isArrived 
+                      ? "Arrived at your location" 
+                      : "En route to your location"}
                 </Text>
               </View>
             </View>
             <View style={styles.etaBox}>
-              <Text style={styles.etaNumber}>
+              <Text style={[styles.etaNumber, isTransporting && { color: '#065F46' }]}>
                 {eta.toString().padStart(2, '0')}<Text style={styles.etaMins}>m</Text>
               </Text>
               <Text style={styles.etaLabel}>ETA</Text>
@@ -682,12 +713,16 @@ export default function TrackingScreen() {
           {/* Progress Bar */}
           <View style={styles.progressContainer}>
             <View style={styles.progressLabels}>
-              <Text style={styles.progressLabelLeft}>CDRRMO HQ</Text>
-              <Text style={styles.progressLabelRight}>Your Location</Text>
+              <Text style={[styles.progressLabelLeft, isTransporting && { color: '#047857' }]}>
+                {isTransporting ? "Your Location" : "CDRRMO HQ"}
+              </Text>
+              <Text style={[styles.progressLabelRight, isTransporting && { color: '#047857' }]}>
+                {isTransporting ? liveTargetHospital.name : "Your Location"}
+              </Text>
             </View>
             <View style={styles.progressBarTrack}>
-              <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
-              <View style={[styles.progressKnob, { left: `${progressPercent}%` }]} />
+              <View style={[styles.progressBarFill, { width: `${progressPercent}%` }, isTransporting && { backgroundColor: '#10B981' }]} />
+              <View style={[styles.progressKnob, { left: `${progressPercent}%` }, isTransporting && { borderColor: '#10B981' }]} />
             </View>
           </View>
         </View>
@@ -760,24 +795,30 @@ export default function TrackingScreen() {
                   </View>
                   <View style={styles.timelineLineCompleted} />
                   <View style={styles.timelineContent}>
-                    <Text style={styles.timelineTitleCompleted}>Passing Rizal Street</Text>
-                    <Text style={styles.timelineSubtitle}>09:46 AM • 0.9 km covered</Text>
+                    <Text style={styles.timelineTitleCompleted}>
+                      {isTransporting ? "Arrived at Your Location" : "Passing Rizal Street"}
+                    </Text>
+                    <Text style={styles.timelineSubtitle}>
+                      {isTransporting ? "09:50 AM • Patients on-board" : "09:46 AM • 0.9 km covered"}
+                    </Text>
                   </View>
                 </View>
 
                 {/* Step 3 (Current / Completed) */}
                 <View style={styles.timelineItem}>
-                  <View style={isArrived ? styles.timelineIconCompleted : styles.timelineIconCurrent}>
-                    {!isArrived && <View style={styles.timelineIconCurrentInner} />}
-                    {isArrived && <Check color="#1E3A8A" size={12} />}
+                  <View style={(isTransporting || isArrived) ? styles.timelineIconCompleted : styles.timelineIconCurrent}>
+                    {!(isTransporting || isArrived) && <View style={styles.timelineIconCurrentInner} />}
+                    {(isTransporting || isArrived) && <Check color="#1E3A8A" size={12} />}
                   </View>
-                  <View style={isArrived ? styles.timelineLineCompleted : styles.timelineLinePending} />
+                  <View style={(isTransporting || isArrived) ? styles.timelineLineCompleted : styles.timelineLinePending} />
                   <View style={styles.timelineContent}>
-                    <Text style={isArrived ? styles.timelineTitleCompleted : styles.timelineTitleCurrent}>En route Near Pagala</Text>
-                    <Text style={isArrived ? styles.timelineSubtitle : styles.timelineSubtitleCurrent}>
-                      {isArrived ? "09:50 AM • Passed" : `Now • ${distance.toFixed(1)} km remaining`}
+                    <Text style={(isTransporting || isArrived) ? styles.timelineTitleCompleted : styles.timelineTitleCurrent}>
+                      {isTransporting ? "Departed Incident Scene" : "En route Near Pagala"}
                     </Text>
-                    {!isArrived && (
+                    <Text style={(isTransporting || isArrived) ? styles.timelineSubtitle : styles.timelineSubtitleCurrent}>
+                      {isTransporting ? "09:52 AM • Passed" : isArrived ? "09:50 AM • Passed" : `Now • ${distance.toFixed(1)} km remaining`}
+                    </Text>
+                    {!(isTransporting || isArrived) && (
                       <View style={styles.alertPill}>
                         <AlertCircle color="#DC2626" size={14} style={{marginRight: 4}} />
                         <Text style={styles.alertText}>Traffic ahead minor delay</Text>
@@ -788,13 +829,19 @@ export default function TrackingScreen() {
 
                 {/* Step 4 (Future / Current) */}
                 <View style={[styles.timelineItem, { paddingBottom: 0 }]}>
-                  <View style={isArrived ? styles.timelineIconCurrent : styles.timelineIconPending}>
-                    {isArrived && <View style={styles.timelineIconCurrentInner} />}
+                  <View style={isTransporting ? styles.timelineIconCurrent : isArrived ? styles.timelineIconCurrent : styles.timelineIconPending}>
+                    {(isTransporting || isArrived) && <View style={styles.timelineIconCurrentInner} />}
                   </View>
                   <View style={styles.timelineContent}>
-                    <Text style={isArrived ? styles.timelineTitleCurrent : styles.timelineTitlePending}>Arrival at Your Location</Text>
-                    <Text style={isArrived ? styles.timelineSubtitleCurrent : styles.timelineSubtitlePending}>
-                      {isArrived ? "Now • Arrived" : "Est. 09:54 AM • Your Location"}
+                    <Text style={isTransporting ? styles.timelineTitleCurrent : isArrived ? styles.timelineTitleCurrent : styles.timelineTitlePending}>
+                      {isTransporting ? `Hospital Transfer` : "Arrival at Your Location"}
+                    </Text>
+                    <Text style={isTransporting ? styles.timelineSubtitleCurrent : isArrived ? styles.timelineSubtitleCurrent : styles.timelineSubtitlePending}>
+                      {isTransporting 
+                        ? `En route to ${liveTargetHospital.name} · ${distance.toFixed(1)} km remaining` 
+                        : isArrived 
+                          ? "Now • Arrived" 
+                          : "Est. 09:54 AM • Your Location"}
                     </Text>
                   </View>
                 </View>

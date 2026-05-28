@@ -99,59 +99,185 @@ export default function TrackingScreen() {
     setDrawerExpanded(nextExpand);
   };
 
-  // Safety net: If incidentId is missing but report.id (request ID) is present, resolve it from the database
+  // 1. Mount/focus sync: Fetch the current active incident for this request to ensure store is perfectly in sync
   useEffect(() => {
+    const requestId = report.id;
+    if (!requestId) return;
+
     let active = true;
-    let timeoutId: ReturnType<typeof setTimeout>;
 
-    if (!report.incidentId && report.id) {
-      console.log('[TrackingScreen] Safety net: incidentId is missing. Resolving by request ID:', report.id);
-      const resolveIncident = async () => {
-        try {
-          const { data: incident, error } = await supabase
-            .from('incidents')
-            .select('id')
-            .eq('request_id', report.id)
-            .maybeSingle();
+    const syncIncidentState = async () => {
+      try {
+        console.log('[TrackingScreen] Syncing incident state for request:', requestId);
+        const { data: incident, error } = await supabase
+          .from('incidents')
+          .select('id, status, responder_id')
+          .eq('request_id', requestId)
+          .maybeSingle();
 
-          if (!active) return;
+        if (!active) return;
 
-          if (incident && !error) {
-            console.log('[TrackingScreen] Safety net resolved incident ID:', incident.id);
+        if (error) {
+          console.error('[TrackingScreen] Error syncing incident:', error);
+          return;
+        }
+
+        if (incident) {
+          console.log('[TrackingScreen] Sync resolved active incident ID:', incident.id);
+          // Sync store if incidentId is missing or stale
+          if (incident.id !== report.incidentId) {
             useEmergencyReportStore.setState((state) => ({
               report: {
                 ...state.report,
                 incidentId: incident.id
               }
             }));
+          }
+          
+          if (incident.status === 'ARRIVED') {
+            setIsArrived(true);
+          }
+          
+          if (incident.responder_id) {
+            setIsFindingAmbulance(false);
+            const { data: resp } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', incident.responder_id)
+              .single();
+            if (resp && active) {
+              setAssignedResponder(resp);
+              if (resp.last_latitude && resp.last_longitude) {
+                setAmbulanceLocation({
+                  latitude: Number(resp.last_latitude),
+                  longitude: Number(resp.last_longitude)
+                });
+              }
+            }
           } else {
-            console.log('[TrackingScreen] Safety net could not resolve incident yet, retrying in 1s...');
-            timeoutId = setTimeout(resolveIncident, 1000);
+            setAssignedResponder(null);
+            setIsFindingAmbulance(true);
           }
-        } catch (err) {
-          console.error('[TrackingScreen] Safety net error resolving incident:', err);
-          if (active) {
-            timeoutId = setTimeout(resolveIncident, 2000);
-          }
+        } else {
+          // No incident exists for this request in the database (e.g. cascaded out)
+          console.log('[TrackingScreen] Sync found no active incident. Reverting to pending screen.');
+          useEmergencyReportStore.setState((state) => ({
+            report: {
+              ...state.report,
+              incidentId: undefined
+            }
+          }));
+          router.replace('/help/pending');
         }
-      };
-      resolveIncident();
-    }
+      } catch (err) {
+        console.error('[TrackingScreen] Catch block error during sync:', err);
+      }
+    };
+
+    syncIncidentState();
 
     return () => {
       active = false;
-      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [report.incidentId, report.id]);
+  }, [report.id]);
 
-  // Real-time telemetry receiver
+  // 2. Request-level Incident Lifecycle Listener (Tracks inserts, updates, and deletes)
+  useEffect(() => {
+    const requestId = report.id;
+    if (!requestId) return;
+
+    console.log('[TrackingScreen] Subscribing to incident lifecycle updates for request:', requestId);
+
+    const dbChannel = supabase
+      .channel(`incident-lifecycle-${requestId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'incidents',
+          filter: `request_id=eq.${requestId}`,
+        },
+        async (payload) => {
+          console.log('[TrackingScreen] Real-time incident event received:', payload.eventType, payload);
+          
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const newIncident = payload.new;
+            if (newIncident) {
+              // Sync store if incidentId changed (e.g. PACC manual dispatch created a new record)
+              if (newIncident.id !== report.incidentId) {
+                console.log('[TrackingScreen] Incident ID updated/created! Syncing to store:', newIncident.id);
+                useEmergencyReportStore.setState((state) => ({
+                  report: {
+                    ...state.report,
+                    incidentId: newIncident.id
+                  }
+                }));
+              }
+
+              if (newIncident.status === 'ARRIVED') {
+                setIsArrived(true);
+              }
+              if (newIncident.status === 'RESOLVED') {
+                router.replace('/help/resolution');
+              }
+
+              if (newIncident.responder_id) {
+                const { data: resp } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('id', newIncident.responder_id)
+                  .single();
+
+                if (resp) {
+                  setAssignedResponder(resp);
+                  if (resp.last_latitude && resp.last_longitude) {
+                    setAmbulanceLocation({
+                      latitude: Number(resp.last_latitude),
+                      longitude: Number(resp.last_longitude)
+                    });
+                  }
+                  setIsFindingAmbulance((prev) => {
+                    if (prev) {
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    }
+                    return false;
+                  });
+                }
+              } else {
+                setAssignedResponder(null);
+                setIsFindingAmbulance(true);
+              }
+            }
+          } else if (payload.eventType === 'DELETE') {
+            console.log('[TrackingScreen] Active incident deleted (cascade expired). Reverting back to pending triage queue.');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            
+            useEmergencyReportStore.setState((state) => ({
+              report: {
+                ...state.report,
+                incidentId: undefined
+              }
+            }));
+            router.replace('/help/pending');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(dbChannel);
+    };
+  }, [report.id]);
+
+  // 3. Incident-specific high-frequency telemetry broadcasts receiver
   useEffect(() => {
     const incidentId = report.incidentId;
     if (!incidentId) return;
 
-    console.log('[TrackingScreen] Subscribing to telemetry channel for incident:', incidentId);
+    console.log('[TrackingScreen] Subscribing to coordinate telemetry channel for incident:', incidentId);
 
-    // 1. Fetch initial responder coordinates and info from database
+    // Fetch initial coordinates & info
     const fetchInitialResponderLocation = async () => {
       try {
         const { data: incident, error } = await supabase
@@ -167,7 +293,6 @@ export default function TrackingScreen() {
           
           if (incident.responder_id) {
             setIsFindingAmbulance(false);
-            // Fetch responder from users table directly
             const { data: resp } = await supabase
               .from('users')
               .select('*')
@@ -195,7 +320,7 @@ export default function TrackingScreen() {
 
     fetchInitialResponderLocation();
 
-    // 2. Subscribe to realtime telemetry broadcasts
+    // Coordinates channel (high frequency OSRM simulator telemetry broadcasts)
     const channel = supabase.channel(`incident-tracking:${incidentId}`);
     const sub = channel
       .on('broadcast', { event: 'telemetry' }, ({ payload }) => {
@@ -209,101 +334,10 @@ export default function TrackingScreen() {
       })
       .subscribe();
 
-    // 3. Listen to incident updates (e.g. ARRIVED, RESOLVED, and responder assignments)
-    const dbChannel = supabase
-      .channel(`incident-status-${incidentId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'incidents',
-          filter: `id=eq.${incidentId}`,
-        },
-        async (payload) => {
-          console.log('[TrackingScreen] Real-time incident status/responder update:', payload.new);
-          if (payload.new) {
-            if (payload.new.status === 'ARRIVED') {
-              setIsArrived(true);
-            }
-            if (payload.new.status === 'RESOLVED') {
-              router.replace('/help/resolution');
-            }
-
-            // Detect changes in responder assignment
-            if (payload.new.responder_id) {
-              const { data: resp } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', payload.new.responder_id)
-                .single();
-
-              if (resp) {
-                setAssignedResponder(resp);
-                if (resp.last_latitude && resp.last_longitude) {
-                  setAmbulanceLocation({
-                    latitude: Number(resp.last_latitude),
-                    longitude: Number(resp.last_longitude)
-                  });
-                }
-
-                setIsFindingAmbulance((prev) => {
-                  if (prev) {
-                    // Trigger physical success haptic feedback
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  }
-                  return false;
-                });
-              }
-            } else {
-              setAssignedResponder(null);
-              setIsFindingAmbulance(true);
-            }
-          }
-        }
-      )
-      .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
-      supabase.removeChannel(dbChannel);
     };
   }, [report.incidentId]);
-
-  // Listen for the verification request status to revert back to 'PENDING' (cascade exhaustion fallback)
-  useEffect(() => {
-    const requestId = report.id;
-    if (!requestId) return;
-
-    console.log('[TrackingScreen] Subscribing to status changes for request ID:', requestId);
-
-    const channel = supabase
-      .channel(`tracking-request-${requestId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'verification_requests',
-          filter: `id=eq.${requestId}`,
-        },
-        (payload) => {
-          console.log('[TrackingScreen] Real-time request status updated:', payload.new);
-          if (payload.new && payload.new.status === 'PENDING') {
-            // Trigger physical warning haptic vibration
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            
-            // Revert back to the pending screen
-            router.replace('/help/pending');
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [report.id]);
 
   // Natural elapsed time incrementer
   useEffect(() => {

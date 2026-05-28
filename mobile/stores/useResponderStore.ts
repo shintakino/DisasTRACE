@@ -66,7 +66,7 @@ interface ResponderState {
   hideArrivalConfirm: () => void;
   arriveAtScene: () => Promise<void>;
   transportToHospital: () => void;
-  startReport: () => void;
+  startReport: () => Promise<void>;
   submitReport: (incidentId?: string, formData?: any) => Promise<void>;
   finishAndClose: () => void;
   completeIncident: () => void;
@@ -135,9 +135,24 @@ export const useResponderStore = create<ResponderState>((set) => ({
     elapsedTimeSeconds: 0
   }),
 
-  startReport: () => set({
-    status: 'report_filling'
-  }),
+  startReport: async () => {
+    const activeDispatch = useResponderStore.getState().activeDispatch;
+    if (activeDispatch) {
+      try {
+        const { error } = await supabase
+          .from('incidents')
+          .update({ status: 'RESOLVED', resolved_at: new Date().toISOString() })
+          .eq('id', activeDispatch.id);
+        if (error) throw error;
+        console.log('[useResponderStore] Successfully updated status to RESOLVED in DB (on-scene resolution).');
+      } catch (e) {
+        console.error('[useResponderStore] Failed to update incident status to RESOLVED:', e);
+      }
+    }
+    set({
+      status: 'report_filling'
+    });
+  },
 
   submitReport: async (incidentId?: string, formData?: any) => {
     set({ isSubmittingReport: true });

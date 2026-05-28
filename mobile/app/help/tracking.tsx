@@ -372,6 +372,7 @@ export default function TrackingScreen() {
   }, [isArrived]);
 
   const isTransporting = liveResponderStatus === 'to_hospital' && liveTargetHospital;
+  const displayProgressPercent = isArrived && !isTransporting ? 100 : progressPercent;
   const destLng = isTransporting ? liveTargetHospital.coordinates.longitude : targetLocation.longitude;
   const destLat = isTransporting ? liveTargetHospital.coordinates.latitude : targetLocation.latitude;
 
@@ -646,7 +647,11 @@ export default function TrackingScreen() {
       <View style={styles.topHeader}>
         <Text style={styles.title}>Ambulance Tracker</Text>
         <Text style={styles.subtitle}>
-          {isTransporting ? `Transporting to ${liveTargetHospital.name}` : "DR-2026-0847 · Help is on the way"}
+          {isTransporting 
+            ? `Transporting to ${liveTargetHospital.name}` 
+            : isArrived 
+              ? "Ambulance Arrived · Crew Assisting on Scene" 
+              : `${report.requestId || "DR-2026-0847"} · Help is on the way`}
         </Text>
         
         <View style={styles.statsRow}>
@@ -656,7 +661,9 @@ export default function TrackingScreen() {
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statLabel}>{isTransporting ? "Distance to Hosp" : "Distance"}</Text>
-            <Text style={styles.statValue}>{distance.toFixed(1)} km</Text>
+            <Text style={styles.statValue}>
+              {isArrived && !isTransporting ? "0.0" : distance.toFixed(1)} km
+            </Text>
           </View>
         </View>
       </View>
@@ -704,7 +711,7 @@ export default function TrackingScreen() {
             </View>
             <View style={styles.etaBox}>
               <Text style={[styles.etaNumber, isTransporting && { color: '#065F46' }]}>
-                {eta.toString().padStart(2, '0')}<Text style={styles.etaMins}>m</Text>
+                {isArrived && !isTransporting ? "00" : eta.toString().padStart(2, '0')}<Text style={styles.etaMins}>m</Text>
               </Text>
               <Text style={styles.etaLabel}>ETA</Text>
             </View>
@@ -721,8 +728,8 @@ export default function TrackingScreen() {
               </Text>
             </View>
             <View style={styles.progressBarTrack}>
-              <View style={[styles.progressBarFill, { width: `${progressPercent}%` }, isTransporting && { backgroundColor: '#10B981' }]} />
-              <View style={[styles.progressKnob, { left: `${progressPercent}%` }, isTransporting && { borderColor: '#10B981' }]} />
+              <View style={[styles.progressBarFill, { width: `${displayProgressPercent}%` }, isTransporting && { backgroundColor: '#10B981' }]} />
+              <View style={[styles.progressKnob, { left: `${displayProgressPercent}%` }, isTransporting && { borderColor: '#10B981' }]} />
             </View>
           </View>
         </View>

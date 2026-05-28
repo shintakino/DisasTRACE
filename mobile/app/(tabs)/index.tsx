@@ -16,78 +16,45 @@ import { supabase } from '../../lib/supabase';
 export default function HomeScreen() {
   const router = useRouter();
   const { profile, verificationStatus, role, user, isLoaded } = useAuthStatus();
-  const [isCheckingIncident, setIsCheckingIncident] = useState(role === 'public_user');
+  const [isCheckingIncident, setIsCheckingIncident] = useState(true);
 
   useEffect(() => {
     let active = true;
 
     async function checkForActiveIncident() {
-      if (!isLoaded || role !== 'public_user' || !user) {
+      if (!isLoaded || !user) {
         setIsCheckingIncident(false);
         return;
       }
 
       try {
-        console.log('[HomeScreen] Checking for active or pending incidents for user:', user.id);
-        
-        // 1. Fetch latest verification request for the resident
-        const { data: request, error: reqError } = await supabase
-          .from('verification_requests')
-          .select('*')
-          .eq('resident_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (reqError) {
-          console.error('[HomeScreen] Error fetching active verification request:', reqError);
-          if (active) setIsCheckingIncident(false);
-          return;
-        }
-
-        if (request) {
-          console.log('[HomeScreen] Latest verification request found:', request.id, 'status:', request.status);
+        if (role === 'public_user') {
+          console.log('[HomeScreen] Checking for active or pending incidents for resident:', user.id);
           
-          if (request.status === 'PENDING') {
-            // Restore store state and route to pending
-            useEmergencyReportStore.setState({
-              report: {
-                id: request.id,
-                requestId: request.request_id,
-                latitude: request.latitude,
-                longitude: request.longitude,
-                incidentType: request.type as any,
-                peopleInvolved: request.people_involved as any,
-                landmarks: request.location_description || undefined,
-                photoUri: request.image_url || '',
-                severity: request.severity as any,
-              }
-            });
-            
-            console.log('[HomeScreen] Redirecting to pending screen.');
-            router.replace('/help/pending');
+          // 1. Fetch latest verification request for the resident
+          const { data: request, error: reqError } = await supabase
+            .from('verification_requests')
+            .select('*')
+            .eq('resident_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (reqError) {
+            console.error('[HomeScreen] Error fetching active verification request:', reqError);
+            if (active) setIsCheckingIncident(false);
             return;
-          } else if (request.status === 'VERIFIED') {
-            // Check if there is an active (unresolved) incident associated with it
-            const { data: incident, error: incError } = await supabase
-              .from('incidents')
-              .select('*')
-              .eq('request_id', request.id)
-              .maybeSingle();
+          }
 
-            if (incError) {
-              console.error('[HomeScreen] Error fetching incident:', incError);
-            }
-
-            if (incident && incident.status !== 'RESOLVED') {
-              console.log('[HomeScreen] Active incident found:', incident.id, 'status:', incident.status);
-              
-              // Restore store state and route to tracking
+          if (request) {
+            console.log('[HomeScreen] Latest verification request found:', request.id, 'status:', request.status);
+            
+            if (request.status === 'PENDING') {
+              // Restore store state and route to pending
               useEmergencyReportStore.setState({
                 report: {
                   id: request.id,
                   requestId: request.request_id,
-                  incidentId: incident.id,
                   latitude: request.latitude,
                   longitude: request.longitude,
                   incidentType: request.type as any,
@@ -98,9 +65,201 @@ export default function HomeScreen() {
                 }
               });
               
-              console.log('[HomeScreen] Redirecting to tracking screen.');
-              router.replace('/help/tracking');
+              console.log('[HomeScreen] Redirecting to pending screen.');
+              router.replace('/help/pending');
               return;
+            } else if (request.status === 'VERIFIED') {
+              // Check if there is an active (unresolved) incident associated with it
+              const { data: incident, error: incError } = await supabase
+                .from('incidents')
+                .select('*')
+                .eq('request_id', request.id)
+                .maybeSingle();
+
+              if (incError) {
+                console.error('[HomeScreen] Error fetching incident:', incError);
+              }
+
+              if (incident && incident.status !== 'RESOLVED') {
+                console.log('[HomeScreen] Active incident found:', incident.id, 'status:', incident.status);
+                
+                // Restore store state and route to tracking
+                useEmergencyReportStore.setState({
+                  report: {
+                    id: request.id,
+                    requestId: request.request_id,
+                    incidentId: incident.id,
+                    latitude: request.latitude,
+                    longitude: request.longitude,
+                    incidentType: request.type as any,
+                    peopleInvolved: request.people_involved as any,
+                    landmarks: request.location_description || undefined,
+                    photoUri: request.image_url || '',
+                    severity: request.severity as any,
+                  }
+                });
+                
+                console.log('[HomeScreen] Redirecting to tracking screen.');
+                router.replace('/help/tracking');
+                return;
+              }
+            }
+          }
+        } else if (role === 'ambulance_responder') {
+          console.log('[HomeScreen] Checking for active dispatch in database for responder:', user.id);
+          const { data: activeInc, error } = await supabase
+            .from('incidents')
+            .select('*')
+            .eq('responder_id', user.id)
+            .neq('status', 'RESOLVED')
+            .maybeSingle();
+
+          if (error) throw error;
+
+          if (activeInc) {
+            console.log('[HomeScreen] Found active incident in DB to resume:', activeInc);
+            
+            let reporterName = 'Resident';
+            let reporterInitials = 'R';
+            let locationName = 'Baliwag City';
+            let typeOfEmergency = 'Medical Emergency';
+            let peopleInvolved = 1;
+            let incidentLat = 14.9538;
+            let incidentLng = 120.9029;
+
+            const { data: vReq } = await supabase
+              .from('verification_requests')
+              .select('*')
+              .eq('id', activeInc.request_id)
+              .single();
+
+            if (vReq) {
+              locationName = vReq.location_description || vReq.address || 'Baliwag City';
+              typeOfEmergency = vReq.type || 'Emergency';
+              incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
+              incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
+              
+              if (vReq.people_involved) {
+                const matched = vReq.people_involved.match(/\d+/);
+                peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
+              }
+
+              const { data: resUser } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', vReq.resident_id)
+                .single();
+
+              if (resUser) {
+                reporterName = resUser.full_name || 'Resident';
+                reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
+              }
+            }
+
+            let storeStatus: any = 'en_route';
+            if (activeInc.status === 'ARRIVED') {
+              storeStatus = 'on_scene';
+            }
+
+            useResponderStore.setState({
+              status: storeStatus,
+              activeDispatch: {
+                id: activeInc.id,
+                type: typeOfEmergency,
+                locationName,
+                distance: '1.5 km',
+                natureOfCall: 'Emergency',
+                peopleInvolved,
+                eta: activeInc.eta_minutes ? `~${activeInc.eta_minutes} min` : '~8 min',
+                reporterName,
+                reporterInitials,
+                timestamp: new Date(activeInc.created_at).toLocaleTimeString("en-US", {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }),
+                coordinates: {
+                  latitude: incidentLat,
+                  longitude: incidentLng,
+                },
+                typeOfEmergency,
+                assignedAmbulance: activeInc.assigned_ambulance || 'AMB-001',
+              }
+            });
+          } else {
+            // If no accepted incident, check for pending dispatch offers
+            console.log('[HomeScreen] Checking for pending dispatch offers in DB for responder:', user.id);
+            const { data: offerInc, error: offerError } = await supabase
+              .from('incidents')
+              .select('*')
+              .eq('current_offer_responder_id', user.id)
+              .eq('status', 'DISPATCHED')
+              .maybeSingle();
+
+            if (!offerError && offerInc) {
+              console.log('[HomeScreen] Found active offer in DB to resume:', offerInc);
+              
+              let reporterName = 'Resident';
+              let reporterInitials = 'R';
+              let locationName = 'Baliwag City';
+              let typeOfEmergency = 'Medical Emergency';
+              let peopleInvolved = 1;
+              let incidentLat = 14.9538;
+              let incidentLng = 120.9029;
+
+              const { data: vReq } = await supabase
+                .from('verification_requests')
+                .select('*')
+                .eq('id', offerInc.request_id)
+                .single();
+
+              if (vReq) {
+                locationName = vReq.location_description || vReq.address || 'Baliwag City';
+                typeOfEmergency = vReq.type || 'Emergency';
+                incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
+                incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
+                
+                if (vReq.people_involved) {
+                  const matched = vReq.people_involved.match(/\d+/);
+                  peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
+                }
+
+                const { data: resUser } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('id', vReq.resident_id)
+                  .single();
+
+                if (resUser) {
+                  reporterName = resUser.full_name || 'Resident';
+                  reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
+                }
+              }
+
+              useResponderStore.setState({
+                status: 'dispatch_offered',
+                activeDispatch: {
+                  id: offerInc.id,
+                  type: typeOfEmergency,
+                  locationName,
+                  distance: '1.5 km',
+                  natureOfCall: 'Emergency',
+                  peopleInvolved,
+                  eta: offerInc.eta_minutes ? `~${offerInc.eta_minutes} min` : '~8 min',
+                  reporterName,
+                  reporterInitials,
+                  timestamp: new Date(offerInc.created_at).toLocaleTimeString("en-US", {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }),
+                  coordinates: {
+                    latitude: incidentLat,
+                    longitude: incidentLng,
+                  },
+                  typeOfEmergency,
+                  dispatchOfferDurationSeconds: offerInc.dispatch_offer_duration_seconds || 30,
+                  assignedAmbulance: offerInc.assigned_ambulance || 'AMB-001',
+                }
+              });
             }
           }
         }
@@ -117,6 +276,7 @@ export default function HomeScreen() {
       checkForActiveIncident();
     }
   }, [isLoaded, role, user]);
+
   const { isLocationGateActive, requestPermissions } = useLocationPermission();
   
   // Fallback for initials
@@ -133,7 +293,7 @@ export default function HomeScreen() {
 
   const { status } = useResponderStore();
 
-  if (!isLoaded || (role === 'public_user' && isCheckingIncident)) {
+  if (!isLoaded || isCheckingIncident) {
     return (
       <View className="flex-1 bg-[#1E3A8A] justify-center items-center">
         <StatusBar barStyle="light-content" />

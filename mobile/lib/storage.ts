@@ -1,6 +1,57 @@
 import { File } from 'expo-file-system';
 import { decode } from "base64-arraybuffer";
 import { supabase } from "./supabase";
+import { Image } from 'react-native';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+
+/**
+ * Optimizes an image URI on-device by resizing and compressing it.
+ * 
+ * @param imageUri - The local URI of the image to optimize.
+ * @param maxDimension - The maximum width or height of the optimized image.
+ * @returns The new local URI of the optimized image.
+ */
+async function optimizeImage(imageUri: string, maxDimension: number = 1024): Promise<string> {
+  try {
+    console.log('[Storage] Fetching image dimensions for:', imageUri);
+    const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      Image.getSize(
+        imageUri,
+        (width, height) => resolve({ width, height }),
+        (error) => {
+          console.error('[Storage] Failed to get image dimensions:', error);
+          reject(error);
+        }
+      );
+    });
+
+    const { width, height } = dimensions;
+    const actions: any[] = [];
+
+    if (width > maxDimension || height > maxDimension) {
+      if (width > height) {
+        actions.push({ resize: { width: maxDimension } });
+      } else {
+        actions.push({ resize: { height: maxDimension } });
+      }
+      console.log(`[Storage] Scaling image down from ${width}x${height} to fit max dimension ${maxDimension}`);
+    } else {
+      console.log(`[Storage] Image size (${width}x${height}) is already within limits. No scaling needed.`);
+    }
+
+    const result = await manipulateAsync(
+      imageUri,
+      actions,
+      { compress: 0.6, format: SaveFormat.JPEG }
+    );
+
+    console.log('[Storage] On-device image optimization completed. Optimized URI:', result.uri);
+    return result.uri;
+  } catch (err) {
+    console.warn('[Storage] On-device image optimization failed, falling back to original image:', err);
+    return imageUri;
+  }
+}
 
 /**
  * Uploads a government ID image to the private 'user-ids' bucket.
@@ -11,7 +62,10 @@ import { supabase } from "./supabase";
  */
 export async function uploadGovernmentID(userId: string, imageUri: string): Promise<string> {
   try {
-    const file = new File(imageUri);
+    // 1. Optimize the image on-device before reading
+    const optimizedUri = await optimizeImage(imageUri, 1024);
+
+    const file = new File(optimizedUri);
     
     if (!file.exists) {
       throw new Error("Image file does not exist.");
@@ -26,12 +80,13 @@ export async function uploadGovernmentID(userId: string, imageUri: string): Prom
     const base64 = await file.base64();
     const arrayBuffer = decode(base64);
 
-    const filePath = `ids/${userId}/id-card.png`;
+    // Save as JPEG (extremely efficient)
+    const filePath = `ids/${userId}/id-card.jpg`;
 
     const { data, error } = await supabase.storage
       .from('user-ids')
       .upload(filePath, arrayBuffer, {
-        contentType: 'image/png',
+        contentType: 'image/jpeg',
         upsert: true,
       });
 
@@ -55,7 +110,10 @@ export async function uploadGovernmentID(userId: string, imageUri: string): Prom
  */
 export async function uploadIncidentPhoto(randomId: string, imageUri: string): Promise<string> {
   try {
-    const file = new File(imageUri);
+    // 1. Optimize the image on-device before reading
+    const optimizedUri = await optimizeImage(imageUri, 1024);
+
+    const file = new File(optimizedUri);
     
     if (!file.exists) {
       throw new Error("Image file does not exist.");
@@ -68,12 +126,13 @@ export async function uploadIncidentPhoto(randomId: string, imageUri: string): P
     const base64 = await file.base64();
     const arrayBuffer = decode(base64);
 
-    const filePath = `scenes/${randomId}/photo.png`;
+    // Save as JPEG (extremely efficient)
+    const filePath = `scenes/${randomId}/photo.jpg`;
 
     const { data, error } = await supabase.storage
       .from('incident-photos')
       .upload(filePath, arrayBuffer, {
-        contentType: 'image/png',
+        contentType: 'image/jpeg',
         upsert: true,
       });
 

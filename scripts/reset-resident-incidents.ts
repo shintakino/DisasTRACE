@@ -10,7 +10,7 @@ async function reset() {
     const { verificationRequests } = await import('../db/schema/verification_requests');
     const { incidents } = await import('../db/schema/incidents');
     const { reports } = await import('../db/schema/reports');
-    const { eq, inArray } = await import('drizzle-orm');
+    const { eq, inArray, ne } = await import('drizzle-orm');
 
     // 1. Find the seeded resident user profile
     const residentEmail = 'user@disastrace.com';
@@ -33,10 +33,13 @@ async function reset() {
     if (requests.length === 0) {
       console.log('No verification requests found for this resident. Database is already clean.');
       
-      // Still make sure to release any reserved responders back to ON_DUTY just in case
+      // Ensure only responder@disastrace.com is ON_DUTY
+      await db.update(users)
+        .set({ dutyStatus: 'OFF_DUTY' })
+        .where(ne(users.email, 'responder@disastrace.com'));
       await db.update(users)
         .set({ dutyStatus: 'ON_DUTY' })
-        .where(eq(users.dutyStatus, 'ACTIVE_DISPATCH'));
+        .where(eq(users.email, 'responder@disastrace.com'));
       return;
     }
 
@@ -63,11 +66,14 @@ async function reset() {
     console.log('Deleting verification requests...');
     await db.delete(verificationRequests).where(inArray(verificationRequests.id, requestIds));
 
-    // 5. Reset all responders back to ON_DUTY if they were reserved (ACTIVE_DISPATCH)
-    console.log('Resetting reserved responders back to ON_DUTY...');
+    // 5. Ensure only responder@disastrace.com is ON_DUTY
+    console.log('Ensuring only responder@disastrace.com is ON_DUTY...');
+    await db.update(users)
+      .set({ dutyStatus: 'OFF_DUTY' })
+      .where(ne(users.email, 'responder@disastrace.com'));
     await db.update(users)
       .set({ dutyStatus: 'ON_DUTY' })
-      .where(eq(users.dutyStatus, 'ACTIVE_DISPATCH'));
+      .where(eq(users.email, 'responder@disastrace.com'));
 
     console.log('--- Incident and Verification Reset Successfully Completed ---');
 

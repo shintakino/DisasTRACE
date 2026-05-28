@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card"
 import { VerificationRequest } from "@/types/verification"
 import { formatDistanceToNow } from "date-fns"
 import { MapPin, Users, Info, AlertTriangle } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface VerificationDetailsProps {
   request: VerificationRequest | null
@@ -19,6 +20,14 @@ export function VerificationDetails({ request }: VerificationDetailsProps) {
     )
   }
 
+  const isPendingDispatch = request.status === "VERIFIED" && 
+    request.incident && 
+    request.incident.dispatchMethod === "PACC_MANUAL" &&
+    !request.incident.responderId &&
+    !request.incident.currentOfferResponderId;
+
+  const displayStatus = isPendingDispatch ? "EMERGENCY (PENDING DISPATCH)" : request.status;
+
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto">
       <div className="flex justify-between items-start mb-6">
@@ -27,8 +36,14 @@ export function VerificationDetails({ request }: VerificationDetailsProps) {
           <div className="flex items-center gap-2 text-muted-foreground text-sm mt-1">
             <span>Received {formatDistanceToNow(new Date(request.receivedAt), { addSuffix: true })}</span>
             <span>•</span>
-            <Badge variant="outline" className="font-semibold uppercase text-[10px]">
-              {request.status}
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "font-semibold uppercase text-[10px]",
+                isPendingDispatch && "bg-red-100 text-red-800 border-red-200"
+              )}
+            >
+              {displayStatus}
             </Badge>
           </div>
         </div>

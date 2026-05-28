@@ -75,6 +75,25 @@ export function VerificationQueue({
     return r.status === filter;
   });
 
+  const sortedRequests = [...filteredRequests].sort((a, b) => {
+    // Priority 1: Manual dispatch (needs attention right now)
+    const aManual = needsManualDispatch(a);
+    const bManual = needsManualDispatch(b);
+    if (aManual && !bManual) return -1;
+    if (!aManual && bManual) return 1;
+
+    // Priority 2: EMERGENCY nature
+    if (a.nature === "EMERGENCY" && b.nature !== "EMERGENCY") return -1;
+    if (a.nature !== "EMERGENCY" && b.nature === "EMERGENCY") return 1;
+
+    // Priority 3: Oldest first or newest first? Usually older emergencies need immediate attention. Let's do oldest first if they are pending, newest if not.
+    // For now, let's keep it oldest first for PENDING queue so older items get handled.
+    if (filter === "PENDING") {
+      return new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime();
+    }
+    return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
+  });
+
   return (
     <div className="flex flex-col h-full gap-4 w-80 shrink-0 border-r bg-muted/30 p-4">
       <div className="grid grid-cols-1 gap-3">
@@ -107,7 +126,7 @@ export function VerificationQueue({
 
       <ScrollArea className="flex-1 -mx-4 px-4">
         <div className="flex flex-col gap-3 py-2">
-          {filteredRequests.map((request) => (
+          {sortedRequests.map((request) => (
             <Card
               key={request.id}
               className={cn(
@@ -141,7 +160,7 @@ export function VerificationQueue({
               </div>
             </Card>
           ))}
-          {filteredRequests.length === 0 && (
+          {sortedRequests.length === 0 && (
             <div className="text-center py-8 text-muted-foreground text-sm italic">
               No {filter.toLowerCase()} requests
             </div>

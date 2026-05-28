@@ -173,6 +173,15 @@ export default function DetailsScreen() {
     }
   };
 
+  useEffect(() => {
+    if (showSubmitted) {
+      const timer = setTimeout(() => {
+        handleFinish();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSubmitted, isAutoDispatched]);
+
   return (
     <View style={styles.container}>
       <View style={styles.topBlueArea}>

@@ -88,5 +88,6 @@ Update this file whenever the current phase, active feature, or implementation s
 - Enabled Supabase Realtime in the database for `verification_requests` and `incidents` tables.
 - Increased the mobile countdown timer for manual dispatch offers from 5 seconds to 30 seconds in `DispatchSheet.tsx` to match the backend offer duration and allow sufficient time for testing.
 - Implemented Realistic Route Simulation for Developer Testing: Added a dynamic driving simulation button and trigger in `ResponderHome.tsx`. Integrated route-walking using OSRM geometry coordinates, dynamic trigonometrical bearing/heading calculations, real-time Supabase Realtime L2 telemetry broadcast sync, and PostgreSQL REST keep-alive updates. Configured Location tracker and broadcast trackers to automatically yield to simulated runs while active, ensuring off-site verification testing matches production street-navigation behaviors.
+- Resolved resident mobile session restore for pending/active incidents: added startup check in `HomeScreen` to fetch the user's latest verification request and associated incident from Supabase, restoring memory store and routing to `/help/pending` or `/help/tracking` as appropriate. Displayed a beautiful Navy Blue loader to prevent flickering of the "HELP" button on startup.
 
 

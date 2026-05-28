@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useLocationPermission } from '../../hooks/use-location-permission';
@@ -10,10 +10,113 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, Tabs } from 'expo-router';
 import { ResponderHome } from '../../components/responder/ResponderHome';
 import { useResponderStore } from '../../stores/useResponderStore';
+import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { supabase } from '../../lib/supabase';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { profile, verificationStatus, role, user } = useAuthStatus();
+  const { profile, verificationStatus, role, user, isLoaded } = useAuthStatus();
+  const [isCheckingIncident, setIsCheckingIncident] = useState(role === 'public_user');
+
+  useEffect(() => {
+    let active = true;
+
+    async function checkForActiveIncident() {
+      if (!isLoaded || role !== 'public_user' || !user) {
+        setIsCheckingIncident(false);
+        return;
+      }
+
+      try {
+        console.log('[HomeScreen] Checking for active or pending incidents for user:', user.id);
+        
+        // 1. Fetch latest verification request for the resident
+        const { data: request, error: reqError } = await supabase
+          .from('verification_requests')
+          .select('*')
+          .eq('resident_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (reqError) {
+          console.error('[HomeScreen] Error fetching active verification request:', reqError);
+          if (active) setIsCheckingIncident(false);
+          return;
+        }
+
+        if (request) {
+          console.log('[HomeScreen] Latest verification request found:', request.id, 'status:', request.status);
+          
+          if (request.status === 'PENDING') {
+            // Restore store state and route to pending
+            useEmergencyReportStore.setState({
+              report: {
+                id: request.id,
+                requestId: request.request_id,
+                latitude: request.latitude,
+                longitude: request.longitude,
+                incidentType: request.type as any,
+                peopleInvolved: request.people_involved as any,
+                landmarks: request.location_description || undefined,
+                photoUri: request.image_url || '',
+                severity: request.severity as any,
+              }
+            });
+            
+            console.log('[HomeScreen] Redirecting to pending screen.');
+            router.replace('/help/pending');
+            return;
+          } else if (request.status === 'VERIFIED') {
+            // Check if there is an active (unresolved) incident associated with it
+            const { data: incident, error: incError } = await supabase
+              .from('incidents')
+              .select('*')
+              .eq('request_id', request.id)
+              .maybeSingle();
+
+            if (incError) {
+              console.error('[HomeScreen] Error fetching incident:', incError);
+            }
+
+            if (incident && incident.status !== 'RESOLVED') {
+              console.log('[HomeScreen] Active incident found:', incident.id, 'status:', incident.status);
+              
+              // Restore store state and route to tracking
+              useEmergencyReportStore.setState({
+                report: {
+                  id: request.id,
+                  requestId: request.request_id,
+                  incidentId: incident.id,
+                  latitude: request.latitude,
+                  longitude: request.longitude,
+                  incidentType: request.type as any,
+                  peopleInvolved: request.people_involved as any,
+                  landmarks: request.location_description || undefined,
+                  photoUri: request.image_url || '',
+                  severity: request.severity as any,
+                }
+              });
+              
+              console.log('[HomeScreen] Redirecting to tracking screen.');
+              router.replace('/help/tracking');
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[HomeScreen] Error in checkForActiveIncident:', err);
+      } finally {
+        if (active) {
+          setIsCheckingIncident(false);
+        }
+      }
+    }
+
+    if (isLoaded) {
+      checkForActiveIncident();
+    }
+  }, [isLoaded, role, user]);
   const { isLocationGateActive, requestPermissions } = useLocationPermission();
   
   // Fallback for initials
@@ -29,6 +132,18 @@ export default function HomeScreen() {
   const initials = profile?.fullName ? getInitials(profile.fullName) : '??';
 
   const { status } = useResponderStore();
+
+  if (!isLoaded || (role === 'public_user' && isCheckingIncident)) {
+    return (
+      <View className="flex-1 bg-[#1E3A8A] justify-center items-center">
+        <StatusBar barStyle="light-content" />
+        <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text className="text-white font-medium text-sm mt-4 tracking-wider uppercase opacity-80">
+          Checking active incidents...
+        </Text>
+      </View>
+    );
+  }
 
   if (role === 'ambulance_responder') {
     return (

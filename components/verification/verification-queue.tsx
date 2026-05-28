@@ -48,13 +48,32 @@ export function VerificationQueue({
   filter,
   onFilterChange,
 }: VerificationQueueProps) {
+  // Helper to determine if a request needs manual PACC dispatch (PACC_MANUAL status and no assigned responder)
+  const needsManualDispatch = (r: VerificationRequest) => {
+    return (
+      r.status === "VERIFIED" &&
+      r.incident &&
+      r.incident.dispatchMethod === "PACC_MANUAL" &&
+      !r.incident.responderId &&
+      !r.incident.currentOfferResponderId
+    );
+  };
+
   const counts = {
-    PENDING: requests.filter((r) => r.status === "PENDING").length,
-    VERIFIED: requests.filter((r) => r.status === "VERIFIED").length,
+    PENDING: requests.filter((r) => r.status === "PENDING" || needsManualDispatch(r)).length,
+    VERIFIED: requests.filter((r) => r.status === "VERIFIED" && !needsManualDispatch(r)).length,
     REJECTED: requests.filter((r) => r.status === "REJECTED").length,
   }
 
-  const filteredRequests = requests.filter((r) => r.status === filter)
+  const filteredRequests = requests.filter((r) => {
+    if (filter === "PENDING") {
+      return r.status === "PENDING" || needsManualDispatch(r);
+    }
+    if (filter === "VERIFIED") {
+      return r.status === "VERIFIED" && !needsManualDispatch(r);
+    }
+    return r.status === filter;
+  });
 
   return (
     <div className="flex flex-col h-full gap-4 w-80 shrink-0 border-r bg-muted/30 p-4">

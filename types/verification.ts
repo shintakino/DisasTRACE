@@ -17,6 +17,14 @@ export const ResidentInfoSchema = z.object({
 });
 export type ResidentInfo = z.infer<typeof ResidentInfoSchema>;
 
+export const VerificationIncidentSchema = z.object({
+  id: z.string(),
+  status: z.enum(['DISPATCHED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED']),
+  responderId: z.string().nullable().optional(),
+  currentOfferResponderId: z.string().nullable().optional(),
+  dispatchMethod: z.string().nullable().optional(),
+}).nullable().optional();
+
 export const VerificationRequestSchema = z.object({
   id: z.string(),
   requestId: z.string(), // e.g., REQ-2026-0047
@@ -28,5 +36,6 @@ export const VerificationRequestSchema = z.object({
   imageUrl: z.string().url().optional(),
   receivedAt: z.string(), // ISO timestamp
   resident: ResidentInfoSchema,
+  incident: VerificationIncidentSchema,
 });
 export type VerificationRequest = z.infer<typeof VerificationRequestSchema>;

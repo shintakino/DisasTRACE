@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { verificationRequests } from "@/db/schema/verification_requests";
+import { incidents } from "@/db/schema/incidents";
 import { createClient } from "@/lib/supabase-server";
 import { eq, desc } from "drizzle-orm";
 
@@ -24,7 +25,12 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const mappedRequests = requests.map((r) => {
+    const mappedRequests = await Promise.all(requests.map(async (r) => {
+      // Query associated incident
+      const incident = await db.query.incidents.findFirst({
+        where: eq(incidents.requestId, r.id),
+      });
+
       // Convert peopleInvolved enum string to a number
       let peopleCount = 0;
       if (r.peopleInvolved === '1-2 Persons') peopleCount = 2;
@@ -50,9 +56,16 @@ export async function GET(req: NextRequest) {
           address: r.resident.address || "No address recorded",
           priorReports: 3, // Mock/Default standing score since not stored in DB
           isVerified: r.resident.verificationStatus === 'APPROVED',
-        }
+        },
+        incident: incident ? {
+          id: incident.id,
+          status: incident.status,
+          responderId: incident.responderId,
+          currentOfferResponderId: incident.currentOfferResponderId,
+          dispatchMethod: incident.dispatchMethod
+        } : null
       };
-    });
+    }));
 
     return NextResponse.json(mappedRequests);
   } catch (error) {

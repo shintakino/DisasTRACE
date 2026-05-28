@@ -21,6 +21,17 @@ export default function VerificationPage() {
   const [dispatchReqId, setDispatchReqId] = useState<string | null>(null)
   const [dispatchReqNum, setDispatchReqNum] = useState<string | null>(null)
 
+  // Helper to determine if a request needs manual PACC dispatch
+  const needsManualDispatch = (r: VerificationRequest) => {
+    return (
+      r.status === "VERIFIED" &&
+      r.incident &&
+      r.incident.dispatchMethod === "PACC_MANUAL" &&
+      !r.incident.responderId &&
+      !r.incident.currentOfferResponderId
+    );
+  };
+
   const fetchRequests = async () => {
     setIsLoading(true)
     try {
@@ -31,7 +42,7 @@ export default function VerificationPage() {
       
       // Select the first pending request if none selected
       if (data.length > 0 && !selectedId) {
-        const firstPending = data.find((r: VerificationRequest) => r.status === "PENDING")
+        const firstPending = data.find((r: VerificationRequest) => r.status === "PENDING" || needsManualDispatch(r))
         if (firstPending) setSelectedId(firstPending.id)
       }
     } catch (error) {
@@ -66,8 +77,8 @@ export default function VerificationPage() {
       
       // Move to next pending request
       const currentIdx = requests.findIndex(r => r.id === id)
-      const nextPending = requests.slice(currentIdx + 1).find(r => r.status === "PENDING") || 
-                          requests.slice(0, currentIdx).find(r => r.status === "PENDING")
+      const nextPending = requests.slice(currentIdx + 1).find(r => r.status === "PENDING" || needsManualDispatch(r)) || 
+                          requests.slice(0, currentIdx).find(r => r.status === "PENDING" || needsManualDispatch(r))
       
       if (nextPending) {
         setSelectedId(nextPending.id)

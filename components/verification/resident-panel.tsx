@@ -45,10 +45,14 @@ export function ResidentPanel({ request, onAccept, onReject, isProcessing }: Res
         <Button
           className="w-full bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 text-white flex items-center justify-center gap-2"
           onClick={() => onAccept(request.id)}
-          disabled={isProcessing || request.status !== "PENDING"}
+          disabled={
+            isProcessing || 
+            (request.status === "REJECTED") ||
+            (request.status === "VERIFIED" && request.incident ? !!(request.incident.responderId || request.incident.currentOfferResponderId) : false)
+          }
         >
           <Check className="w-4 h-4" />
-          Accept
+          {request.status === "VERIFIED" ? "Dispatch" : "Accept"}
         </Button>
       </div>
 

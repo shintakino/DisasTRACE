@@ -221,7 +221,7 @@ export function ResponderHome() {
               console.error('Error fetching verification request details for dispatch offer:', err);
             }
 
-             useResponderStore.setState({
+            useResponderStore.setState({
               status: 'dispatch_offered',
               activeDispatch: {
                 id: inc.id,
@@ -243,6 +243,74 @@ export function ResponderHome() {
                 },
                 typeOfEmergency,
                 dispatchOfferDurationSeconds: inc.dispatch_offer_duration_seconds || 30,
+                assignedAmbulance: inc.assigned_ambulance || 'AMB-001',
+              }
+            });
+          } else if (inc && inc.responder_id === user.id && inc.status === 'EN_ROUTE') {
+            console.log('[ResponderHome] Responder has been manually dispatched! Auto-accepting and transitioning directly to EN_ROUTE.');
+            
+            let reporterName = 'Resident';
+            let reporterInitials = 'R';
+            let locationName = 'Baliwag City';
+            let typeOfEmergency = 'Medical Emergency';
+            let peopleInvolved = 1;
+            let incidentLat = 14.9538;
+            let incidentLng = 120.9029;
+
+            try {
+              const { data: vReq, error: vReqError } = await supabase
+                .from('verification_requests')
+                .select('*')
+                .eq('id', inc.request_id)
+                .single();
+
+              if (!vReqError && vReq) {
+                locationName = vReq.location_description || vReq.address || 'Baliwag City';
+                typeOfEmergency = vReq.type || 'Emergency';
+                incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
+                incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
+                
+                if (vReq.people_involved) {
+                  const matched = vReq.people_involved.match(/\d+/);
+                  peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
+                }
+
+                const { data: resUser } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('id', vReq.resident_id)
+                  .single();
+
+                if (resUser) {
+                  reporterName = resUser.full_name || 'Resident';
+                  reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching verification request details for manual dispatch:', err);
+            }
+
+            useResponderStore.setState({
+              status: 'en_route',
+              activeDispatch: {
+                id: inc.id,
+                type: typeOfEmergency,
+                locationName,
+                distance: '1.5 km',
+                natureOfCall: 'Emergency',
+                peopleInvolved,
+                eta: inc.eta_minutes ? `~${inc.eta_minutes} min` : '~8 min',
+                reporterName,
+                reporterInitials,
+                timestamp: new Date(inc.created_at).toLocaleTimeString("en-US", {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }),
+                coordinates: {
+                  latitude: incidentLat,
+                  longitude: incidentLng,
+                },
+                typeOfEmergency,
                 assignedAmbulance: inc.assigned_ambulance || 'AMB-001',
               }
             });

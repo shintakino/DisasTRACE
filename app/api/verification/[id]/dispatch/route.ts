@@ -67,26 +67,18 @@ export async function POST(
       })
       .where(eq(verificationRequests.id, id));
 
-    // 4. Create the new incident
-    // Fetch system settings to resolve dynamic dispatch offer timeout duration
-    const settings = await db.query.systemSettings.findFirst({
-      where: eq(systemSettings.id, 'current'),
-    });
-    const offerDuration = settings?.dispatchOfferTimeoutSeconds ?? 30;
-    const offerExpiresAt = new Date(Date.now() + offerDuration * 1000);
-
+    // 4. Create the new incident with immediate assignment (Auto-Accept)
     const [newIncident] = await db.insert(incidents).values({
       id: crypto.randomUUID(),
       requestId: id,
-      responderId: null, // Null during negotiation offer
-      status: "DISPATCHED",
+      responderId: responderId, // Directly assign the responder immediately
+      status: "EN_ROUTE",       // Set status directly to EN_ROUTE (auto-accepted)
       assignedAmbulance: vehicleId,
-      etaMinutes: 8, // Default PACC Manual estimate
-      currentOfferResponderId: responderId,
+      etaMinutes: 8,            // Default PACC Manual estimate
+      currentOfferResponderId: null, // No outstanding negotiation offer
       skippedResponderIds: [],
-      offerExpiresAt,
+      offerExpiresAt: null,     // No countdown expiration
       dispatchMethod: "PACC_MANUAL",
-      dispatchOfferDurationSeconds: offerDuration,
     }).returning();
 
     // 5. Reserve responder as ACTIVE_DISPATCH

@@ -368,7 +368,8 @@ export function ResponderHome() {
     activeDispatch?.id || null,
     (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') && !isSimulating,
     status,
-    targetHospital
+    targetHospital,
+    activeDispatch
   );
 
   // 2. Track current location of the responder via GPS
@@ -396,8 +397,13 @@ export function ResponderHome() {
             
             // Mock coordinates in Baliwag if user is outside the city (for developer convenience)
             if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
-              lat = 14.954;
-              lng = 120.902;
+              if (status === 'on_scene' && activeDispatch) {
+                lat = activeDispatch.coordinates.latitude;
+                lng = activeDispatch.coordinates.longitude;
+              } else {
+                lat = 14.954;
+                lng = 120.902;
+              }
             }
             
             setCurrentLocation([lng, lat]);

@@ -6,7 +6,8 @@ export function useBroadcastTracker(
   incidentId: string | null,
   active: boolean,
   responderStatus?: string,
-  targetHospital?: any
+  targetHospital?: any,
+  activeDispatch?: any
 ) {
   useEffect(() => {
     let channel: any = null;
@@ -79,8 +80,13 @@ export function useBroadcastTracker(
 
           // Mock coordinates in Baliwag if responder is outside the city (for developer convenience)
           if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
-            lat = 14.954;
-            lng = 120.902;
+            if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
+              lat = activeDispatch.coordinates.latitude;
+              lng = activeDispatch.coordinates.longitude;
+            } else {
+              lat = 14.954;
+              lng = 120.902;
+            }
           }
 
           const payload = {
@@ -136,8 +142,13 @@ export function useBroadcastTracker(
           let lng = pos.longitude;
 
           if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
-            lat = 14.954;
-            lng = 120.902;
+            if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
+              lat = activeDispatch.coordinates.latitude;
+              lng = activeDispatch.coordinates.longitude;
+            } else {
+              lat = 14.954;
+              lng = 120.902;
+            }
           }
 
           const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -169,5 +180,5 @@ export function useBroadcastTracker(
         channel.unsubscribe();
       }
     };
-  }, [incidentId, active, responderStatus, targetHospital]);
+  }, [incidentId, active, responderStatus, targetHospital, activeDispatch]);
 }

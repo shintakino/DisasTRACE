@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPin, CheckCircle2, Truck, Navigation } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
+import * as Haptics from 'expo-haptics';
 
 const { height, width } = Dimensions.get('window');
 const COLLAPSED_HEIGHT = 220;
@@ -38,6 +39,54 @@ export default function TrackingScreen() {
   const drawerHeight = useRef(new Animated.Value(COLLAPSED_HEIGHT)).current;
   const isExpandedRef = useRef(false);
 
+  const [assignedResponder, setAssignedResponder] = useState<any>(null);
+  const [isFindingAmbulance, setIsFindingAmbulance] = useState(true);
+
+  // Pulse animation values for radar holding screen
+  const pulseAnim1 = useRef(new Animated.Value(0)).current;
+  const pulseAnim2 = useRef(new Animated.Value(0)).current;
+  const pulseAnim3 = useRef(new Animated.Value(0)).current;
+
+  // Trigger pulsing loop for radar animation
+  useEffect(() => {
+    if (isFindingAmbulance) {
+      const createPulse = (anim: Animated.Value, delay: number) => {
+        anim.setValue(0);
+        return Animated.loop(
+          Animated.sequence([
+            Animated.delay(delay),
+            Animated.parallel([
+              Animated.timing(anim, {
+                toValue: 1,
+                duration: 2000,
+                useNativeDriver: true,
+              }),
+              Animated.timing(anim, {
+                toValue: 0,
+                duration: 2000,
+                useNativeDriver: true,
+              }),
+            ]),
+          ])
+        );
+      };
+
+      const animation1 = createPulse(pulseAnim1, 0);
+      const animation2 = createPulse(pulseAnim2, 600);
+      const animation3 = createPulse(pulseAnim3, 1200);
+
+      animation1.start();
+      animation2.start();
+      animation3.start();
+
+      return () => {
+        animation1.stop();
+        animation2.stop();
+        animation3.stop();
+      };
+    }
+  }, [isFindingAmbulance]);
+
   const toggleDrawer = () => {
     const nextExpand = !isExpandedRef.current;
     isExpandedRef.current = nextExpand;
@@ -57,7 +106,7 @@ export default function TrackingScreen() {
 
     console.log('[TrackingScreen] Subscribing to telemetry channel for incident:', incidentId);
 
-    // 1. Fetch initial responder coordinates from database
+    // 1. Fetch initial responder coordinates and info from database
     const fetchInitialResponderLocation = async () => {
       try {
         const { data: incident, error } = await supabase
@@ -71,14 +120,37 @@ export default function TrackingScreen() {
             setIsArrived(true);
           }
           
-          if (incident.responder) {
-            const resp = incident.responder;
-            if (resp.last_latitude && resp.last_longitude) {
-              setAmbulanceLocation({
-                latitude: Number(resp.last_latitude),
-                longitude: Number(resp.last_longitude)
-              });
+          if (incident.responder_id) {
+            setIsFindingAmbulance(false);
+            if (incident.responder) {
+              setAssignedResponder(incident.responder);
+              const resp = incident.responder;
+              if (resp.last_latitude && resp.last_longitude) {
+                setAmbulanceLocation({
+                  latitude: Number(resp.last_latitude),
+                  longitude: Number(resp.last_longitude)
+                });
+              }
+            } else {
+              // Fallback query if join has latency
+              const { data: resp } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', incident.responder_id)
+                .single();
+              if (resp) {
+                setAssignedResponder(resp);
+                if (resp.last_latitude && resp.last_longitude) {
+                  setAmbulanceLocation({
+                    latitude: Number(resp.last_latitude),
+                    longitude: Number(resp.last_longitude)
+                  });
+                }
+              }
             }
+          } else {
+            setAssignedResponder(null);
+            setIsFindingAmbulance(true);
           }
         }
       } catch (err) {
@@ -102,7 +174,7 @@ export default function TrackingScreen() {
       })
       .subscribe();
 
-    // 3. Listen to incident status changes (e.g. ARRIVED or RESOLVED)
+    // 3. Listen to incident updates (e.g. ARRIVED, RESOLVED, and responder assignments)
     const dbChannel = supabase
       .channel(`incident-status-${incidentId}`)
       .on(
@@ -113,13 +185,45 @@ export default function TrackingScreen() {
           table: 'incidents',
           filter: `id=eq.${incidentId}`,
         },
-        (payload) => {
-          console.log('[TrackingScreen] Real-time incident status update:', payload.new);
-          if (payload.new && payload.new.status === 'ARRIVED') {
-            setIsArrived(true);
-          }
-          if (payload.new && payload.new.status === 'RESOLVED') {
-            router.replace('/help/resolution');
+        async (payload) => {
+          console.log('[TrackingScreen] Real-time incident status/responder update:', payload.new);
+          if (payload.new) {
+            if (payload.new.status === 'ARRIVED') {
+              setIsArrived(true);
+            }
+            if (payload.new.status === 'RESOLVED') {
+              router.replace('/help/resolution');
+            }
+
+            // Detect changes in responder assignment
+            if (payload.new.responder_id) {
+              const { data: resp } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', payload.new.responder_id)
+                .single();
+
+              if (resp) {
+                setAssignedResponder(resp);
+                if (resp.last_latitude && resp.last_longitude) {
+                  setAmbulanceLocation({
+                    latitude: Number(resp.last_latitude),
+                    longitude: Number(resp.last_longitude)
+                  });
+                }
+
+                setIsFindingAmbulance((prev) => {
+                  if (prev) {
+                    // Trigger physical success haptic feedback
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }
+                  return false;
+                });
+              }
+            } else {
+              setAssignedResponder(null);
+              setIsFindingAmbulance(true);
+            }
           }
         }
       )
@@ -186,6 +290,153 @@ export default function TrackingScreen() {
     latitudeDelta: 0.04,
     longitudeDelta: 0.04,
   };
+
+  if (isFindingAmbulance) {
+    return (
+      <View style={styles.holdingContainer}>
+        {/* Top Header Overlay */}
+        <View style={styles.topHeaderHolding}>
+          <Text style={styles.holdingTitle}>Securing Dispatch</Text>
+          <Text style={styles.holdingSubtitle}>
+            {report.requestId || "REQ-2026-0847"} · Processing Emergency
+          </Text>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.holdingScrollContent} showsVerticalScrollIndicator={false}>
+          {/* Pulsing Radar Animation */}
+          <View style={styles.radarWrapper}>
+            <View style={styles.radarContainer}>
+              <Animated.View style={[
+                styles.pulseCircle,
+                {
+                  transform: [{
+                    scale: pulseAnim1.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 2.5],
+                    })
+                  }],
+                  opacity: pulseAnim1.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.6, 0],
+                  })
+                }
+              ]} />
+              <Animated.View style={[
+                styles.pulseCircle,
+                {
+                  transform: [{
+                    scale: pulseAnim2.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 2.5],
+                    })
+                  }],
+                  opacity: pulseAnim2.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.6, 0],
+                  })
+                }
+              ]} />
+              <Animated.View style={[
+                styles.pulseCircle,
+                {
+                  transform: [{
+                    scale: pulseAnim3.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 2.5],
+                    })
+                  }],
+                  opacity: pulseAnim3.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.6, 0],
+                  })
+                }
+              ]} />
+              
+              <View style={styles.radarCenter}>
+                <Truck color="#FFF" size={32} />
+              </View>
+            </View>
+          </View>
+
+          {/* Status Messaging */}
+          <View style={styles.statusBox}>
+            <Text style={styles.statusTitle}>Finding Closest Ambulance...</Text>
+            <Text style={styles.statusDescription}>
+              PACC is currently dispatching the closest active unit in Baliwag City. If the closest unit does not respond, it will be automatically recycled and manually assigned by the PACC Command Center to guarantee response.
+            </Text>
+          </View>
+
+          {/* Progress Timeline */}
+          <View style={styles.holdingTimeline}>
+            <View style={styles.holdingTimelineItem}>
+              <View style={styles.timelineCheckIcon}>
+                <Check color="#22C55E" size={14} />
+              </View>
+              <Text style={styles.timelineLabelActive}>Incident Report Submitted</Text>
+            </View>
+            
+            <View style={styles.holdingTimelineItem}>
+              <View style={styles.timelinePulseIconContainer}>
+                <View style={styles.timelinePulseIcon} />
+              </View>
+              <Text style={styles.timelineLabelActive}>Auto-routing & Alerting Nearest Unit...</Text>
+            </View>
+
+            <View style={styles.holdingTimelineItem}>
+              <View style={styles.timelinePendingIcon} />
+              <Text style={styles.timelineLabelPending}>Dispatch Accepted by Crew</Text>
+            </View>
+          </View>
+
+          {/* Safety Instructions Card */}
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsHeader}>CRITICAL SAFETY INSTRUCTIONS</Text>
+            
+            <View style={styles.instructionRow}>
+              <View style={styles.instructionNumberBox}>
+                <Text style={styles.instructionNumber}>1</Text>
+              </View>
+              <Text style={styles.instructionText}>
+                Stay calm and remain at your reported location. Ensure your phone is not on silent.
+              </Text>
+            </View>
+
+            <View style={styles.instructionRow}>
+              <View style={styles.instructionNumberBox}>
+                <Text style={styles.instructionNumber}>2</Text>
+              </View>
+              <Text style={styles.instructionText}>
+                If indoors, clear any pathways, unlock gates, and secure pets for crew entry.
+              </Text>
+            </View>
+
+            <View style={styles.instructionRow}>
+              <View style={styles.instructionNumberBox}>
+                <Text style={styles.instructionNumber}>3</Text>
+              </View>
+              <Text style={styles.instructionText}>
+                Gather basic identification details and medication records of the patient.
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Action Button at the bottom */}
+        <View style={styles.holdingActionContainer}>
+          <TouchableOpacity 
+            style={styles.callPaccButton} 
+            activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }}
+          >
+            <Phone color="#FFF" size={20} style={{ marginRight: 10 }} />
+            <Text style={styles.callPaccText}>Call Command Center (PACC)</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -298,9 +549,11 @@ export default function TrackingScreen() {
                 <Truck color="#991B1B" size={18} />
               </View>
               <View style={styles.ambulancePillText}>
-                <Text style={styles.ambulanceUnitText}>AMB-001</Text>
+                <Text style={styles.ambulanceUnitText}>
+                  {assignedResponder?.fullName ? `AMB-${assignedResponder.fullName.split(',')[0].toUpperCase()}` : "AMB-001"}
+                </Text>
                 <Text style={styles.ambulanceStatusText}>
-                  {isArrived ? "Arrived at your location" : "Near Rizal St. heading your way"}
+                  {isArrived ? "Arrived at your location" : "En route to your location"}
                 </Text>
               </View>
             </View>
@@ -337,12 +590,18 @@ export default function TrackingScreen() {
               <View style={styles.crewRow}>
                 {/* Driver */}
                 <View style={styles.crewCard}>
-                  <Text style={styles.crewRole}>DRIVER</Text>
+                  <Text style={styles.crewRole}>RESPONDER</Text>
                   <View style={styles.crewAvatar}>
-                    <Text style={styles.crewAvatarText}>RB</Text>
+                    <Text style={styles.crewAvatarText}>
+                      {assignedResponder?.fullName ? assignedResponder.fullName.substring(0, 2).toUpperCase() : "RB"}
+                    </Text>
                   </View>
-                  <Text style={styles.crewName}>Bastes, Renzy</Text>
-                  <Text style={styles.crewYears}>Serving since 2018</Text>
+                  <Text style={styles.crewName} numberOfLines={1}>
+                    {assignedResponder?.fullName || "Bastes, Renzy"}
+                  </Text>
+                  <Text style={styles.crewYears}>
+                    {assignedResponder?.phone || "0917-123-4567"}
+                  </Text>
                   <View style={styles.verifiedBadge}>
                     <CheckCircle2 color="#1E3A8A" size={12} style={{marginRight: 4}} />
                     <Text style={styles.verifiedText}>Verified</Text>
@@ -355,7 +614,7 @@ export default function TrackingScreen() {
                   <View style={styles.crewAvatar}>
                     <Text style={styles.crewAvatarText}>CG</Text>
                   </View>
-                  <Text style={styles.crewName}>Guanzing, Christopher</Text>
+                  <Text style={styles.crewName} numberOfLines={1}>Guanzing, Chris</Text>
                   <Text style={styles.crewYears}>Serving since 2020</Text>
                   <View style={styles.verifiedBadge}>
                     <CheckCircle2 color="#1E3A8A" size={12} style={{marginRight: 4}} />
@@ -435,11 +694,17 @@ export default function TrackingScreen() {
         {/* Action Buttons Fixed at Bottom */}
         {drawerExpanded && (
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.actionButton}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+            >
               <MessageSquare color="#FFF" size={20} style={{marginRight: 8}} />
               <Text style={styles.actionButtonText}>Message</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+            >
               <Phone color="#FFF" size={20} style={{marginRight: 8}} />
               <Text style={styles.actionButtonText}>Call Unit</Text>
             </TouchableOpacity>
@@ -1070,6 +1335,205 @@ const styles = StyleSheet.create({
   proceedButtonText: {
     color: '#FFF',
     fontSize: 18,
+    fontWeight: 'bold',
+  },
+  holdingContainer: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 24,
+  },
+  topHeaderHolding: {
+    marginTop: 60,
+    marginBottom: 20,
+  },
+  holdingTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  holdingSubtitle: {
+    fontSize: 14,
+    color: '#94A3B8',
+  },
+  holdingScrollContent: {
+    paddingBottom: 120,
+    alignItems: 'center',
+  },
+  radarWrapper: {
+    height: 260,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  radarContainer: {
+    width: 200,
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pulseCircle: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  radarCenter: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#1E3A8A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  statusBox: {
+    width: '100%',
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginBottom: 24,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 8,
+  },
+  statusDescription: {
+    fontSize: 13,
+    color: '#94A3B8',
+    lineHeight: 20,
+  },
+  holdingTimeline: {
+    width: '100%',
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginBottom: 24,
+  },
+  holdingTimelineItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  timelineCheckIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#DCFCE7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  timelinePulseIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  timelinePulseIcon: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+  },
+  timelinePendingIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#475569',
+    backgroundColor: 'transparent',
+    marginRight: 16,
+  },
+  timelineLabelActive: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  timelineLabelPending: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  instructionsCard: {
+    width: '100%',
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  instructionsHeader: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#EF4444',
+    letterSpacing: 1,
+    marginBottom: 16,
+  },
+  instructionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 8,
+  },
+  instructionNumberBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    marginTop: 2,
+  },
+  instructionNumber: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  instructionText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#CBD5E1',
+    lineHeight: 18,
+  },
+  holdingActionContainer: {
+    position: 'absolute',
+    bottom: 24,
+    left: 24,
+    right: 24,
+  },
+  callPaccButton: {
+    backgroundColor: '#EF4444',
+    flexDirection: 'row',
+    paddingVertical: 18,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  callPaccText: {
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });

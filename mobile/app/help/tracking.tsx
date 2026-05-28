@@ -30,6 +30,7 @@ export default function TrackingScreen() {
   const [distance, setDistance] = useState(1.7);
   const [elapsed, setElapsed] = useState(0); // Natural elapsed time starting from 0
   const [isArrived, setIsArrived] = useState(false);
+  const [hasDismissedArrivedModal, setHasDismissedArrivedModal] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0); // Starts at 0% and climbs dynamically
   
   const [routeCoords, setRouteCoords] = useState<number[][] | null>(null);
@@ -132,6 +133,11 @@ export default function TrackingScreen() {
                 incidentId: incident.id
               }
             }));
+          }
+          
+          if (incident.status === 'RESOLVED') {
+            router.replace('/help/resolution');
+            return;
           }
           
           if (incident.status === 'ARRIVED') {
@@ -287,6 +293,10 @@ export default function TrackingScreen() {
           .single();
 
         if (!error && incident) {
+          if (incident.status === 'RESOLVED') {
+            router.replace('/help/resolution');
+            return;
+          }
           if (incident.status === 'ARRIVED') {
             setIsArrived(true);
           }
@@ -817,7 +827,7 @@ export default function TrackingScreen() {
       </Animated.View>
 
       {/* Ambulance Arrived Modal */}
-      <Modal visible={isArrived} transparent animationType="fade">
+      <Modal visible={isArrived && !hasDismissedArrivedModal} transparent animationType="fade">
         <View style={styles.arrivedOverlay}>
           <View style={styles.arrivedCard}>
             {/* Ambulance Icon */}
@@ -854,7 +864,10 @@ export default function TrackingScreen() {
             {/* Proceed Button */}
             <TouchableOpacity
               style={styles.proceedButton}
-              onPress={() => router.replace('/help/resolution')}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setHasDismissedArrivedModal(true);
+              }}
             >
               <Text style={styles.proceedButtonText}>Proceed</Text>
             </TouchableOpacity>

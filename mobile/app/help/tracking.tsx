@@ -99,6 +99,51 @@ export default function TrackingScreen() {
     setDrawerExpanded(nextExpand);
   };
 
+  // Safety net: If incidentId is missing but report.id (request ID) is present, resolve it from the database
+  useEffect(() => {
+    let active = true;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    if (!report.incidentId && report.id) {
+      console.log('[TrackingScreen] Safety net: incidentId is missing. Resolving by request ID:', report.id);
+      const resolveIncident = async () => {
+        try {
+          const { data: incident, error } = await supabase
+            .from('incidents')
+            .select('id')
+            .eq('request_id', report.id)
+            .maybeSingle();
+
+          if (!active) return;
+
+          if (incident && !error) {
+            console.log('[TrackingScreen] Safety net resolved incident ID:', incident.id);
+            useEmergencyReportStore.setState((state) => ({
+              report: {
+                ...state.report,
+                incidentId: incident.id
+              }
+            }));
+          } else {
+            console.log('[TrackingScreen] Safety net could not resolve incident yet, retrying in 1s...');
+            timeoutId = setTimeout(resolveIncident, 1000);
+          }
+        } catch (err) {
+          console.error('[TrackingScreen] Safety net error resolving incident:', err);
+          if (active) {
+            timeoutId = setTimeout(resolveIncident, 2000);
+          }
+        }
+      };
+      resolveIncident();
+    }
+
+    return () => {
+      active = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [report.incidentId, report.id]);
+
   // Real-time telemetry receiver
   useEffect(() => {
     const incidentId = report.incidentId;

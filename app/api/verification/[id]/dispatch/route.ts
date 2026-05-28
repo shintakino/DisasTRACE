@@ -59,15 +59,7 @@ export async function POST(
       .slice(0, 3);
     const vehicleId = `AMB-${initials || "001"}`;
 
-    // 3. Mark the verification request as VERIFIED
-    await db.update(verificationRequests)
-      .set({
-        status: "VERIFIED",
-        updatedAt: new Date()
-      })
-      .where(eq(verificationRequests.id, id));
-
-    // 4. Create the new incident with immediate assignment (Auto-Accept)
+    // 3. Create the new incident with immediate assignment (Auto-Accept) first
     const [newIncident] = await db.insert(incidents).values({
       id: crypto.randomUUID(),
       requestId: id,
@@ -80,6 +72,14 @@ export async function POST(
       offerExpiresAt: null,     // No countdown expiration
       dispatchMethod: "PACC_MANUAL",
     }).returning();
+
+    // 4. Mark the verification request as VERIFIED second
+    await db.update(verificationRequests)
+      .set({
+        status: "VERIFIED",
+        updatedAt: new Date()
+      })
+      .where(eq(verificationRequests.id, id));
 
     // 5. Reserve responder as ACTIVE_DISPATCH
     await db.update(users)

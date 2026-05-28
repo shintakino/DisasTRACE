@@ -5,6 +5,7 @@ import { ShieldAlert, CheckCircle, Navigation } from 'lucide-react-native';
 import { TransmissionLoader } from '../../components/help/TransmissionLoader';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
+import * as Haptics from 'expo-haptics';
 
 export default function PendingScreen() {
   const router = useRouter();
@@ -33,27 +34,45 @@ export default function PendingScreen() {
           table: 'verification_requests',
           filter: `id=eq.${requestId}`,
         },
-        async (payload) => {
+         async (payload) => {
           console.log('[PendingScreen] Verification request update received:', payload.new);
           if (payload.new && payload.new.status === 'VERIFIED') {
-            try {
-              const { data: incident } = await supabase
-                .from('incidents')
-                .select('*')
-                .eq('request_id', requestId)
-                .maybeSingle();
+            const fetchIncidentWithRetry = async (retriesLeft = 5, delayMs = 500): Promise<boolean> => {
+              try {
+                const { data: incident, error } = await supabase
+                  .from('incidents')
+                  .select('*')
+                  .eq('request_id', requestId)
+                  .maybeSingle();
 
-              if (incident) {
-                useEmergencyReportStore.setState((state) => ({
-                  report: {
-                    ...state.report,
-                    incidentId: incident.id
-                  }
-                }));
+                if (error) {
+                  console.error('[PendingScreen] Error querying incident:', error);
+                }
+
+                if (incident) {
+                  console.log('[PendingScreen] Successfully fetched incident details:', incident.id);
+                  useEmergencyReportStore.setState((state) => ({
+                    report: {
+                      ...state.report,
+                      incidentId: incident.id
+                    }
+                  }));
+                  return true;
+                }
+              } catch (err) {
+                console.error('[PendingScreen] Try-catch error querying incident:', err);
               }
-            } catch (err) {
-              console.error('Error fetching incident for verified request:', err);
-            }
+
+              if (retriesLeft > 0) {
+                console.log(`[PendingScreen] Incident not found yet. Retrying in ${delayMs}ms... (${retriesLeft} retries left)`);
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+                return fetchIncidentWithRetry(retriesLeft - 1, delayMs);
+              }
+              console.warn('[PendingScreen] Failed to find incident after maximum retries.');
+              return false;
+            };
+
+            await fetchIncidentWithRetry();
             setIsAccepted(true);
           }
         }
@@ -64,6 +83,21 @@ export default function PendingScreen() {
       supabase.removeChannel(channel);
     };
   }, [report.id]);
+
+  // Trigger tactile haptic success feedback and start auto-navigation timer when accepted
+  useEffect(() => {
+    if (isAccepted) {
+      // 1. Success haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      // 2. Auto-navigation after 2.5 seconds
+      const timer = setTimeout(() => {
+        router.push('/help/tracking');
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isAccepted]);
 
   useEffect(() => {
     // Simulate Transmission

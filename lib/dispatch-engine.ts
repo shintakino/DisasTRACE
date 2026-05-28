@@ -95,11 +95,6 @@ export async function autoDispatchIncident(
     const assignedItem = respondersWithDistance[0];
     const assignedResponder = assignedItem.responder;
 
-    // 4. Update the verification request to VERIFIED
-    await db.update(verificationRequests)
-      .set({ status: "VERIFIED", updatedAt: new Date() })
-      .where(eq(verificationRequests.id, requestId));
-
     // Fetch system settings to resolve dynamic dispatch offer timeout duration
     const settings = await db.query.systemSettings.findFirst({
       where: eq(systemSettings.id, 'current'),
@@ -107,7 +102,7 @@ export async function autoDispatchIncident(
     const offerDuration = settings?.dispatchOfferTimeoutSeconds ?? 30;
     const offerExpiresAt = new Date(Date.now() + offerDuration * 1000);
 
-    // 5. Create the incident record with the initial dispatch offer
+    // 4. Create the incident record with the initial dispatch offer first
     const [newIncident] = await db.insert(incidents).values({
       id: crypto.randomUUID(),
       requestId,
@@ -121,6 +116,11 @@ export async function autoDispatchIncident(
       dispatchOfferDurationSeconds: offerDuration,
       skippedResponderIds: [],
     }).returning();
+
+    // 5. Update the verification request to VERIFIED second
+    await db.update(verificationRequests)
+      .set({ status: "VERIFIED", updatedAt: new Date() })
+      .where(eq(verificationRequests.id, requestId));
 
     // 6. Set responder's dutyStatus to ACTIVE_DISPATCH (reserved for countdown)
     await db.update(users)

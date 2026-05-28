@@ -14,26 +14,29 @@ export default function ResolutionScreen() {
   const [feedback, setFeedback] = useState('');
  
   const handleReturnHome = async () => {
-    try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-      const { data: { session } } = await supabase.auth.getSession();
-      const reqHeaders: any = { 'Content-Type': 'application/json' };
-      if (session?.access_token) {
-        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+    // Only submit feedback if a rating star was selected (rating > 0)
+    if (rating > 0) {
+      try {
+        const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+        const { data: { session } } = await supabase.auth.getSession();
+        const reqHeaders: any = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+        }
+   
+        await fetch(`${apiUrl}/api/incidents/feedback`, {
+          method: 'POST',
+          headers: reqHeaders,
+          body: JSON.stringify({
+            incidentId: report.incidentId || undefined,
+            requestId: report.id || undefined,
+            rating,
+            feedback: feedback || undefined,
+          })
+        });
+      } catch (err) {
+        console.log('Feedback submission failed, returning home anyway:', err);
       }
- 
-      await fetch(`${apiUrl}/api/incidents/feedback`, {
-        method: 'POST',
-        headers: reqHeaders,
-        body: JSON.stringify({
-          incidentId: report.incidentId || undefined,
-          requestId: report.id || undefined,
-          rating,
-          feedback: feedback || undefined,
-        })
-      });
-    } catch (err) {
-      console.log('Feedback submission failed, returning home anyway:', err);
     }
     
     resetReport();

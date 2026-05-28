@@ -4,9 +4,14 @@ import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { createClient } from "@/lib/supabase-server";
 import { eq, or, and, ne } from "drizzle-orm";
+import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides } from "@/lib/dispatch-engine";
 
 export async function GET(req: NextRequest) {
   try {
+    // 1. Run self-healing checks on active dispatch offers and manual overrides
+    await checkAndCascadeExpiredOffers();
+    await checkAndRecycleManualOverrides();
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 

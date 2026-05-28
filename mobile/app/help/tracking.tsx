@@ -156,7 +156,7 @@ export default function TrackingScreen() {
       try {
         const { data: incident, error } = await supabase
           .from('incidents')
-          .select('*, responder:users(*)')
+          .select('*')
           .eq('id', incidentId)
           .single();
 
@@ -167,30 +167,20 @@ export default function TrackingScreen() {
           
           if (incident.responder_id) {
             setIsFindingAmbulance(false);
-            if (incident.responder) {
-              setAssignedResponder(incident.responder);
-              const resp = incident.responder;
+            // Fetch responder from users table directly
+            const { data: resp } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', incident.responder_id)
+              .single();
+            
+            if (resp) {
+              setAssignedResponder(resp);
               if (resp.last_latitude && resp.last_longitude) {
                 setAmbulanceLocation({
                   latitude: Number(resp.last_latitude),
                   longitude: Number(resp.last_longitude)
                 });
-              }
-            } else {
-              // Fallback query if join has latency
-              const { data: resp } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', incident.responder_id)
-                .single();
-              if (resp) {
-                setAssignedResponder(resp);
-                if (resp.last_latitude && resp.last_longitude) {
-                  setAmbulanceLocation({
-                    latitude: Number(resp.last_latitude),
-                    longitude: Number(resp.last_longitude)
-                  });
-                }
               }
             }
           } else {

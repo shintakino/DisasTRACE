@@ -4,6 +4,7 @@ import { CameraView, useCameraPermissions, FlashMode } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, FlashlightOff, RefreshCw, Sun, Camera as CameraIcon } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import * as Haptics from 'expo-haptics';
 
 export default function CameraScreen() {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function CameraScreen() {
   const takePicture = async () => {
     if (cameraRef.current && !isCapturing) {
       setIsCapturing(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       try {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.7,

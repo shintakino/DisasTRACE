@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
 import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
+import { OfflineBanner } from '../dashboard/OfflineBanner';
 
 export function ResponderHome() {
   const router = useRouter();
@@ -428,6 +429,7 @@ export function ResponderHome() {
 
   return (
     <View className="flex-1 bg-[#16203A]">
+      <OfflineBanner />
       <StatusBar barStyle="light-content" />
 
       {/* Map Layer */}

@@ -92,25 +92,64 @@ export default function FormScreen() {
         return;
       }
       
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.BestForNavigation,
-      });
-      
-      let lat = loc.coords.latitude;
-      let lng = loc.coords.longitude;
+      let lat = 14.945;
+      let lng = 120.895;
+      let usedFallback = false;
+
+      try {
+        // Attempt high-accuracy GPS with a 4-second timeout limit
+        const loc = await Promise.race([
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('GPS timeout')), 4000)
+          )
+        ]);
+
+        if (loc && loc.coords) {
+          lat = loc.coords.latitude;
+          lng = loc.coords.longitude;
+        }
+      } catch (gpsError) {
+        console.warn('[GPS] High accuracy request failed/timed out, attempting cached location:', gpsError);
+        try {
+          // Fallback 1: Get last known cached location
+          const lastLoc = await Location.getLastKnownPositionAsync();
+          if (lastLoc && lastLoc.coords) {
+            lat = lastLoc.coords.latitude;
+            lng = lastLoc.coords.longitude;
+            console.log('[GPS] Retrieved cached location successfully.');
+          } else {
+            throw new Error('No cached position available');
+          }
+        } catch (cacheError) {
+          console.warn('[GPS] Cached location fallback failed, using default Baliwag coordinates:', cacheError);
+          // Fallback 2: Sensible default Baliwag command center coordinates with a small random offset
+          lat = 14.945 + (Math.random() - 0.5) * 0.005;
+          lng = 120.895 + (Math.random() - 0.5) * 0.005;
+          usedFallback = true;
+        }
+      }
 
       // Mock coordinates in Baliwag if user is outside the city (for developer convenience)
       if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
-        // Baliwag coordinates with a small random offset to scatter test locations
         lat = 14.945 + (Math.random() - 0.5) * 0.01;
         lng = 120.895 + (Math.random() - 0.5) * 0.01;
       }
       
       setLocation({ latitude: lat, longitude: lng });
       await reverseGeocode(lat, lng);
+
+      if (usedFallback) {
+        Alert.alert(
+          'Weak GPS Signal', 
+          'We estimated your local coordinates so you can still submit. Please describe your exact landmarks below to help responders.'
+        );
+      }
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not get current location.');
+      Alert.alert('Error', 'Could not retrieve coordinates.');
     } finally {
       setIsLoadingLocation(false);
     }

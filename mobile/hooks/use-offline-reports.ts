@@ -18,7 +18,7 @@ export function useOfflineReports() {
       } catch (err) {
         setIsOnline(false);
       }
-    }, 10000); // Poll every 10 seconds to check internet connectivity
+    }, 4000); // Poll every 4 seconds to check internet connectivity
 
     return () => clearInterval(interval);
   }, []);

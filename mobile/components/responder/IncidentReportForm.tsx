@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Info, ChevronDown, Minus, Plus, FolderDown, Check } from 'lucide-react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { ReportSubmittedModal } from './ReportSubmittedModal';
+import * as Haptics from 'expo-haptics';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -106,6 +107,7 @@ export function IncidentReportForm() {
 
   const handleSubmit = () => {
     if (activeDispatch) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const formData = {
         natureOfCall,
         typeOfEmergency,

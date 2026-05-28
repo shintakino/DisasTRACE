@@ -5,6 +5,7 @@ import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useLocationPermission } from '../../hooks/use-location-permission';
 import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
 import { HelpButton } from '../../components/dashboard/HelpButton';
+import { OfflineBanner } from '../../components/dashboard/OfflineBanner';
 import { MapPin, HelpCircle, Bell, Shield, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, Tabs } from 'expo-router';
@@ -327,6 +328,7 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-[#1E3A8A]">
+      <OfflineBanner />
       <StatusBar barStyle="light-content" />
       
       {/* Header Section */}

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,7 +8,6 @@ import Animated, {
   withTiming,
   withSequence,
   Easing,
-  interpolate,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -16,6 +16,10 @@ interface HelpButtonProps {
 }
 
 export function HelpButton({ onPress }: HelpButtonProps) {
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    onPress();
+  };
   const scale = useSharedValue(1);
   const ringScale = useSharedValue(1);
   const ringOpacity = useSharedValue(0.3);
@@ -68,7 +72,7 @@ export function HelpButton({ onPress }: HelpButtonProps) {
       {/* Primary HELP Button */}
       <TouchableOpacity 
         activeOpacity={0.9} 
-        onPress={onPress}
+        onPress={handlePress}
       >
         <Animated.View 
           style={animatedButtonStyle}

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { MapPin } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
 import Animated, { 
   useAnimatedStyle, 
@@ -23,6 +24,9 @@ export function DispatchSheet() {
 
   useEffect(() => {
     if (status === 'dispatch_offered') {
+      // Trigger success notification haptic pulse immediately to get attention
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
       // Animate in from the top
       translateY.value = withSpring(insets.top + 16, {
         damping: 18,
@@ -148,6 +152,7 @@ export function DispatchSheet() {
         <TouchableOpacity 
           className="bg-[#B91C1C] rounded-[20px] py-4 items-center shadow-lg shadow-[#B91C1C]/30 active:bg-red-800"
           onPress={async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             progress.value = 100; // Cancel animation
             try {
               const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';

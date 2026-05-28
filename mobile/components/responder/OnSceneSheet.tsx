@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { Activity, Truck, ThumbsDown, Info } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
 
 const OUTCOMES = [
@@ -92,7 +93,10 @@ export function OnSceneSheet() {
                 <TouchableOpacity
                   key={outcome.id}
                   activeOpacity={0.7}
-                  onPress={() => setSelectedOutcome(outcome.id)}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedOutcome(outcome.id);
+                  }}
                   className={`flex-row items-center p-4 rounded-2xl border ${
                     isSelected ? 'border-[#1E3A8A]' : 'border-slate-100 bg-white'
                   }`}
@@ -135,6 +139,7 @@ export function OnSceneSheet() {
           }`}
           disabled={!selectedOutcome}
           onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             if (selectedOutcome === 'transport') {
               bottomSheetRef.current?.close();
               setTimeout(() => {

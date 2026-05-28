@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { MapPin } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
 
 export function ArrivalConfirmDialog() {
@@ -32,6 +33,7 @@ export function ArrivalConfirmDialog() {
             <TouchableOpacity 
               className="bg-[#1E3A8A] rounded-2xl py-4 items-center"
               onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 hideArrivalConfirm();
                 arriveAtScene();
               }}
@@ -41,7 +43,10 @@ export function ArrivalConfirmDialog() {
             
             <TouchableOpacity 
               className="bg-slate-100 rounded-2xl py-4 items-center"
-              onPress={hideArrivalConfirm}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                hideArrivalConfirm();
+              }}
             >
               <Text className="text-slate-600 font-bold text-lg">No, cancel</Text>
             </TouchableOpacity>

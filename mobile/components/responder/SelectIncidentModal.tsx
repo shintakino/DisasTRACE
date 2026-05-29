@@ -17,37 +17,93 @@ export function SelectIncidentModal({ visible, onClose }: SelectIncidentModalPro
 
   const fetchIncidents = async () => {
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
       const { data: { session } } = await supabase.auth.getSession();
-      const reqHeaders: any = {};
-      if (session?.access_token) {
-        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+      if (!session?.user) {
+        setIncidents([]);
+        return;
       }
 
-      const response = await fetch(`${apiUrl}/api/reports`, {
-        headers: reqHeaders,
-      });
-      const result = await response.json();
-      
-      if (result.data) {
-        const unsubmitted = result.data
-          .filter((r: any) => r.status !== 'SUBMITTED' && !submittedIncidentIds.includes(r.id))
-          .map((r: any) => ({
-            id: r.id,
-            type: r.type || 'Emergency Response',
-            locationName: r.location || 'Baliwag City',
-            distance: '1.2 km',
-            natureOfCall: 'Emergency',
-            peopleInvolved: 1,
-            eta: 'Completed',
-            reporterName: r.responderName || 'CDRRMO Officer',
-            reporterInitials: 'CO',
-            timestamp: r.time || 'Just now',
-            coordinates: { latitude: 14.9516, longitude: 120.9011 },
-            typeOfEmergency: r.type
-          }));
-        setIncidents(unsubmitted);
+      const userId = session.user.id;
+
+      // 1. Fetch all resolved incidents assigned to this responder
+      const { data: unresolvedIncidents, error: incError } = await supabase
+        .from('incidents')
+        .select('id, status, created_at, assigned_ambulance, request_id')
+        .eq('responder_id', userId)
+        .eq('status', 'RESOLVED');
+
+      if (incError) throw incError;
+
+      if (!unresolvedIncidents || unresolvedIncidents.length === 0) {
+        setIncidents([]);
+        return;
       }
+
+      // 2. Fetch all submitted reports by this responder
+      const { data: dbReports, error: repError } = await supabase
+        .from('reports')
+        .select('incident_id')
+        .eq('responder_id', userId);
+
+      if (repError) throw repError;
+
+      const reportedIncidentIds = dbReports ? dbReports.map((r: any) => r.incident_id) : [];
+
+      // Filter out incidents that already have a submitted report or are marked as locally submitted
+      const unreported = unresolvedIncidents.filter(
+        (inc: any) => !reportedIncidentIds.includes(inc.id) && !submittedIncidentIds.includes(inc.id)
+      );
+
+      if (unreported.length === 0) {
+        setIncidents([]);
+        return;
+      }
+
+      // 3. Fetch verification request details for context pre-fills
+      const requestIds = unreported.map(inc => inc.request_id).filter(Boolean);
+      let requests: any[] = [];
+      
+      if (requestIds.length > 0) {
+        const { data: reqData, error: reqError } = await supabase
+          .from('verification_requests')
+          .select('*')
+          .in('id', requestIds);
+        
+        if (reqError) throw reqError;
+        requests = reqData || [];
+      }
+
+      // 4. Map into high-fidelity DispatchDetails contract
+      const unsubmitted = unreported.map((inc: any) => {
+        const vReq = requests.find((r: any) => r.id === inc.request_id);
+        const peopleInvolvedStr = vReq?.people_involved || '1-2 Persons';
+        const matched = peopleInvolvedStr.match(/\d+/);
+        const peopleInvolvedCount = matched ? parseInt(matched[0], 10) : 1;
+
+        return {
+          id: inc.id,
+          type: vReq?.type || 'Emergency Response',
+          locationName: vReq?.location_description || vReq?.address || 'Baliwag City',
+          distance: '1.2 km',
+          natureOfCall: vReq?.nature || 'Emergency',
+          peopleInvolved: peopleInvolvedCount,
+          eta: 'Completed',
+          reporterName: 'Resident',
+          reporterInitials: 'R',
+          timestamp: new Date(inc.created_at).toLocaleTimeString("en-US", {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          coordinates: { 
+            latitude: vReq?.latitude ? Number(vReq.latitude) : 14.9516, 
+            longitude: vReq?.longitude ? Number(vReq.longitude) : 120.9011 
+          },
+          typeOfEmergency: vReq?.type || 'Medical Emergency',
+          assignedAmbulance: inc.assigned_ambulance || 'AMB-001'
+        };
+      });
+
+      setIncidents(unsubmitted);
     } catch (e) {
       console.error('Error fetching select incidents:', e);
     } finally {

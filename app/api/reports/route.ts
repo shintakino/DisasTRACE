@@ -4,9 +4,11 @@ import { reports } from "@/db/schema/reports";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
+import { notifications } from "@/db/schema/notifications";
 import { eq, and, or, like, desc } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
+import crypto from "crypto";
 
 const SubmitReportSchema = z.object({
   incidentId: z.string().uuid(),
@@ -29,7 +31,24 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get("type");
     const status = searchParams.get("status");
 
-    // Fetch reports by joining Drizzle schema tables
+    // Fetch active user profile from database to determine role scopes
+    const userProfile = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+
+    const whereConditions: any[] = [];
+
+    if (userProfile) {
+      if (userProfile.role === 'ambulance_responder') {
+        // Ambulance responders can only view incident reports they submitted
+        whereConditions.push(eq(reports.responderId, user.id));
+      } else if (userProfile.role === 'public_user') {
+        // Residents can only view verification reports they created
+        whereConditions.push(eq(verificationRequests.residentId, user.id));
+      }
+    }
+
+    // Fetch reports by joining Drizzle schema tables with dynamic filters
     const dbReports = await db
       .select({
         id: reports.id,
@@ -43,6 +62,7 @@ export async function GET(req: NextRequest) {
       .innerJoin(incidents, eq(reports.incidentId, incidents.id))
       .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
       .innerJoin(users, eq(reports.responderId, users.id))
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(reports.createdAt));
 
     let filtered = [...dbReports].map((r) => ({
@@ -147,6 +167,26 @@ export async function POST(req: NextRequest) {
     await db.update(users)
       .set({ dutyStatus: "ON_DUTY" })
       .where(eq(users.id, user.id));
+
+    // 5. Send report audit status update notification if their updates setting is enabled (defaults to true)
+    const updatesEnabled = user.user_metadata?.notification_preferences?.updates !== false;
+    if (updatesEnabled) {
+      const notifId = crypto.randomUUID();
+      await db.insert(notifications).values({
+        id: notifId,
+        userId: user.id,
+        type: "report_audited",
+        title: "Report Audited",
+        body: `Your incident report ${reportId} has been successfully submitted and audited in our registers.`,
+        unread: true,
+        createdAt: new Date(),
+        metadata: {
+          reportId: reportId,
+          incidentId: incidentId,
+          category: "report_update"
+        }
+      });
+    }
 
     return NextResponse.json({
       success: true,

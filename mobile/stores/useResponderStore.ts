@@ -37,6 +37,7 @@ export interface DraftForm {
   incidentType: string; // e.g. "Fire Emergency"
   lastSaved: string; // e.g. "2 mins ago"
   formData: any; // mock form data payload
+  incidentDetails?: DispatchDetails; // Cache full incident context for draft recovery
 }
 
 interface ResponderState {
@@ -235,7 +236,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
       incidentId: incident.id,
       incidentType: incident.typeOfEmergency || incident.type,
       lastSaved: 'Unsent - Auto-save active',
-      formData
+      formData,
+      incidentDetails: incident
     };
 
     if (existingDraftIndex >= 0) {

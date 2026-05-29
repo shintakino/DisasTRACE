@@ -56,19 +56,50 @@ function InlineDropdown({
 }
 
 export function IncidentReportForm() {
-  const { status, setStatus, activeDispatch, isSubmittingReport, submitReport, saveDraft } = useResponderStore();
+  const { status, setStatus, activeDispatch, isSubmittingReport, submitReport, saveDraft, drafts } = useResponderStore();
   
   const [natureOfCall, setNatureOfCall] = useState('Emergency');
-  const [typeOfEmergency, setTypeOfEmergency] = useState('Medical');
-  const [severityLevel, setSeverityLevel] = useState('Critical');
+  const [typeOfEmergency, setTypeOfEmergency] = useState('Medical Emergency');
+  const [severityLevel, setSeverityLevel] = useState('Medium');
   
   const [patients, setPatients] = useState([
     { id: 1, status: 'Stable — Conscious', bp: '120/80', hr: '', spo2: '' },
-    { id: 2, status: 'Stable — Conscious', bp: '120/80', hr: '', spo2: '' },
-    { id: 3, status: 'Stable — Conscious', bp: '120/80', hr: '', spo2: '' },
   ]);
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (status === 'report_filling' && activeDispatch) {
+      // 1. Check if there is an existing local draft for this incident
+      const existingDraft = drafts.find(d => d.incidentId === activeDispatch.id);
+      
+      if (existingDraft && existingDraft.formData) {
+        console.log('[IncidentReportForm] Loading existing draft data:', existingDraft);
+        setNatureOfCall(existingDraft.formData.natureOfCall || 'Emergency');
+        setTypeOfEmergency(existingDraft.formData.typeOfEmergency || activeDispatch.typeOfEmergency || activeDispatch.type || 'Medical Emergency');
+        setSeverityLevel(existingDraft.formData.severityLevel || 'Medium');
+        setPatients(existingDraft.formData.patients || [
+          { id: 1, status: 'Stable — Conscious', bp: '', hr: '', spo2: '' }
+        ]);
+      } else {
+        console.log('[IncidentReportForm] Initializing fresh form from active dispatch pre-fills:', activeDispatch);
+        setNatureOfCall(activeDispatch.natureOfCall || 'Emergency');
+        setTypeOfEmergency(activeDispatch.typeOfEmergency || activeDispatch.type || 'Medical Emergency');
+        setSeverityLevel('Medium');
+        
+        // Match the number of people involved from resident findings
+        const count = activeDispatch.peopleInvolved || 1;
+        const initialPatients = Array.from({ length: count }, (_, i) => ({
+          id: i + 1,
+          status: 'Stable — Conscious',
+          bp: '',
+          hr: '',
+          spo2: ''
+        }));
+        setPatients(initialPatients);
+      }
+    }
+  }, [status, activeDispatch, drafts]);
 
   const toggleDropdown = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

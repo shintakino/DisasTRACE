@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, Trash } from 'lucide-react-native';
+import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, Trash, CloudLightning, Megaphone, FileText } from 'lucide-react-native';
 import { useAuthStatus } from '../hooks/use-auth-status';
 import { supabase } from '../lib/supabase';
 
@@ -101,6 +101,53 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleNotificationPress = async (item: Notification) => {
+    // 1. Mark as read immediately in the DB if it is unread
+    if (item.unread) {
+      await handleMarkAsRead(item.id);
+    }
+
+    // 2. Perform redirection / actions based on notification type
+    try {
+      if (item.type === 'dispatch_alert' || item.type === 'new_incident') {
+        // Redirection for Responders to accept or resume active emergency
+        router.replace('/(tabs)');
+      } else if (
+        item.type === 'ambulance_dispatched' || 
+        item.type === 'responder_arrived'
+      ) {
+        // Redirection for Residents to track the responder in real-time
+        router.replace('/help/tracking');
+      } else if (
+        item.type === 'registration_approved' || 
+        item.type === 'registration_rejected'
+      ) {
+        // Redirection to profile settings
+        router.replace('/(tabs)/profile');
+      } else if (item.type === 'incident_resolved') {
+        // Redirection back to base screen
+        router.replace('/(tabs)');
+      } else if (item.type === 'report_audited') {
+        // Redirection to reports list (under profile stats)
+        router.replace('/(tabs)/profile');
+      } else if (item.type === 'pagasa_alert') {
+        // Route weather warnings to the Map view so they can see context
+        router.replace('/(tabs)/map');
+      } else if (item.type === 'system_announcement') {
+        // Display System Notices directly inside a native overlay alert dialog
+        Alert.alert(
+          item.title,
+          item.body,
+          [{ text: 'Dismiss', style: 'cancel' }],
+          { cancelable: true }
+        );
+      }
+    } catch (err) {
+      console.error('[Notifications] Redirection action failed:', err);
+    }
+  };
+
+
   const handleClearAll = async () => {
     if (notifications.length === 0) return;
     
@@ -150,6 +197,12 @@ export default function NotificationsScreen() {
       case 'incident_verified':
       case 'registration_approved':
         return <ShieldCheck size={22} color="#22C55E" />;
+      case 'pagasa_alert':
+        return <CloudLightning size={22} color="#F59E0B" />;
+      case 'system_announcement':
+        return <Megaphone size={22} color="#8B5CF6" />;
+      case 'report_audited':
+        return <FileText size={22} color="#3B82F6" />;
       default:
         return <Activity size={22} color="#64748B" />;
     }
@@ -206,7 +259,7 @@ export default function NotificationsScreen() {
               notifications.map((item) => (
                 <TouchableOpacity
                   key={item.id}
-                  onPress={() => item.unread && handleMarkAsRead(item.id)}
+                  onPress={() => handleNotificationPress(item)}
                   activeOpacity={0.7}
                   className={`bg-white rounded-3xl border ${item.unread ? 'border-blue-100 bg-blue-50/10' : 'border-slate-100'} p-5 mb-4 flex-row shadow-sm`}
                 >

@@ -52,20 +52,18 @@ export default function FormsScreen() {
           drafts.map((draft) => (
             <TouchableOpacity 
               key={draft.id}
-              // Here we mock creating a DispatchDetails object out of the draft.
-              // In reality, we'd lookup the incident by incidentId.
-              onPress={() => openFormForIncident({
+              onPress={() => openFormForIncident(draft.incidentDetails || {
                 id: draft.incidentId,
                 type: draft.incidentType,
                 locationName: 'Draft Location',
-                distance: '',
+                distance: '1.2 km',
                 natureOfCall: 'Emergency',
                 peopleInvolved: 1,
-                eta: '',
-                reporterName: '',
-                reporterInitials: '',
-                timestamp: '',
-                coordinates: { latitude: 0, longitude: 0 },
+                eta: 'Completed',
+                reporterName: 'Resident',
+                reporterInitials: 'R',
+                timestamp: 'Completed',
+                coordinates: { latitude: 14.9516, longitude: 120.9011 },
                 typeOfEmergency: draft.incidentType
               })}
               className="bg-[#FEFCE8] border border-[#FEF08A] rounded-2xl p-5 mb-4 shadow-sm"

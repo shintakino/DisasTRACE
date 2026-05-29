@@ -1,13 +1,26 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Linking, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft2, Call, Sms, Location, ArrowDown2, ArrowRight2 } from 'iconsax-react-native';
+
+type FaqItem = {
+  id?: string;
+  question: string;
+  answer: string;
+};
 
 export default function SupportScreen() {
   const router = useRouter();
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
+  const [loading, setLoading] = useState(true);
 
-  const faqs = [
+  const [support, setSupport] = useState({
+    phone: '(044) 761-0000',
+    email: 'cdrrmobaliwag@gmail.com',
+    address: 'Baliwag Government Center, Brgy. Bagong Nayon, Baliwag City, Bulacan',
+  });
+
+  const [faqs, setFaqs] = useState<FaqItem[]>([
     {
       question: "How do I report an emergency?",
       answer: "Go to the 'Reports' tab and tap 'Report Emergency'. Select the disaster type, capture or upload an image, add your location, and submit. CDRRMO will dispatch responders immediately."
@@ -24,7 +37,36 @@ export default function SupportScreen() {
       question: "What should I do if my location is wrong?",
       answer: "Make sure you have granted GPS/Location permissions to the DisasTRACE app in your phone's settings. For best accuracy, stay outdoors or near a window when pinning your location."
     }
-  ];
+  ]);
+
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
+
+  useEffect(() => {
+    async function fetchSupportData() {
+      try {
+        const response = await fetch(`${apiUrl}/api/settings/support`);
+        const data = await response.json();
+        if (response.ok && data.success) {
+          if (data.support) {
+            setSupport({
+              phone: data.support.phone,
+              email: data.support.email,
+              address: data.support.address,
+            });
+          }
+          if (data.faqs && data.faqs.length > 0) {
+            setFaqs(data.faqs);
+          }
+        }
+      } catch (err) {
+        console.warn('[Support] Failed to fetch dynamic settings, utilizing fallback presets:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchSupportData();
+  }, []);
 
   const toggleFaq = (index: number) => {
     if (expandedFaq === index) {
@@ -35,11 +77,12 @@ export default function SupportScreen() {
   };
 
   const handleCall = () => {
-    Linking.openURL('tel:0447610000');
+    const cleanNumber = support.phone.replace(/[^\d+]/g, '');
+    Linking.openURL(`tel:${cleanNumber}`);
   };
 
   const handleEmail = () => {
-    Linking.openURL('mailto:cdrrmobaliwag@gmail.com');
+    Linking.openURL(`mailto:${support.email}`);
   };
 
   return (
@@ -58,7 +101,10 @@ export default function SupportScreen() {
 
       <ScrollView className="flex-1 px-6 pt-6" showsVerticalScrollIndicator={false}>
         
-        <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Contact CDRRMO Baliwag</Text>
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest">Contact CDRRMO Baliwag</Text>
+          {loading && <ActivityIndicator color="#1E3A8A" size="small" />}
+        </View>
         
         <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-8">
           <TouchableOpacity 
@@ -70,7 +116,7 @@ export default function SupportScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-sm text-slate-500">Emergency Hotline</Text>
-              <Text className="text-lg font-bold text-slate-800">(044) 761-0000</Text>
+              <Text className="text-lg font-bold text-slate-800">{support.phone}</Text>
             </View>
           </TouchableOpacity>
 
@@ -83,7 +129,7 @@ export default function SupportScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-sm text-slate-500">Email Address</Text>
-              <Text className="text-base font-bold text-slate-800">cdrrmobaliwag@gmail.com</Text>
+              <Text className="text-base font-bold text-slate-800">{support.email}</Text>
             </View>
           </TouchableOpacity>
 
@@ -94,7 +140,7 @@ export default function SupportScreen() {
             <View className="flex-1">
               <Text className="text-sm text-slate-500">Command Center</Text>
               <Text className="text-sm font-bold text-slate-800 leading-tight">
-                Baliwag Government Center, Brgy. Bagong Nayon, Baliwag City, Bulacan
+                {support.address}
               </Text>
             </View>
           </View>

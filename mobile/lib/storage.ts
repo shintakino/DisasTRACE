@@ -11,7 +11,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
  * @param maxDimension - The maximum width or height of the optimized image.
  * @returns The new local URI of the optimized image.
  */
-async function optimizeImage(imageUri: string, maxDimension: number = 1024): Promise<string> {
+export async function optimizeImage(imageUri: string, maxDimension: number = 1024): Promise<string> {
   try {
     console.log('[Storage] Fetching image dimensions for:', imageUri);
     const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -148,6 +148,53 @@ export async function uploadIncidentPhoto(randomId: string, imageUri: string): P
     return publicUrl;
   } catch (err: any) {
     console.error("Upload incident photo error:", err);
+    throw err;
+  }
+}
+
+/**
+ * Uploads a profile avatar using the optimized image pipeline.
+ * 
+ * @param imageUri - The local URI of the selected avatar image.
+ * @returns The public URL of the uploaded avatar.
+ */
+export async function uploadAvatar(imageUri: string): Promise<string> {
+  try {
+    // 1. Optimize on-device before uploading
+    const optimizedUri = await optimizeImage(imageUri, 1024);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("No active auth session.");
+
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: optimizedUri,
+      name: 'avatar.jpg',
+      type: 'image/jpeg',
+    } as any);
+
+    console.log('[Storage] Uploading optimized avatar to backend:', optimizedUri);
+
+    const response = await fetch(`${apiUrl}/api/users/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Accept': 'application/json',
+      },
+      body: formData,
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to upload avatar.");
+    }
+
+    console.log('[Storage] Avatar successfully updated on server. Public URL:', result.avatarUrl);
+    return result.avatarUrl;
+  } catch (err: any) {
+    console.error('[Storage] Error in uploadAvatar:', err);
     throw err;
   }
 }

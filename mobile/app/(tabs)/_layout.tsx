@@ -1,12 +1,22 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import { Home2, FolderOpen, Map, User, CalendarAdd } from 'iconsax-react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
+import { useResponderStore } from '../../stores/useResponderStore';
 
 export default function TabLayout() {
+  const router = useRouter();
   const { user, role } = useAuthStatus();
+  const responderStatus = useResponderStore((state) => state.status);
 
   const isResponder = role === 'ambulance_responder';
+
+  useEffect(() => {
+    if (isResponder && (responderStatus === 'dispatch_offered' || responderStatus === 'en_route')) {
+      console.log(`[TabLayout] Responder status updated to: ${responderStatus}. Redirecting to home tab to show incident sheet.`);
+      router.replace('/(tabs)');
+    }
+  }, [responderStatus, isResponder]);
 
   return (
     <Tabs screenOptions={{

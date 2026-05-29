@@ -1,15 +1,105 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, StatusBar, Modal, Image, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Platform, StatusBar, Modal, Image, Alert, ActivityIndicator } from 'react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { supabase } from '../../lib/supabase';
 import { Edit2, Logout, User, FolderOpen, Notification, MessageQuestion, Lock1, ArrowLeft2 } from 'iconsax-react-native';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadAvatar } from '../../lib/storage';
+import { useResponderStore } from '../../stores/useResponderStore';
 
 export default function ProfileScreen() {
   const { user, role, profile } = useAuthStatus();
   const [logoutVisible, setLogoutVisible] = useState(false);
   const router = useRouter();
   const isResponder = role === 'ambulance_responder';
+
+  const [dbCount, setDbCount] = useState(0);
+  const [dbActiveCount, setDbActiveCount] = useState(0);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const draftsLength = useResponderStore((state) => state.drafts.length);
+
+  useEffect(() => {
+    if (!user) return;
+    const currentUserId = user.id;
+
+    let isMounted = true;
+
+    async function fetchCounts() {
+      try {
+        if (isResponder) {
+          // Fetch submitted reports count
+          const { data, error } = await supabase
+            .from('reports')
+            .select('id')
+            .eq('responder_id', currentUserId);
+
+          if (error) throw error;
+          if (data && isMounted) {
+            setDbCount(data.length);
+          }
+        } else {
+          // Fetch resident verification requests
+          const { data, error } = await supabase
+            .from('verification_requests')
+            .select('id, status')
+            .eq('resident_id', currentUserId);
+
+          if (error) throw error;
+          if (data && isMounted) {
+            setDbCount(data.length);
+            const active = data.filter(r => r.status === 'PENDING' || r.status === 'VERIFIED').length;
+            setDbActiveCount(active);
+          }
+        }
+      } catch (err) {
+        console.error('[ProfileScreen] Error fetching counts:', err);
+      }
+    }
+
+    fetchCounts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, role, draftsLength]);
+
+  const handleSelectAvatar = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'We need camera roll permissions to update your profile photo.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      setUploadingAvatar(true);
+      const selectedUri = result.assets[0].uri;
+
+      // Upload with full image scaling & compression optimization
+      await uploadAvatar(selectedUri);
+
+      // Force-refresh session to pull down the newly updated avatar metadata url
+      await supabase.auth.refreshSession();
+
+      Alert.alert('Success', 'Profile picture updated successfully!');
+    } catch (err: any) {
+      console.error('[ProfileScreen] Avatar update error:', err);
+      Alert.alert('Upload Failed', err.message || 'An error occurred while uploading your profile picture.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleSignOut = async () => {
     setLogoutVisible(false);
@@ -68,15 +158,33 @@ export default function ProfileScreen() {
         </View>
 
         <View className="flex-row items-center relative z-10">
-          <View className="w-24 h-24 rounded-full border border-white items-center justify-center mr-5 overflow-hidden">
-            {user?.user_metadata?.avatar_url ? (
-              <Image 
-                source={{ uri: user.user_metadata.avatar_url }} 
-                style={{ width: '100%', height: '100%', borderRadius: 48 }} 
-              />
-            ) : (
-              <Text className="text-white text-3xl font-bold">{initials}</Text>
-            )}
+          <View className="relative mr-5">
+            <TouchableOpacity 
+              onPress={handleSelectAvatar}
+              disabled={uploadingAvatar}
+              activeOpacity={0.7}
+              className="w-24 h-24 rounded-full border border-white items-center justify-center overflow-hidden bg-white/10"
+            >
+              {user?.user_metadata?.avatar_url ? (
+                <Image 
+                  source={{ uri: user.user_metadata.avatar_url }} 
+                  style={{ width: '100%', height: '100%', borderRadius: 48 }} 
+                />
+              ) : (
+                <Text className="text-white text-3xl font-bold">{initials}</Text>
+              )}
+              
+              {uploadingAvatar ? (
+                <View className="absolute inset-0 bg-black/50 items-center justify-center">
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                </View>
+              ) : (
+                <View className="absolute bottom-0 right-0 left-0 bg-black/40 py-0.5 items-center">
+                  <Text className="text-[9px] text-white font-bold uppercase tracking-wider">Edit</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            
             <View className="absolute top-1 right-1 w-6 h-6 bg-white rounded-full items-center justify-center">
               <View className="w-4 h-4 bg-[#1E3A8A] rounded-full" />
             </View>
@@ -119,7 +227,14 @@ export default function ProfileScreen() {
       <ScrollView className="flex-1 px-6 pt-8" showsVerticalScrollIndicator={false}>
         <Text className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-4">ACCOUNT</Text>
         {renderPillRow(User, 'Personal Information', 'Name, contact, emergency details...', () => router.push('/personal-info'))}
-        {renderPillRow(FolderOpen, 'My Reports', isResponder ? '12 total · 1 active' : '3 total · 1 active', () => router.push('/(tabs)/reports'))}
+        {renderPillRow(
+          FolderOpen, 
+          'My Reports', 
+          isResponder 
+            ? `${dbCount + draftsLength} total · ${draftsLength} active` 
+            : `${dbCount} total · ${dbActiveCount} active`, 
+          () => router.push('/(tabs)/reports')
+        )}
         
         <Text className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-4 mt-6">SETTINGS</Text>
         {renderPillRow(Notification, 'Notifications', 'Alerts, emergency updates', () => router.push('/notification-settings'))}

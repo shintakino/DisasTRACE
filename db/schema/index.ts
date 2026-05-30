@@ -9,6 +9,7 @@ export * from './system_settings';
 export * from './hospitals';
 export * from './support_settings';
 export * from './faqs';
+export * from './feedbacks';
 
 
 

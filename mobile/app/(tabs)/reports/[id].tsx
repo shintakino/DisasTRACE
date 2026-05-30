@@ -1,29 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform, StatusBar, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Platform, StatusBar, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, User, MapPin, Award } from 'lucide-react-native';
+import { ArrowLeft, User, MapPin, Award, CheckCircle, Edit3 } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
 
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const [rating, setRating] = useState(4);
+  const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [existingFeedback, setExistingFeedback] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [loadingFeedback, setLoadingFeedback] = useState(false);
 
   const reportId = Array.isArray(id) ? id[0] : id || '';
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: any = {};
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    return headers;
+  };
 
   const fetchReportDetails = async () => {
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-      const { data: { session } } = await supabase.auth.getSession();
-      const reqHeaders: any = {};
-      if (session?.access_token) {
-        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
-      }
-
+      const reqHeaders = await getAuthHeaders();
       const response = await fetch(`${apiUrl}/api/reports/${reportId}`, {
         headers: reqHeaders,
       });
@@ -38,25 +45,49 @@ export default function IncidentDetailScreen() {
     }
   };
 
+  // Fetch existing feedback for this incident
+  const fetchExistingFeedback = async (incidentId: string) => {
+    setLoadingFeedback(true);
+    try {
+      const reqHeaders = await getAuthHeaders();
+      const response = await fetch(`${apiUrl}/api/incidents/feedback?incidentId=${incidentId}`, {
+        headers: reqHeaders,
+      });
+      const data = await response.json();
+      if (data.success && data.feedback) {
+        setExistingFeedback(data.feedback);
+        setRating(data.feedback.rating);
+        setFeedback(data.feedback.comment || '');
+      }
+    } catch (err) {
+      console.warn('[ReportDetail] Could not fetch existing feedback:', err);
+    } finally {
+      setLoadingFeedback(false);
+    }
+  };
+
   useEffect(() => {
     if (reportId) {
       fetchReportDetails();
     }
   }, [reportId]);
 
+  // Once report is loaded, fetch existing feedback
+  useEffect(() => {
+    if (report?.incidentId) {
+      fetchExistingFeedback(report.incidentId);
+    }
+  }, [report?.incidentId]);
+
   const handleFeedbackSubmit = async () => {
     if (rating === 0) {
-      alert("Please select a rating.");
+      Alert.alert("Rating Required", "Please select a star rating before submitting.");
       return;
     }
     setSubmittingFeedback(true);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-      const { data: { session } } = await supabase.auth.getSession();
-      const reqHeaders: any = { 'Content-Type': 'application/json' };
-      if (session?.access_token) {
-        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
-      }
+      const reqHeaders = await getAuthHeaders();
+      reqHeaders['Content-Type'] = 'application/json';
 
       const response = await fetch(`${apiUrl}/api/incidents/feedback`, {
         method: 'POST',
@@ -70,14 +101,20 @@ export default function IncidentDetailScreen() {
       });
       const res = await response.json();
       if (res.success) {
-        alert("Thank you for your feedback!");
-        setFeedback('');
+        setExistingFeedback(res.feedback);
+        setIsEditing(false);
+        Alert.alert(
+          res.updated ? "Feedback Updated" : "Thank You!",
+          res.updated 
+            ? "Your feedback has been updated successfully." 
+            : "Your feedback has been recorded. Thank you for helping us improve!"
+        );
       } else {
-        alert("Failed to submit feedback.");
+        Alert.alert("Error", res.error || "Failed to submit feedback.");
       }
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      alert("An error occurred while submitting feedback.");
+      Alert.alert("Error", "An error occurred while submitting feedback.");
     } finally {
       setSubmittingFeedback(false);
     }
@@ -85,8 +122,14 @@ export default function IncidentDetailScreen() {
 
   const renderStar = (index: number) => {
     const isFilled = index <= rating;
+    const isDisabled = existingFeedback && !isEditing;
     return (
-      <TouchableOpacity key={index} onPress={() => setRating(index)}>
+      <TouchableOpacity 
+        key={index} 
+        onPress={() => !isDisabled && setRating(index)}
+        disabled={!!isDisabled}
+        activeOpacity={isDisabled ? 1 : 0.6}
+      >
         <Text style={{ fontSize: 40, color: isFilled ? '#EF4444' : '#CBD5E1', marginHorizontal: 4 }}>
           ★
         </Text>
@@ -113,6 +156,8 @@ export default function IncidentDetailScreen() {
       </View>
     );
   }
+
+  const hasSubmittedFeedback = !!existingFeedback && !isEditing;
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -198,32 +243,109 @@ export default function IncidentDetailScreen() {
           </View>
         </View>
 
-        <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">RATE US</Text>
-        <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-10">
-          <Text className="text-base font-bold text-slate-800 mb-4">How was the response?</Text>
-          <View className="flex-row justify-center mb-6">
-            {[1, 2, 3, 4, 5].map(renderStar)}
+        {/* FEEDBACK SECTION */}
+        <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">
+          {hasSubmittedFeedback ? 'YOUR FEEDBACK' : 'RATE US'}
+        </Text>
+
+        {loadingFeedback ? (
+          <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-10 items-center py-10">
+            <ActivityIndicator size="small" color="#1E3A8A" />
+            <Text className="text-slate-400 font-medium mt-2 text-sm">Loading feedback...</Text>
           </View>
-          <TextInput 
-            className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-800 h-28 text-left align-top mb-6"
-            placeholder="Leave a note (optional)..."
-            placeholderTextColor="#94A3B8"
-            multiline
-            value={feedback}
-            onChangeText={setFeedback}
-          />
-          <TouchableOpacity 
-            className="bg-[#1E3A8A] py-4 rounded-2xl items-center shadow-sm"
-            onPress={handleFeedbackSubmit}
-            disabled={submittingFeedback}
-          >
-            {submittingFeedback ? (
-              <ActivityIndicator color="#FFFFFF" />
+        ) : hasSubmittedFeedback ? (
+          /* Already submitted — show read-only feedback with edit option */
+          <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-10">
+            <View className="flex-row items-center mb-4">
+              <View className="w-10 h-10 rounded-full bg-green-100 items-center justify-center mr-3">
+                <CheckCircle size={20} color="#16A34A" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-bold text-slate-800">Feedback Submitted</Text>
+                <Text className="text-xs text-slate-400 mt-0.5">
+                  {existingFeedback.updatedAt !== existingFeedback.createdAt 
+                    ? `Updated ${new Date(existingFeedback.updatedAt).toLocaleDateString()}`
+                    : `Submitted ${new Date(existingFeedback.createdAt).toLocaleDateString()}`
+                  }
+                </Text>
+              </View>
+            </View>
+
+            <View className="flex-row justify-center mb-4">
+              {[1, 2, 3, 4, 5].map((index) => (
+                <Text key={index} style={{ fontSize: 32, color: index <= existingFeedback.rating ? '#EF4444' : '#CBD5E1', marginHorizontal: 3 }}>
+                  ★
+                </Text>
+              ))}
+            </View>
+
+            {existingFeedback.comment ? (
+              <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-4">
+                <Text className="text-sm text-slate-600 leading-relaxed">"{existingFeedback.comment}"</Text>
+              </View>
             ) : (
-              <Text className="text-white text-base font-bold">Submit Feedback</Text>
+              <Text className="text-sm text-slate-400 text-center mb-4">No additional comments</Text>
             )}
-          </TouchableOpacity>
-        </View>
+
+            <TouchableOpacity 
+              className="border border-[#1E3A8A] py-3.5 rounded-2xl items-center flex-row justify-center"
+              onPress={() => setIsEditing(true)}
+            >
+              <Edit3 size={16} color="#1E3A8A" strokeWidth={2.5} />
+              <Text className="text-[#1E3A8A] text-base font-bold ml-2">Edit Feedback</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          /* Feedback form — for new submissions or edit mode */
+          <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-10">
+            {isEditing && (
+              <View className="bg-blue-50 rounded-xl px-4 py-2.5 mb-4 flex-row items-center">
+                <Edit3 size={14} color="#1E3A8A" strokeWidth={2.5} />
+                <Text className="text-xs font-bold text-[#1E3A8A] ml-2">Editing your previous feedback</Text>
+              </View>
+            )}
+            <Text className="text-base font-bold text-slate-800 mb-4">How was the response?</Text>
+            <View className="flex-row justify-center mb-6">
+              {[1, 2, 3, 4, 5].map(renderStar)}
+            </View>
+            <TextInput 
+              className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-800 h-28 text-left align-top mb-6"
+              placeholder="Leave a note (optional)..."
+              placeholderTextColor="#94A3B8"
+              multiline
+              value={feedback}
+              onChangeText={setFeedback}
+            />
+            <View className={isEditing ? "flex-row" : ""}>
+              {isEditing && (
+                <TouchableOpacity 
+                  className="flex-1 border border-slate-200 py-4 rounded-2xl items-center mr-2"
+                  onPress={() => {
+                    setIsEditing(false);
+                    // Restore original values
+                    setRating(existingFeedback.rating);
+                    setFeedback(existingFeedback.comment || '');
+                  }}
+                >
+                  <Text className="text-slate-500 text-base font-bold">Cancel</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                className={`bg-[#1E3A8A] py-4 rounded-2xl items-center shadow-sm ${isEditing ? 'flex-1 ml-2' : ''}`}
+                onPress={handleFeedbackSubmit}
+                disabled={submittingFeedback}
+              >
+                {submittingFeedback ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text className="text-white text-base font-bold">
+                    {isEditing ? 'Update Feedback' : 'Submit Feedback'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );

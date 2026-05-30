@@ -39,17 +39,37 @@ export default function ProfileScreen() {
             setDbCount(data.length);
           }
         } else {
-          // Fetch resident verification requests
-          const { data, error } = await supabase
+          // Fetch resident's incidents via verification requests to get accurate counts
+          const { data: vRequests, error: vError } = await supabase
             .from('verification_requests')
             .select('id, status')
             .eq('resident_id', currentUserId);
 
-          if (error) throw error;
-          if (data && isMounted) {
-            setDbCount(data.length);
-            const active = data.filter(r => r.status === 'PENDING' || r.status === 'VERIFIED').length;
-            setDbActiveCount(active);
+          if (vError) throw vError;
+
+          if (vRequests && vRequests.length > 0 && isMounted) {
+            // Get all verification request IDs for this resident
+            const vRequestIds = vRequests.map(v => v.id);
+
+            // Fetch incidents linked to these verification requests
+            const { data: incidentData, error: incError } = await supabase
+              .from('incidents')
+              .select('id, request_id, status')
+              .in('request_id', vRequestIds);
+
+            if (incError) throw incError;
+
+            const totalIncidents = incidentData?.length || 0;
+            // Active = incidents that are NOT resolved (still dispatched, en route, or arrived)
+            const activeIncidents = incidentData?.filter(
+              inc => inc.status !== 'RESOLVED'
+            ).length || 0;
+
+            setDbCount(totalIncidents);
+            setDbActiveCount(activeIncidents);
+          } else if (isMounted) {
+            setDbCount(0);
+            setDbActiveCount(0);
           }
         }
       } catch (err) {

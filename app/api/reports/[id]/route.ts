@@ -25,6 +25,7 @@ export async function GET(
     const results = await db
       .select({
         id: reports.id,
+        incidentId: reports.incidentId,
         responderName: users.fullName,
         vehicleId: incidents.assignedAmbulance,
         type: verificationRequests.type,
@@ -60,6 +61,7 @@ export async function GET(
     // Format output matching DetailedIncidentReport typescript contract
     const formatted = {
       id: r.id,
+      incidentId: r.incidentId,
       responderName: r.responderName,
       vehicleId: r.vehicleId || "AMB-001",
       type: r.type,

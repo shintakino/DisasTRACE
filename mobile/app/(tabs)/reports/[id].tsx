@@ -62,7 +62,8 @@ export default function IncidentDetailScreen() {
         method: 'POST',
         headers: reqHeaders,
         body: JSON.stringify({
-          incidentId: report?.id,
+          incidentId: report?.incidentId,
+          reportId: report?.id,
           rating,
           feedback: feedback || undefined,
         })

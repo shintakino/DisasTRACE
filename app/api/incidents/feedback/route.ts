@@ -7,6 +7,7 @@ import { z } from "zod";
 const FeedbackSchema = z.object({
   requestId: z.string().uuid().optional(),
   incidentId: z.string().uuid().optional(),
+  reportId: z.string().optional(),
   rating: z.number().min(1).max(5),
   feedback: z.string().optional(),
 });
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid parameters", details: result.error.format() }, { status: 400 });
     }
 
-    const { requestId, incidentId, rating, feedback } = result.data;
+    const { requestId, incidentId, reportId, rating, feedback } = result.data;
 
     // Log the feedback into our system audit logs for Super Admin visualization
     await db.insert(auditLogs).values({
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
       action: "SUBMIT_FEEDBACK",
       entityType: "INCIDENT",
       entityId: incidentId || requestId || null,
-      details: { rating, feedback: feedback || 'None provided.' },
+      details: { rating, feedback: feedback || 'None provided.', reportId: reportId || null },
     });
 
     return NextResponse.json({

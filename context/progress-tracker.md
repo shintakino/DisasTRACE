@@ -114,8 +114,4 @@ Update this file whenever the current phase, active feature, or implementation s
   1. Refactored [SelectIncidentModal.tsx](file:///home/shintakino/dev/freelance/DisasTRACE/mobile/components/responder/SelectIncidentModal.tsx) to query Supabase directly for resolved incidents assigned to the responder that do not have reports in the database yet.
   2. Integrated the full pre-filled resident findings context (`incidentDetails` inside `DraftForm` in [useResponderStore.ts](file:///home/shintakino/dev/freelance/DisasTRACE/mobile/stores/useResponderStore.ts)) into local drafts.
   3. Added a dynamic `useEffect` to [IncidentReportForm.tsx](file:///home/shintakino/dev/freelance/DisasTRACE/mobile/components/responder/IncidentReportForm.tsx) to automatically initialize/load the form. If a draft is opened, it fully re-hydrates vital signs (BP, HR, SPO2) and patient statuses; otherwise, it pre-populates based on resident findings (automatically generating the correct number of patient logs).
-
-
-
-
-
+- Implemented Real-Time PACC Verification & Audio Alert HUD: Integrated a client-side Supabase Realtime subscription on the PACC Verification dashboard to capture incoming reports, offer expirations, and status reversions in real time. Designed a high-fidelity synthesized warning audio alert system using Web Audio API (dual-tone emergency siren, fast warning beeps, sweet info chime) with custom mute control to bypass browser autoplay blocks. Created a glowing, pulsing Alert HUD at the top of the Verification page showing active unhandled counts, details of the most urgent incident, a quick 'Triage Now' shortcut button, and the audio volume selector. Fully typechecked both Next.js and mobile apps with 0 errors.

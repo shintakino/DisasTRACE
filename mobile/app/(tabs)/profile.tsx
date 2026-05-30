@@ -38,6 +38,17 @@ export default function ProfileScreen() {
           if (data && isMounted) {
             setDbCount(data.length);
           }
+
+          // Fetch active (unresolved) incidents assigned to this responder
+          const { data: activeIncidents, error: incError } = await supabase
+            .from('incidents')
+            .select('id')
+            .eq('responder_id', currentUserId)
+            .neq('status', 'RESOLVED');
+
+          if (!incError && activeIncidents && isMounted) {
+            setDbActiveCount(activeIncidents.length);
+          }
         } else {
           // Fetch resident's incidents via verification requests to get accurate counts
           const { data: vRequests, error: vError } = await supabase
@@ -251,7 +262,7 @@ export default function ProfileScreen() {
           FolderOpen, 
           'My Reports', 
           isResponder 
-            ? `${dbCount + draftsLength} total · ${draftsLength} active` 
+            ? `${dbCount + draftsLength} total · ${dbActiveCount + draftsLength} active` 
             : `${dbCount} total · ${dbActiveCount} active`, 
           () => router.push('/(tabs)/reports')
         )}

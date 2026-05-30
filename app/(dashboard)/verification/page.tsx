@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { VerificationQueue } from "@/components/verification/verification-queue"
 import { VerificationDetails } from "@/components/verification/verification-details"
 import { ResidentPanel } from "@/components/verification/resident-panel"
@@ -8,6 +8,9 @@ import { ManualDispatchModal } from "@/components/verification/manual-dispatch-m
 import { VerificationRequest, VerificationStatus } from "@/types/verification"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
+import { createClientBrowser } from "@/lib/supabase"
+import { Volume2, VolumeX, ShieldAlert, Sparkles } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export default function VerificationPage() {
   const [requests, setRequests] = useState<VerificationRequest[]>([])
@@ -15,6 +18,15 @@ export default function VerificationPage() {
   const [filter, setFilter] = useState<VerificationStatus>("PENDING")
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+
+  const isMutedRef = useRef(isMuted)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+
+  // Sync mute state to ref for realtime callbacks
+  useEffect(() => {
+    isMutedRef.current = isMuted
+  }, [isMuted])
 
   // Manual Dispatch States
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false)
@@ -30,6 +42,116 @@ export default function VerificationPage() {
       !r.incident.responderId &&
       !r.incident.currentOfferResponderId
     );
+  };
+
+  const initAudio = () => {
+    if (audioCtxRef.current) return audioCtxRef.current;
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return null;
+      const ctx = new AudioContextClass();
+      audioCtxRef.current = ctx;
+      return ctx;
+    } catch (e) {
+      console.error("AudioContext initialization failed:", e);
+      return null;
+    }
+  }
+
+  const playAlertSound = (type: 'info' | 'warning' | 'emergency', customCtx?: AudioContext | null) => {
+    if (isMutedRef.current) return;
+    
+    try {
+      const ctx = customCtx || audioCtxRef.current || initAudio();
+      if (!ctx) return;
+      
+      // Resume if suspended (browser autoplay security check)
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      if (type === 'emergency') {
+        // Dual-tone siren (High-low)
+        const playTone = (freq: number, startTime: number, duration: number) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, startTime);
+          
+          gain.gain.setValueAtTime(0.15, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+          
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+        };
+
+        const now = ctx.currentTime;
+        playTone(960, now, 0.3);
+        playTone(770, now + 0.35, 0.3);
+        playTone(960, now + 0.7, 0.3);
+        playTone(770, now + 1.05, 0.3);
+      } else if (type === 'warning') {
+        // Fast pulsing double beep
+        const playTone = (freq: number, startTime: number, duration: number) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, startTime);
+          
+          gain.gain.setValueAtTime(0.12, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+          
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+        };
+        
+        const now = ctx.currentTime;
+        playTone(587.33, now, 0.25);
+        playTone(587.33, now + 0.3, 0.25);
+      } else {
+        // Sweet chime (Info)
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc1.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+        osc2.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08); // E5
+        
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        
+        osc1.start();
+        osc2.start(ctx.currentTime + 0.08);
+        osc1.stop(ctx.currentTime + 0.4);
+        osc2.stop(ctx.currentTime + 0.4);
+      }
+    } catch (err) {
+      console.error("Failed to play alert sound:", err);
+    }
+  };
+
+  const toggleMute = () => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    
+    if (!nextMuted) {
+      const ctx = initAudio();
+      if (ctx) {
+        ctx.resume().then(() => {
+          playAlertSound("info", ctx);
+        });
+      }
+    }
   };
 
   const fetchRequests = async () => {
@@ -53,9 +175,109 @@ export default function VerificationPage() {
     }
   }
 
+  const fetchRequestsSilent = async () => {
+    try {
+      const response = await fetch("/api/verification")
+      if (!response.ok) throw new Error("Failed to fetch requests")
+      const data = await response.json()
+      setRequests(data)
+    } catch (error) {
+      console.error("Silent verification update failed:", error)
+    }
+  }
+
   useEffect(() => {
     fetchRequests()
   }, [])
+
+  // Setup Real-Time Subscriptions
+  useEffect(() => {
+    const supabase = createClientBrowser();
+    
+    const vrChannel = supabase
+      .channel("pacc-verification-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "verification_requests" },
+        async (payload) => {
+          console.log("Realtime verification_request change:", payload);
+          
+          // Trigger a silent fetch to keep the UI perfectly in sync
+          await fetchRequestsSilent();
+          
+          if (payload.eventType === "INSERT") {
+            const newRequest = payload.new;
+            const isEmergency = newRequest.nature === "EMERGENCY";
+            const reqNum = newRequest.request_id || newRequest.requestId || "REQ-NEW";
+            const reqType = newRequest.type || "Unknown Emergency";
+            const reqLoc = newRequest.location_description || newRequest.locationDescription || "Baliwag City";
+            
+            if (isEmergency) {
+              playAlertSound("emergency");
+              toast.error(`NEW EMERGENCY INCIDENT: ${reqType} reported! (${reqNum})`, {
+                duration: 10000,
+                description: `Location: ${reqLoc}. Immediate triage and dispatch required.`,
+              });
+            } else {
+              playAlertSound("warning");
+              toast.warning(`New Incident Report: ${reqType} submitted. (${reqNum})`, {
+                duration: 6000,
+                description: `Location: ${reqLoc}. Review for triage.`,
+              });
+            }
+          }
+          
+          if (payload.eventType === "UPDATE") {
+            const oldReq = payload.old;
+            const newReq = payload.new;
+            const reqNum = newReq.request_id || newReq.requestId || "REQ-UPD";
+            
+            // Reverted to PENDING status
+            if (newReq.status === "PENDING" && oldReq.status !== "PENDING") {
+              playAlertSound("emergency");
+              toast.error(`CRITICAL: Request ${reqNum} has reverted to PENDING status!`, {
+                duration: 10000,
+                description: "Dispatcher attention required immediately.",
+              });
+            }
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "incidents" },
+        async (payload) => {
+          console.log("Realtime incident change:", payload);
+          
+          // Silent fetch to update current incident tracking states
+          await fetchRequestsSilent();
+          
+          if (payload.eventType === "UPDATE") {
+            const oldInc = payload.old;
+            const newInc = payload.new;
+            
+            const isPaccManual = newInc.dispatch_method === "PACC_MANUAL" || newInc.dispatchMethod === "PACC_MANUAL";
+            const noResponder = !newInc.responder_id && !newInc.current_offer_responder_id && !newInc.responderId && !newInc.currentOfferResponderId;
+            const wasAlreadyManual = oldInc.dispatch_method === "PACC_MANUAL" || oldInc.dispatchMethod === "PACC_MANUAL";
+            const hadResponder = oldInc.responder_id || oldInc.current_offer_responder_id || oldInc.responderId || oldInc.currentOfferResponderId;
+            
+            // If it needs manual dispatch and either just transitioned or was rejected/expired
+            if (isPaccManual && noResponder && (!wasAlreadyManual || hadResponder)) {
+              playAlertSound("emergency");
+              toast.error(`MANUAL DISPATCH REQUIRED: A responder rejected the offer or the timer expired!`, {
+                duration: 10000,
+                description: "Open the request to dispatch a backup unit manually.",
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(vrChannel);
+    };
+  }, []);
 
   const handleUpdateStatus = async (id: string, status: VerificationStatus) => {
     setIsProcessing(true)
@@ -103,31 +325,86 @@ export default function VerificationPage() {
   }
 
   const selectedRequest = requests.find((r) => r.id === selectedId) || null
+  const activeAlerts = requests.filter((r) => r.status === "PENDING" || needsManualDispatch(r))
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-[#F3F4F6]">
         <Spinner className="size-12 text-[#1E3A8A]" />
       </div>
     )
   }
 
   return (
-    <div className="flex-1 flex h-[calc(100vh-4rem)] overflow-hidden">
-      <VerificationQueue
-        requests={requests}
-        selectedId={selectedId}
-        onSelect={(r) => setSelectedId(r.id)}
-        filter={filter}
-        onFilterChange={setFilter}
-      />
-      <VerificationDetails request={selectedRequest} />
-      <ResidentPanel
-        request={selectedRequest}
-        onAccept={handleAccept}
-        onReject={(id) => handleUpdateStatus(id, "REJECTED")}
-        isProcessing={isProcessing}
-      />
+    <div className="flex-1 flex flex-col h-[calc(100vh-88px)] overflow-hidden bg-[#F3F4F6]">
+      {/* Real-time Triage Alert HUD */}
+      {activeAlerts.length > 0 && (
+        <div className="bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white px-6 py-2.5 flex items-center justify-between shadow-lg relative overflow-hidden shrink-0 border-b border-red-700">
+          <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:40px_40px] opacity-10 animate-[pulse_2s_infinite]" />
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="bg-white/20 p-1.5 rounded-full animate-bounce">
+              <ShieldAlert className="size-5 text-white" />
+            </div>
+            <span className="font-extrabold tracking-wide text-sm">
+              🚨 {activeAlerts.length} URGENT INCIDENT(S) PENDING TRIAGE
+            </span>
+            <span className="text-white/80 text-xs hidden lg:inline border-l border-white/20 pl-3">
+              Most Urgent: <span className="font-black text-white">{activeAlerts[0].type}</span> at <span className="italic font-bold">{activeAlerts[0].location}</span>
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-3 relative z-10">
+            <button 
+              onClick={() => setSelectedId(activeAlerts[0].id)}
+              className="bg-white text-red-600 font-bold px-3 py-1 rounded-lg text-xs hover:bg-red-50 hover:scale-105 active:scale-95 transition-all shadow-sm flex items-center gap-1.5"
+            >
+              <Sparkles className="size-3.5" />
+              Triage Now
+            </button>
+            
+            <button
+              onClick={toggleMute}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all shadow-sm border",
+                isMuted 
+                  ? "bg-red-700/50 hover:bg-red-700 text-red-100 border-red-500" 
+                  : "bg-white/20 hover:bg-white/30 text-white border-white/30"
+              )}
+            >
+              {isMuted ? (
+                <>
+                  <VolumeX className="size-3.5" />
+                  Muted
+                </>
+              ) : (
+                <>
+                  <Volume2 className="size-3.5 animate-bounce" />
+                  Sound On
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Panel Content */}
+      <div className="flex-1 flex overflow-hidden">
+        <VerificationQueue
+          requests={requests}
+          selectedId={selectedId}
+          onSelect={(r) => setSelectedId(r.id)}
+          filter={filter}
+          onFilterChange={setFilter}
+        />
+        <VerificationDetails request={selectedRequest} />
+        <ResidentPanel
+          request={selectedRequest}
+          onAccept={handleAccept}
+          onReject={(id) => handleUpdateStatus(id, "REJECTED")}
+          isProcessing={isProcessing}
+        />
+      </div>
+
       <ManualDispatchModal
         isOpen={isDispatchModalOpen}
         onClose={() => {

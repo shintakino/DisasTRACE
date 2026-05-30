@@ -11,8 +11,10 @@ import { Spinner } from "@/components/ui/spinner"
 import { createClientBrowser } from "@/lib/supabase"
 import { Volume2, VolumeX, ShieldAlert, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function VerificationPage() {
+  const { user } = useAuth()
   const [requests, setRequests] = useState<VerificationRequest[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filter, setFilter] = useState<VerificationStatus>("PENDING")
@@ -192,6 +194,8 @@ export default function VerificationPage() {
 
   // Setup Real-Time Subscriptions
   useEffect(() => {
+    if (!user) return;
+
     const supabase = createClientBrowser();
     
     const vrChannel = supabase
@@ -277,7 +281,7 @@ export default function VerificationPage() {
     return () => {
       supabase.removeChannel(vrChannel);
     };
-  }, []);
+  }, [user]);
 
   const handleUpdateStatus = async (id: string, status: VerificationStatus) => {
     setIsProcessing(true)

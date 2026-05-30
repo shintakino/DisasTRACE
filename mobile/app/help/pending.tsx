@@ -74,6 +74,28 @@ export default function PendingScreen() {
 
             await fetchIncidentWithRetry();
             setIsAccepted(true);
+          } else if (payload.new && payload.new.status === 'REJECTED') {
+            // Tactile haptic feedback
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+            
+            // Unsubscribe channel
+            supabase.removeChannel(channel);
+            
+            // Clear local report details from store
+            useEmergencyReportStore.getState().resetReport();
+            
+            // Alert user and redirect back to dashboard
+            Alert.alert(
+              "Report Dismissed",
+              "Baliwag CDRRMO PACC has rejected or dismissed your incident report. If this is an error, please try submitting again or call PACC directly.",
+              [
+                { 
+                  text: "OK", 
+                  onPress: () => router.replace('/(tabs)') 
+                }
+              ],
+              { cancelable: false }
+            );
           }
         }
       )

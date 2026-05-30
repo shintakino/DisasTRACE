@@ -22,6 +22,7 @@ export const EmergencyReportSchema = z.object({
   latitude: z.number(),
   longitude: z.number(),
   severity: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
+  nature: z.enum(["Emergency", "Non-emergency"]).optional(),
 });
 
 export type EmergencyReportType = z.infer<typeof EmergencyReportSchema>;

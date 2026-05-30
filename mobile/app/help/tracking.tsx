@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Modal, Alert } from 'react-native';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { useRouter } from 'expo-router';
 import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPin, CheckCircle2, Truck, Navigation } from 'lucide-react-native';
@@ -279,6 +279,64 @@ export default function TrackingScreen() {
     };
   }, [report.id]);
 
+  // 2.1. Request-level Rejection Listener (Ensures active tracking closes instantly if PACC rejects)
+  useEffect(() => {
+    const requestId = report.id;
+    if (!requestId) return;
+
+    console.log('[TrackingScreen] Subscribing to request rejection events for ID:', requestId);
+
+    const reqChannel = supabase
+      .channel(`tracking-request-reject-${requestId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'verification_requests',
+          filter: `id=eq.${requestId}`,
+        },
+        async (payload) => {
+          console.log('[TrackingScreen] Request lifecycle event received:', payload);
+          if (payload.new && payload.new.status === 'REJECTED') {
+            // Error haptic vibe
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+            
+            // Unsubscribe channel
+            supabase.removeChannel(reqChannel);
+            
+            // Clean up emergency report Zustand store
+            useEmergencyReportStore.setState((state) => ({
+              report: {
+                ...state.report,
+                incidentId: undefined,
+                id: undefined,
+                requestId: undefined
+              }
+            }));
+            
+            // Show alert and redirect back to Home dashboard
+            Alert.alert(
+              "Report Dismissed",
+              "Baliwag CDRRMO PACC has rejected or dismissed your incident report. If this is an error, please try submitting again or call PACC directly.",
+              [
+                { 
+                  text: "OK", 
+                  onPress: () => router.replace('/(tabs)') 
+                }
+              ],
+              { cancelable: false }
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(reqChannel);
+    };
+  }, [report.id]);
+
   // 3. Incident-specific high-frequency telemetry broadcasts receiver
   useEffect(() => {
     const incidentId = report.incidentId;
@@ -488,9 +546,13 @@ export default function TrackingScreen() {
 
           {/* Status Messaging */}
           <View style={styles.statusBox}>
-            <Text style={styles.statusTitle}>Finding Closest Ambulance...</Text>
+            <Text style={styles.statusTitle}>
+              {report.nature === 'Non-emergency' ? 'Awaiting Dispatcher Triage...' : 'Finding Closest Ambulance...'}
+            </Text>
             <Text style={styles.statusDescription}>
-              PACC is currently dispatching the closest active unit in Baliwag City. If the closest unit does not respond, it will be automatically recycled and manually assigned by the PACC Command Center to guarantee response.
+              {report.nature === 'Non-emergency'
+                ? 'PACC Command Center is currently reviewing your non-emergency report. An administrator will manually verify your request shortly and assign an ambulance based on priority and unit availability. Please remain patient.'
+                : 'PACC is currently dispatching the closest active unit in Baliwag City. If the closest unit does not respond, it will be automatically recycled and manually assigned by the PACC Command Center to guarantee response.'}
             </Text>
           </View>
 
@@ -507,12 +569,16 @@ export default function TrackingScreen() {
               <View style={styles.timelinePulseIconContainer}>
                 <View style={styles.timelinePulseIcon} />
               </View>
-              <Text style={styles.timelineLabelActive}>Auto-routing & Alerting Nearest Unit...</Text>
+              <Text style={styles.timelineLabelActive}>
+                {report.nature === 'Non-emergency' ? 'Awaiting Manual Verification...' : 'Auto-routing & Alerting Nearest Unit...'}
+              </Text>
             </View>
 
             <View style={styles.holdingTimelineItem}>
               <View style={styles.timelinePendingIcon} />
-              <Text style={styles.timelineLabelPending}>Dispatch Accepted by Crew</Text>
+              <Text style={styles.timelineLabelPending}>
+                {report.nature === 'Non-emergency' ? 'Ambulance Dispatched by Admin' : 'Dispatch Accepted by Crew'}
+              </Text>
             </View>
           </View>
 

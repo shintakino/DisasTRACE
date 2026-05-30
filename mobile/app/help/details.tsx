@@ -119,7 +119,7 @@ export default function DetailsScreen() {
         latitude: report.latitude,
         longitude: report.longitude,
         severity: report.severity || 'Medium',
-        nature: report.severity ? 'EMERGENCY' : 'NON-EMERGENCY',
+        nature: report.nature === 'Non-emergency' ? 'NON-EMERGENCY' : 'EMERGENCY',
         imageUrl: uploadedUrl,
       };
 

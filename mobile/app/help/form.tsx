@@ -167,6 +167,7 @@ export default function FormScreen() {
     
     // Save to store
     setDetails({
+      nature: nature as any,
       incidentType: nature === 'Emergency' ? emergencyType as any : nature as any,
       peopleInvolved: people === 0 ? "None" : (people >= 6 ? "6+ Persons" : `${people} Person${people > 1 ? 's' : ''}`) as any,
       latitude: location.latitude,

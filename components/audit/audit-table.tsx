@@ -129,21 +129,38 @@ export function AuditTable({ data }: AuditTableProps) {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-1 mx-2">
-            {[0, 1, 2].map((i) => (
-              <Button
-                key={i}
-                variant={table.getState().pagination.pageIndex === i ? "default" : "ghost"}
-                className={cn(
-                  "h-8 w-8 rounded-full text-xs font-bold transition-all",
-                  table.getState().pagination.pageIndex === i 
-                    ? "bg-[#1E3A8A] text-white shadow-md" 
-                    : "text-slate-500 hover:bg-slate-100"
-                )}
-                onClick={() => table.setPageIndex(i)}
-              >
-                {i + 1}
-              </Button>
-            ))}
+            {Array.from({ length: Math.min(5, table.getPageCount()) }).map((_, i) => {
+              const pageCount = table.getPageCount();
+              const currentIndex = table.getState().pagination.pageIndex;
+              let pageIdx = i;
+              
+              if (pageCount > 5) {
+                if (currentIndex > 2) {
+                  pageIdx = currentIndex - 2 + i;
+                  if (pageIdx + (5 - i) > pageCount) {
+                    pageIdx = pageCount - 5 + i;
+                  }
+                }
+              }
+              
+              if (pageIdx >= pageCount) return null;
+              
+              return (
+                <Button
+                  key={pageIdx}
+                  variant={currentIndex === pageIdx ? "default" : "ghost"}
+                  className={cn(
+                    "h-8 w-8 rounded-full text-xs font-bold transition-all",
+                    currentIndex === pageIdx 
+                      ? "bg-[#1E3A8A] text-white shadow-md" 
+                      : "text-slate-500 hover:bg-slate-100"
+                  )}
+                  onClick={() => table.setPageIndex(pageIdx)}
+                >
+                  {pageIdx + 1}
+                </Button>
+              );
+            })}
           </div>
           <Button
             variant="outline"

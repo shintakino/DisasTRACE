@@ -103,7 +103,7 @@ export function ResponderStatus({ responders = [] }: { responders?: Responder[] 
                   key={responder.id}
                   variants={item}
                   whileHover={{ scale: 1.02, translateY: -2 }}
-                  className="flex flex-col items-center justify-center p-4 rounded-3xl border border-[#F1F5F9] min-w-[calc((100%-32px)/3)] bg-white shadow-sm select-none h-full"
+                  className="flex flex-col items-center justify-center p-4 rounded-3xl border border-[#F1F5F9] w-[160px] md:w-[180px] shrink-0 bg-white shadow-sm select-none h-full"
                 >
                   <Avatar className="size-16 mb-4 ring-4 ring-[#F1F5F9] ring-offset-2 pointer-events-none">
                     <AvatarFallback className="bg-[#15286A] text-white text-2xl font-bold">

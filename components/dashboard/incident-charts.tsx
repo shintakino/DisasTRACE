@@ -165,8 +165,8 @@ export function IncidentDistribution({
           </SelectContent>
         </Select>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 flex items-center justify-between gap-8 p-6">
-        <div className="flex flex-col gap-4 w-[35%]">
+      <CardContent className="flex-1 min-h-0 flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-8 p-6 overflow-hidden">
+        <div className="flex flex-row flex-wrap sm:flex-col gap-3 w-full sm:w-[40%] max-h-[100px] sm:max-h-full overflow-y-auto pr-2 shrink-0">
           {data.map((item, index) => {
             const configKey = Object.keys(chartConfig).find(
               key => chartConfig[key as keyof typeof chartConfig].label === item.name
@@ -175,7 +175,7 @@ export function IncidentDistribution({
             const color = chartConfig[configKey]?.color || "#94A3B8"
             
             return (
-              <div key={index} className="flex items-center gap-3">
+              <div key={index} className="flex items-center gap-3 min-w-[120px] sm:min-w-0">
                 <div 
                   className="w-4 h-4 rounded shrink-0" 
                   style={{ backgroundColor: color }} 
@@ -185,7 +185,7 @@ export function IncidentDistribution({
             )
           })}
         </div>
-        <div className="relative w-[65%] flex justify-center h-full items-center">
+        <div className="relative w-full sm:w-[60%] flex justify-center items-center h-full min-h-0">
           <ChartContainer config={chartConfig} className="aspect-square w-full max-h-[280px]">
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent hideLabel />} />
@@ -204,7 +204,7 @@ export function IncidentDistribution({
                   const x = (cx as number) + radius * Math.cos(-midAngle * RADIAN);
                   const y = (cy as number) + radius * Math.sin(-midAngle * RADIAN);
 
-                  if (percent < 0.04) return null;
+                  if (isNaN(percent) || percent < 0.04) return null;
 
                   return (
                     <text

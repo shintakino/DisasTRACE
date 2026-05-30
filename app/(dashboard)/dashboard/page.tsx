@@ -123,23 +123,31 @@ export default function DashboardPage() {
   // Render CDRRMO Super Admin Layout
   if (role?.toLowerCase() === 'cdrrmo_super_admin') {
     return (
-      <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 min-h-0">
+      <div className="h-full overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:scrollbar-default">
         <div className="shrink-0">
           <KpiCards data={data.kpis} />
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
-          <IncidentTrends data={data.trends} />
-          <IncidentDistribution 
-            data={data.distribution} 
-            period={period}
-            onPeriodChange={(val) => setPeriod(val || "monthly")}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0">
+          <div className="h-[400px] lg:h-full">
+            <IncidentTrends data={data.trends} />
+          </div>
+          <div className="h-[400px] lg:h-full">
+            <IncidentDistribution 
+              data={data.distribution} 
+              period={period}
+              onPeriodChange={(val) => setPeriod(val || "monthly")}
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
-          <RecentReports reports={data.reports} />
-          <ResponderStatus responders={data.responders} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0 pb-4">
+          <div className="h-[400px] lg:h-full">
+            <RecentReports reports={data.reports} />
+          </div>
+          <div className="h-[400px] lg:h-full">
+            <ResponderStatus responders={data.responders} />
+          </div>
         </div>
       </div>
     );

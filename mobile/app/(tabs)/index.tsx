@@ -18,6 +18,51 @@ export default function HomeScreen() {
   const router = useRouter();
   const { profile, verificationStatus, role, user, isLoaded } = useAuthStatus();
   const [isCheckingIncident, setIsCheckingIncident] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch and subscribe to unread notification count
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('unread', true);
+        
+        if (!error && count !== null) {
+          setUnreadCount(count);
+        }
+      } catch (err) {
+        console.error('[HomeScreen] Failed to fetch unread count:', err);
+      }
+    };
+
+    fetchUnreadCount();
+
+    const instanceId = Math.random().toString(36).substring(7);
+    const channel = supabase
+      .channel(`mobile_home_notifs_${user.id}_${instanceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   useEffect(() => {
     let active = true;
@@ -347,11 +392,18 @@ export default function HomeScreen() {
               <HelpCircle size={24} color="white" />
             </TouchableOpacity>
             <TouchableOpacity 
-              className="p-2" 
+              className="p-2 relative" 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => router.push('/notifications')}
             >
               <Bell size={24} color="white" />
+              {unreadCount > 0 && (
+                <View className="absolute top-1 right-1 flex h-[18px] w-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 border border-white">
+                  <Text className="text-white text-[8px] font-black px-0.5 text-center leading-none">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>

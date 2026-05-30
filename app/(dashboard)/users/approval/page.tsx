@@ -8,6 +8,7 @@ import { ApprovalActions } from "@/components/users/approval/approval-actions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { UserCheck } from "lucide-react";
+import { createClientBrowser } from "@/lib/supabase";
 
 export default function UsersApprovalPage() {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
@@ -33,8 +34,54 @@ export default function UsersApprovalPage() {
     }
   };
 
+  const fetchApplicantsSilent = async () => {
+    try {
+      const response = await fetch("/api/users/approval");
+      const data = await response.json();
+      if (response.ok) {
+        setApplicants(data.applicants);
+        setSummary(data.summary);
+        
+        setSelectedApplicant(prev => {
+          if (!prev) return data.applicants.length > 0 ? data.applicants[0] : null;
+          const stillExists = data.applicants.some((a: Applicant) => a.id === prev.id);
+          if (stillExists) {
+            return data.applicants.find((a: Applicant) => a.id === prev.id) || prev;
+          }
+          return data.applicants.length > 0 ? data.applicants[0] : null;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to silently update applicants:", err);
+    }
+  };
+
   useEffect(() => {
     fetchApplicants();
+
+    const supabase = createClientBrowser();
+    
+    const channel = supabase
+      .channel("cdrrmo-users-approval-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        async (payload) => {
+          console.log("Realtime user change in approval list:", payload);
+          await fetchApplicantsSilent();
+          
+          if (payload.eventType === "INSERT" && payload.new.verification_status === "PENDING") {
+            toast.info(`New Registration: ${payload.new.full_name || "An applicant"} is awaiting review!`, {
+              duration: 5000,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleApprove = async () => {

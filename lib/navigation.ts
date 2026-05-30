@@ -8,6 +8,7 @@ import {
   ClipboardList,
   UserPlus,
   ShieldCheck,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react"
 
@@ -58,6 +59,11 @@ export const CDRRMO_NAV: NavItem[] = [
     title: "Audit Logs",
     url: "/audit",
     icon: ClipboardList,
+  },
+  {
+    title: "Support & FAQs",
+    url: "/help",
+    icon: HelpCircle,
   },
 ]
 

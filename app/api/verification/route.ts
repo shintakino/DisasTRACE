@@ -36,11 +36,20 @@ export async function GET(req: NextRequest) {
         where: eq(incidents.requestId, r.id),
       });
 
-      // Convert peopleInvolved enum string to a number
+      // Convert peopleInvolved enum string or text count to a number robustly
       let peopleCount = 0;
-      if (r.peopleInvolved === '1-2 Persons') peopleCount = 2;
-      else if (r.peopleInvolved === '3-5 Persons') peopleCount = 4;
-      else if (r.peopleInvolved === '6+ Persons') peopleCount = 6;
+      if (r.peopleInvolved === '1-2 Persons') {
+        peopleCount = 2;
+      } else if (r.peopleInvolved === '3-5 Persons') {
+        peopleCount = 4;
+      } else if (r.peopleInvolved === '6+ Persons') {
+        peopleCount = 6;
+      } else {
+        const matched = r.peopleInvolved.match(/\d+/);
+        if (matched) {
+          peopleCount = parseInt(matched[0], 10);
+        }
+      }
 
       const imageUrlStr = r.imageUrl || undefined;
 

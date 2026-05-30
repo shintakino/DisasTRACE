@@ -27,6 +27,27 @@ async function enableRealtime() {
       console.error('❌ Failed to add incidents. Raw error:', e);
     }
 
+    try {
+      await db.execute(sql.raw('alter publication supabase_realtime add table users;'));
+      console.log('✅ Successfully added users to supabase_realtime');
+    } catch (e: any) {
+      console.error('❌ Failed to add users. Raw error:', e);
+    }
+
+    try {
+      await db.execute(sql.raw('alter publication supabase_realtime add table notifications;'));
+      console.log('✅ Successfully added notifications to supabase_realtime');
+    } catch (e: any) {
+      console.error('❌ Failed to add notifications. Raw error:', e);
+    }
+
+    try {
+      await db.execute(sql.raw('alter publication supabase_realtime add table feedbacks;'));
+      console.log('✅ Successfully added feedbacks to supabase_realtime');
+    } catch (e: any) {
+      console.error('❌ Failed to add feedbacks. Raw error:', e);
+    }
+
     console.log('--- Realtime Enablement Complete ---');
   } catch (error) {
     console.error('Fatal error executing Realtime SQL:', error);

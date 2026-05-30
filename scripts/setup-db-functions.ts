@@ -92,7 +92,7 @@ const runSetup = async () => {
               new.resident_id,
               'incident_verified',
               'Report Rejected',
-              'Your request (' || coalesce(new.nature, 'Emergency') || ') was rejected. Reason: ' || coalesce(new.rejection_reason, 'Not specified'),
+              'Your request (' || coalesce(new.nature, 'Emergency') || ') has been rejected.',
               true,
               now(),
               jsonb_build_object('requestId', new.id)

@@ -129,25 +129,17 @@ export default function DashboardPage() {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0">
-          <div className="h-[400px] lg:h-full">
-            <IncidentTrends data={data.trends} />
-          </div>
-          <div className="h-[400px] lg:h-full">
-            <IncidentDistribution 
-              data={data.distribution} 
-              period={period}
-              onPeriodChange={(val) => setPeriod(val || "monthly")}
-            />
-          </div>
+          <IncidentTrends data={data.trends} />
+          <IncidentDistribution 
+            data={data.distribution} 
+            period={period}
+            onPeriodChange={(val) => setPeriod(val || "monthly")}
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0 pb-4">
-          <div className="h-[400px] lg:h-full">
-            <RecentReports reports={data.reports} />
-          </div>
-          <div className="h-[400px] lg:h-full">
-            <ResponderStatus responders={data.responders} />
-          </div>
+          <RecentReports reports={data.reports} />
+          <ResponderStatus responders={data.responders} />
         </div>
       </div>
     );
@@ -162,16 +154,12 @@ export default function DashboardPage() {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[450px] shrink-0">
-          <div className="h-[450px] lg:h-full">
-            <RecentReports reports={data.reports} />
-          </div>
-          <div className="h-[450px] lg:h-full">
-            <IncidentDistribution 
-              data={data.distribution} 
-              period={period}
-              onPeriodChange={(val) => setPeriod(val || "monthly")}
-            />
-          </div>
+          <RecentReports reports={data.reports} />
+          <IncidentDistribution 
+            data={data.distribution} 
+            period={period}
+            onPeriodChange={(val) => setPeriod(val || "monthly")}
+          />
         </div>
 
         <div className="w-full pb-4 shrink-0">

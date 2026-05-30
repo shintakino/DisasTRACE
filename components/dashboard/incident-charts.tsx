@@ -194,7 +194,7 @@ export function IncidentDistribution({
                 dataKey="value"
                 nameKey="name"
                 innerRadius={0}
-                outerRadius="100%"
+                outerRadius="80%"
                 stroke="none"
                 labelLine={false}
                 label={({ cx, cy, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 }) => {

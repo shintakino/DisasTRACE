@@ -6,6 +6,7 @@ ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "location_geom" geometry(Point, 432
 
 -- 3. Create GiST index on geometry column
 CREATE INDEX IF NOT EXISTS "users_location_geom_gist_idx" ON "users" USING gist ("location_geom");
+CREATE INDEX IF NOT EXISTS "users_location_geom_geog_gist_idx" ON "users" USING gist ((location_geom::geography));
 
 -- 4. Create trigger function to automatically synchronize lat/lng to geometry
 CREATE OR REPLACE FUNCTION public.update_location_geom()

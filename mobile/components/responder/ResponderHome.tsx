@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Play, Pause } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
-import { useResponderStore } from '../../stores/useResponderStore';
+import { useResponderStore, checkConnectivity } from '../../stores/useResponderStore';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { DispatchSheet } from './DispatchSheet';
 import { EnRouteSheet } from './EnRouteSheet';
@@ -68,6 +68,7 @@ export function ResponderHome() {
   const isSimulatingRef = useRef(false);
   const simIntervalRef = useRef<any>(null);
   const simIndexRef = useRef<number>(0);
+  const simChannelRef = useRef<any>(null);
 
   const startSimulation = (coords: [number, number][]) => {
     if (coords.length < 2) return;
@@ -79,8 +80,11 @@ export function ResponderHome() {
     const stepSize = Math.max(1, Math.floor(coords.length / 15));
     
     // Connect to the resident telemetry channel
-    const telemetryChannel = supabase.channel(`telemetry:${activeDispatch?.id}`);
-    telemetryChannel.subscribe();
+    if (activeDispatch?.id) {
+      const channel = supabase.channel(`telemetry:${activeDispatch.id}`);
+      channel.subscribe();
+      simChannelRef.current = channel;
+    }
 
     simIntervalRef.current = setInterval(async () => {
       let nextIdx = simIndexRef.current + stepSize;
@@ -118,19 +122,25 @@ export function ResponderHome() {
       useResponderStore.setState({ currentSpeedKph: 50 });
 
       // 1. Broadcast telemetry to the resident
-      telemetryChannel.send({
-        type: 'broadcast',
-        event: 'telemetry',
-        payload: {
-          latitude: currentCoord[1],
-          longitude: currentCoord[0],
-          heading: angle,
-          speedKph: 50,
-          timestamp: new Date().toISOString(),
-          responderStatus: status,
-          targetHospital: targetHospital
+      if (simChannelRef.current) {
+        try {
+          simChannelRef.current.send({
+            type: 'broadcast',
+            event: 'telemetry',
+            payload: {
+              latitude: currentCoord[1],
+              longitude: currentCoord[0],
+              heading: angle,
+              speedKph: 50,
+              timestamp: new Date().toISOString(),
+              responderStatus: status,
+              targetHospital: targetHospital
+            }
+          });
+        } catch (err) {
+          console.error('[Simulation] Failed to send telemetry broadcast:', err);
         }
-      });
+      }
 
       // 2. Sync to central DB cache (Throttled)
       const now = Date.now();
@@ -163,14 +173,50 @@ export function ResponderHome() {
         if (session?.access_token) {
           reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
         }
-        fetch(`${apiUrl}/responder/location`, {
-          method: 'POST',
-          headers: reqHeaders,
-          body: JSON.stringify({
-            latitude: currentCoord[1],
-            longitude: currentCoord[0]
-          })
-        }).catch(err => console.log('[Simulation] Telemetry DB sync failed:', err));
+
+        const sendSimTelemetry = async () => {
+          let isOnline = false;
+          try {
+            isOnline = await checkConnectivity();
+          } catch (e) {
+            isOnline = false;
+          }
+
+          if (!isOnline) {
+            console.log('[Simulation] Network offline before telemetry fetch. Enqueuing telemetry sync.');
+            await useResponderStore.getState().enqueueAction({
+              type: 'TELEMETRY_SYNC',
+              endpoint: '/api/responder/location',
+              method: 'POST',
+              payload: { latitude: currentCoord[1], longitude: currentCoord[0] }
+            });
+            return;
+          }
+
+          try {
+            const response = await fetch(`${apiUrl}/responder/location`, {
+              method: 'POST',
+              headers: reqHeaders,
+              body: JSON.stringify({
+                latitude: currentCoord[1],
+                longitude: currentCoord[0]
+              })
+            });
+            if (!response.ok) {
+              throw new Error(`HTTP error ${response.status}`);
+            }
+          } catch (err) {
+            console.log('[Simulation] Telemetry DB sync failed, enqueuing offline telemetry:', err);
+            await useResponderStore.getState().enqueueAction({
+              type: 'TELEMETRY_SYNC',
+              endpoint: '/api/responder/location',
+              method: 'POST',
+              payload: { latitude: currentCoord[1], longitude: currentCoord[0] }
+            });
+          }
+        };
+
+        sendSimTelemetry();
       }
 
     }, 3000);
@@ -179,6 +225,10 @@ export function ResponderHome() {
   const stopSimulation = () => {
     if (simIntervalRef.current) {
       clearInterval(simIntervalRef.current);
+    }
+    if (simChannelRef.current) {
+      supabase.removeChannel(simChannelRef.current);
+      simChannelRef.current = null;
     }
     setIsSimulating(false);
     isSimulatingRef.current = false;
@@ -197,6 +247,9 @@ export function ResponderHome() {
     return () => {
       if (simIntervalRef.current) {
         clearInterval(simIntervalRef.current);
+      }
+      if (simChannelRef.current) {
+        supabase.removeChannel(simChannelRef.current);
       }
     };
   }, []);

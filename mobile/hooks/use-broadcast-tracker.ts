@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
+import { useResponderStore, checkConnectivity } from '../stores/useResponderStore';
 
 // Helper to calculate distance in meters
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -165,14 +166,49 @@ export function useBroadcastTracker(
               reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
             }
 
-            fetch(`${apiUrl}/api/responder/location`, {
-              method: 'POST',
-              headers: reqHeaders,
-              body: JSON.stringify({
-                latitude: lat,
-                longitude: lng
-              })
-            }).catch(err => console.log('Location DB cache sync failed:', err));
+            const sendTelemetry = async () => {
+              let isOnline = false;
+              try {
+                isOnline = await checkConnectivity();
+              } catch (e) {
+                isOnline = false;
+              }
+
+              if (!isOnline) {
+                console.log('[BroadcastTracker] Network offline before telemetry fetch. Enqueuing telemetry sync.');
+                await useResponderStore.getState().enqueueAction({
+                  type: 'TELEMETRY_SYNC',
+                  endpoint: '/api/responder/location',
+                  method: 'POST',
+                  payload: { latitude: lat, longitude: lng }
+                });
+                return;
+              }
+
+              try {
+                const response = await fetch(`${apiUrl}/api/responder/location`, {
+                  method: 'POST',
+                  headers: reqHeaders,
+                  body: JSON.stringify({
+                    latitude: lat,
+                    longitude: lng
+                  })
+                });
+                if (!response.ok) {
+                  throw new Error(`HTTP error ${response.status}`);
+                }
+              } catch (err) {
+                console.log('Location DB cache sync failed, enqueuing offline telemetry:', err);
+                await useResponderStore.getState().enqueueAction({
+                  type: 'TELEMETRY_SYNC',
+                  endpoint: '/api/responder/location',
+                  method: 'POST',
+                  payload: { latitude: lat, longitude: lng }
+                });
+              }
+            };
+
+            sendTelemetry();
           }
         }
       } catch (error) {
@@ -211,14 +247,49 @@ export function useBroadcastTracker(
             reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
           }
 
-          fetch(`${apiUrl}/api/responder/location`, {
-            method: 'POST',
-            headers: reqHeaders,
-            body: JSON.stringify({
-              latitude: lat,
-              longitude: lng
-            })
-          }).catch(err => console.log('Location DB initial sync failed:', err));
+          const sendInitialTelemetry = async () => {
+            let isOnline = false;
+            try {
+              isOnline = await checkConnectivity();
+            } catch (e) {
+              isOnline = false;
+            }
+
+            if (!isOnline) {
+              console.log('[BroadcastTracker] Network offline during initial sync. Enqueuing telemetry.');
+              await useResponderStore.getState().enqueueAction({
+                type: 'TELEMETRY_SYNC',
+                endpoint: '/api/responder/location',
+                method: 'POST',
+                payload: { latitude: lat, longitude: lng }
+              });
+              return;
+            }
+
+            try {
+              const response = await fetch(`${apiUrl}/api/responder/location`, {
+                method: 'POST',
+                headers: reqHeaders,
+                body: JSON.stringify({
+                  latitude: lat,
+                  longitude: lng
+                })
+              });
+              if (!response.ok) {
+                throw new Error(`HTTP status ${response.status}`);
+              }
+            } catch (err) {
+              console.log('Location DB initial sync failed, enqueuing offline telemetry:', err);
+              await useResponderStore.getState().enqueueAction({
+                type: 'TELEMETRY_SYNC',
+                endpoint: '/api/responder/location',
+                method: 'POST',
+                payload: { latitude: lat, longitude: lng }
+              });
+            }
+          };
+
+          sendInitialTelemetry();
         }
       } catch (err) {
         console.log('Error initial sync:', err);

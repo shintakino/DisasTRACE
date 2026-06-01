@@ -1,63 +1,107 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Animated, StyleSheet } from 'react-native';
+import { View, Text, Animated, StyleSheet, ActivityIndicator } from 'react-native';
 import { useOfflineReports } from '../../hooks/use-offline-reports';
 import { WifiOff, Wifi } from 'lucide-react-native';
 
 export function OfflineBanner() {
-  const { isOnline } = useOfflineReports();
+  const { isOnline, syncing, isSyncingQueue, offlineQueue } = useOfflineReports();
   const [showBanner, setShowBanner] = useState(false);
+  const [bannerStatus, setBannerStatus] = useState<'offline' | 'syncing' | 'restored'>('offline');
   const slideAnim = useRef(new Animated.Value(-100)).current;
-
-  const prevOnlineRef = useRef(true);
+  const timerRef = useRef<any>(null);
 
   useEffect(() => {
+    // Clear any pending timers
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
     if (!isOnline) {
+      // 1. Offline State
+      setBannerStatus('offline');
       setShowBanner(true);
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 350,
         useNativeDriver: true,
       }).start();
-    } else if (isOnline && !prevOnlineRef.current) {
+    } else if (isSyncingQueue || syncing) {
+      // 2. Online & Syncing State
+      setBannerStatus('syncing');
+      setShowBanner(true);
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 0,
+        duration: 350,
         useNativeDriver: true,
       }).start();
-
-      const timer = setTimeout(() => {
+    } else {
+      // 3. Online & Fully Flushed/Synced
+      // Only transition to restored and then auto-hide if the banner was already visible!
+      if (showBanner) {
+        setBannerStatus('restored');
         Animated.timing(slideAnim, {
-          toValue: -100,
+          toValue: 0,
           duration: 350,
           useNativeDriver: true,
-        }).start(() => {
-          setShowBanner(false);
-        });
-      }, 2500);
+        }).start();
 
-      return () => clearTimeout(timer);
+        timerRef.current = setTimeout(() => {
+          Animated.timing(slideAnim, {
+            toValue: -100,
+            duration: 350,
+            useNativeDriver: true,
+          }).start(() => {
+            setShowBanner(false);
+          });
+        }, 2500);
+      }
     }
-    prevOnlineRef.current = isOnline;
-  }, [isOnline]);
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [isOnline, isSyncingQueue, syncing, showBanner]);
 
   if (!showBanner) return null;
+
+  let bgStyle = styles.offlineBg;
+  if (bannerStatus === 'syncing') {
+    bgStyle = styles.syncBg;
+  } else if (bannerStatus === 'restored') {
+    bgStyle = styles.onlineBg;
+  }
 
   return (
     <Animated.View 
       style={[
         styles.bannerContainer, 
         { transform: [{ translateY: slideAnim }] },
-        isOnline ? styles.onlineBg : styles.offlineBg
+        bgStyle
       ]}
     >
       <View style={styles.contentRow}>
-        {isOnline ? (
-          <Wifi size={14} color="#FFFFFF" style={styles.iconStyle} />
-        ) : (
+        {bannerStatus === 'offline' && (
           <WifiOff size={14} color="#FFFFFF" style={styles.iconStyle} />
         )}
+        {bannerStatus === 'syncing' && (
+          <ActivityIndicator size="small" color="#FFFFFF" style={styles.loaderStyle} />
+        )}
+        {bannerStatus === 'restored' && (
+          <Wifi size={14} color="#FFFFFF" style={styles.iconStyle} />
+        )}
         <Text style={styles.bannerText}>
-          {isOnline ? 'Connection Restored' : 'Offline — features limited'}
+          {bannerStatus === 'offline' && 'Offline — features limited'}
+          {bannerStatus === 'syncing' && (
+            isSyncingQueue && offlineQueue.length > 0
+              ? `Syncing ${offlineQueue.length} pending updates...`
+              : syncing
+              ? 'Uploading report drafts...'
+              : 'Restoring connections...'
+          )}
+          {bannerStatus === 'restored' && 'Connection Restored'}
         </Text>
       </View>
     </Animated.View>
@@ -86,12 +130,18 @@ const styles = StyleSheet.create({
   onlineBg: {
     backgroundColor: '#22C55E', // Baliwag Success Green
   },
+  syncBg: {
+    backgroundColor: '#3B82F6', // Dynamic Info Blue
+  },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconStyle: {
+    marginRight: 8,
+  },
+  loaderStyle: {
     marginRight: 8,
   },
   bannerText: {

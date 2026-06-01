@@ -1,4 +1,11 @@
-import { pgTable, text, varchar, timestamp, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, text, varchar, timestamp, doublePrecision, index, customType } from 'drizzle-orm/pg-core';
+
+// Custom PostGIS Geometry Point Type definition for Drizzle
+const geometryPoint = customType<{ data: string }>({
+  dataType() {
+    return 'geometry(Point, 4326)';
+  },
+});
 
 export const users = pgTable('users', {
   id: varchar('id', { length: 255 }).primaryKey(), // Supabase Auth ID (UUID)
@@ -20,4 +27,7 @@ export const users = pgTable('users', {
   lastLatitude: doublePrecision('last_latitude'),
   lastLongitude: doublePrecision('last_longitude'),
   lastLocationUpdatedAt: timestamp('last_location_updated_at', { withTimezone: true }),
-});
+  locationGeom: geometryPoint('location_geom'),
+}, (table) => ({
+  locationGeomGistIdx: index('users_location_geom_gist_idx').using('gist', table.locationGeom),
+}));

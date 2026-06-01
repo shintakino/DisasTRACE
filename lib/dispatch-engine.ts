@@ -3,7 +3,7 @@ import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { systemSettings } from "@/db/schema/system_settings";
-import { eq, ne, and, notInArray } from "drizzle-orm";
+import { eq, ne, and, notInArray, sql } from "drizzle-orm";
 
 // Haversine formula to compute distance in kilometers
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -39,22 +39,6 @@ export async function autoDispatchIncident(
 
     const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
-    // 2. Fetch all clocked-in responders
-    // Clocked-in means: role = 'ambulance_responder', status = 'ACTIVE', dutyStatus = 'ON_DUTY'
-    const whereConditions = [
-      eq(users.role, "ambulance_responder"),
-      eq(users.status, "ACTIVE"),
-      eq(users.dutyStatus, "ON_DUTY")
-    ];
-
-    if (isDevMode) {
-      whereConditions.push(eq(users.email, "responder@disastrace.com"));
-    }
-
-    const eligibleResponders = await db.query.users.findMany({
-      where: and(...whereConditions),
-    });
-
     let reqLat = latitude;
     let reqLng = longitude;
 
@@ -66,9 +50,60 @@ export async function autoDispatchIncident(
       }
     }
 
+    // 2. Fetch all clocked-in responders using PostGIS or standard query (dev fallback)
+    let eligibleResponders: any[];
+
+    if (isDevMode) {
+      eligibleResponders = await db.query.users.findMany({
+        where: and(
+          eq(users.role, "ambulance_responder"),
+          eq(users.status, "ACTIVE"),
+          eq(users.dutyStatus, "ON_DUTY"),
+          eq(users.email, "responder@disastrace.com")
+        ),
+      });
+    } else {
+      eligibleResponders = await db
+        .select({
+          id: users.id,
+          fullName: users.fullName,
+          email: users.email,
+          role: users.role,
+          status: users.status,
+          dutyStatus: users.dutyStatus,
+          lastLatitude: users.lastLatitude,
+          lastLongitude: users.lastLongitude,
+          distanceMeters: sql<number>`ST_Distance(
+            ${users.locationGeom}::geography,
+            ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography
+          )`
+        })
+        .from(users)
+        .where(
+          and(
+            eq(users.role, "ambulance_responder"),
+            eq(users.status, "ACTIVE"),
+            eq(users.dutyStatus, "ON_DUTY"),
+            sql`ST_DWithin(
+              ${users.locationGeom}::geography,
+              ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography,
+              15000 -- 15 km
+            )`
+          )
+        );
+    }
+
     // 3. Compute distance vectors and filter responders within 1.2km radius
     const respondersWithDistance = eligibleResponders
-      .map((responder) => {
+      .map((item) => {
+        if ('distanceMeters' in item) {
+          return {
+            responder: item,
+            distanceKm: item.distanceMeters / 1000
+          };
+        }
+
+        const responder = item;
         // Fallback to CDRRMO HQ coordinates if responder location is null (crucial for seeded/new responders)
         let resLat = responder.lastLatitude !== null ? Number(responder.lastLatitude) : 14.9516;
         let resLng = responder.lastLongitude !== null ? Number(responder.lastLongitude) : 120.9011;
@@ -116,7 +151,7 @@ export async function autoDispatchIncident(
     // Generate deterministic vehicle ID based on initials and unique UUID suffix (Option 1)
     const initials = assignedResponder.fullName
       .split(" ")
-      .map((n) => n[0])
+      .map((n: string) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 3);
@@ -188,17 +223,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         .where(eq(users.id, timedOutResponderId));
     }
 
-    // Fetch clocked-in responders who are not in the skipped list
-    const eligibleResponders = await db.query.users.findMany({
-      where: and(
-        eq(users.role, "ambulance_responder"),
-        eq(users.status, "ACTIVE"),
-        eq(users.dutyStatus, "ON_DUTY"),
-        eq(users.email, "responder@disastrace.com") // Temp restriction to only allow specific responder
-      ),
-    });
-
-    const filteredResponders = eligibleResponders.filter((r) => !updatedSkipped.includes(r.id));
+    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
     let reqLat = request.latitude;
     let reqLng = request.longitude;
@@ -209,9 +234,62 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
       reqLng = 120.895;
     }
 
+    // Fetch clocked-in responders who are not in the skipped list using PostGIS or standard query (dev fallback)
+    let eligibleResponders: any[];
+
+    if (isDevMode) {
+      eligibleResponders = await db.query.users.findMany({
+        where: and(
+          eq(users.role, "ambulance_responder"),
+          eq(users.status, "ACTIVE"),
+          eq(users.dutyStatus, "ON_DUTY"),
+          eq(users.email, "responder@disastrace.com")
+        ),
+      });
+    } else {
+      eligibleResponders = await db
+        .select({
+          id: users.id,
+          fullName: users.fullName,
+          email: users.email,
+          role: users.role,
+          status: users.status,
+          dutyStatus: users.dutyStatus,
+          lastLatitude: users.lastLatitude,
+          lastLongitude: users.lastLongitude,
+          distanceMeters: sql<number>`ST_Distance(
+            ${users.locationGeom}::geography,
+            ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography
+          )`
+        })
+        .from(users)
+        .where(
+          and(
+            eq(users.role, "ambulance_responder"),
+            eq(users.status, "ACTIVE"),
+            eq(users.dutyStatus, "ON_DUTY"),
+            sql`ST_DWithin(
+              ${users.locationGeom}::geography,
+              ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography,
+              15000 -- 15 km
+            )`
+          )
+        );
+    }
+
+    const filteredResponders = eligibleResponders.filter((r) => !updatedSkipped.includes(r.id));
+
     // Compute distances
     const sortedResponders = filteredResponders
-      .map((responder) => {
+      .map((item) => {
+        if ('distanceMeters' in item) {
+          return {
+            responder: item,
+            distanceKm: item.distanceMeters / 1000
+          };
+        }
+
+        const responder = item;
         // Fallback to CDRRMO HQ coordinates if responder location is null
         let resLat = responder.lastLatitude !== null ? Number(responder.lastLatitude) : 14.9516;
         let resLng = responder.lastLongitude !== null ? Number(responder.lastLongitude) : 120.9011;

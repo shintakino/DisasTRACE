@@ -20,6 +20,22 @@ import * as Location from 'expo-location';
 import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
 
+// Helper to calculate distance in meters
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // Earth's radius in meters
+  const phi1 = lat1 * Math.PI / 180;
+  const phi2 = lat2 * Math.PI / 180;
+  const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+  const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
 export function ResponderHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -42,6 +58,8 @@ export function ResponderHome() {
   const [routeBounds, setRouteBounds] = useState<any>(null);
   const [cameraMode, setCameraMode] = useState<'follow' | 'overview'>('follow');
   const isMarkerPress = useRef(false);
+  const lastDbUpdateRef = useRef<number>(0);
+  const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const [hospitals, setHospitals] = useState<any[]>([]);
 
 
@@ -61,7 +79,7 @@ export function ResponderHome() {
     const stepSize = Math.max(1, Math.floor(coords.length / 15));
     
     // Connect to the resident telemetry channel
-    const telemetryChannel = supabase.channel(`incident-tracking:${activeDispatch?.id}`);
+    const telemetryChannel = supabase.channel(`telemetry:${activeDispatch?.id}`);
     telemetryChannel.subscribe();
 
     simIntervalRef.current = setInterval(async () => {
@@ -114,21 +132,46 @@ export function ResponderHome() {
         }
       });
 
-      // 2. Sync to central DB cache
-      const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
-      const { data: { session } } = await supabase.auth.getSession();
-      const reqHeaders: any = { 'Content-Type': 'application/json' };
-      if (session?.access_token) {
-        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+      // 2. Sync to central DB cache (Throttled)
+      const now = Date.now();
+      const lastUpdate = lastDbUpdateRef.current;
+      const lastLoc = lastDbLocationRef.current;
+      
+      let shouldUpdateDb = false;
+      if (!lastLoc || lastUpdate === 0) {
+        shouldUpdateDb = true;
+      } else {
+        const secondsElapsed = (now - lastUpdate) / 1000;
+        const distanceMoved = calculateDistanceMeters(
+          lastLoc.latitude,
+          lastLoc.longitude,
+          currentCoord[1],
+          currentCoord[0]
+        );
+        if (secondsElapsed >= 30 || distanceMoved >= 50) {
+          shouldUpdateDb = true;
+        }
       }
-      fetch(`${apiUrl}/responder/location`, {
-        method: 'POST',
-        headers: reqHeaders,
-        body: JSON.stringify({
-          latitude: currentCoord[1],
-          longitude: currentCoord[0]
-        })
-      }).catch(err => console.log('[Simulation] Telemetry DB sync failed:', err));
+
+      if (shouldUpdateDb) {
+        lastDbUpdateRef.current = now;
+        lastDbLocationRef.current = { latitude: currentCoord[1], longitude: currentCoord[0] };
+
+        const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+        const { data: { session } } = await supabase.auth.getSession();
+        const reqHeaders: any = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        fetch(`${apiUrl}/responder/location`, {
+          method: 'POST',
+          headers: reqHeaders,
+          body: JSON.stringify({
+            latitude: currentCoord[1],
+            longitude: currentCoord[0]
+          })
+        }).catch(err => console.log('[Simulation] Telemetry DB sync failed:', err));
+      }
 
     }, 3000);
   };

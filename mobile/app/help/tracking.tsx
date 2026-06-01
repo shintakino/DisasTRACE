@@ -415,7 +415,7 @@ export default function TrackingScreen() {
     fetchInitialResponderLocation();
 
     // Coordinates channel (high frequency OSRM simulator telemetry broadcasts)
-    const channel = supabase.channel(`incident-tracking:${incidentId}`);
+    const channel = supabase.channel(`telemetry:${incidentId}`);
     const sub = channel
       .on('broadcast', { event: 'telemetry' }, ({ payload }) => {
         console.log('[TrackingScreen] Real-time telemetry broadcast received:', payload);

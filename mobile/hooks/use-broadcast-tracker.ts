@@ -1,6 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
+
+// Helper to calculate distance in meters
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // Earth's radius in meters
+  const phi1 = lat1 * Math.PI / 180;
+  const phi2 = lat2 * Math.PI / 180;
+  const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+  const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
 
 export function useBroadcastTracker(
   incidentId: string | null,
@@ -9,12 +25,15 @@ export function useBroadcastTracker(
   targetHospital?: any,
   activeDispatch?: any
 ) {
+  const lastDbUpdateRef = useRef<number>(0);
+  const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+
   useEffect(() => {
     let channel: any = null;
 
     if (incidentId && active) {
       // Connect to Supabase Realtime Broadcast Channel
-      channel = supabase.channel(`incident-tracking:${incidentId}`);
+      channel = supabase.channel(`telemetry:${incidentId}`);
       
       channel.subscribe((status: string) => {
         if (status === 'SUBSCRIBED') {
@@ -67,7 +86,7 @@ export function useBroadcastTracker(
       };
     };
 
-    // Start location updates on a 5-second fixed interval
+    // Start location updates on a 3-second fixed interval
     const intervalId = setInterval(async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -114,27 +133,52 @@ export function useBroadcastTracker(
             });
           }
 
-          // 2. Perform background REST keep-alive cache updates in postgres
-          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-          const { data: { session } } = await supabase.auth.getSession();
-          const reqHeaders: any = { 'Content-Type': 'application/json' };
-          if (session?.access_token) {
-            reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+          // 2. Perform background REST keep-alive cache updates in postgres (Throttled)
+          const now = Date.now();
+          const lastUpdate = lastDbUpdateRef.current;
+          const lastLoc = lastDbLocationRef.current;
+          
+          let shouldUpdateDb = false;
+          if (!lastLoc || lastUpdate === 0) {
+            shouldUpdateDb = true;
+          } else {
+            const secondsElapsed = (now - lastUpdate) / 1000;
+            const distanceMoved = calculateDistanceMeters(
+              lastLoc.latitude,
+              lastLoc.longitude,
+              lat,
+              lng
+            );
+            if (secondsElapsed >= 30 || distanceMoved >= 50) {
+              shouldUpdateDb = true;
+            }
           }
 
-          fetch(`${apiUrl}/api/responder/location`, {
-            method: 'POST',
-            headers: reqHeaders,
-            body: JSON.stringify({
-              latitude: lat,
-              longitude: lng
-            })
-          }).catch(err => console.log('Location DB cache sync failed:', err));
+          if (shouldUpdateDb) {
+            lastDbUpdateRef.current = now;
+            lastDbLocationRef.current = { latitude: lat, longitude: lng };
+
+            const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+            const { data: { session } } = await supabase.auth.getSession();
+            const reqHeaders: any = { 'Content-Type': 'application/json' };
+            if (session?.access_token) {
+              reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+            }
+
+            fetch(`${apiUrl}/api/responder/location`, {
+              method: 'POST',
+              headers: reqHeaders,
+              body: JSON.stringify({
+                latitude: lat,
+                longitude: lng
+              })
+            }).catch(err => console.log('Location DB cache sync failed:', err));
+          }
         }
       } catch (error) {
         console.error('Error broadcasting telemetry:', error);
       }
-    }, 5000);
+    }, 3000);
 
     // Call it once immediately for fast initial sync
     const initialSync = async () => {
@@ -156,6 +200,9 @@ export function useBroadcastTracker(
               lng = 120.902;
             }
           }
+
+          lastDbUpdateRef.current = Date.now();
+          lastDbLocationRef.current = { latitude: lat, longitude: lng };
 
           const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
           const { data: { session } } = await supabase.auth.getSession();

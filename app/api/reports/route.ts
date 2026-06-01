@@ -57,6 +57,12 @@ export async function GET(req: NextRequest) {
         status: reports.status,
         createdAt: reports.createdAt,
         location: verificationRequests.locationDescription,
+        residentPhotoUrl: verificationRequests.imageUrl,
+        natureOfCall: verificationRequests.nature,
+        severityLevel: verificationRequests.severity,
+        peopleInvolved: verificationRequests.peopleInvolved,
+        crewFindings: reports.description,
+        scenePhotos: reports.scenePhotos,
       })
       .from(reports)
       .innerJoin(incidents, eq(reports.incidentId, incidents.id))
@@ -80,6 +86,16 @@ export async function GET(req: NextRequest) {
         minute: '2-digit'
       }),
       location: r.location || "Baliwag City",
+      residentPhotoUrl: r.residentPhotoUrl,
+      natureOfCall: r.natureOfCall,
+      severityLevel: r.severityLevel,
+      peopleInvolved: (() => {
+        if (!r.peopleInvolved || r.peopleInvolved === 'None') return 0;
+        const match = r.peopleInvolved.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 1;
+      })(),
+      crewFindings: r.crewFindings || "No additional logs provided.",
+      scenePhotos: Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
     }));
 
     if (search) {

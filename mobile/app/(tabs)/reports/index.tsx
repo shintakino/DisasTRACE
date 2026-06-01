@@ -42,6 +42,7 @@ export default function MyReportsScreen() {
           }
 
           return {
+            ...r,
             id: r.id,
             type: r.type || 'Incident',
             date: r.date || 'Today',

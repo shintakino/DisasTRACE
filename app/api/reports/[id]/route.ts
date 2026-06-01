@@ -33,6 +33,7 @@ export async function GET(
         createdAt: reports.createdAt,
         location: verificationRequests.locationDescription,
         residentReportDescription: verificationRequests.locationDescription,
+        residentPhotoUrl: verificationRequests.imageUrl,
         crewFindings: reports.description,
         natureOfCall: verificationRequests.nature,
         severityLevel: verificationRequests.severity,
@@ -77,10 +78,15 @@ export async function GET(
       }),
       location: r.location || "Baliwag City",
       residentReportDescription: r.residentReportDescription || "Awaiting detail logs.",
+      residentPhotoUrl: r.residentPhotoUrl,
       crewFindings: r.crewFindings || "No findings recorded.",
       natureOfCall: r.natureOfCall,
       severityLevel: r.severityLevel,
-      peopleInvolved: r.peopleInvolved === 'None' ? 0 : r.peopleInvolved === '1-2 Persons' ? 2 : r.peopleInvolved === '3-5 Persons' ? 4 : 6,
+      peopleInvolved: (() => {
+        if (!r.peopleInvolved || r.peopleInvolved === 'None') return 0;
+        const match = r.peopleInvolved.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 1;
+      })(),
       scenePhotos: Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
       logs: [
         { action: "Incident Dispatched", time: new Date(r.createdAt).toLocaleTimeString() },

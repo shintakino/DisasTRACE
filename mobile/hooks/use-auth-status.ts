@@ -12,7 +12,7 @@ export function useAuthStatus() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | 'loading' | 'unauthorized_platform'>('loading');
   const [role, setRole] = useState<string>('public_user');
-  const [profile, setProfile] = useState<{ fullName: string; address: string } | null>(null);
+  const [profile, setProfile] = useState<{ fullName: string; address: string; dutyStatus?: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const checkVerification = async (currentUser: User, currentSession: Session) => {
@@ -25,7 +25,7 @@ export function useAuthStatus() {
       // Direct Supabase query is more robust than a separate API call for mobile
       const { data: dbUser, error: dbError } = await supabase
         .from('users')
-        .select('role, verification_status, full_name, address')
+        .select('role, verification_status, full_name, address, duty_status')
         .eq('id', currentUser.id)
         .single();
 
@@ -45,6 +45,7 @@ export function useAuthStatus() {
       setProfile({
         fullName: dbUser.full_name,
         address: dbUser.address || '',
+        dutyStatus: dbUser.duty_status || 'OFF_DUTY',
       });
     } catch (error) {
       console.error('Error checking verification status via Supabase:', error);
@@ -131,10 +132,11 @@ export function useAuthStatus() {
             setVerificationStatus(VerificationStatusSchema.parse(newStatus.toLowerCase()));
           }
           
-          if (payload.new.full_name || payload.new.address) {
+          if (payload.new.full_name || payload.new.address || payload.new.duty_status) {
             setProfile({
-              fullName: payload.new.full_name,
+              fullName: payload.new.full_name || '',
               address: payload.new.address || '',
+              dutyStatus: payload.new.duty_status || 'OFF_DUTY',
             });
           }
         }

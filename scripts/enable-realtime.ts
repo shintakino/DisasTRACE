@@ -48,6 +48,13 @@ async function enableRealtime() {
       console.error('❌ Failed to add feedbacks. Raw error:', e);
     }
 
+    try {
+      await db.execute(sql.raw('alter publication supabase_realtime add table status_logs;'));
+      console.log('✅ Successfully added status_logs to supabase_realtime');
+    } catch (e: any) {
+      console.error('❌ Failed to add status_logs. Raw error:', e);
+    }
+
     console.log('--- Realtime Enablement Complete ---');
   } catch (error) {
     console.error('Fatal error executing Realtime SQL:', error);

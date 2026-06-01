@@ -78,8 +78,10 @@ export function useBroadcastTracker(
           let lat = pos.latitude;
           let lng = pos.longitude;
 
-          // Mock coordinates in Baliwag if responder is outside the city (for developer convenience)
-          if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
+          const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+
+          // Geofence coordinate locking for developer testing convenience
+          if (isDevMode && (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00)) {
             if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
               lat = activeDispatch.coordinates.latitude;
               lng = activeDispatch.coordinates.longitude;
@@ -87,6 +89,10 @@ export function useBroadcastTracker(
               lat = 14.954;
               lng = 120.902;
             }
+          } else if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
+            // Maintain on-scene snap alignment in both dev and production to ensure map markers overlap perfectly
+            lat = activeDispatch.coordinates.latitude;
+            lng = activeDispatch.coordinates.longitude;
           }
 
           const payload = {

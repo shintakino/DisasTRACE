@@ -17,6 +17,7 @@ export default function ReportsPage() {
   const [selectedReportId, setSelectedReportId] = React.useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"all" | ReportStatus>("all");
+  const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
 
   const handleFilterChange = React.useCallback((newFilters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => {
     setFilters((prev) => {
@@ -27,6 +28,8 @@ export default function ReportsPage() {
         status: activeTab === "all" ? undefined : activeTab,
       };
     });
+    // Reset selection when filters change to avoid index mismatches
+    setRowSelection({});
   }, [activeTab]);
 
   const handleTabChange = (tab: "all" | ReportStatus) => {
@@ -35,6 +38,7 @@ export default function ReportsPage() {
       ...prev,
       status: tab === "all" ? undefined : tab
     }));
+    setRowSelection({});
   };
 
   const fetchReports = React.useCallback(async () => {
@@ -66,10 +70,35 @@ export default function ReportsPage() {
   };
 
   const handleExportPDF = () => {
-    toast.info("Generating reports summary PDF...");
-    setTimeout(() => {
-      toast.success("PDF exported successfully.");
-    }, 2000);
+    const selectedIndices = Object.keys(rowSelection).filter(key => rowSelection[key]);
+    const reportsToExport = selectedIndices.length > 0
+      ? selectedIndices.map(idx => data[parseInt(idx)]).filter(Boolean)
+      : data;
+
+    if (reportsToExport.length === 0) {
+      toast.error("No reports available to export.");
+      return;
+    }
+
+    const exportingMsg = selectedIndices.length > 0
+      ? `Generating PDF summary for ${reportsToExport.length} selected report(s)...`
+      : `Generating PDF summary for all ${reportsToExport.length} report(s)...`;
+
+    toast.promise(
+      (async () => {
+        const { exportReportsSummaryPDF } = await import("@/lib/pdf-export");
+        await exportReportsSummaryPDF(reportsToExport, {
+          search: filters.search,
+          type: filters.type,
+          status: filters.status,
+        });
+      })(),
+      {
+        loading: exportingMsg,
+        success: "PDF exported successfully.",
+        error: "Failed to generate PDF. Please try again.",
+      }
+    );
   };
 
   return (
@@ -126,6 +155,8 @@ export default function ReportsPage() {
           <ReportsTable
             data={data}
             onViewDetails={handleViewDetails}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
           />
         )}
       </Card>

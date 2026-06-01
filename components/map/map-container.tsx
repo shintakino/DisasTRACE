@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback, useRef, useEffect } from "react";
-import Map, { NavigationControl, Marker, MapRef } from "react-map-gl/maplibre";
+import React, { useCallback, useRef, useEffect, useState } from "react";
+import Map, { NavigationControl, Marker, MapRef, Source, Layer } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MapIncident, MapResponder, MapHospital } from "@/types/map";
 import { MapMarker } from "./map-marker";
@@ -31,6 +31,7 @@ export function MapContainer({
   onSelectIncident,
 }: MapContainerProps) {
   const mapRef = useRef<MapRef>(null);
+  const [routeGeometry, setRouteGeometry] = useState<any>(null);
 
   // Fly to incident when selected from the list
   useEffect(() => {
@@ -47,6 +48,53 @@ export function MapContainer({
     }
   }, [selectedIncidentId, incidents]);
 
+  // Fetch real road route between assigned responder and selected ongoing incident
+  useEffect(() => {
+    let active = true;
+
+    if (!selectedIncidentId) {
+      setRouteGeometry(null);
+      return;
+    }
+
+    const selectedIncident = incidents.find((i) => i.id === selectedIncidentId);
+    if (!selectedIncident || selectedIncident.status !== "ONGOING") {
+      setRouteGeometry(null);
+      return;
+    }
+
+    // Find the assigned responder for this ongoing incident
+    const assignedResponder = responders.find((r) => r.vehicleId === selectedIncident.vehicleId);
+    if (!assignedResponder) {
+      setRouteGeometry(null);
+      return;
+    }
+
+    const fetchRoute = async () => {
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${assignedResponder.lng},${assignedResponder.lat};${selectedIncident.lng},${selectedIncident.lat}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (active && data.routes && data.routes.length > 0) {
+          setRouteGeometry({
+            type: "Feature",
+            properties: {},
+            geometry: data.routes[0].geometry,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch road navigation route:", err);
+      }
+    };
+
+    fetchRoute();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedIncidentId, incidents, responders]);
+
   const handleMarkerClick = useCallback((id: string, lat: number, lng: number) => {
     onSelectIncident(id);
     // Note: useEffect above will handle the flyTo
@@ -62,6 +110,25 @@ export function MapContainer({
         attributionControl={false}
       >
         <NavigationControl position="bottom-right" />
+
+        {/* Live Road Route layer for active dispatched ongoing incidents */}
+        {routeGeometry && (
+          <Source id="route-source" type="geojson" data={routeGeometry}>
+            <Layer
+              id="route-layer"
+              type="line"
+              layout={{
+                "line-join": "round",
+                "line-cap": "round",
+              }}
+              paint={{
+                "line-color": "#f97316", // Vibrant orange route line matching active theme
+                "line-width": 5,
+                "line-opacity": 0.85,
+              }}
+            />
+          </Source>
+        )}
 
         {/* Incident Markers */}
         {incidents.map((incident) => (
@@ -84,21 +151,23 @@ export function MapContainer({
           </Marker>
         ))}
 
-        {/* Responder Markers */}
-        {responders.map((responder) => (
-          <Marker
-            key={responder.id}
-            latitude={responder.lat}
-            longitude={responder.lng}
-            anchor="bottom"
-          >
-            <MapMarker
-              type="responder"
-              status={responder.status === "DISPATCHED" ? "ONGOING" : "STANDBY"}
-              label={responder.vehicleId}
-            />
-          </Marker>
-        ))}
+        {/* Live Standby & Active Responder Markers */}
+        {responders
+          .filter((r) => r.status === "AVAILABLE" || r.status === "DISPATCHED")
+          .map((responder) => (
+            <Marker
+              key={responder.id}
+              latitude={responder.lat}
+              longitude={responder.lng}
+              anchor="bottom"
+            >
+              <MapMarker
+                type="responder"
+                status={responder.status === "DISPATCHED" ? "ONGOING" : "STANDBY"}
+                label={responder.vehicleId}
+              />
+            </Marker>
+          ))}
 
         {/* Hospital Markers */}
         {hospitals.map((hospital) => (

@@ -9,6 +9,7 @@ import {
   UserPlus,
   ShieldCheck,
   HelpCircle,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react"
 
@@ -34,7 +35,11 @@ export const CDRRMO_NAV: NavItem[] = [
     url: "/logs",
     icon: Folder,
   },
-
+  {
+    title: "Announcements",
+    url: "/announcements",
+    icon: Megaphone,
+  },
   {
     title: "Reports",
     url: "/reports",

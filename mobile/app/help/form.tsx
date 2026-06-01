@@ -132,10 +132,26 @@ export default function FormScreen() {
         }
       }
 
-      // Mock coordinates in Baliwag if user is outside the city (for developer convenience)
-      if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
-        lat = 14.945 + (Math.random() - 0.5) * 0.01;
-        lng = 120.895 + (Math.random() - 0.5) * 0.01;
+      // Geofence enforcement: DisasTRACE is only active within the municipality of Baliwag City
+      const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+      const isOutsideBaliwag = lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00;
+
+      if (isOutsideBaliwag) {
+        if (isDevMode) {
+          // Mock coordinates inside Baliwag for developer testing convenience
+          lat = 14.945 + (Math.random() - 0.5) * 0.01;
+          lng = 120.895 + (Math.random() - 0.5) * 0.01;
+          console.log('[DevMode] User is outside Baliwag. Mocked location to center.');
+        } else {
+          // Strictly fail/warn in production/deployment
+          Alert.alert(
+            'Out of Service Area',
+            'DisasTRACE emergency response services are currently only active within the municipality of Baliwag City. We are unable to dispatch an ambulance to your current location.',
+            [{ text: 'OK' }]
+          );
+          setIsLoadingLocation(false);
+          return;
+        }
       }
       
       setLocation({ latitude: lat, longitude: lng });

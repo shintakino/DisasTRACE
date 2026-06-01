@@ -5,7 +5,8 @@ export const verificationRequests = pgTable('verification_requests', {
   id: varchar('id', { length: 255 }).primaryKey(), // Server-generated UUID
   requestId: varchar('request_id', { length: 20 }).notNull().unique(), // e.g., REQ-2026-0047
   residentId: varchar('resident_id', { length: 255 }).references(() => users.id).notNull(),
-  status: text('status', { enum: ['PENDING', 'VERIFIED', 'REJECTED'] }).default('PENDING').notNull(),
+  status: text('status', { enum: ['PENDING', 'VERIFIED', 'REJECTED', 'DUPLICATE'] }).default('PENDING').notNull(),
+  parentRequestId: varchar('parent_request_id', { length: 255 }).references((): any => verificationRequests.id),
   nature: text('nature', { enum: ['EMERGENCY', 'NON-EMERGENCY'] }).default('EMERGENCY').notNull(),
   type: text('type', { enum: ['Medical Emergency', 'Vehicular Collision', 'Fire Emergency', 'Structural Failure', 'Flood/Water', 'Unknown Cause'] }).notNull(),
   peopleInvolved: text('people_involved', { enum: ['None', '1-2 Persons', '3-5 Persons', '6+ Persons'] }).default('None').notNull(),
@@ -24,5 +25,9 @@ export const verificationRequestsRelations = relations(verificationRequests, ({ 
   resident: one(users, {
     fields: [verificationRequests.residentId],
     references: [users.id],
+  }),
+  parentRequest: one(verificationRequests, {
+    fields: [verificationRequests.parentRequestId],
+    references: [verificationRequests.id],
   }),
 }));

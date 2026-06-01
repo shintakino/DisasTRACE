@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Modal } from 'react-native';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { MapPin, ChevronDown, ChevronUp, Image as ImageIcon } from 'lucide-react-native';
+import { MapPin, ChevronDown, ChevronUp, Image as ImageIcon, X } from 'lucide-react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
 
 
 export function EnRouteSheet() {
-  const { status, activeDispatch, elapsedTimeSeconds, confirmArrival } = useResponderStore();
+  const { status, activeDispatch, elapsedTimeSeconds, confirmArrival, currentSpeedKph } = useResponderStore();
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ['50%', '90%'], []);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isImageExpanded, setIsImageExpanded] = useState(false);
 
   useEffect(() => {
     if (status === 'en_route') {
@@ -36,7 +37,8 @@ export function EnRouteSheet() {
   };
 
   return (
-    <BottomSheet
+    <>
+      <BottomSheet
       ref={bottomSheetRef}
       index={status === 'en_route' ? (isExpanded ? 1 : 0) : -1}
       snapPoints={snapPoints}
@@ -68,7 +70,9 @@ export function EnRouteSheet() {
             <Text className="text-slate-400 text-[9px] font-bold mt-1 uppercase tracking-widest">ELAPSED</Text>
           </View>
           <View className="flex-1 bg-white border border-slate-100 shadow-sm shadow-slate-200 rounded-2xl p-3 items-center justify-center">
-            <Text className="text-[#1E3A8A] font-bold text-xl">42 km/h</Text>
+            <Text className="text-[#1E3A8A] font-bold text-xl">
+              {currentSpeedKph > 0 ? `${currentSpeedKph} km/h` : '0 km/h'}
+            </Text>
             <Text className="text-slate-400 text-[9px] font-bold mt-1 uppercase tracking-widest">SPEED</Text>
           </View>
         </View>
@@ -127,12 +131,17 @@ export function EnRouteSheet() {
               <View className="mb-6">
                 <Text className="text-slate-400 text-[10px] font-bold tracking-widest uppercase mb-3">RESIDENT&apos;S ATTACHMENT</Text>
                 {activeDispatch?.attachmentUrl ? (
-                  <View className="rounded-xl overflow-hidden relative h-32 bg-slate-100">
+                  <TouchableOpacity 
+                    activeOpacity={0.9} 
+                    onPress={() => setIsImageExpanded(true)}
+                    className="rounded-xl overflow-hidden relative h-32 bg-slate-100"
+                  >
                     <Image source={{ uri: activeDispatch?.attachmentUrl }} className="w-full h-full" resizeMode="cover" />
-                    <View className="absolute bottom-0 left-0 right-0 bg-black/60 p-2">
+                    <View className="absolute bottom-0 left-0 right-0 bg-black/60 p-2 flex-row justify-between items-center">
                       <Text className="text-white text-xs font-medium">IMG_7904.jpg</Text>
+                      <Text className="text-white/80 text-[10px] font-semibold">Click to expand</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ) : (
                   <View className="h-32 bg-slate-50 rounded-xl items-center justify-center border border-slate-200 border-dashed">
                     <ImageIcon color="#94A3B8" size={32} />
@@ -163,5 +172,37 @@ export function EnRouteSheet() {
 
       </View>
     </BottomSheet>
+
+    {/* Lightbox Modal */}
+    <Modal 
+      visible={isImageExpanded} 
+      transparent 
+      animationType="fade"
+      onRequestClose={() => setIsImageExpanded(false)}
+    >
+      <View className="flex-1 bg-black/95 justify-center items-center relative">
+        <TouchableOpacity 
+          onPress={() => setIsImageExpanded(false)}
+          className="absolute top-12 right-6 w-12 h-12 bg-white/10 rounded-full items-center justify-center z-50 border border-white/15"
+        >
+          <X size={24} color="#FFFFFF" strokeWidth={2.5} />
+        </TouchableOpacity>
+
+        {activeDispatch?.attachmentUrl && (
+          <Image 
+            source={{ uri: activeDispatch.attachmentUrl }} 
+            className="w-full h-5/6" 
+            resizeMode="contain" 
+          />
+        )}
+
+        <View className="absolute bottom-12 left-6 right-6 items-center">
+          <Text className="text-white/60 text-xs font-medium text-center">
+            Tap the X or outside to close the full view
+          </Text>
+        </View>
+      </View>
+    </Modal>
+  </>
   );
 }

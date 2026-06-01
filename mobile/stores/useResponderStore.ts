@@ -49,6 +49,14 @@ interface ResponderState {
   isArrivalConfirmVisible: boolean;
   isSubmittingReport: boolean;
   showReportSuccess: boolean;
+  currentSpeedKph: number;
+  hospitalDistanceKm: number | null;
+  hospitalEtaMins: number | null;
+  lastSubmittedSummary: {
+    responseTimeMins: number;
+    patientsCount: number;
+    distanceKm: number;
+  } | null;
   
   drafts: DraftForm[];
   submittedIncidentIds: string[];
@@ -57,6 +65,7 @@ interface ResponderState {
   setStatus: (status: DispatchState) => void;
   setActiveDispatch: (dispatch: DispatchDetails | null) => void;
   setTargetHospital: (hospital: HospitalDetails | null) => void;
+  setHospitalRouteMetrics: (distanceKm: number | null, etaMins: number | null) => void;
   incrementSceneTime: () => void;
   incrementElapsedTime: () => void;
   resetTimer: () => void;
@@ -86,12 +95,17 @@ export const useResponderStore = create<ResponderState>((set) => ({
   isArrivalConfirmVisible: false,
   isSubmittingReport: false,
   showReportSuccess: false,
+  currentSpeedKph: 0,
+  hospitalDistanceKm: null,
+  hospitalEtaMins: null,
+  lastSubmittedSummary: null,
   drafts: [],
   submittedIncidentIds: [],
 
   setStatus: (status) => set({ status }),
   setActiveDispatch: (activeDispatch) => set({ activeDispatch }),
   setTargetHospital: (targetHospital) => set({ targetHospital }),
+  setHospitalRouteMetrics: (hospitalDistanceKm, hospitalEtaMins) => set({ hospitalDistanceKm, hospitalEtaMins }),
   incrementSceneTime: () => set((state) => ({ sceneTimeSeconds: state.sceneTimeSeconds + 1 })),
   incrementElapsedTime: () => set((state) => ({ elapsedTimeSeconds: state.elapsedTimeSeconds + 1 })),
   resetTimer: () => set({ sceneTimeSeconds: 0, elapsedTimeSeconds: 0 }),
@@ -163,6 +177,22 @@ export const useResponderStore = create<ResponderState>((set) => ({
       return;
     }
 
+    const activeDispatch = useResponderStore.getState().activeDispatch;
+    const elapsedTimeSeconds = useResponderStore.getState().elapsedTimeSeconds;
+    
+    // Parse distance from activeDispatch.distance (e.g. "1.7 km" or similar)
+    let parsedDistance = 1.7;
+    if (activeDispatch?.distance) {
+      const match = activeDispatch.distance.match(/[\d.]+/);
+      if (match) parsedDistance = parseFloat(match[0]);
+    }
+
+    const summary = {
+      responseTimeMins: Math.ceil(elapsedTimeSeconds / 60) || 9,
+      patientsCount: formData?.patients?.length || 1,
+      distanceKm: parsedDistance,
+    };
+
     try {
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
       const { data: { session } } = await supabase.auth.getSession();
@@ -187,6 +217,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
         set((state) => ({
           isSubmittingReport: false,
           showReportSuccess: true,
+          lastSubmittedSummary: summary,
           submittedIncidentIds: [...state.submittedIncidentIds, idToSubmit],
           drafts: state.drafts.filter(d => d.incidentId !== idToSubmit)
         }));
@@ -201,6 +232,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       set((state) => ({
         isSubmittingReport: false,
         showReportSuccess: true,
+        lastSubmittedSummary: summary,
         submittedIncidentIds: [...state.submittedIncidentIds, idToSubmit],
         drafts: state.drafts.filter(d => d.incidentId !== idToSubmit)
       }));
@@ -215,7 +247,11 @@ export const useResponderStore = create<ResponderState>((set) => ({
     elapsedTimeSeconds: 0,
     isArrivalConfirmVisible: false,
     isSubmittingReport: false,
-    showReportSuccess: false
+    showReportSuccess: false,
+    currentSpeedKph: 0,
+    hospitalDistanceKm: null,
+    hospitalEtaMins: null,
+    lastSubmittedSummary: null
   }),
 
   completeIncident: () => set({ 
@@ -226,7 +262,11 @@ export const useResponderStore = create<ResponderState>((set) => ({
     elapsedTimeSeconds: 0,
     isArrivalConfirmVisible: false,
     isSubmittingReport: false,
-    showReportSuccess: false
+    showReportSuccess: false,
+    currentSpeedKph: 0,
+    hospitalDistanceKm: null,
+    hospitalEtaMins: null,
+    lastSubmittedSummary: null
   }),
 
   saveDraft: (incident, formData) => set((state) => {

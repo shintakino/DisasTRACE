@@ -19,6 +19,42 @@ export default function ProfileScreen() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const draftsLength = useResponderStore((state) => state.drafts.length);
 
+  const [updatingDuty, setUpdatingDuty] = useState(false);
+
+  const handleToggleDutyStatus = async () => {
+    if (!profile) return;
+    const currentDuty = (profile as any).dutyStatus || 'OFF_DUTY';
+    const nextDuty = currentDuty === 'ON_DUTY' ? 'OFF_DUTY' : 'ON_DUTY';
+    
+    setUpdatingDuty(true);
+    try {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch(`${apiUrl}/api/users/duty-status`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ dutyStatus: nextDuty }),
+      });
+
+      const res = await response.json();
+      if (!response.ok) {
+        Alert.alert('Status Error', res.error || 'Failed to update duty status.');
+      }
+    } catch (err) {
+      console.error('[Profile] Failed to update duty status:', err);
+      Alert.alert('Network Error', 'Failed to connect to backend.');
+    } finally {
+      setUpdatingDuty(false);
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
     const currentUserId = user.id;
@@ -148,6 +184,9 @@ export default function ProfileScreen() {
 
   const initials = profile?.fullName ? getInitials(profile.fullName) : (isResponder ? 'RB' : 'EG');
   const displayName = profile?.fullName || (isResponder ? 'Renzy Bastes' : 'Eloisa Guibani');
+  const vehicleInitials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
+  const suffix = user?.id ? user.id.slice(-3).toUpperCase() : "";
+  const vehicleId = `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
   const barangayName = profile?.address?.split(',')[1]?.trim() || (profile?.address || 'Paitan');
 
   const renderPillRow = (Icon: any, title: string, subtitle: string, onPress?: () => void) => (
@@ -227,13 +266,43 @@ export default function ProfileScreen() {
               <View className="mt-1">
                 <View className="flex-row items-center mb-2">
                   <Text className="text-sm text-blue-200 mr-2">Assigned Unit:</Text>
-                  <Text className="text-base font-bold text-white">AMB-001</Text>
+                  <Text className="text-base font-bold text-white">{vehicleId}</Text>
                 </View>
                 <View className="flex-row">
-                  <View className="bg-green-500/20 px-2 py-1 rounded border border-green-400 flex-row items-center">
-                    <View className="w-2 h-2 rounded-full bg-green-400 mr-1.5" />
-                    <Text className="text-green-400 text-[10px] font-bold uppercase tracking-wider">On Duty</Text>
-                  </View>
+                  <TouchableOpacity 
+                    onPress={handleToggleDutyStatus}
+                    disabled={updatingDuty || (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'}
+                    className={`px-3 py-1.5 rounded-full border flex-row items-center ${
+                      (profile as any)?.dutyStatus === 'ON_DUTY' 
+                        ? "bg-green-500/20 border-green-400" 
+                        : (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'
+                          ? "bg-red-500/20 border-red-400"
+                          : "bg-slate-500/20 border-slate-400"
+                    }`}
+                  >
+                    <View className={`w-2 h-2 rounded-full mr-1.5 ${
+                      (profile as any)?.dutyStatus === 'ON_DUTY' 
+                        ? "bg-green-400" 
+                        : (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'
+                          ? "bg-red-400"
+                          : "bg-slate-400"
+                    }`} />
+                    <Text className={`text-[10px] font-black uppercase tracking-widest ${
+                      (profile as any)?.dutyStatus === 'ON_DUTY' 
+                        ? "text-green-400" 
+                        : (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'
+                          ? "text-red-400"
+                          : "text-slate-400"
+                    }`}>
+                      {updatingDuty 
+                        ? "Updating..." 
+                        : (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'
+                          ? "Active Dispatch"
+                          : (profile as any)?.dutyStatus === 'ON_DUTY'
+                            ? "On Duty (Standby)"
+                            : "Off Duty"}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             ) : (

@@ -67,6 +67,7 @@ export function IncidentReportForm() {
   ]);
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [crewNotes, setCrewNotes] = useState('');
 
   React.useEffect(() => {
     if (status === 'report_filling' && activeDispatch) {
@@ -78,6 +79,7 @@ export function IncidentReportForm() {
         setNatureOfCall(existingDraft.formData.natureOfCall || 'Emergency');
         setTypeOfEmergency(existingDraft.formData.typeOfEmergency || activeDispatch.typeOfEmergency || activeDispatch.type || 'Medical Emergency');
         setSeverityLevel(existingDraft.formData.severityLevel || 'Medium');
+        setCrewNotes(existingDraft.formData.crewNotes || '');
         setPatients(existingDraft.formData.patients || [
           { id: 1, status: 'Stable — Conscious', bp: '', hr: '', spo2: '' }
         ]);
@@ -86,6 +88,7 @@ export function IncidentReportForm() {
         setNatureOfCall(activeDispatch.natureOfCall || 'Emergency');
         setTypeOfEmergency(activeDispatch.typeOfEmergency || activeDispatch.type || 'Medical Emergency');
         setSeverityLevel('Medium');
+        setCrewNotes('');
         
         // Match the number of people involved from resident findings
         const count = activeDispatch.peopleInvolved || 1;
@@ -131,7 +134,7 @@ export function IncidentReportForm() {
 
   const handleSaveDraft = () => {
     if (activeDispatch) {
-      saveDraft(activeDispatch, { natureOfCall, typeOfEmergency, severityLevel, patients });
+      saveDraft(activeDispatch, { natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes });
       setStatus('idle');
     }
   };
@@ -144,7 +147,7 @@ export function IncidentReportForm() {
         typeOfEmergency,
         severityLevel,
         patients,
-        description: `Crew findings on scene: ${natureOfCall} call. Emergency type identified as ${typeOfEmergency}. Severity level: ${severityLevel}. Treated ${patients.length} patient(s) on scene.`,
+        description: crewNotes.trim() || `Crew findings on scene: ${natureOfCall} call. Emergency type identified as ${typeOfEmergency}. Severity level: ${severityLevel}. Treated ${patients.length} patient(s) on scene.`,
       };
       submitReport(activeDispatch.id, formData);
     }
@@ -280,6 +283,20 @@ export function IncidentReportForm() {
                 <TextInput 
                   className="border border-slate-200 rounded-xl px-4 py-3.5 bg-white text-[#1E3A8A] font-medium"
                   value={activeDispatch?.locationName || 'Brgy. Sabang, near corner of Rizal St.'}
+                />
+              </View>
+
+              <View>
+                <Text className="text-[#1E3A8A] font-black text-[10px] uppercase tracking-widest mb-2">CREW CLINICAL NOTES (OPTIONAL)</Text>
+                <TextInput 
+                  placeholder="Type any findings, diagnoses, treatment notes, or crew observations here..."
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  className="border border-slate-200 rounded-xl px-4 py-3.5 bg-white text-[#1E3A8A] font-medium min-h-[100px]"
+                  value={crewNotes}
+                  onChangeText={setCrewNotes}
                 />
               </View>
 

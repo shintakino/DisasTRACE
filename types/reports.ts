@@ -46,6 +46,7 @@ export const DetailedIncidentReportSchema = z.object({
   location: z.string(),
   description: z.string().optional(), // keeping for backward compatibility if needed
   residentReportDescription: z.string().optional(),
+  residentPhotoUrl: z.string().optional(),
   crewFindings: z.string().optional(),
   natureOfCall: z.string().optional(),
   severityLevel: z.string().optional(),

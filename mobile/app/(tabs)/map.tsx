@@ -147,13 +147,33 @@ export default function MapScreen() {
               <View className="w-16 h-16 bg-[#1E3A8A] rounded-full items-center justify-center mr-4 relative">
                 <Text className="text-white text-xl font-bold">{initials}</Text>
                 <View className="absolute top-0 right-0 w-5 h-5 bg-white rounded-full items-center justify-center">
-                  <View className="w-3.5 h-3.5 bg-green-500 rounded-full" />
+                  <View className={`w-3.5 h-3.5 rounded-full ${
+                    profile?.dutyStatus === 'ON_DUTY'
+                      ? 'bg-green-500'
+                      : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                        ? 'bg-red-500'
+                        : 'bg-slate-400'
+                  }`} />
                 </View>
               </View>
               <View className="flex-1 pt-1">
                 <Text className="text-lg font-bold text-[#1E3A8A]">{displayName}</Text>
                 <Text className="text-sm font-medium text-slate-500 mt-1" numberOfLines={1}>{address}</Text>
-                <Text className="text-xs font-bold text-[#1E3A8A] mt-1">Responder Status: On Duty</Text>
+                <Text className={`text-xs font-bold mt-1 ${
+                  profile?.dutyStatus === 'ON_DUTY'
+                    ? 'text-green-600'
+                    : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                      ? 'text-red-600'
+                      : 'text-slate-500'
+                }`}>
+                  Responder Status: {
+                    profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                      ? 'Active Dispatch'
+                      : profile?.dutyStatus === 'ON_DUTY'
+                        ? 'On Duty (Standby)'
+                        : 'Off Duty'
+                  }
+                </Text>
               </View>
             </React.Fragment>
           )}

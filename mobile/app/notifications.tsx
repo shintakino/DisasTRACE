@@ -27,12 +27,24 @@ export default function NotificationsScreen() {
 
   const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
 
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: Record<string, string> = {};
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    return headers;
+  };
+
   const fetchNotifications = async (showPulse = true) => {
     if (!user) return;
     if (showPulse) setLoading(true);
     
     try {
-      const response = await fetch(`${apiUrl}/api/notifications`);
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(`${apiUrl}/api/notifications`, {
+        headers: authHeaders,
+      });
       const data = await response.json();
       if (response.ok && data.notifications) {
         setNotifications(data.notifications);
@@ -84,10 +96,12 @@ export default function NotificationsScreen() {
 
   const handleMarkAsRead = async (id: string) => {
     try {
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`${apiUrl}/api/notifications`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders,
         },
         body: JSON.stringify({ id }),
       });
@@ -159,8 +173,10 @@ export default function NotificationsScreen() {
         onPress: async () => {
           setRefreshing(true);
           try {
+            const authHeaders = await getAuthHeaders();
             const response = await fetch(`${apiUrl}/api/notifications`, {
               method: 'DELETE',
+              headers: authHeaders,
             });
             if (response.ok) {
               setNotifications([]);

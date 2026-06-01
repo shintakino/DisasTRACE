@@ -26,6 +26,8 @@ import { cn } from "@/lib/utils";
 interface ReportsTableProps {
   data: ReportEntry[];
   onViewDetails: (id: string) => void;
+  rowSelection?: Record<string, boolean>;
+  onRowSelectionChange?: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
 const StatusBadge = ({ status }: { status: ReportStatus }) => {
@@ -42,8 +44,16 @@ const StatusBadge = ({ status }: { status: ReportStatus }) => {
   );
 };
 
-export function ReportsTable({ data, onViewDetails }: ReportsTableProps) {
-  const [rowSelection, setRowSelection] = React.useState({});
+export function ReportsTable({ 
+  data, 
+  onViewDetails,
+  rowSelection = {},
+  onRowSelectionChange,
+}: ReportsTableProps) {
+  const [internalRowSelection, setInternalRowSelection] = React.useState({});
+
+  const activeRowSelection = onRowSelectionChange ? rowSelection : internalRowSelection;
+  const activeSetRowSelection = onRowSelectionChange ? onRowSelectionChange : setInternalRowSelection as any;
 
   const columns: ColumnDef<ReportEntry>[] = [
     {
@@ -120,9 +130,9 @@ export function ReportsTable({ data, onViewDetails }: ReportsTableProps) {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: activeSetRowSelection,
     state: {
-      rowSelection,
+      rowSelection: activeRowSelection,
     },
   });
 

@@ -30,6 +30,7 @@ export default function TrackingScreen() {
   const [eta, setEta] = useState(8);
   const [distance, setDistance] = useState(1.7);
   const [elapsed, setElapsed] = useState(0); // Natural elapsed time starting from 0
+  const elapsedRef = useRef(0);
   const [isArrived, setIsArrived] = useState(false);
   const [hasDismissedArrivedModal, setHasDismissedArrivedModal] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0); // Starts at 0% and climbs dynamically
@@ -42,9 +43,31 @@ export default function TrackingScreen() {
   const isExpandedRef = useRef(false);
 
   const [assignedResponder, setAssignedResponder] = useState<any>(null);
+  const assignedResponderRef = useRef<any>(null);
+  const updateAssignedResponder = (val: any) => {
+    assignedResponderRef.current = val;
+    setAssignedResponder(val);
+  };
   const [isFindingAmbulance, setIsFindingAmbulance] = useState(true);
   const [liveResponderStatus, setLiveResponderStatus] = useState<string | null>(null);
   const [liveTargetHospital, setLiveTargetHospital] = useState<any | null>(null);
+
+  const handleResolutionRedirect = () => {
+    const currentResponder = assignedResponderRef.current;
+    const vehicleId = currentResponder?.full_name 
+      ? `AMB-${currentResponder.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 3)}${currentResponder.id ? `-${currentResponder.id.slice(-3).toUpperCase()}` : ""}` 
+      : "AMB-001";
+
+    useEmergencyReportStore.setState((state) => ({
+      report: {
+        ...state.report,
+        totalDurationSeconds: elapsedRef.current,
+        responderFullName: currentResponder?.full_name || undefined,
+        responderVehicleId: vehicleId
+      }
+    }));
+    router.replace('/help/resolution');
+  };
 
   // Pulse animation values for radar holding screen
   const pulseAnim1 = useRef(new Animated.Value(0)).current;
@@ -139,7 +162,7 @@ export default function TrackingScreen() {
           }
           
           if (incident.status === 'RESOLVED') {
-            router.replace('/help/resolution');
+            handleResolutionRedirect();
             return;
           }
           
@@ -155,7 +178,7 @@ export default function TrackingScreen() {
               .eq('id', incident.responder_id)
               .single();
             if (resp && active) {
-              setAssignedResponder(resp);
+              updateAssignedResponder(resp);
               if (resp.last_latitude && resp.last_longitude) {
                 setAmbulanceLocation({
                   latitude: Number(resp.last_latitude),
@@ -164,7 +187,7 @@ export default function TrackingScreen() {
               }
             }
           } else {
-            setAssignedResponder(null);
+            updateAssignedResponder(null);
             setIsFindingAmbulance(true);
           }
         } else {
@@ -228,7 +251,7 @@ export default function TrackingScreen() {
                 setIsArrived(true);
               }
               if (newIncident.status === 'RESOLVED') {
-                router.replace('/help/resolution');
+                handleResolutionRedirect();
               }
 
               if (newIncident.responder_id) {
@@ -239,7 +262,7 @@ export default function TrackingScreen() {
                   .single();
 
                 if (resp) {
-                  setAssignedResponder(resp);
+                  updateAssignedResponder(resp);
                   if (resp.last_latitude && resp.last_longitude) {
                     setAmbulanceLocation({
                       latitude: Number(resp.last_latitude),
@@ -254,7 +277,7 @@ export default function TrackingScreen() {
                   });
                 }
               } else {
-                setAssignedResponder(null);
+                updateAssignedResponder(null);
                 setIsFindingAmbulance(true);
               }
             }
@@ -355,7 +378,7 @@ export default function TrackingScreen() {
 
         if (!error && incident) {
           if (incident.status === 'RESOLVED') {
-            router.replace('/help/resolution');
+            handleResolutionRedirect();
             return;
           }
           if (incident.status === 'ARRIVED') {
@@ -371,7 +394,7 @@ export default function TrackingScreen() {
               .single();
             
             if (resp) {
-              setAssignedResponder(resp);
+              updateAssignedResponder(resp);
               if (resp.last_latitude && resp.last_longitude) {
                 setAmbulanceLocation({
                   latitude: Number(resp.last_latitude),
@@ -380,7 +403,7 @@ export default function TrackingScreen() {
               }
             }
           } else {
-            setAssignedResponder(null);
+            updateAssignedResponder(null);
             setIsFindingAmbulance(true);
           }
         }
@@ -418,16 +441,14 @@ export default function TrackingScreen() {
     };
   }, [report.incidentId]);
 
-  // Natural elapsed time incrementer
+  // Natural elapsed time incrementer - runs continuously during active tracking
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (!isArrived) {
-      interval = setInterval(() => {
-        setElapsed((prev) => prev + 1);
-      }, 1000);
-    }
+    const interval = setInterval(() => {
+      elapsedRef.current += 1;
+      setElapsed(elapsedRef.current);
+    }, 1000);
     return () => clearInterval(interval);
-  }, [isArrived]);
+  }, []);
 
   const isTransporting = liveResponderStatus === 'to_hospital' && liveTargetHospital;
   const displayProgressPercent = isArrived && !isTransporting ? 100 : progressPercent;
@@ -547,12 +568,16 @@ export default function TrackingScreen() {
           {/* Status Messaging */}
           <View style={styles.statusBox}>
             <Text style={styles.statusTitle}>
-              {report.nature === 'Non-emergency' ? 'Awaiting Dispatcher Triage...' : 'Finding Closest Ambulance...'}
+              {report.isMergedDuplicate 
+                ? 'Rescue Operations Active' 
+                : (report.nature === 'Non-emergency' ? 'Awaiting Dispatcher Triage...' : 'Finding Closest Ambulance...')}
             </Text>
             <Text style={styles.statusDescription}>
-              {report.nature === 'Non-emergency'
-                ? 'PACC Command Center is currently reviewing your non-emergency report. An administrator will manually verify your request shortly and assign an ambulance based on priority and unit availability. Please remain patient.'
-                : 'PACC is currently dispatching the closest active unit in Baliwag City. If the closest unit does not respond, it will be automatically recycled and manually assigned by the PACC Command Center to guarantee response.'}
+              {report.isMergedDuplicate
+                ? 'Your alert has been merged with a verified active emergency at this exact location. An ambulance unit has already been dispatched and is currently en route. You can track their real-time location above.'
+                : (report.nature === 'Non-emergency'
+                  ? 'PACC Command Center is currently reviewing your non-emergency report. An administrator will manually verify your request shortly and assign an ambulance based on priority and unit availability. Please remain patient.'
+                  : 'PACC is currently dispatching the closest active unit in Baliwag City. If the closest unit does not respond, it will be automatically recycled and manually assigned by the PACC Command Center to guarantee response.')}
             </Text>
           </View>
 
@@ -654,7 +679,9 @@ export default function TrackingScreen() {
               <Navigation color="white" size={14} fill="white" />
             </View>
             <Text className="ml-2 text-[10px] font-bold text-slate-700">
-              AMB-001
+              {assignedResponder?.full_name 
+                ? `AMB-${assignedResponder.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 3)}${assignedResponder.id ? `-${assignedResponder.id.slice(-3).toUpperCase()}` : ""}` 
+                : "AMB-001"}
             </Text>
           </View>
         </Marker>
@@ -764,7 +791,9 @@ export default function TrackingScreen() {
               </View>
               <View style={styles.ambulancePillText}>
                 <Text style={[styles.ambulanceUnitText, isTransporting && { color: '#065F46' }]}>
-                  {assignedResponder?.fullName ? `AMB-${assignedResponder.fullName.split(',')[0].toUpperCase()}` : "AMB-001"}
+                  {assignedResponder?.full_name 
+                    ? `AMB-${assignedResponder.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 3)}${assignedResponder.id ? `-${assignedResponder.id.slice(-3).toUpperCase()}` : ""}` 
+                    : "AMB-001"}
                 </Text>
                 <Text style={[styles.ambulanceStatusText, isTransporting && { color: '#047857' }]}>
                   {isTransporting 
@@ -815,11 +844,11 @@ export default function TrackingScreen() {
                   <Text style={styles.crewRole}>RESPONDER</Text>
                   <View style={styles.crewAvatar}>
                     <Text style={styles.crewAvatarText}>
-                      {assignedResponder?.fullName ? assignedResponder.fullName.substring(0, 2).toUpperCase() : "RB"}
+                      {assignedResponder?.full_name ? assignedResponder.full_name.substring(0, 2).toUpperCase() : "RB"}
                     </Text>
                   </View>
                   <Text style={styles.crewName} numberOfLines={1}>
-                    {assignedResponder?.fullName || "Bastes, Renzy"}
+                    {assignedResponder?.full_name || "Bastes, Renzy"}
                   </Text>
                   <Text style={styles.crewYears}>
                     {assignedResponder?.phone || "0917-123-4567"}

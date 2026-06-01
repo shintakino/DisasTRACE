@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { MapIncident, MapResponder, MapSummary, MapHospital, MapIncidentSchema, MapResponderSchema, MapSummarySchema, MapHospitalSchema } from "@/types/map";
 import { z } from "zod";
+import { createClientBrowser } from "@/lib/supabase";
 
 export function useMapData() {
   const [incidents, setIncidents] = useState<MapIncident[]>([]);
@@ -12,7 +13,8 @@ export function useMapData() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = async (showSkeleton = true) => {
+    if (showSkeleton) setIsLoading(true);
     try {
       const [incidentsRes, respondersRes, summaryRes, hospitalsRes] = await Promise.all([
         fetch("/api/map/incidents"),
@@ -34,37 +36,62 @@ export function useMapData() {
       setResponders(z.array(MapResponderSchema).parse(respondersData));
       setSummary(MapSummarySchema.parse(summaryData));
       setHospitals(z.array(MapHospitalSchema).parse(hospitalsData));
-      setIsLoading(false);
+      if (showSkeleton) setIsLoading(false);
     } catch (err) {
       console.error("Error fetching map data:", err);
       setError(err instanceof Error ? err.message : "An unknown error occurred");
-      setIsLoading(false);
+      if (showSkeleton) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
 
-    // Simulate real-time updates every 5 seconds
-    const interval = setInterval(() => {
-      setResponders((currentResponders) => 
-        currentResponders.map((r) => {
-          // If dispatched, move slightly towards a random hospital or destination
-          const latDiff = (Math.random() - 0.5) * 0.001;
-          const lngDiff = (Math.random() - 0.5) * 0.001;
-          
-          return {
-            ...r,
-            lat: r.lat + latDiff,
-            lng: r.lng + lngDiff,
-            heading: (r.heading || 0) + (Math.random() - 0.5) * 10,
-          };
-        })
-      );
-    }, 5000);
+    const supabase = createClientBrowser();
+    
+    // Subscribe to realtime database changes for incidents, users (responders), and verification requests
+    const channel = supabase
+      .channel("map_data_realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "incidents",
+        },
+        () => {
+          fetchData(false);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "users",
+          filter: "role=eq.ambulance_responder",
+        },
+        () => {
+          fetchData(false);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "verification_requests",
+        },
+        () => {
+          fetchData(false);
+        }
+      )
+      .subscribe();
 
-    return () => clearInterval(interval);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  return { incidents, responders, hospitals, summary, isLoading, error, refresh: fetchData };
+  return { incidents, responders, hospitals, summary, isLoading, error, refresh: () => fetchData(true) };
 }

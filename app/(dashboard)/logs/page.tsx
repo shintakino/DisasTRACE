@@ -8,6 +8,7 @@ import { StatusLogEntry, LogFilter } from "@/types/logs"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { createClientBrowser } from "@/lib/supabase"
 
 export default function LogsPage() {
   const { role } = useAuth()
@@ -17,8 +18,8 @@ export default function LogsPage() {
   const [isLoading, setIsLoading] = React.useState(true)
   const [filters, setFilters] = React.useState<LogFilter>({})
 
-  const fetchLogs = React.useCallback(async () => {
-    setIsLoading(true)
+  const fetchLogs = React.useCallback(async (showSkeleton = true) => {
+    if (showSkeleton) setIsLoading(true)
     try {
       const queryParams = new URLSearchParams()
       if (filters.search) queryParams.append("search", filters.search)
@@ -32,13 +33,40 @@ export default function LogsPage() {
       console.error("Failed to fetch logs:", error)
       toast.error("Error loading activity logs")
     } finally {
-      setIsLoading(false)
+      if (showSkeleton) setIsLoading(false)
     }
   }, [filters])
 
   React.useEffect(() => {
     if (role) {
-      fetchLogs()
+      fetchLogs(true)
+    }
+  }, [fetchLogs, role])
+
+  React.useEffect(() => {
+    if (!role) return
+
+    const supabase = createClientBrowser()
+    
+    // Subscribe to realtime status logs changes
+    const channel = supabase
+      .channel("status_logs_realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "status_logs",
+        },
+        () => {
+          // Silent refresh (avoid skeleton flicker)
+          fetchLogs(false)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
     }
   }, [fetchLogs, role])
 

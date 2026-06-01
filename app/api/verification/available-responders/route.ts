@@ -18,13 +18,21 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+
+    const whereConditions = [
+      eq(users.role, "ambulance_responder"),
+      eq(users.status, "ACTIVE"),
+      eq(users.dutyStatus, "ON_DUTY")
+    ];
+
+    if (isDevMode) {
+      whereConditions.push(eq(users.email, "responder@disastrace.com"));
+    }
+
     // Query active and clocked-in responders
     const activeResponders = await db.query.users.findMany({
-      where: and(
-        eq(users.role, "ambulance_responder"),
-        eq(users.status, "ACTIVE"),
-        eq(users.dutyStatus, "ON_DUTY")
-      ),
+      where: and(...whereConditions),
     });
 
     const mappedResponders = activeResponders.map((r) => ({

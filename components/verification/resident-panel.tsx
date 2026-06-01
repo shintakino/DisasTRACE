@@ -5,16 +5,17 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { VerificationRequest } from "@/types/verification"
-import { CheckCircle2, Phone, MapPin, History, ShieldCheck, XCircle, Check } from "lucide-react"
+import { CheckCircle2, Phone, MapPin, History, ShieldCheck, XCircle, Check, GitMerge } from "lucide-react"
 
 interface ResidentPanelProps {
   request: VerificationRequest | null
   onAccept: (id: string) => void
   onReject: (id: string) => void
+  onMerge?: (id: string) => void
   isProcessing: boolean
 }
 
-export function ResidentPanel({ request, onAccept, onReject, isProcessing }: ResidentPanelProps) {
+export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessing }: ResidentPanelProps) {
   if (!request) {
     return (
       <div className="w-80 shrink-0 border-l bg-muted/30 p-4 flex flex-col items-center justify-center text-muted-foreground text-sm italic">
@@ -32,28 +33,40 @@ export function ResidentPanel({ request, onAccept, onReject, isProcessing }: Res
 
   return (
     <div className="w-80 shrink-0 border-l bg-muted/30 p-4 flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          variant="secondary"
-          className="w-full flex items-center justify-center gap-2"
-          onClick={() => onReject(request.id)}
-          disabled={isProcessing || request.status !== "PENDING"}
-        >
-          <XCircle className="w-4 h-4" />
-          Reject
-        </Button>
-        <Button
-          className="w-full bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 text-white flex items-center justify-center gap-2"
-          onClick={() => onAccept(request.id)}
-          disabled={
-            isProcessing || 
-            (request.status === "REJECTED") ||
-            (request.status === "VERIFIED" && request.incident ? !!(request.incident.responderId || request.incident.currentOfferResponderId) : false)
-          }
-        >
-          <Check className="w-4 h-4" />
-          {request.status === "VERIFIED" ? "Dispatch" : "Accept"}
-        </Button>
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            variant="secondary"
+            className="w-full flex items-center justify-center gap-2"
+            onClick={() => onReject(request.id)}
+            disabled={isProcessing || request.status !== "PENDING"}
+          >
+            <XCircle className="w-4 h-4" />
+            Reject
+          </Button>
+          <Button
+            className="w-full bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 text-white flex items-center justify-center gap-2"
+            onClick={() => onAccept(request.id)}
+            disabled={
+              isProcessing || 
+              (request.status === "REJECTED") ||
+              (request.status === "VERIFIED" && request.incident ? !!(request.incident.responderId || request.incident.currentOfferResponderId) : false)
+            }
+          >
+            <Check className="w-4 h-4" />
+            {request.status === "VERIFIED" ? "Dispatch" : "Accept"}
+          </Button>
+        </div>
+        {request.status === "PENDING" && (
+          <Button
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2"
+            onClick={() => onMerge?.(request.id)}
+            disabled={isProcessing}
+          >
+            <GitMerge className="w-4 h-4" />
+            Merge Duplicate
+          </Button>
+        )}
       </div>
 
       <Separator />

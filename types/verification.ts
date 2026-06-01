@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { IncidentTypeSchema } from "./reports"; // Reuse existing enum
 
-export const VerificationStatusSchema = z.enum(["PENDING", "VERIFIED", "REJECTED"]);
+export const VerificationStatusSchema = z.enum(["PENDING", "VERIFIED", "REJECTED", "DUPLICATE"]);
 export type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
 
 export const IncidentNatureSchema = z.enum(["EMERGENCY", "NON-EMERGENCY"]);

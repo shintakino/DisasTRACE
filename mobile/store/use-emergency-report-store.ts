@@ -23,6 +23,10 @@ export const EmergencyReportSchema = z.object({
   longitude: z.number(),
   severity: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
   nature: z.enum(["Emergency", "Non-emergency"]).optional(),
+  totalDurationSeconds: z.number().optional(),
+  responderFullName: z.string().optional(),
+  responderVehicleId: z.string().optional(),
+  isMergedDuplicate: z.boolean().optional(),
 });
 
 export type EmergencyReportType = z.infer<typeof EmergencyReportSchema>;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal } from 'react-native';
-import { X, Truck } from 'lucide-react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
+import { X, Truck, Image as ImageIcon } from 'lucide-react-native';
 
 export function ReportDetailModal({ 
   visible, 
@@ -12,11 +12,13 @@ export function ReportDetailModal({
   onClose: () => void 
 }) {
   const [activeTab, setActiveTab] = useState('FROM RESIDENT');
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
   if (!report) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <>
+      <Modal visible={visible} transparent animationType="fade">
       <View className="flex-1 bg-black/40 justify-center items-center p-4">
         <View className="bg-white rounded-3xl w-full max-w-md shadow-lg overflow-hidden mt-10" style={{ maxHeight: '85%' }}>
           
@@ -92,7 +94,7 @@ export function ReportDetailModal({
               <View className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 mb-6">
                 <View className="flex-row justify-between mb-4">
                   <Text className="text-sm font-medium text-slate-500">Nature of Call</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">Emergency</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.natureOfCall || 'Emergency'}</Text>
                 </View>
                 <View className="flex-row justify-between mb-4 items-center">
                   <Text className="text-sm font-medium text-slate-500">Type of Emergency</Text>
@@ -100,53 +102,99 @@ export function ReportDetailModal({
                 </View>
                 <View className="flex-row justify-between mb-4 items-center">
                   <Text className="text-sm font-medium text-slate-500">Severity Level</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">Critical</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.severityLevel || 'Critical'}</Text>
                 </View>
                 <View className="flex-row justify-between mb-4">
                   <Text className="text-sm font-medium text-slate-500">People Involved</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">3</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.peopleInvolved !== undefined ? String(report.peopleInvolved) : '3'}</Text>
                 </View>
                 <View className="flex-row justify-between mb-6">
                   <Text className="text-sm font-medium text-slate-500">Location</Text>
                   <Text className="text-sm font-bold text-[#1E3A8A]">{report.location}</Text>
                 </View>
                 
-                {/* Attached Image placeholder */}
-                <View className="w-full h-32 bg-slate-200 rounded-xl overflow-hidden relative justify-end p-3">
-                   {/* In a real scenario we'd use Image component, simulating it with a colored block here */}
-                   <View className="absolute inset-0 bg-slate-800" />
-                   <Text className="text-white font-medium text-xs z-10">IMG_7904.jpg</Text>
+                {/* Attached Image */}
+                <View className="w-full">
+                  {report.residentPhotoUrl ? (
+                    <TouchableOpacity 
+                      activeOpacity={0.9} 
+                      onPress={() => setExpandedImage(report.residentPhotoUrl)}
+                      className="w-full h-32 bg-slate-100 rounded-xl overflow-hidden relative justify-end"
+                    >
+                      <Image 
+                        source={{ uri: report.residentPhotoUrl }} 
+                        className="absolute inset-0 w-full h-full" 
+                        resizeMode="cover" 
+                      />
+                      <View className="absolute inset-0 bg-black/10" />
+                      <View className="absolute bottom-0 left-0 right-0 bg-black/60 p-2 flex-row justify-between items-center">
+                        <Text className="text-white text-xs font-semibold">IMG_7904.jpg</Text>
+                        <Text className="text-white/80 text-[10px] font-medium">Click to expand</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ) : (
+                    <View className="w-full h-32 bg-slate-50 rounded-xl items-center justify-center border border-slate-200 border-dashed">
+                      <ImageIcon color="#94A3B8" size={32} />
+                      <Text className="text-slate-400 text-xs mt-2 font-medium">No attached image</Text>
+                    </View>
+                  )}
                 </View>
               </View>
 
               {report.status !== 'RESPONDING' && (
                 <>
                   <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">CREW'S ACTUAL FINDINGS {report.status === 'ONGOING' ? '(DRAFT)' : ''}</Text>
-                  <Text className="text-xs font-bold text-[#1E3A8A] uppercase tracking-widest mb-4">NATURE OF CALL</Text>
                   
-                  <View className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-                <View className="flex-row justify-between mb-4">
-                  <Text className="text-sm font-medium text-slate-500">Nature of Call</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">Emergency</Text>
-                </View>
-                <View className="flex-row justify-between mb-4 items-center">
-                  <Text className="text-sm font-medium text-slate-500">Type of Emergency</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.type}</Text>
-                </View>
-                <View className="flex-row justify-between mb-4 items-center">
-                  <Text className="text-sm font-medium text-slate-500">Severity Level</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">Critical</Text>
-                </View>
-                <View className="flex-row justify-between mb-4">
-                  <Text className="text-sm font-medium text-slate-500">People Involved</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">3</Text>
-                </View>
-                <View className="flex-row justify-between">
-                  <Text className="text-sm font-medium text-slate-500">Location</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.location}</Text>
-                </View>
-              </View>
-              </>
+                  <View className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 mb-6">
+                    <View className="flex-row justify-between mb-4">
+                      <Text className="text-sm font-medium text-slate-500">Nature of Call</Text>
+                      <Text className="text-sm font-bold text-[#1E3A8A]">{report.natureOfCall || 'Emergency'}</Text>
+                    </View>
+                    <View className="flex-row justify-between mb-4 items-center">
+                      <Text className="text-sm font-medium text-slate-500">Type of Emergency</Text>
+                      <Text className="text-sm font-bold text-[#1E3A8A]">{report.type}</Text>
+                    </View>
+                    <View className="flex-row justify-between mb-4 items-center">
+                      <Text className="text-sm font-medium text-slate-500">Severity Level</Text>
+                      <Text className="text-sm font-bold text-[#1E3A8A]">{report.severityLevel || 'Critical'}</Text>
+                    </View>
+                    <View className="flex-row justify-between mb-4">
+                      <Text className="text-sm font-medium text-slate-500">People Involved</Text>
+                      <Text className="text-sm font-bold text-[#1E3A8A]">{report.peopleInvolved !== undefined ? String(report.peopleInvolved) : '3'}</Text>
+                    </View>
+                    <View className="flex-row justify-between mb-4">
+                      <Text className="text-sm font-medium text-slate-500">Location</Text>
+                      <Text className="text-sm font-bold text-[#1E3A8A]">{report.location}</Text>
+                    </View>
+
+                    {/* Dynamic Crew Notes */}
+                    {report.crewFindings && (
+                      <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mt-2 mb-4">
+                        <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Crew Notes</Text>
+                        <Text className="text-sm text-slate-600 leading-relaxed">{report.crewFindings}</Text>
+                      </View>
+                    )}
+
+                    {/* Scene Photos if available */}
+                    {report.scenePhotos && report.scenePhotos.length > 0 && (
+                      <View className="mt-2">
+                        <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">SCENE PHOTOS</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+                          {report.scenePhotos.map((photo: string, idx: number) => (
+                            <TouchableOpacity
+                              key={idx}
+                              activeOpacity={0.9}
+                              onPress={() => setExpandedImage(photo)}
+                              className="w-20 h-20 bg-slate-100 rounded-xl overflow-hidden border border-slate-100 mr-3 relative"
+                            >
+                              <Image source={{ uri: photo }} className="w-full h-full" resizeMode="cover" />
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+                </>
               )}
               </>
             ) : (
@@ -159,5 +207,37 @@ export function ReportDetailModal({
         </View>
       </View>
     </Modal>
+
+    {/* Lightbox Modal */}
+    <Modal 
+      visible={!!expandedImage} 
+      transparent 
+      animationType="fade"
+      onRequestClose={() => setExpandedImage(null)}
+    >
+      <View className="flex-1 bg-black/95 justify-center items-center relative">
+        <TouchableOpacity 
+          onPress={() => setExpandedImage(null)}
+          className="absolute top-12 right-6 w-12 h-12 bg-white/10 rounded-full items-center justify-center z-50 border border-white/15"
+        >
+          <X size={24} color="#FFFFFF" strokeWidth={2.5} />
+        </TouchableOpacity>
+
+        {expandedImage && (
+          <Image 
+            source={{ uri: expandedImage }} 
+            className="w-full h-5/6" 
+            resizeMode="contain" 
+          />
+        )}
+
+        <View className="absolute bottom-12 left-6 right-6 items-center">
+          <Text className="text-white/60 text-xs font-medium text-center">
+            Tap the X or outside to close the full view
+          </Text>
+        </View>
+      </View>
+    </Modal>
+  </>
   );
 }

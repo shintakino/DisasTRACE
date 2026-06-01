@@ -9,8 +9,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { DetailedIncidentReport } from "@/types/reports";
-import { Truck, MoreVertical, X } from "lucide-react";
+import { Truck, MoreVertical, X, FileDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface ReportDetailSheetProps {
   reportId: string | null;
@@ -27,6 +28,24 @@ export function ReportDetailSheet({
   const [loading, setLoading] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"incident" | "resident">("resident");
   const [expandedImage, setExpandedImage] = React.useState<string | null>(null);
+  const [exporting, setExporting] = React.useState(false);
+
+  const handleSingleReportExport = async () => {
+    if (!report) return;
+    setExporting(true);
+    toast.promise(
+      (async () => {
+        const { exportSingleIncidentReportPDF } = await import("@/lib/pdf-export");
+        await exportSingleIncidentReportPDF(report);
+      })(),
+      {
+        loading: `Exporting report ${report.id} to PDF...`,
+        success: "PDF exported successfully.",
+        error: "Failed to export PDF.",
+      }
+    );
+    setExporting(false);
+  };
 
   React.useEffect(() => {
     if (reportId && isOpen) {
@@ -82,12 +101,23 @@ export function ReportDetailSheet({
                     </div>
                   </div>
                 </div>
-                <button 
-                  onClick={onClose}
-                  className="h-8 w-8 rounded-full bg-[#E8EAF6] flex items-center justify-center text-[#1A237E] hover:bg-[#C5CAE9] transition-colors shrink-0"
-                >
-                  <X className="h-4 w-4 stroke-[3]" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSingleReportExport}
+                    disabled={exporting}
+                    className="h-8 px-3 rounded-full bg-[#E8EAF6] text-[#1A237E] hover:bg-[#C5CAE9] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0"
+                    title="Export Report to PDF"
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    <span>PDF</span>
+                  </button>
+                  <button 
+                    onClick={onClose}
+                    className="h-8 w-8 rounded-full bg-[#E8EAF6] flex items-center justify-center text-[#1A237E] hover:bg-[#C5CAE9] transition-colors shrink-0"
+                  >
+                    <X className="h-4 w-4 stroke-[3]" />
+                  </button>
+                </div>
               </div>
 
               {/* Vehicle Icon */}
@@ -157,19 +187,19 @@ export function ReportDetailSheet({
                       </div>
 
                       {/* Photo attached */}
-                      {report.scenePhotos && report.scenePhotos.length > 0 && (
+                      {report.residentPhotoUrl && (
                         <button 
                           type="button"
-                          onClick={() => setExpandedImage(report.scenePhotos[0])}
+                          onClick={() => setExpandedImage(report.residentPhotoUrl || null)}
                           className="relative rounded-[20px] overflow-hidden h-[140px] w-full mt-5 bg-slate-100 group block text-left"
                         >
                           <img 
-                            src={report.scenePhotos[0]} 
+                            src={report.residentPhotoUrl} 
                             alt="Scene photo" 
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
                           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-12 pb-3 px-4 flex justify-between items-end">
-                            <span className="text-white text-xs font-medium tracking-wide">IMG_7904.jpg</span>
+                            <span className="text-white text-xs font-medium tracking-wide">RESIDENT_ATTACHMENT.jpg</span>
                             <div className="text-white bg-white/20 p-1 rounded-full group-hover:bg-white/30 transition-colors">
                               <MoreVertical className="h-4 w-4" />
                             </div>
@@ -231,8 +261,87 @@ export function ReportDetailSheet({
               )}
 
               {activeTab === "incident" && (
-                <div className="w-full text-center text-sm text-slate-500 py-10 animate-in fade-in zoom-in-95 duration-200">
-                  <p className="font-medium text-[#1A237E]">Incident Information content goes here</p>
+                <div className="w-full space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                  {/* Crew's Summary findings */}
+                  <div>
+                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Crew Findings & Description</h3>
+                    <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
+                      <p className="text-slate-600 text-xs leading-relaxed font-medium">
+                        {report.crewFindings || "No findings recorded by the responding crew."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Treated Patients Roster */}
+                  {report.participants && report.participants.length > 0 && (
+                    <div>
+                      <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Treated Patients</h3>
+                      <div className="border border-[#E8EAF6] rounded-3xl overflow-hidden shadow-sm bg-white">
+                        <table className="w-full border-collapse text-left text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-[#E8EAF6] text-[#1A237E] font-black uppercase tracking-wider text-[9px]">
+                              <th className="py-3 px-4">Patient Name</th>
+                              <th className="py-3 px-4">Contact</th>
+                              <th className="py-3 px-4">Triage Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {report.participants.map((p, idx) => (
+                              <tr key={idx} className="border-b border-[#E8EAF6] last:border-0 font-bold text-slate-700">
+                                <td className="py-3 px-4">{p.name || `Patient #${idx + 1}`}</td>
+                                <td className="py-3 px-4 text-slate-500">{p.contact || "N/A"}</td>
+                                <td className="py-3 px-4">
+                                  <Badge className={cn(
+                                    "font-black text-[8px] uppercase tracking-wider border-none shadow-none px-2 py-0.5",
+                                    p.triageStatus?.includes("Critical") || p.triageStatus?.includes("Red")
+                                      ? "bg-red-100 text-red-700"
+                                      : p.triageStatus?.includes("Stable") || p.triageStatus?.includes("Green")
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-amber-100 text-amber-700"
+                                  )}>
+                                    {p.triageStatus || "Stable"}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Scene Photos Grid */}
+                  {report.scenePhotos && report.scenePhotos.length > 0 && (
+                    <div>
+                      <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Clinical Crew Scene Photos</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        {report.scenePhotos.map((photo, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setExpandedImage(photo)}
+                            className="relative rounded-2xl overflow-hidden h-[110px] bg-slate-100 group block text-left shadow-sm border border-slate-100"
+                          >
+                            <img
+                              src={photo}
+                              alt={`Scene photo ${idx + 1}`}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pt-8 pb-2 px-3">
+                              <span className="text-white text-[10px] font-medium tracking-wide">SCENE_PHOTO_{idx + 1}.jpg</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Scroll Up indicator */}
+                  <div className="text-center pt-8 pb-4 opacity-50 hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer">
+                      Scroll Up
+                    </span>
+                  </div>
                 </div>
               )}
             </div>

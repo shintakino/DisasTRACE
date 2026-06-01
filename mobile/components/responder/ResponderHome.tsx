@@ -29,6 +29,9 @@ export function ResponderHome() {
   // Mock initials
   const initials = profile?.fullName ? profile.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'RB';
   const name = profile?.fullName || 'Renzy Bastes';
+  const vehicleInitials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
+  const suffix = user?.id ? user.id.slice(-3).toUpperCase() : "";
+  const myVehicleId = `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
 
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number]>([120.895, 14.945]);
@@ -92,6 +95,9 @@ export function ResponderHome() {
       // Update state coordinates and heading
       setCurrentLocation(currentCoord);
       setHeading(angle);
+
+      // Update current speed in store during simulation
+      useResponderStore.setState({ currentSpeedKph: 50 });
 
       // 1. Broadcast telemetry to the resident
       telemetryChannel.send({
@@ -159,6 +165,22 @@ export function ResponderHome() {
     }
   }, [status]);
 
+  // Active Dispatch Elapsed Time Incrementer (dynamic run timer)
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') {
+      interval = setInterval(() => {
+        useResponderStore.getState().incrementElapsedTime();
+        if (status === 'on_scene') {
+          useResponderStore.getState().incrementSceneTime();
+        }
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [status]);
+
   // Active incident restoration is handled at the parent tab index.tsx gate to prevent screen flashing.
 
   // Real-time incident dispatch listener
@@ -189,6 +211,7 @@ export function ResponderHome() {
             let peopleInvolved = 1;
             let incidentLat = 14.9538;
             let incidentLng = 120.9029;
+            let attachmentUrl: string | undefined = undefined;
 
             try {
               const { data: vReq, error: vReqError } = await supabase
@@ -202,6 +225,7 @@ export function ResponderHome() {
                 typeOfEmergency = vReq.type || 'Emergency';
                 incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
                 incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
+                attachmentUrl = vReq.image_url || undefined;
                 
                 if (vReq.people_involved) {
                   const matched = vReq.people_involved.match(/\d+/);
@@ -246,6 +270,7 @@ export function ResponderHome() {
                 typeOfEmergency,
                 dispatchOfferDurationSeconds: inc.dispatch_offer_duration_seconds || 30,
                 assignedAmbulance: inc.assigned_ambulance || 'AMB-001',
+                attachmentUrl,
               }
             });
           } else if (inc && inc.responder_id === user.id && inc.status === 'EN_ROUTE') {
@@ -258,6 +283,7 @@ export function ResponderHome() {
             let peopleInvolved = 1;
             let incidentLat = 14.9538;
             let incidentLng = 120.9029;
+            let attachmentUrl: string | undefined = undefined;
 
             try {
               const { data: vReq, error: vReqError } = await supabase
@@ -271,10 +297,11 @@ export function ResponderHome() {
                 typeOfEmergency = vReq.type || 'Emergency';
                 incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
                 incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
+                attachmentUrl = vReq.image_url || undefined;
                 
                 if (vReq.people_involved) {
-                  const matched = vReq.people_involved.match(/\d+/);
-                  peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
+                   const matched = vReq.people_involved.match(/\d+/);
+                   peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
                 }
 
                 const { data: resUser } = await supabase
@@ -314,6 +341,7 @@ export function ResponderHome() {
                 },
                 typeOfEmergency,
                 assignedAmbulance: inc.assigned_ambulance || 'AMB-001',
+                attachmentUrl,
               }
             });
           }
@@ -395,21 +423,34 @@ export function ResponderHome() {
             let lat = loc.coords.latitude;
             let lng = loc.coords.longitude;
             
-            // Mock coordinates in Baliwag if user is outside the city (for developer convenience)
-            if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
-              if (status === 'on_scene' && activeDispatch) {
+            const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+
+            // Geofence coordinate locking for developer testing convenience
+            if (isDevMode && (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00)) {
+              if (status === 'on_scene' && activeDispatch?.coordinates) {
                 lat = activeDispatch.coordinates.latitude;
                 lng = activeDispatch.coordinates.longitude;
               } else {
                 lat = 14.954;
                 lng = 120.902;
               }
+            } else if (status === 'on_scene' && activeDispatch?.coordinates) {
+              // Maintain on-scene snap alignment in both dev and production to ensure map markers overlap perfectly
+              lat = activeDispatch.coordinates.latitude;
+              lng = activeDispatch.coordinates.longitude;
             }
             
             setCurrentLocation([lng, lat]);
             if (loc.coords.heading !== null && loc.coords.heading !== undefined) {
               setHeading(loc.coords.heading);
             }
+
+            // Update physical speed in store
+            let speedKph = 0;
+            if (loc.coords.speed !== null && loc.coords.speed !== undefined && loc.coords.speed > 0) {
+              speedKph = Math.round(loc.coords.speed * 3.6);
+            }
+            useResponderStore.setState({ currentSpeedKph: speedKph });
           }
         );
       } catch (err) {
@@ -469,6 +510,10 @@ export function ResponderHome() {
             const coords = data.routes[0].geometry.coordinates;
             setRouteCoords(coords);
             
+            const distanceKm = Number((data.routes[0].distance / 1000).toFixed(1));
+            const etaMins = Math.ceil(data.routes[0].duration / 60);
+            useResponderStore.getState().setHospitalRouteMetrics(distanceKm, etaMins);
+
             // Calculate map view bounds for OSRM route
             let minLng = coords[0][0], maxLng = coords[0][0], minLat = coords[0][1], maxLat = coords[0][1];
             coords.forEach((coord: number[]) => {
@@ -695,8 +740,8 @@ export function ResponderHome() {
           </View>
         )}
 
-        {/* Floating Simulation Button */}
-        {(status === 'en_route' || status === 'to_hospital') && (
+        {/* Floating Simulation Button - Only visible in Developer Mode */}
+        {process.env.EXPO_PUBLIC_DEV_MODE === 'true' && (status === 'en_route' || status === 'to_hospital') && (
           <View className="absolute right-6 top-[140px] pointer-events-auto" style={{ zIndex: 999 }}>
             <TouchableOpacity
               onPress={toggleSimulation}
@@ -724,7 +769,7 @@ export function ResponderHome() {
         <View className="px-6 mt-6 pointer-events-auto">
           {status === 'idle' && (
             <View className="flex-row items-center justify-between bg-transparent">
-              <View className="flex-row items-center">
+              <View className="flex-row items-center flex-1 mr-3">
                 <View className="relative">
                   <View className="w-14 h-14 rounded-full border border-white/30 items-center justify-center bg-blue-900/80 backdrop-blur-md">
                     <Text className="text-white font-black text-xl">{initials}</Text>
@@ -733,13 +778,38 @@ export function ResponderHome() {
                     <Check size={10} color="#1E3A8A" strokeWidth={4} />
                   </View>
                 </View>
-                <View className="ml-3">
-                  <Text className="text-white text-lg font-bold shadow-sm">{name}</Text>
+                <View className="ml-3 flex-1">
+                  <Text className="text-white text-lg font-bold shadow-sm" numberOfLines={1}>{name}</Text>
                   <Text className="text-white/70 text-xs font-medium tracking-wider">EMP-2026-0012</Text>
                 </View>
               </View>
-              <View className="bg-red-200 px-3 py-1.5 rounded-full shadow-sm">
-                <Text className="text-red-900 text-[10px] font-black tracking-widest uppercase">On Duty</Text>
+              <View className={`px-3 py-1.5 rounded-full border flex-row items-center shadow-sm shrink-0 ${
+                profile?.dutyStatus === 'ON_DUTY'
+                  ? "bg-green-500/20 border-green-400/40"
+                  : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                    ? "bg-red-500/20 border-red-400/40"
+                    : "bg-slate-500/20 border-slate-400/40"
+              }`}>
+                <View className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                  profile?.dutyStatus === 'ON_DUTY'
+                    ? "bg-green-400"
+                    : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                      ? "bg-red-400"
+                      : "bg-slate-400"
+                }`} />
+                <Text className={`text-[10px] font-black uppercase tracking-widest ${
+                  profile?.dutyStatus === 'ON_DUTY'
+                    ? "text-green-400"
+                    : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                      ? "text-red-400"
+                      : "text-slate-400"
+                }`}>
+                  {profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                    ? "Active Dispatch"
+                    : profile?.dutyStatus === 'ON_DUTY'
+                      ? "On Duty (Standby)"
+                      : "Off Duty"}
+                </Text>
               </View>
             </View>
           )}
@@ -751,7 +821,7 @@ export function ResponderHome() {
             <View className="flex-row items-center justify-between bg-transparent">
               <View>
                 <View className="flex-row items-center">
-                  <Text className="text-white text-2xl font-black shadow-sm tracking-tight">AMB-001</Text>
+                  <Text className="text-white text-2xl font-black shadow-sm tracking-tight">{myVehicleId}</Text>
                   <View className="ml-3 bg-white px-3 py-1 rounded-full shadow-sm">
                     <Text className="text-[#1E3A8A] text-[10px] font-black tracking-widest uppercase">
                       {status === 'en_route' ? 'Dispatched' : status === 'dispatch_offered' ? 'Incoming' : status === 'to_hospital' ? 'To Hospital' : 'On Scene'}

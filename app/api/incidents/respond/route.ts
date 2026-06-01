@@ -54,6 +54,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'ACCEPT') {
+      // Generate deterministic vehicle ID based on initials and unique UUID suffix (Option 1)
+      const initials = dbUser.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 3);
+      const suffix = dbUser.id.slice(-3).toUpperCase();
+      const vehicleId = `AMB-${initials || "001"}-${suffix}`;
+
       // 1. Accept dispatch: Update incident state
       const [updatedIncident] = await db.update(incidents)
         .set({
@@ -61,6 +71,7 @@ export async function POST(req: NextRequest) {
           responderId: user.id,
           currentOfferResponderId: null,
           offerExpiresAt: null,
+          assignedAmbulance: vehicleId,
         })
         .where(eq(incidents.id, incidentId))
         .returning();

@@ -6,7 +6,7 @@ import { Hospital } from 'iconsax-react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
 
 export function ToHospitalSheet() {
-  const { status, elapsedTimeSeconds, targetHospital, startReport } = useResponderStore();
+  const { status, elapsedTimeSeconds, targetHospital, startReport, hospitalDistanceKm, hospitalEtaMins } = useResponderStore();
   const bottomSheetRef = useRef<BottomSheet>(null);
 
   useEffect(() => {
@@ -49,7 +49,9 @@ export function ToHospitalSheet() {
         {/* Metrics Grid */}
         <View className="flex-row space-x-3 mb-6">
           <View className="flex-1 bg-white border border-slate-100 shadow-sm shadow-slate-200 rounded-2xl p-3 items-center justify-center">
-            <Text className="text-[#1E3A8A] font-bold text-xl">11 min</Text>
+            <Text className="text-[#1E3A8A] font-bold text-xl">
+              {hospitalEtaMins !== null ? `${hospitalEtaMins} min` : 'Calculating...'}
+            </Text>
             <Text className="text-slate-400 text-[9px] font-bold mt-1 uppercase tracking-widest">ETA</Text>
           </View>
           <View className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl p-3 items-center justify-center">
@@ -57,7 +59,9 @@ export function ToHospitalSheet() {
             <Text className="text-slate-400 text-[9px] font-bold mt-1 uppercase tracking-widest">ELAPSED</Text>
           </View>
           <View className="flex-1 bg-white border border-slate-100 shadow-sm shadow-slate-200 rounded-2xl p-3 items-center justify-center">
-            <Text className="text-[#1E3A8A] font-bold text-xl">3.2 km</Text>
+            <Text className="text-[#1E3A8A] font-bold text-xl">
+              {hospitalDistanceKm !== null ? `${hospitalDistanceKm} km` : 'Calculating...'}
+            </Text>
             <Text className="text-slate-400 text-[9px] font-bold mt-1 uppercase tracking-widest">DISTANCE</Text>
           </View>
         </View>

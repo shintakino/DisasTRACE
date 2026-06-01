@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Star } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
@@ -12,6 +12,15 @@ export default function ResolutionScreen() {
   
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
+
+  const formatDuration = (seconds?: number) => {
+    if (seconds === undefined || seconds === null) return '12 Minutes'; // Fallback
+    if (seconds < 60) return `${seconds} Seconds`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (secs === 0) return `${mins} Minute${mins > 1 ? 's' : ''}`;
+    return `${mins} Min${mins > 1 ? 's' : ''} ${secs} Sec${secs > 1 ? 's' : ''}`;
+  };
  
   const handleReturnHome = async () => {
     // Only submit feedback if a rating star was selected (rating > 0)
@@ -44,8 +53,15 @@ export default function ResolutionScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+      style={styles.container}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         
         {/* Success Header */}
         <View style={styles.headerArea}>
@@ -64,12 +80,16 @@ export default function ResolutionScreen() {
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Dispatched Unit</Text>
-            <Text style={styles.summaryValue}>{report.incidentId ? 'AMB-001 (Dispatched)' : 'Ambulance Unit 3'}</Text>
+            <Text style={styles.summaryValue}>
+              {report.responderVehicleId 
+                ? `${report.responderVehicleId}${report.responderFullName ? ` (${report.responderFullName})` : ''}` 
+                : (report.incidentId ? 'AMB-001 (Dispatched)' : 'Ambulance Unit 3')}
+            </Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Duration</Text>
-            <Text style={styles.summaryValue}>12 Minutes</Text>
+            <Text style={styles.summaryValue}>{formatDuration(report.totalDurationSeconds)}</Text>
           </View>
         </View>
 
@@ -104,15 +124,13 @@ export default function ResolutionScreen() {
           />
         </View>
 
-        <View style={{ flex: 1 }} />
-
         {/* Action Button */}
         <TouchableOpacity style={styles.returnButton} onPress={handleReturnHome} activeOpacity={0.8}>
           <Text style={styles.returnButtonText}>RETURN TO HOME</Text>
         </TouchableOpacity>
 
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -121,74 +139,79 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  content: {
-    flex: 1,
+  scrollContent: {
     padding: 24,
-    paddingTop: 80,
+    paddingTop: Platform.OS === 'ios' ? 70 : 50,
+    paddingBottom: 40,
   },
   headerArea: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   iconCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#DCFCE7', // Green 100
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#1E3A8A', // Navy
   },
   summaryCard: {
     backgroundColor: '#FFF',
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
   summaryLabel: {
     color: '#64748B',
     fontSize: 14,
     fontWeight: '500',
+    flexShrink: 0,
   },
   summaryValue: {
     color: '#0F172A',
     fontSize: 14,
     fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'right',
   },
   divider: {
     height: 1,
     backgroundColor: '#E2E8F0',
-    marginVertical: 16,
+    marginVertical: 12,
   },
   ratingSection: {
     alignItems: 'center',
+    marginBottom: 32,
   },
   ratingTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#334155',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
     gap: 8,
   },
   starButton: {
-    padding: 8,
+    padding: 4,
   },
   feedbackInput: {
     width: '100%',
@@ -204,9 +227,8 @@ const styles = StyleSheet.create({
   returnButton: {
     backgroundColor: '#1E3A8A',
     borderRadius: 12,
-    paddingVertical: 18,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 20,
   },
   returnButtonText: {
     color: '#FFF',

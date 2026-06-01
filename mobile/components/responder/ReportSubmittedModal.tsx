@@ -4,7 +4,7 @@ import { useResponderStore } from '../../stores/useResponderStore';
 import { FolderCheck } from 'lucide-react-native';
 
 export function ReportSubmittedModal() {
-  const { showReportSuccess, activeDispatch, elapsedTimeSeconds, finishAndClose } = useResponderStore();
+  const { showReportSuccess, activeDispatch, lastSubmittedSummary, finishAndClose } = useResponderStore();
 
   if (!showReportSuccess) return null;
 
@@ -32,17 +32,23 @@ export function ReportSubmittedModal() {
             
             <View className="flex-row justify-between">
               <View className="items-center flex-1">
-                <Text className="text-[#1E3A8A] font-bold text-2xl mb-1">9m</Text>
+                <Text className="text-[#1E3A8A] font-bold text-2xl mb-1">
+                  {lastSubmittedSummary?.responseTimeMins || 9}m
+                </Text>
                 <Text className="text-slate-400 font-bold text-[8px] tracking-widest uppercase">RESPONSE</Text>
               </View>
               
               <View className="items-center flex-1 border-x border-slate-200">
-                <Text className="text-[#1E3A8A] font-bold text-2xl mb-1">3</Text>
+                <Text className="text-[#1E3A8A] font-bold text-2xl mb-1">
+                  {lastSubmittedSummary?.patientsCount || 1}
+                </Text>
                 <Text className="text-slate-400 font-bold text-[8px] tracking-widest uppercase">PATIENTS</Text>
               </View>
               
               <View className="items-center flex-1">
-                <Text className="text-[#1E3A8A] font-bold text-2xl mb-1">1.7</Text>
+                <Text className="text-[#1E3A8A] font-bold text-2xl mb-1">
+                  {lastSubmittedSummary?.distanceKm?.toFixed(1) || 1.7}
+                </Text>
                 <Text className="text-slate-400 font-bold text-[8px] tracking-widest uppercase">KM</Text>
               </View>
             </View>

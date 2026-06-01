@@ -50,14 +50,15 @@ export async function POST(
       return NextResponse.json({ error: "Responder not found" }, { status: 404 });
     }
 
-    // Generate dynamic vehicle ID based on initials, or fall back to AMB-001
+    // Generate dynamic vehicle ID based on initials and unique UUID suffix (Option 1)
     const initials = responder.fullName
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 3);
-    const vehicleId = `AMB-${initials || "001"}`;
+    const suffix = responder.id.slice(-3).toUpperCase();
+    const vehicleId = `AMB-${initials || "001"}-${suffix}`;
 
     // 3. Create the new incident with immediate assignment (Auto-Accept) first
     const [newIncident] = await db.insert(incidents).values({

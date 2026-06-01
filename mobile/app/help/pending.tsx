@@ -96,6 +96,66 @@ export default function PendingScreen() {
               ],
               { cancelable: false }
             );
+          } else if (payload.new && payload.new.status === 'DUPLICATE') {
+            const parentId = payload.new.parent_request_id || payload.new.parentRequestId;
+            if (parentId) {
+              console.log('[PendingScreen] Incident merged as duplicate of parent:', parentId);
+              
+              // 1. Fetch the incident associated with the parent request
+              const fetchParentIncidentWithRetry = async (retriesLeft = 5, delayMs = 500): Promise<boolean> => {
+                try {
+                  const { data: incident, error } = await supabase
+                    .from('incidents')
+                    .select('*')
+                    .eq('request_id', parentId)
+                    .maybeSingle();
+
+                  if (incident) {
+                    console.log('[PendingScreen] Successfully fetched parent incident details:', incident.id);
+                    
+                    // We update the state with the parent requestId and incidentId so we track it!
+                    useEmergencyReportStore.setState((state) => ({
+                      report: {
+                        ...state.report,
+                        id: parentId, // Set to parent ID so tracking queries parent telemetry!
+                        incidentId: incident.id,
+                        isMergedDuplicate: true // Flag to show customized overlay notice
+                      }
+                    }));
+                    return true;
+                  }
+                } catch (err) {
+                  console.error('[PendingScreen] Error querying parent incident:', err);
+                }
+
+                if (retriesLeft > 0) {
+                  await new Promise((resolve) => setTimeout(resolve, delayMs));
+                  return fetchParentIncidentWithRetry(retriesLeft - 1, delayMs);
+                }
+                return false;
+              };
+
+              await fetchParentIncidentWithRetry();
+              
+              // Tactile success haptic
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+              
+              // Show customized warning/alert and redirect to tracking
+              Alert.alert(
+                "Emergency Merged",
+                "Another bystander has already reported this emergency. An ambulance crew is already en route. We are transferring you to the active tracking view.",
+                [
+                  { 
+                    text: "Track Ambulance", 
+                    onPress: () => {
+                      supabase.removeChannel(channel);
+                      router.push('/help/tracking');
+                    }
+                  }
+                ],
+                { cancelable: false }
+              );
+            }
           }
         }
       )

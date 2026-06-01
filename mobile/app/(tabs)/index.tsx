@@ -229,6 +229,7 @@ export default function HomeScreen() {
                 },
                 typeOfEmergency,
                 assignedAmbulance: activeInc.assigned_ambulance || 'AMB-001',
+                attachmentUrl: vReq?.image_url || undefined,
               }
             });
           } else {
@@ -304,6 +305,7 @@ export default function HomeScreen() {
                   typeOfEmergency,
                   dispatchOfferDurationSeconds: offerInc.dispatch_offer_duration_seconds || 30,
                   assignedAmbulance: offerInc.assigned_ambulance || 'AMB-001',
+                  attachmentUrl: vReq?.image_url || undefined,
                 }
               });
             }

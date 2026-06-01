@@ -5,6 +5,7 @@ import { VerificationQueue } from "@/components/verification/verification-queue"
 import { VerificationDetails } from "@/components/verification/verification-details"
 import { ResidentPanel } from "@/components/verification/resident-panel"
 import { ManualDispatchModal } from "@/components/verification/manual-dispatch-modal"
+import { MergeDuplicateModal } from "@/components/verification/merge-duplicate-modal"
 import { VerificationRequest, VerificationStatus } from "@/types/verification"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
@@ -34,6 +35,10 @@ export default function VerificationPage() {
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false)
   const [dispatchReqId, setDispatchReqId] = useState<string | null>(null)
   const [dispatchReqNum, setDispatchReqNum] = useState<string | null>(null)
+
+  // Merge Duplicate States
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false)
+  const [mergeReqId, setMergeReqId] = useState<string | null>(null)
 
   // Helper to determine if a request needs manual PACC dispatch
   const needsManualDispatch = (r: VerificationRequest) => {
@@ -328,6 +333,50 @@ export default function VerificationPage() {
     }
   }
 
+  const handleMerge = async (duplicateId: string, parentId: string) => {
+    setIsProcessing(true)
+    try {
+      const response = await fetch(`/api/verification/${duplicateId}/merge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentRequestId: parentId }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to merge incident")
+      }
+
+      toast.success("Incident successfully merged as duplicate")
+
+      // Update the duplicate request status in local state to 'DUPLICATE'
+      setRequests((prev) =>
+        prev.map((r) => (r.id === duplicateId ? { ...r, status: "DUPLICATE" } : r))
+      )
+
+      // Close the modal and reset ID
+      setIsMergeModalOpen(false)
+      setMergeReqId(null)
+
+      // Automatically select the next pending request (or null)
+      const currentIdx = requests.findIndex((r) => r.id === duplicateId)
+      const nextPending =
+        requests.slice(currentIdx + 1).find((r) => r.status === "PENDING" || needsManualDispatch(r)) ||
+        requests.slice(0, currentIdx).find((r) => r.status === "PENDING" || needsManualDispatch(r))
+
+      if (nextPending) {
+        setSelectedId(nextPending.id)
+      } else {
+        setSelectedId(null)
+      }
+    } catch (error: any) {
+      console.error(error)
+      toast.error(error.message || "Failed to merge incident")
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   const selectedRequest = requests.find((r) => r.id === selectedId) || null
   const activeAlerts = requests.filter((r) => r.status === "PENDING" || needsManualDispatch(r))
 
@@ -405,6 +454,10 @@ export default function VerificationPage() {
           request={selectedRequest}
           onAccept={handleAccept}
           onReject={(id) => handleUpdateStatus(id, "REJECTED")}
+          onMerge={(id) => {
+            setMergeReqId(id)
+            setIsMergeModalOpen(true)
+          }}
           isProcessing={isProcessing}
         />
       </div>
@@ -419,6 +472,22 @@ export default function VerificationPage() {
         requestId={dispatchReqId}
         requestNum={dispatchReqNum}
         onSuccess={fetchRequests}
+      />
+
+      <MergeDuplicateModal
+        isOpen={isMergeModalOpen}
+        onClose={() => {
+          setIsMergeModalOpen(false)
+          setMergeReqId(null)
+        }}
+        requestId={mergeReqId}
+        activeVerifiedRequests={requests.filter((r) => r.status === "VERIFIED")}
+        onConfirm={async (parentRequestId) => {
+          if (mergeReqId) {
+            await handleMerge(mergeReqId, parentRequestId)
+          }
+        }}
+        isProcessing={isProcessing}
       />
     </div>
   )

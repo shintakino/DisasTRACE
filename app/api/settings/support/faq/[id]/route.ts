@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase-server";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -25,7 +25,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden: Super Admin privileges required" }, { status: 403 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json({ error: "FAQ ID is required" }, { status: 400 });

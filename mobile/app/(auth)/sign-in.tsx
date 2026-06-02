@@ -23,13 +23,45 @@ export default function SignInScreen() {
     setGlobalError(null);
 
     try {
+      let emailToUse = data.identifier.trim();
+
+      // If the identifier doesn't look like an email, treat it as a phone number
+      if (!emailToUse.includes('@')) {
+        const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+        try {
+          const response = await fetch(`${apiUrl}/api/auth/resolve-phone`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ phone: emailToUse }),
+          });
+
+          const result = await response.json();
+          if (response.ok && result.success && result.email) {
+            emailToUse = result.email;
+          } else {
+            setGlobalError(result.error || "No account found associated with this mobile number.");
+            return;
+          }
+        } catch (fetchErr) {
+          console.error("Error resolving phone number:", fetchErr);
+          setGlobalError("Connection error. Could not resolve mobile number.");
+          return;
+        }
+      }
+
       const { data: signInData, error } = await supabase.auth.signInWithPassword({
-        email: data.identifier, // Supabase identifier is email for password sign-in by default
+        email: emailToUse,
         password: data.password,
       });
 
       if (error) {
-        setGlobalError(error.message);
+        if (error.message.includes('Email not confirmed') || error.message.includes('not verified')) {
+          setGlobalError("Your email has not been verified yet. Please check your inbox and confirm your address before logging in.");
+        } else {
+          setGlobalError(error.message);
+        }
         return;
       }
 

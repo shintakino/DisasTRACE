@@ -53,6 +53,13 @@ export async function POST(
       );
     }
 
+    if (targetRequest.nature !== "EMERGENCY") {
+      return NextResponse.json(
+        { error: "Only emergency reports can be merged as duplicates." },
+        { status: 400 }
+      );
+    }
+
     // Validate that parent request exists
     const parentRequest = await db.query.verificationRequests.findFirst({
       where: eq(verificationRequests.id, parentRequestId),
@@ -62,6 +69,13 @@ export async function POST(
       return NextResponse.json(
         { error: "Parent verification request not found" },
         { status: 404 }
+      );
+    }
+
+    if (parentRequest.nature !== "EMERGENCY") {
+      return NextResponse.json(
+        { error: "Reports can only be merged into active verified emergencies." },
+        { status: 400 }
       );
     }
 

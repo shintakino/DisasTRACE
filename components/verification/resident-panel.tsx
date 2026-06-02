@@ -57,7 +57,7 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
             {request.status === "VERIFIED" ? "Dispatch" : "Accept"}
           </Button>
         </div>
-        {request.status === "PENDING" && (
+        {request.status === "PENDING" && request.nature === "EMERGENCY" && (
           <Button
             className="w-full bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2"
             onClick={() => onMerge?.(request.id)}

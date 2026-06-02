@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
-import { eq } from "drizzle-orm";
+import { eq, and, gte, inArray, sql } from "drizzle-orm";
 
 export async function GET() {
   const supabase = await createClient();
@@ -47,11 +47,26 @@ export async function GET() {
     })
   );
 
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const [reviewedTodayResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(users)
+    .where(
+      and(
+        inArray(users.verificationStatus, ['APPROVED', 'REJECTED']),
+        gte(users.updatedAt, todayStart)
+      )
+    );
+
+  const reviewedToday = Number(reviewedTodayResult?.count || 0);
+
   return NextResponse.json({
     applicants,
     summary: {
       pending: applicants.length,
-      reviewedToday: 0, // In production, query audit/logs table
+      reviewedToday,
     }
   });
 }

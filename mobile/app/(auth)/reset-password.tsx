@@ -130,7 +130,13 @@ export default function ResetPasswordScreen() {
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View className="flex-1 p-6 justify-center mt-10">
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(auth)/sign-in');
+                }
+              }}
               className="absolute top-10 left-6 p-2 z-10"
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >

@@ -10,6 +10,8 @@ export * from './hospitals';
 export * from './support_settings';
 export * from './faqs';
 export * from './feedbacks';
+export * from './phone_verifications';
+
 
 
 

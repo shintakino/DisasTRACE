@@ -35,15 +35,22 @@ export async function GET() {
       where: and(...whereConditions),
     });
 
-    const mappedResponders = activeResponders.map((r) => ({
-      id: r.id,
-      fullName: r.fullName,
-      phone: r.phone || "N/A",
-      address: r.address || "Baliwag City",
-      status: "STANDBY", // Match green STANDBY pill in design mockups
-      lat: r.lastLatitude,
-      lng: r.lastLongitude,
-    }));
+    const mappedResponders = activeResponders.map((r) => {
+      const isDevResponder = isDevMode && r.email === "responder@disastrace.com";
+      const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
+      const isRecent = r.lastLocationUpdatedAt && new Date(r.lastLocationUpdatedAt) >= threeMinutesAgo;
+      const status = (isDevResponder || isRecent) ? "STANDBY" : "OFFLINE";
+
+      return {
+        id: r.id,
+        fullName: r.fullName,
+        phone: r.phone || "N/A",
+        address: r.address || "Baliwag City",
+        status,
+        lat: r.lastLatitude,
+        lng: r.lastLongitude,
+      };
+    });
 
     // Split standard CDRRMO HQ responders vs Barangay Rescue Units
     const cdrrmo = mappedResponders.filter(

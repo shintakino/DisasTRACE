@@ -17,6 +17,15 @@ function sanitizePhone(phone: string): string {
   return cleaned;
 }
 
+// Convert to international format for SMS delivery
+function toInternationalPhone(phone: string): string {
+  const cleaned = sanitizePhone(phone);
+  if (cleaned.startsWith('09') && cleaned.length === 11) {
+    return '+63' + cleaned.slice(1);
+  }
+  return phone;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -47,6 +56,39 @@ export async function POST(req: NextRequest) {
         .where(eq(users.id, userRecord.id));
 
       console.log(`[OTP] Generated verification code for ${cleanedPhone}: ${otpCode}`);
+
+      // Dispatch SMS via the Textbee API if keys are available
+      const apiKey = process.env.TEXTBEE_API_KEY;
+      const deviceId = process.env.TEXTBEE_DEVICE_ID;
+      const recipient = toInternationalPhone(cleanedPhone);
+      const message = `DisasTRACE OTP: ${otpCode}. Valid for 5 minutes. Do not share.`;
+
+      if (apiKey && deviceId) {
+        try {
+          const response = await fetch(`https://api.textbee.dev/api/v1/gateway/devices/${deviceId}/sendSMS`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              recipients: [recipient],
+              message,
+            }),
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            console.error(`[OTP] Textbee API returned status ${response.status}: ${errText}`);
+          } else {
+            console.log(`[OTP] SMS sent successfully via Textbee to ${recipient}`);
+          }
+        } catch (fetchErr) {
+          console.error("[OTP] Failed to send SMS via Textbee API:", fetchErr);
+        }
+      } else {
+        console.warn("[OTP] Textbee API credentials not found. SMS dispatch was bypassed.");
+      }
 
       // We return the code to the mobile client in dev mode to make testing seamless
       return NextResponse.json({

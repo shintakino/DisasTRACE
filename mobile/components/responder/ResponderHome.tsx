@@ -365,7 +365,7 @@ export function ResponderHome() {
                 },
                 typeOfEmergency,
                 dispatchOfferDurationSeconds: inc.dispatch_offer_duration_seconds || 30,
-                assignedAmbulance: inc.assigned_ambulance || 'AMB-001',
+                assignedAmbulance: inc.assigned_ambulance || myVehicleId,
                 attachmentUrl,
               }
             });
@@ -436,7 +436,7 @@ export function ResponderHome() {
                   longitude: incidentLng,
                 },
                 typeOfEmergency,
-                assignedAmbulance: inc.assigned_ambulance || 'AMB-001',
+                assignedAmbulance: inc.assigned_ambulance || myVehicleId,
                 attachmentUrl,
               }
             });
@@ -711,7 +711,7 @@ export function ResponderHome() {
                 <Truck color="white" size={11} fill="white" />
               </View>
               <Text className="ml-1.5 text-[9px] font-extrabold text-blue-900 uppercase tracking-wider">
-                {activeDispatch?.assignedAmbulance || 'AMB-001'}
+                {activeDispatch?.assignedAmbulance || myVehicleId}
               </Text>
             </View>
           </View>

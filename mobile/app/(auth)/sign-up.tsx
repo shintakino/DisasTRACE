@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useRouter, Link, useLocalSearchParams } from 'expo-router';
@@ -22,7 +22,14 @@ export default function SignUpScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isAutoConfirmed, setIsAutoConfirmed] = useState(false);
-  const { data, reset } = useSignUpStore();
+  const { data, reset, updateData } = useSignUpStore();
+
+  // Synchronize dynamic search param role into the Zustand store on mount
+  useEffect(() => {
+    if (role) {
+      updateData({ role: role as any });
+    }
+  }, [role]);
 
   const handleRegister = async () => {
     setLoading(true);
@@ -144,18 +151,39 @@ export default function SignUpScreen() {
     >
       <LinearGradient colors={['#0A1332', '#15286A']} className="flex-1 pt-10">
         {/* Header */}
-        <View className="px-6 py-4 flex-row items-center">
+        <View className="px-6 py-4 flex-row items-center justify-between">
           <TouchableOpacity 
             onPress={() => {
-              if (currentStep > 1) setCurrentStep(currentStep - 1);
-              else router.back();
+              if (currentStep > 1) {
+                setCurrentStep(currentStep - 1);
+              } else {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(auth)/sign-in');
+                }
+              }
             }}
             className="p-2 -ml-2"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <ArrowLeft color="#FFFFFF" size={24} />
           </TouchableOpacity>
-          <Text className="flex-1 text-center font-bold text-lg text-white mr-8">Create Account</Text>
+          
+          <View className="flex-1 items-center justify-center mr-8 flex-row space-x-2">
+            <Text className="font-bold text-lg text-white">Create Account</Text>
+            <View className={`px-2.5 py-0.5 rounded-full border ${
+              role === 'ambulance_responder' 
+                ? 'bg-red-500/20 border-red-500/30' 
+                : 'bg-blue-500/20 border-blue-500/30'
+            }`}>
+              <Text className={`text-[10px] font-black tracking-widest uppercase ${
+                role === 'ambulance_responder' ? 'text-red-400' : 'text-blue-400'
+              }`}>
+                {role === 'ambulance_responder' ? 'Responder' : 'Resident'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Progress Bar */}

@@ -15,18 +15,20 @@ import { useAuthStatus } from '../hooks/use-auth-status';
 
 const { width } = Dimensions.get('window');
 
+let hasShownSplashGlobal = false;
+
 export default function EntryScreen() {
   const router = useRouter();
   const { isLoaded, isSignedIn, verificationStatus } = useAuthStatus();
 
-  const glowOpacity = useSharedValue(0);
-  const glowScale = useSharedValue(0.7);
-  const logoOpacity = useSharedValue(0);
-  const logoTranslate = useSharedValue(20);
-  const cardTranslate = useSharedValue(120);
-  const cardOpacity = useSharedValue(0);
-  const trackingTranslateX = useSharedValue(-width * 1.5);
-  const ambulanceDriveOffX = useSharedValue(0);
+  const glowOpacity = useSharedValue(hasShownSplashGlobal ? 1 : 0);
+  const glowScale = useSharedValue(hasShownSplashGlobal ? 1.2 : 0.7);
+  const logoOpacity = useSharedValue(hasShownSplashGlobal ? 1 : 0);
+  const logoTranslate = useSharedValue(hasShownSplashGlobal ? (isSignedIn ? 0 : -220) : 20);
+  const cardTranslate = useSharedValue(hasShownSplashGlobal ? 0 : 120);
+  const cardOpacity = useSharedValue(hasShownSplashGlobal ? 1 : 0);
+  const trackingTranslateX = useSharedValue(hasShownSplashGlobal ? 0 : -width * 1.5);
+  const ambulanceDriveOffX = useSharedValue(hasShownSplashGlobal ? width : 0);
 
   useEffect(() => {
     if (!isLoaded) return; // wait for auth session
@@ -34,6 +36,21 @@ export default function EntryScreen() {
     async function prepare() {
       // Hide native splash once we start our animation
       await SplashScreen.hideAsync();
+
+      if (hasShownSplashGlobal) {
+        if (isSignedIn) {
+          if (verificationStatus === 'approved') {
+            router.replace('/(tabs)');
+          } else if (verificationStatus === 'pending') {
+            router.replace('/(verification)/pending');
+          } else if (verificationStatus === 'rejected') {
+            router.replace('/(verification)/rejected');
+          } else {
+            router.replace('/(verification)/unauthorized');
+          }
+        }
+        return;
+      }
 
       glowOpacity.value = withTiming(1, {
         duration: 1200,
@@ -101,6 +118,8 @@ export default function EntryScreen() {
           withTiming(1, { duration: 600 })
         );
       }
+
+      hasShownSplashGlobal = true;
     }
 
     prepare();
@@ -235,7 +254,7 @@ const styles = StyleSheet.create({
     borderRadius: width,
   },
   logo: {
-    width: 560,
+    width: 260,
     height: 380,
   },
   tagline: {

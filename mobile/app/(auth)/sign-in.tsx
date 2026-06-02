@@ -84,7 +84,13 @@ export default function SignInScreen() {
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View className="flex-1 p-6 justify-center mt-10">
           <TouchableOpacity 
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/');
+              }
+            }}
             className="absolute top-10 left-6 p-2 z-10"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -94,7 +100,7 @@ export default function SignInScreen() {
           <View className="mb-10 items-center">
             <Image 
               source={require('../../assets/images/DisasTRACELogo.png')} 
-              className="w-24 h-24 mb-6" 
+              className="w-180 h-24 mb-6" 
               resizeMode="contain"
             />
             <Text className="text-3xl font-bold text-white mb-2">Log In</Text>

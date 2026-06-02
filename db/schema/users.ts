@@ -11,6 +11,7 @@ export const users = pgTable('users', {
   id: varchar('id', { length: 255 }).primaryKey(), // Supabase Auth ID (UUID)
   fullName: text('full_name').notNull(),
   email: text('email').notNull().unique(),
+  employeeId: varchar('employee_id', { length: 50 }),
   phone: varchar('phone', { length: 20 }),
   address: text('address'),
   role: text('role', { enum: ['public_user', 'ambulance_responder', 'pacc_admin', 'cdrrmo_super_admin'] }).notNull(),

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { motion } from "motion/react";
+import { ForgotPasswordModal } from "@/components/auth/forgot-password-modal";
+
 
 export default function SignInPage() {
   const supabase = createClientBrowser();
@@ -18,6 +20,8 @@ export default function SignInPage() {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,7 +198,11 @@ export default function SignInPage() {
                   </button>
                 </div>
                 <div className="flex justify-end pt-1">
-                  <button type="button" className="text-sm font-semibold text-white/90 hover:text-white transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPasswordOpen(true)}
+                    className="text-sm font-semibold text-white/90 hover:text-white transition-colors"
+                  >
                     Forgot password?
                   </button>
                 </div>
@@ -221,6 +229,11 @@ export default function SignInPage() {
           </div>
         </div>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={isForgotPasswordOpen}
+        onClose={() => setIsForgotPasswordOpen(false)}
+      />
     </div>
   );
 }

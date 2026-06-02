@@ -160,6 +160,7 @@ async function seed() {
           id: user.id,
           full_name: `${account.firstName} ${account.lastName}`,
           email: account.email,
+          employee_id: account.employeeId,
           role: account.role,
           status: 'ACTIVE',
           verification_status: 'APPROVED',

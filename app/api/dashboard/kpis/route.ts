@@ -67,14 +67,25 @@ export async function GET() {
         )
       );
 
-    const avgMinutes = avgResponse[0] ? Math.round(avgResponse[0].avgSeconds / 60) : 0;
+    let avgMinutes = avgResponse[0] ? Math.round(avgResponse[0].avgSeconds / 60) : 0;
+
+    if (avgMinutes === 0) {
+      const historicalAvgResponse = await db
+        .select({
+          avgSeconds: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (${incidents.resolvedAt} - ${incidents.createdAt}))), 0)`
+        })
+        .from(incidents)
+        .where(eq(incidents.status, "RESOLVED"));
+
+      avgMinutes = historicalAvgResponse[0] ? Math.round(historicalAvgResponse[0].avgSeconds / 60) : 0;
+    }
 
     return NextResponse.json({
       data: {
         totalIncidentsToday: Number(incidentsCount?.count) || 0,
         totalResponders: Number(respondersCount?.count) || 0,
         totalResolvedToday: Number(resolvedCount?.count) || 0,
-        avgResponseTime: String(avgMinutes || 9), // Fallback default to 9 if no resolved cases today yet
+        avgResponseTime: String(avgMinutes),
       }
     });
   } catch (error) {

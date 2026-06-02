@@ -28,6 +28,8 @@ export const users = pgTable('users', {
   lastLongitude: doublePrecision('last_longitude'),
   lastLocationUpdatedAt: timestamp('last_location_updated_at', { withTimezone: true }),
   locationGeom: geometryPoint('location_geom'),
+  otpCode: varchar('otp_code', { length: 255 }),
+  otpExpiresAt: timestamp('otp_expires_at', { withTimezone: true }),
 }, (table) => ({
   locationGeomGistIdx: index('users_location_geom_gist_idx').using('gist', table.locationGeom),
 }));

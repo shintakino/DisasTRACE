@@ -128,7 +128,7 @@ export default function SignInScreen() {
 
             <TouchableOpacity 
               className="mt-4 items-end"
-              onPress={() => {/* TODO: Forgot Password */}}
+              onPress={() => router.push('/(auth)/forgot-password' as any)}
             >
               <Text className="text-[#1E3A8A] font-medium">Forgot Password?</Text>
             </TouchableOpacity>

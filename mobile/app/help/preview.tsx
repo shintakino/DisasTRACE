@@ -56,7 +56,7 @@ export default function PreviewScreen() {
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.sendBtn} onPress={handleUsePhoto} activeOpacity={0.7}>
-          <Send size={32} color="#FFF" style={styles.sendIcon} />
+          <Send size={32} color="#FFF" />
         </TouchableOpacity>
       </View>
     </View>
@@ -106,10 +106,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
-  },
-  sendIcon: {
-    marginLeft: 4, // Visual balance for the paper plane
-    transform: [{ rotate: '45deg' }, { translateY: -2 }, { translateX: -2 }],
   },
   retakeButton: {
     marginTop: 20,

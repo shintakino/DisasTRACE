@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Info } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -9,9 +9,11 @@ export function ToHospitalSheet() {
   const { status, elapsedTimeSeconds, targetHospital, startReport, hospitalDistanceKm, hospitalEtaMins } = useResponderStore();
   const bottomSheetRef = useRef<BottomSheet>(null);
 
+  const snapPoints = useMemo(() => ['15%', '50%', '90%'], []);
+
   useEffect(() => {
     if (status === 'to_hospital') {
-      bottomSheetRef.current?.expand();
+      bottomSheetRef.current?.snapToIndex(1);
     } else {
       bottomSheetRef.current?.close();
     }
@@ -26,13 +28,14 @@ export function ToHospitalSheet() {
   return (
     <BottomSheet
       ref={bottomSheetRef}
-      index={status === 'to_hospital' ? 0 : -1}
-      enableDynamicSizing={true}
+      index={status === 'to_hospital' ? 1 : -1}
+      snapPoints={snapPoints}
+      enableDynamicSizing={false}
       enablePanDownToClose={false}
       handleIndicatorStyle={{ backgroundColor: '#CBD5E1', width: 40 }}
       backgroundStyle={{ borderRadius: 24 }}
     >
-      <BottomSheetView className="px-6 pt-2 pb-12">
+      <BottomSheetScrollView className="px-6 pt-2 pb-12">
         {/* Hospital Header */}
         <View className="flex-row items-center mb-6">
           <View className="w-12 h-12 bg-blue-50 rounded-2xl items-center justify-center border border-blue-100">
@@ -86,7 +89,7 @@ export function ToHospitalSheet() {
           <Text className="text-white font-bold text-lg">Arrived at Hospital</Text>
         </TouchableOpacity>
 
-      </BottomSheetView>
+      </BottomSheetScrollView>
     </BottomSheet>
   );
 }

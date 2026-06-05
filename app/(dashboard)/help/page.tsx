@@ -16,7 +16,8 @@ import {
   Info,
   ChevronRight,
   ChevronDown,
-  Lock
+  Lock,
+  GripVertical
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export default function HelpPage() {
   const [newQuestion, setNewQuestion] = useState("");
   const [newAnswer, setNewAnswer] = useState("");
   const [newDisplayOrder, setNewDisplayOrder] = useState(0);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const fetchSupportData = async () => {
     try {
@@ -172,6 +174,59 @@ export default function HelpPage() {
       console.error(err);
       toast.error("Network error deleting FAQ");
     }
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+    const updated = [...faqs];
+    const [draggedItem] = updated.splice(draggedIndex, 1);
+    updated.splice(targetIndex, 0, draggedItem);
+
+    // Re-assign displayOrder sequentially
+    const reordered = updated.map((faq, idx) => ({
+      ...faq,
+      displayOrder: idx + 1,
+    }));
+
+    setFaqs(reordered);
+    setDraggedIndex(null);
+
+    try {
+      const response = await fetch("/api/settings/support/faq", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reorderedFaqs: reordered.map(item => ({ id: item.id, displayOrder: item.displayOrder })),
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("FAQ order updated successfully!");
+      } else {
+        toast.error(data.error || "Failed to update FAQ order");
+        fetchSupportData();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error updating FAQ order");
+      fetchSupportData();
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
   };
 
   if (loading) {
@@ -372,12 +427,17 @@ export default function HelpPage() {
                       />
                     </div>
                     <div className="col-span-1 space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Display Order</label>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                        <span>Sort Order</span>
+                        <span className="text-[8px] text-slate-400 font-medium normal-case">(Lower first)</span>
+                      </label>
                       <Input
                         type="number"
                         value={newDisplayOrder}
                         onChange={(e) => setNewDisplayOrder(Number(e.target.value))}
+                        placeholder="1"
                         className="rounded-xl border-slate-200 bg-white font-mono"
+                        title="Determines display hierarchy. FAQ items with lower numbers are rendered at the top of the list."
                       />
                     </div>
                   </div>
@@ -406,11 +466,32 @@ export default function HelpPage() {
 
               {/* FAQs List */}
               <div className="space-y-4">
-                <h3 className="font-extrabold text-sm text-slate-700 uppercase tracking-wide">Existing FAQs ({faqs.length})</h3>
+                <div className="flex justify-between items-center">
+                  <h3 className="font-extrabold text-sm text-slate-700 uppercase tracking-wide">Existing FAQs ({faqs.length})</h3>
+                  {faqs.length > 1 && (
+                    <span className="text-[10px] text-slate-400 font-medium italic">Drag cards by the handle to reorder</span>
+                  )}
+                </div>
                 
                 <div className="space-y-3">
-                  {faqs.map((faq) => (
-                    <div key={faq.id} className="p-4 rounded-xl border border-slate-200 flex gap-4 justify-between items-start">
+                  {faqs.map((faq, index) => (
+                    <div 
+                      key={faq.id} 
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDrop={(e) => handleDrop(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className={cn(
+                        "p-4 rounded-xl border border-slate-200 flex gap-4 justify-between items-start transition-all bg-white select-none",
+                        draggedIndex === index ? "opacity-40 border-[#1E3A8A] border-dashed bg-slate-50/50" : "hover:border-slate-300"
+                      )}
+                    >
+                      {/* Drag Handle */}
+                      <div className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 shrink-0 self-center p-1 rounded-md hover:bg-slate-100 transition-colors">
+                        <GripVertical className="h-4 w-4" />
+                      </div>
+
                       <div className="space-y-1.5 flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">
@@ -420,7 +501,7 @@ export default function HelpPage() {
                             {faq.question}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 leading-relaxed pr-4">
+                        <p className="text-xs text-slate-600 leading-relaxed pr-4">
                           {faq.answer}
                         </p>
                       </div>

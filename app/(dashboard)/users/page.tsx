@@ -13,6 +13,7 @@ export default function UsersPage() {
   const [loading, setLoading] = React.useState(true);
   const [users, setUsers] = React.useState<UserManagementEntry[]>([]);
   const [filteredUsers, setFilteredUsers] = React.useState<UserManagementEntry[]>([]);
+  const [currentFilters, setCurrentFilters] = React.useState<UserFilter>({});
   const [summary, setSummary] = React.useState({
     total: 0,
     active: 0,
@@ -48,6 +49,7 @@ export default function UsersPage() {
   }, []);
 
   const handleFilterChange = (filters: UserFilter) => {
+    setCurrentFilters(filters);
     let result = [...users];
 
     if (filters.search) {
@@ -141,7 +143,26 @@ export default function UsersPage() {
   };
 
   const handleExport = () => {
-    toast.info("Exporting user list to PDF...");
+    if (filteredUsers.length === 0) {
+      toast.error("No users available to export.");
+      return;
+    }
+
+    toast.promise(
+      (async () => {
+        const { exportUsersListPDF } = await import("@/lib/pdf-export");
+        await exportUsersListPDF(filteredUsers, {
+          search: currentFilters.search,
+          role: currentFilters.role,
+          status: currentFilters.status,
+        });
+      })(),
+      {
+        loading: "Generating PDF summary of user registry...",
+        success: "User registry PDF generated and downloaded.",
+        error: "Failed to generate PDF. Please try again.",
+      }
+    );
   };
 
   const handleCreateUser = async (newUser: { fullName: string; email: string; role: UserRole; password?: string }) => {
@@ -172,7 +193,7 @@ export default function UsersPage() {
 
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="h-full w-full overflow-y-auto p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-black text-[#1E3A8A] tracking-tight">USER MANAGEMENT</h1>
         <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.2em]">Administrative Control Center</p>

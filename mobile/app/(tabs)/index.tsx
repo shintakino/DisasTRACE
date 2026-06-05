@@ -145,8 +145,13 @@ export default function HomeScreen() {
                   }
                 });
                 
-                console.log('[HomeScreen] Redirecting to tracking screen.');
-                router.replace('/help/tracking');
+                if (incident.responder_id) {
+                  console.log('[HomeScreen] Redirecting to tracking screen.');
+                  router.replace('/help/tracking');
+                } else {
+                  console.log('[HomeScreen] Active incident has no responder assigned yet. Redirecting to pending screen.');
+                  router.replace('/help/pending');
+                }
                 return;
               }
             }
@@ -361,9 +366,9 @@ export default function HomeScreen() {
             backgroundColor: '#020617',
             borderTopWidth: 1,
             borderTopColor: '#1E293B',
-            height: 80,
-            paddingBottom: 25,
-            paddingTop: 10,
+            height: 65,
+            paddingBottom: 8,
+            paddingTop: 8,
             elevation: 0,
             shadowOpacity: 0,
           } : { display: 'none' } 
@@ -379,7 +384,7 @@ export default function HomeScreen() {
       <StatusBar barStyle="light-content" />
       
       {/* Header Section */}
-      <SafeAreaView>
+      <View style={{ paddingTop: (StatusBar.currentHeight || 24) + 12 }}>
         <View className="px-6 py-4 flex-row justify-between items-start">
           <View>
             <View className="flex-row items-center">
@@ -444,7 +449,7 @@ export default function HomeScreen() {
             <Text className="text-white text-[10px] font-black tracking-widest uppercase">Online</Text>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Main Report Canvas */}
       <View className="flex-1 bg-white rounded-t-[32px] px-6 pt-10">

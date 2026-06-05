@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { verificationRequests } from "@/db/schema/verification_requests";
+import { incidents } from "@/db/schema/incidents";
 import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { autoDispatchIncident } from "@/lib/dispatch-engine";
 import { z } from "zod";
+import crypto from "crypto";
 
 const TriageSchema = z.object({
   requestId: z.string().uuid(),
@@ -46,33 +48,49 @@ export async function POST(req: NextRequest) {
     let finalReq;
 
     if (action === 'VERIFY') {
+      const finalNature = nature || existingReq.nature;
+
       // 1. Update fields (nature, severity) but do not mark status as VERIFIED yet to prevent real-time client race
       await db.update(verificationRequests)
         .set({
-          nature: nature || existingReq.nature,
+          nature: finalNature,
           severity: severity || existingReq.severity,
           updatedAt: new Date(),
         })
         .where(eq(verificationRequests.id, requestId));
 
-      // 2. Call auto-dispatch engine
-      incident = await autoDispatchIncident(
-        requestId,
-        existingReq.residentId,
-        existingReq.latitude,
-        existingReq.longitude
-      );
+      // 2. Call auto-dispatch engine only if it is an emergency
+      if (finalNature === 'EMERGENCY') {
+        incident = await autoDispatchIncident(
+          requestId,
+          existingReq.residentId,
+          existingReq.latitude,
+          existingReq.longitude
+        );
+      }
 
       if (incident) {
         autoDispatched = true;
       } else {
-        // 3. Fallback: If no auto-dispatch was triggered, manually mark status as VERIFIED now
+        // 3. Fallback/Non-emergency: Mark status as VERIFIED and create a manual dispatch incident
         await db.update(verificationRequests)
           .set({
             status: 'VERIFIED',
             updatedAt: new Date(),
           })
           .where(eq(verificationRequests.id, requestId));
+
+        const [manualIncident] = await db.insert(incidents).values({
+          id: crypto.randomUUID(),
+          requestId: requestId,
+          responderId: null,
+          currentOfferResponderId: null,
+          status: "DISPATCHED",
+          dispatchMethod: "PACC_MANUAL",
+          assignedAmbulance: null,
+          skippedResponderIds: [],
+        }).returning();
+        incident = manualIncident;
       }
 
       // Fetch the final request to return in response

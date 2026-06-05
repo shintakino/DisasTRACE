@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Star } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
@@ -22,30 +22,46 @@ export default function ResolutionScreen() {
     return `${mins} Min${mins > 1 ? 's' : ''} ${secs} Sec${secs > 1 ? 's' : ''}`;
   };
  
-  const handleReturnHome = async () => {
+  useEffect(() => {
+    const onBackPress = () => {
+      resetReport();
+      router.replace('/(tabs)');
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleReturnHome = () => {
     // Only submit feedback if a rating star was selected (rating > 0)
     if (rating > 0) {
-      try {
-        const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-        const { data: { session } } = await supabase.auth.getSession();
-        const reqHeaders: any = { 'Content-Type': 'application/json' };
-        if (session?.access_token) {
-          reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+      (async () => {
+        try {
+          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+          const { data: { session } } = await supabase.auth.getSession();
+          const reqHeaders: any = { 'Content-Type': 'application/json' };
+          if (session?.access_token) {
+            reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+          }
+     
+          await fetch(`${apiUrl}/api/incidents/feedback`, {
+            method: 'POST',
+            headers: reqHeaders,
+            body: JSON.stringify({
+              incidentId: report.incidentId || undefined,
+              requestId: report.id || undefined,
+              rating,
+              feedback: feedback || undefined,
+            })
+          });
+        } catch (err) {
+          console.log('Feedback background submission failed:', err);
         }
-   
-        await fetch(`${apiUrl}/api/incidents/feedback`, {
-          method: 'POST',
-          headers: reqHeaders,
-          body: JSON.stringify({
-            incidentId: report.incidentId || undefined,
-            requestId: report.id || undefined,
-            rating,
-            feedback: feedback || undefined,
-          })
-        });
-      } catch (err) {
-        console.log('Feedback submission failed, returning home anyway:', err);
-      }
+      })();
     }
     
     resetReport();

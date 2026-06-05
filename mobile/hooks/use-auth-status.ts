@@ -77,6 +77,9 @@ export function useAuthStatus() {
       } else {
         setIsLoaded(true);
       }
+    }).catch(err => {
+      console.error('[useAuthStatus] Failed to restore session on startup:', err);
+      setIsLoaded(true);
     });
 
     // Listen for auth changes

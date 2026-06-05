@@ -20,29 +20,44 @@ export async function proxy(request: NextRequest) {
   }
 
   // If authenticated, check for platform restrictions
-  if (user && !isApiRoute) {
+  if (user) {
     const role = user.app_metadata?.role;
-    const isMobileOnlyRole = role === 'public_user' || role === 'ambulance_responder';
+    const status = user.app_metadata?.status;
+    const isInactive = status === "SUSPENDED" || status === "DEACTIVATED";
     const isUnauthorizedPage = request.nextUrl.pathname === "/unauthorized-platform";
 
-    if (isMobileOnlyRole && !isUnauthorizedPage) {
-      return NextResponse.redirect(new URL("/unauthorized-platform", request.url));
+    if (isInactive) {
+      if (isApiRoute) {
+        return NextResponse.json({ error: "Forbidden: Account is suspended or deactivated" }, { status: 403 });
+      }
+      if (!isUnauthorizedPage) {
+        return NextResponse.redirect(new URL("/unauthorized-platform?reason=inactive", request.url));
+      }
+      return response;
     }
 
-    if (!isMobileOnlyRole && isUnauthorizedPage) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
+    if (!isApiRoute) {
+      const isMobileOnlyRole = role === 'public_user' || role === 'ambulance_responder';
 
-    // Role-based route protection for User Approval
-    if (request.nextUrl.pathname.startsWith("/users/approval")) {
-      if (role !== "cdrrmo_super_admin") {
+      if (isMobileOnlyRole && !isUnauthorizedPage) {
         return NextResponse.redirect(new URL("/unauthorized-platform", request.url));
       }
-    }
 
-    // Redirect authenticated users from root or sign-in to dashboard
-    if (request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/sign-in")) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      if (!isMobileOnlyRole && isUnauthorizedPage) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+
+      // Role-based route protection for User Approval
+      if (request.nextUrl.pathname.startsWith("/users/approval")) {
+        if (role !== "cdrrmo_super_admin") {
+          return NextResponse.redirect(new URL("/unauthorized-platform", request.url));
+        }
+      }
+
+      // Redirect authenticated users from root or sign-in to dashboard
+      if (request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/sign-in")) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
     }
   }
 

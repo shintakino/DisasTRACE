@@ -70,33 +70,48 @@ const runSetup = async () => {
         target_ambulance text;
       begin
         -- -------------------------------------------------------------
-        -- CASE A: Triggered by public.verification_requests status update
+        -- CASE A: Triggered by public.verification_requests
         -- -------------------------------------------------------------
         if TG_TABLE_NAME = 'verification_requests' then
-          if new.status = 'VERIFIED' and (old.status is null or old.status <> 'VERIFIED') then
+          if TG_OP = 'INSERT' then
             insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
-            values (
+            select 
               gen_random_uuid()::text,
-              new.resident_id,
-              'incident_verified',
-              'Report Verified',
-              'Your request (' || coalesce(new.nature, 'Emergency') || ') has been verified. Dispatch initiated.',
+              u.id,
+              'new_incident',
+              'New Incident Report',
+              'A new ' || coalesce(new.nature, 'Emergency') || ' report (' || new.type || ') is pending triage.',
               true,
               now(),
               jsonb_build_object('requestId', new.id)
-            );
-          elsif new.status = 'REJECTED' and (old.status is null or old.status <> 'REJECTED') then
-            insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
-            values (
-              gen_random_uuid()::text,
-              new.resident_id,
-              'incident_verified',
-              'Report Rejected',
-              'Your request (' || coalesce(new.nature, 'Emergency') || ') has been rejected.',
-              true,
-              now(),
-              jsonb_build_object('requestId', new.id)
-            );
+            from public.users u
+            where u.role in ('pacc_admin', 'cdrrmo_super_admin');
+          elsif TG_OP = 'UPDATE' then
+            if new.status = 'VERIFIED' and (old.status is null or old.status <> 'VERIFIED') then
+              insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
+              values (
+                gen_random_uuid()::text,
+                new.resident_id,
+                'incident_verified',
+                'Report Verified',
+                'Your request (' || coalesce(new.nature, 'Emergency') || ') has been verified. Dispatch initiated.',
+                true,
+                now(),
+                jsonb_build_object('requestId', new.id)
+              );
+            elsif new.status = 'REJECTED' and (old.status is null or old.status <> 'REJECTED') then
+              insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
+              values (
+                gen_random_uuid()::text,
+                new.resident_id,
+                'incident_verified',
+                'Report Rejected',
+                'Your request (' || coalesce(new.nature, 'Emergency') || ') has been rejected.',
+                true,
+                now(),
+                jsonb_build_object('requestId', new.id)
+              );
+            end if;
           end if;
 
         -- -------------------------------------------------------------
@@ -205,30 +220,47 @@ const runSetup = async () => {
         -- CASE C: Triggered by public.users verification updates
         -- -------------------------------------------------------------
         elsif TG_TABLE_NAME = 'users' then
-          if new.verification_status = 'APPROVED' and old.verification_status <> 'APPROVED' then
-            insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
-            values (
-              gen_random_uuid()::text,
-              new.id,
-              'registration_approved',
-              'Account Approved',
-              'Your DisasTRACE account has been successfully approved! You now have full access to reporting.',
-              true,
-              now(),
-              null
-            );
-          elsif new.verification_status = 'REJECTED' and old.verification_status <> 'REJECTED' then
-            insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
-            values (
-              gen_random_uuid()::text,
-              new.id,
-              'registration_approved',
-              'Account Registration Rejected',
-              'Your account registration was rejected. Reason: ' || coalesce(new.rejection_reason, 'Not specified'),
-              true,
-              now(),
-              null
-            );
+          if TG_OP = 'INSERT' then
+            if new.verification_status = 'PENDING' then
+              insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
+              select 
+                gen_random_uuid()::text,
+                u.id,
+                'registration_pending',
+                'New Account Pending Verification',
+                'A new ' || (case when new.role = 'ambulance_responder' then 'Responder' else 'Resident' end) || ' (' || new.full_name || ') is pending approval.',
+                true,
+                now(),
+                jsonb_build_object('profileId', new.id)
+              from public.users u
+              where u.role = 'cdrrmo_super_admin';
+            end if;
+          elsif TG_OP = 'UPDATE' then
+            if new.verification_status = 'APPROVED' and old.verification_status <> 'APPROVED' then
+              insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
+              values (
+                gen_random_uuid()::text,
+                new.id,
+                'registration_approved',
+                'Account Approved',
+                'Your DisasTRACE account has been successfully approved! You now have full access to reporting.',
+                true,
+                now(),
+                null
+              );
+            elsif new.verification_status = 'REJECTED' and old.verification_status <> 'REJECTED' then
+              insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
+              values (
+                gen_random_uuid()::text,
+                new.id,
+                'registration_approved',
+                'Account Registration Rejected',
+                'Your account registration was rejected. Reason: ' || coalesce(new.rejection_reason, 'Not specified'),
+                true,
+                now(),
+                null
+              );
+            end if;
           end if;
         end if;
 
@@ -243,7 +275,7 @@ const runSetup = async () => {
 
     await sql`drop trigger if exists on_verification_request_notification on public.verification_requests;`;
     await sql`create trigger on_verification_request_notification
-        after update of status on public.verification_requests
+        after insert or update on public.verification_requests
         for each row execute procedure public.generate_database_notifications();`;
     console.log('✅ Verification request trigger registered.');
 
@@ -255,7 +287,7 @@ const runSetup = async () => {
 
     await sql`drop trigger if exists on_user_verification_notification on public.users;`;
     await sql`create trigger on_user_verification_notification
-        after update of verification_status on public.users
+        after insert or update on public.users
         for each row execute procedure public.generate_database_notifications();`;
     console.log('✅ User verification status trigger registered.');
 

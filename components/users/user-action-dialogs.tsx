@@ -321,7 +321,7 @@ export function CreateUserDialog({ isOpen, onClose, defaultRole, onCreate }: Cre
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <div className="flex items-center gap-2 mb-2">
             <div className="p-2 bg-blue-100 rounded-lg">

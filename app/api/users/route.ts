@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
+import { auditLogs } from "@/db/schema/audit_logs";
 import { eq } from "drizzle-orm";
 import { createClient, createAdminClient } from "@/lib/supabase-server";
 import { z } from "zod";
+import crypto from "crypto";
 
 const UpdateUserSchema = z.object({
   id: z.string(),
@@ -128,6 +130,15 @@ export async function POST(req: NextRequest) {
       createdUser.verificationStatus = 'APPROVED';
     }
 
+    // Insert audit log
+    await db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      action: `Created account: ${email} (${role})`,
+      entityType: "USER",
+      entityId: createData.user.id,
+    });
+
     return NextResponse.json({
       success: true,
       user: createdUser,
@@ -188,6 +199,15 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    // Insert audit log
+    await db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      action: `Updated user: ${updatedUser?.fullName || id} (Role: ${role || 'unchanged'}, Status: ${status || 'unchanged'})`,
+      entityType: "USER",
+      entityId: id,
+    });
+
     return NextResponse.json({
       success: true,
       user: updatedUser,
@@ -226,6 +246,15 @@ export async function DELETE(req: NextRequest) {
 
     // Delete user in Supabase auth via adminClient
     await adminClient.auth.admin.deleteUser(id);
+
+    // Insert audit log
+    await db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      action: `Deleted user account: ${id}`,
+      entityType: "USER",
+      entityId: id,
+    });
 
     return NextResponse.json({
       success: true,

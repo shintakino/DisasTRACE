@@ -16,6 +16,7 @@ export default function AuditPage() {
       setLoading(true);
       const queryParams = new URLSearchParams();
       if (filters.search) queryParams.append("query", filters.search);
+      if (filters.userId) queryParams.append("role", filters.userId);
       
       const response = await fetch(`/api/audit?${queryParams.toString()}`);
       const data = await response.json();

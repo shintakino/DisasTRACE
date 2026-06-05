@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { VerificationStatusSchema } from "@/types/verification";
 import { db } from "@/db";
 import { verificationRequests } from "@/db/schema/verification_requests";
+import { incidents } from "@/db/schema/incidents";
 import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { autoDispatchIncident } from "@/lib/dispatch-engine";
+import crypto from "crypto";
 
 export async function PATCH(
   req: NextRequest,
@@ -45,16 +47,34 @@ export async function PATCH(
     let incident = null;
     let autoDispatched = false;
 
-    // 3. If verified and it's an emergency, trigger auto-dispatch engine
+    // 3. If verified, handle dispatch logic
     if (validatedStatus === "VERIFIED") {
-      incident = await autoDispatchIncident(
-        id,
-        existingReq.residentId,
-        existingReq.latitude,
-        existingReq.longitude
-      );
-      if (incident) {
-        autoDispatched = true;
+      // Auto-dispatch only if it's an emergency
+      if (existingReq.nature === "EMERGENCY") {
+        incident = await autoDispatchIncident(
+          id,
+          existingReq.residentId,
+          existingReq.latitude,
+          existingReq.longitude
+        );
+        if (incident) {
+          autoDispatched = true;
+        }
+      }
+
+      // If non-emergency or if auto-dispatch found no responders:
+      if (!incident) {
+        const [manualIncident] = await db.insert(incidents).values({
+          id: crypto.randomUUID(),
+          requestId: id,
+          responderId: null,
+          currentOfferResponderId: null,
+          status: "DISPATCHED",
+          dispatchMethod: "PACC_MANUAL",
+          assignedAmbulance: null,
+          skippedResponderIds: [],
+        }).returning();
+        incident = manualIncident;
       }
     }
 

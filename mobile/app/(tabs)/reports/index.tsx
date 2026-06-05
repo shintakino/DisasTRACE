@@ -13,7 +13,7 @@ export default function MyReportsScreen() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { role } = useAuthStatus();
+  const { role, isLoaded, user } = useAuthStatus();
   const isResponder = role?.includes('responder');
 
   const fetchReports = async () => {
@@ -63,8 +63,14 @@ export default function MyReportsScreen() {
   };
 
   useEffect(() => {
-    fetchReports();
-  }, []);
+    if (isLoaded) {
+      if (user) {
+        fetchReports();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [isLoaded, user]);
 
   const onRefresh = () => {
     setRefreshing(true);

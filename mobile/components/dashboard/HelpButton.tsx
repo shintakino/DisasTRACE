@@ -84,7 +84,7 @@ export function HelpButton({ onPress }: HelpButtonProps) {
             end={{ x: 1, y: 1 }}
             className="absolute inset-0"
           />
-          <Text className="text-white text-5xl font-black tracking-tighter">HELP</Text>
+          <Text className="text-white text-4xl font-black tracking-tighter">HELP</Text>
           <Text className="text-white/80 text-[10px] font-light tracking-[2px] mt-1">TAP TO REPORT</Text>
         </Animated.View>
       </TouchableOpacity>

@@ -41,11 +41,56 @@ export function ResponderHome() {
   const insets = useSafeAreaInsets();
   const { status, activeDispatch, targetHospital, setTargetHospital } = useResponderStore();
   const { profile, user, role } = useAuthStatus();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch and subscribe to unread notification count
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('unread', true);
+        
+        if (!error && count !== null) {
+          setUnreadCount(count);
+        }
+      } catch (err) {
+        console.error('[ResponderHome] Failed to fetch unread count:', err);
+      }
+    };
+
+    fetchUnreadCount();
+
+    const instanceId = Math.random().toString(36).substring(7);
+    const channel = supabase
+      .channel(`responder_home_notifs_${user.id}_${instanceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
   
   // Mock initials
-  const initials = profile?.fullName ? profile.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'RB';
+  const initials = profile?.fullName ? profile.fullName.trim().split(/\s+/).map(n => n ? n[0] : '').join('').slice(0, 2).toUpperCase() : 'RB';
   const name = profile?.fullName || 'Renzy Bastes';
-  const vehicleInitials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
+  const vehicleInitials = name.trim().split(/\s+/).map(n => n ? n[0] : '').join('').toUpperCase().slice(0, 3);
   const suffix = user?.id ? user.id.slice(-3).toUpperCase() : "";
   const myVehicleId = `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
 
@@ -57,6 +102,7 @@ export function ResponderHome() {
   const [selectedHospital, setSelectedHospital] = useState<any>(null);
   const [routeBounds, setRouteBounds] = useState<any>(null);
   const [cameraMode, setCameraMode] = useState<'follow' | 'overview'>('follow');
+  const [isCameraCentered, setIsCameraCentered] = useState(true);
   const isMarkerPress = useRef(false);
   const lastDbUpdateRef = useRef<number>(0);
   const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -661,26 +707,33 @@ export function ResponderHome() {
           if (isMarkerPress.current) return;
           setSelectedHospital(null);
         }}
+        onRegionWillChange={(event) => {
+          if ((event as any).properties?.isUserGesture) {
+            setIsCameraCentered(false);
+          }
+        }}
       >
-        {(status === 'en_route' || status === 'to_hospital') && cameraMode === 'follow' ? (
-          <Camera
-            center={currentLocation}
-            zoom={16.5}
-            bearing={heading} // Follow phone's compass/heading orientation dynamically!
-            duration={1000}
-          />
-        ) : routeBounds ? (
-          <Camera
-            bounds={routeBounds}
-            padding={{ top: 120, bottom: 400, left: 40, right: 40 }}
-            duration={1500}
-          />
-        ) : (
-          <Camera
-            center={currentLocation}
-            zoom={14}
-            duration={1500}
-          />
+        {isCameraCentered && (
+          (status === 'en_route' || status === 'to_hospital') && cameraMode === 'follow' ? (
+            <Camera
+              center={currentLocation}
+              zoom={16.5}
+              bearing={heading} // Follow phone's compass/heading orientation dynamically!
+              duration={1000}
+            />
+          ) : routeBounds ? (
+            <Camera
+              bounds={routeBounds}
+              padding={{ top: 120, bottom: 400, left: 40, right: 40 }}
+              duration={1500}
+            />
+          ) : (
+            <Camera
+              center={currentLocation}
+              zoom={14}
+              duration={1500}
+            />
+          )
         )}
 
         {/* Route Line */}
@@ -731,12 +784,22 @@ export function ResponderHome() {
           </Marker>
         )}
 
-        {/* All Hospitals Markers */}
         {hospitals.map((hospital) => {
           const isTarget = status === 'to_hospital' && targetHospital?.id === hospital.id;
           const isSelected = selectedHospital?.id === hospital.id;
           return (
-            <Marker key={hospital.id} id={hospital.id} lngLat={[hospital.coordinates.longitude, hospital.coordinates.latitude]}>
+            <Marker 
+              key={hospital.id} 
+              id={hospital.id} 
+              lngLat={[hospital.coordinates.longitude, hospital.coordinates.latitude]}
+              onPress={() => {
+                isMarkerPress.current = true;
+                setSelectedHospital((prev: any) => prev?.id === hospital.id ? null : hospital);
+                setTimeout(() => {
+                  isMarkerPress.current = false;
+                }, 300);
+              }}
+            >
               <View className="items-center justify-center">
                 {/* Floating Tooltip Card */}
                 {isSelected && (
@@ -767,24 +830,14 @@ export function ResponderHome() {
                   </View>
                 )}
 
-                <TouchableOpacity 
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    isMarkerPress.current = true;
-                    setSelectedHospital((prev: any) => prev?.id === hospital.id ? null : hospital);
-                    setTimeout(() => {
-                      isMarkerPress.current = false;
-                    }, 300);
-                  }}
-                  className="items-center justify-center relative"
-                >
+                <View className="items-center justify-center relative">
                   {isTarget && (
                     <View className="absolute w-16 h-16 rounded-full border border-red-500/50 bg-red-500/10 border-dashed animate-pulse" />
                   )}
                   <View className={`w-8 h-8 rounded-full items-center justify-center shadow-sm ${(isTarget || isSelected) ? 'bg-blue-600 shadow-blue-400 scale-110 border-2 border-white' : 'bg-slate-800 border-2 border-slate-600'} z-10`}>
                     <Hospital color={(isTarget || isSelected) ? "white" : "#94A3B8"} size={16} variant="Bold" />
                   </View>
-                </TouchableOpacity>
+                </View>
               </View>
             </Marker>
           );
@@ -792,7 +845,7 @@ export function ResponderHome() {
       </Map>
 
       {/* Overlay UI */}
-      <View className="absolute top-0 w-full" style={{ paddingTop: Math.max(insets.top, 20) }} pointerEvents="box-none">
+      <View className="absolute top-0 w-full" style={{ paddingTop: (StatusBar.currentHeight || 24) + 12 }} pointerEvents="box-none">
         
         {/* Top Header */}
         <View className="px-6 flex-row justify-between items-start pointer-events-auto">
@@ -811,10 +864,17 @@ export function ResponderHome() {
               <HelpCircle size={20} color="white" />
             </TouchableOpacity>
             <TouchableOpacity 
-              className="w-10 h-10 rounded-full bg-blue-900/40 items-center justify-center backdrop-blur-md border border-blue-800/50"
+              className="w-10 h-10 rounded-full bg-blue-900/40 items-center justify-center backdrop-blur-md border border-blue-800/50 relative"
               onPress={() => router.push('/notifications')}
             >
               <Bell size={20} color="white" />
+              {unreadCount > 0 && (
+                <View className="absolute top-1 right-1 flex h-[16px] w-[16px] min-w-[16px] items-center justify-center rounded-full bg-red-500 border border-white">
+                  <Text className="text-white text-[7px] font-black px-0.5 text-center leading-none">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -832,6 +892,20 @@ export function ResponderHome() {
               ) : (
                 <Eye size={20} color="#1E3A8A" strokeWidth={2.5} />
               )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Floating Recenter Map Button */}
+        {!isCameraCentered && (
+          <View className="absolute right-6 top-[196px] pointer-events-auto" style={{ zIndex: 999 }}>
+            <TouchableOpacity
+              onPress={() => setIsCameraCentered(true)}
+              activeOpacity={0.85}
+              className="px-4 py-2.5 bg-blue-900 rounded-full shadow-lg border border-blue-700 items-center justify-center flex-row space-x-2"
+            >
+              <Compass size={16} color="white" strokeWidth={2.5} />
+              <Text className="text-white text-xs font-bold">Recenter</Text>
             </TouchableOpacity>
           </View>
         )}

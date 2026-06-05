@@ -20,8 +20,8 @@ const BALIWAG_CENTER = {
   zoom: 13,
 };
 
-// OpenFreeMap Dark style
-const MAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
+// OpenFreeMap Light style
+const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 export function MapContainer({
   incidents,
@@ -88,6 +88,7 @@ export function MapContainer({
       }
     };
 
+    // Throttle / fetch
     fetchRoute();
 
     return () => {
@@ -101,7 +102,7 @@ export function MapContainer({
   }, [onSelectIncident]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#0a0a1a]">
+    <div className="relative w-full h-full overflow-hidden bg-[#f3f4f6]">
       <Map
         ref={mapRef}
         initialViewState={BALIWAG_CENTER}
@@ -181,6 +182,9 @@ export function MapContainer({
               type="hospital"
               status="AVAILABLE"
               label={hospital.name}
+              hospitalAddress={hospital.address}
+              hospitalPhone={hospital.phone}
+              caters={hospital.caters}
             />
           </Marker>
         ))}

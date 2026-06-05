@@ -93,7 +93,7 @@ export default function LogsPage() {
             <Skeleton className="h-16 w-full" />
           </div>
         ) : (
-          <LogsTable data={logs} />
+          <LogsTable data={logs} showActionColumn={role === "cdrrmo_super_admin"} />
         )}
       </Card>
     </div>

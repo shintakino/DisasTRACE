@@ -110,10 +110,10 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount }: Users
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</label>
                 <Select value={status} onValueChange={handleStatusChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="All Status" />
+                    <SelectValue placeholder="All Statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="ACTIVE">Active</SelectItem>
                     <SelectItem value="SUSPENDED">Suspended</SelectItem>
                     <SelectItem value="DEACTIVATED">Deactivated</SelectItem>

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 
 export default function UnauthorizedPlatformPage() {
-  const { role } = useAuth();
+  const { user, role, loading } = useAuth();
   const supabase = createClientBrowser();
   const router = useRouter();
 
@@ -18,7 +18,24 @@ export default function UnauthorizedPlatformPage() {
     router.refresh();
   };
 
-  const roleLabel = (role as string)?.replace('_', ' ') || 'User';
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F4F6]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A]"></div>
+      </div>
+    );
+  }
+
+  const status = user?.app_metadata?.status;
+  const isInactive = status === "SUSPENDED" || status === "DEACTIVATED";
+
+  const title = isInactive 
+    ? (status === "SUSPENDED" ? "Account Suspended" : "Account Deactivated")
+    : "Mobile App Only";
+
+  const description = isInactive
+    ? `Your account has been ${status === "SUSPENDED" ? "suspended" : "deactivated"} by the system administrator.`
+    : `The ${(role as string)?.replace('_', ' ') || 'User'} role is restricted to the DisasTRACE Mobile Application.`;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F3F4F6] p-4">
@@ -27,29 +44,33 @@ export default function UnauthorizedPlatformPage() {
           <div className="mx-auto w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
             <Smartphone className="size-10 text-red-500" />
           </div>
-          <CardTitle className="text-2xl font-bold text-[#1E3A8A]">Mobile App Only</CardTitle>
+          <CardTitle className="text-2xl font-bold text-[#1E3A8A]">{title}</CardTitle>
           <p className="text-slate-500 mt-2">
-            The {roleLabel} role is restricted to the DisasTRACE Mobile Application.
+            {description}
           </p>
         </CardHeader>
         <CardContent className="space-y-6 pt-4">
           <div className="bg-red-50/50 border border-red-100 rounded-lg p-4 flex gap-3">
             <ShieldAlert className="size-5 text-red-500 shrink-0 mt-0.5" />
             <p className="text-sm text-slate-600 leading-relaxed">
-              Your account is designed for field operations. Please download the mobile app to report incidents or receive dispatches.
+              {isInactive 
+                ? "Access to the DisasTRACE platforms (both Web and Mobile) has been restricted. If you believe this is in error, please contact the CDRRMO administrator."
+                : "Your account is designed for field operations. Please download the mobile app to report incidents or receive dispatches."}
             </p>
           </div>
 
-          <div className="space-y-4">
-            <p className="text-xs font-bold text-[#1E3A8A] uppercase tracking-wider text-center">
-              Next Steps
-            </p>
-            <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside px-2">
-              <li>Open the DisasTRACE App on your phone.</li>
-              <li>Sign in with your registered credentials.</li>
-              <li>Complete your field tasks through the mobile interface.</li>
-            </ol>
-          </div>
+          {!isInactive && (
+            <div className="space-y-4">
+              <p className="text-xs font-bold text-[#1E3A8A] uppercase tracking-wider text-center">
+                Next Steps
+              </p>
+              <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside px-2">
+                <li>Open the DisasTRACE App on your phone.</li>
+                <li>Sign in with your registered credentials.</li>
+                <li>Complete your field tasks through the mobile interface.</li>
+              </ol>
+            </div>
+          )}
 
           <Button 
             onClick={handleSignOut} 

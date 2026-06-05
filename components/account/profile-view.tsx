@@ -119,7 +119,7 @@ export function ProfileView() {
   return (
     <div className="w-full" key={user?.id || "loading"}>
       <Tabs defaultValue="personal" className="w-full">
-        <div className="flex justify-center mb-10">
+        <div className="flex justify-center mb-6">
           <TabsList className="bg-transparent border-b border-[#E2E8F0] w-full max-w-md justify-start rounded-none h-auto p-0 gap-6">
             <TabsTrigger 
               value="personal"
@@ -133,11 +133,17 @@ export function ProfileView() {
             >
               Notifications
             </TabsTrigger>
+            <TabsTrigger 
+              value="terms"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A8A] data-[state=active]:bg-transparent px-2 py-3 text-base text-muted-foreground"
+            >
+              Terms & Conditions
+            </TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="personal" className="max-w-md mx-auto outline-none mt-0">
-          <div className="flex flex-col items-center mb-8">
+          <div className="flex flex-col items-center mb-6">
             <div className="relative">
               {avatarUrl ? (
                 <img 
@@ -156,16 +162,6 @@ export function ProfileView() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A]" />
                 </div>
               )}
-
-              <button 
-                type="button" 
-                onClick={handleAvatarClick}
-                disabled={avatarLoading}
-                className="absolute bottom-0 right-0 h-8 w-8 bg-white border border-[#E2E8F0] rounded-full flex items-center justify-center text-[#1E3A8A] hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
-                aria-label="Change avatar"
-              >
-                <Camera className="h-4 w-4" />
-              </button>
               
               <input 
                 type="file" 
@@ -257,6 +253,17 @@ export function ProfileView() {
               supabase={supabase}
               user={user}
             />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="terms" className="max-w-lg mx-auto outline-none mt-0">
+          <div className="text-xs font-bold uppercase text-[#1E293B] mb-4">Terms & Conditions</div>
+          <div className="p-5 rounded-2xl border border-[#E2E8F0] bg-white text-slate-600 text-xs leading-relaxed space-y-3">
+            <p className="font-bold text-[#1E3A8A] text-sm">Welcome to DisasTRACE!</p>
+            <p>These terms and conditions outline the rules and regulations for the use of the DisasTRACE centralized digital emergency reporting system.</p>
+            <p>By accessing and utilizing this command portal, we assume you accept these terms and conditions in full. Do not continue to operate DisasTRACE if you do not agree to abide by all the guidelines and compliance measures stated herein.</p>
+            <h4 className="font-bold text-[#1E3A8A] uppercase tracking-wider text-[10px] mt-4">Authorized Command Use Only</h4>
+            <p>Access to this dashboard is strictly restricted to authenticated CDRRMO Super Administrators and PACC Dispatchers. Sharing credentials, exposing resident private findings, or downloading diagnostic data without official clearance violates public safety protocol and R.A. 10173 (Data Privacy Act).</p>
           </div>
         </TabsContent>
       </Tabs>

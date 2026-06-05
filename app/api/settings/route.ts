@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { systemSettings } from "@/db/schema/system_settings";
+import { auditLogs } from "@/db/schema/audit_logs";
 import { users } from "@/db/schema/users";
 import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
+import crypto from "crypto";
 
 const SettingsUpdateSchema = z.object({
   dispatchOfferTimeoutSeconds: z.number().int().min(10, "Minimum timeout is 10 seconds").max(120, "Maximum timeout is 120 seconds"),
@@ -88,6 +90,15 @@ export async function POST(req: NextRequest) {
         }
       })
       .returning();
+
+    // Insert audit log
+    await db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      action: `Updated system settings: Dispatch Offer Timeout set to ${dispatchOfferTimeoutSeconds}s`,
+      entityType: "SETTINGS",
+      entityId: "current",
+    });
 
     return NextResponse.json({
       success: true,

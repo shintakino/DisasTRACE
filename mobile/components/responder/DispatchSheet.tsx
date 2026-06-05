@@ -148,43 +148,77 @@ export function DispatchSheet() {
           <Text className="text-[#475569] text-[11px] font-semibold tracking-wide">{activeDispatch?.timestamp || '09:43 PM'}</Text>
         </View>
 
-        {/* Accept Button */}
-        <TouchableOpacity 
-          className="bg-[#B91C1C] rounded-[20px] py-4 items-center shadow-lg shadow-[#B91C1C]/30 active:bg-red-800"
-          onPress={async () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            progress.value = 100; // Cancel animation
-            try {
-              const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-              const { data: { session } } = await supabase.auth.getSession();
-              const reqHeaders: any = { 'Content-Type': 'application/json' };
-              if (session?.access_token) {
-                reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
-              }
+        {/* Actions Button Row */}
+        <View className="flex-row space-x-3">
+          <TouchableOpacity 
+            className="bg-slate-100 rounded-[20px] py-4 items-center active:bg-slate-200"
+            style={{ flex: 1 }}
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              progress.value = 100; // Cancel animation
+              try {
+                const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+                const { data: { session } } = await supabase.auth.getSession();
+                const reqHeaders: any = { 'Content-Type': 'application/json' };
+                if (session?.access_token) {
+                  reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+                }
 
-              const response = await fetch(`${apiUrl}/api/incidents/respond`, {
-                method: 'POST',
-                headers: reqHeaders,
-                body: JSON.stringify({
-                  incidentId: activeDispatch?.id,
-                  action: 'ACCEPT'
-                })
-              });
-              const res = await response.json();
-              if (res.success) {
-                acceptDispatch();
-              } else {
-                alert(res.error || "Failed to accept dispatch.");
+                await fetch(`${apiUrl}/api/incidents/respond`, {
+                  method: 'POST',
+                  headers: reqHeaders,
+                  body: JSON.stringify({
+                    incidentId: activeDispatch?.id,
+                    action: 'REJECT'
+                  })
+                });
+              } catch (err) {
+                console.error("Failed to decline dispatch offer:", err);
               }
-            } catch (err) {
-              console.error("Failed to accept dispatch offer:", err);
-              // Fallback to local state so UX remains intact during dev
-              acceptDispatch();
-            }
-          }}
-        >
-          <Text className="text-white font-bold text-[16px] tracking-wide">Accept Dispatch</Text>
-        </TouchableOpacity>
+              completeIncident(); // Clear offer
+            }}
+          >
+            <Text className="text-slate-600 font-bold text-[16px] tracking-wide">Decline</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            className="bg-[#B91C1C] rounded-[20px] py-4 items-center shadow-lg shadow-[#B91C1C]/30 active:bg-red-800"
+            style={{ flex: 2 }}
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              progress.value = 100; // Cancel animation
+              try {
+                const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+                const { data: { session } } = await supabase.auth.getSession();
+                const reqHeaders: any = { 'Content-Type': 'application/json' };
+                if (session?.access_token) {
+                  reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+                }
+
+                const response = await fetch(`${apiUrl}/api/incidents/respond`, {
+                  method: 'POST',
+                  headers: reqHeaders,
+                  body: JSON.stringify({
+                    incidentId: activeDispatch?.id,
+                    action: 'ACCEPT'
+                  })
+                });
+                const res = await response.json();
+                if (res.success) {
+                  acceptDispatch();
+                } else {
+                  alert(res.error || "Failed to accept dispatch.");
+                }
+              } catch (err) {
+                console.error("Failed to accept dispatch offer:", err);
+                // Fallback to local state so UX remains intact during dev
+                acceptDispatch();
+              }
+            }}
+          >
+            <Text className="text-white font-bold text-[16px] tracking-wide">Accept Dispatch</Text>
+          </TouchableOpacity>
+        </View>
 
       </View>
     </Animated.View>

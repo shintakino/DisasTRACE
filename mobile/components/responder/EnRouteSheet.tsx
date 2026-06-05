@@ -8,14 +8,14 @@ import { useResponderStore } from '../../stores/useResponderStore';
 export function EnRouteSheet() {
   const { status, activeDispatch, elapsedTimeSeconds, confirmArrival, currentSpeedKph } = useResponderStore();
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ['50%', '90%'], []);
+  const snapPoints = useMemo(() => ['15%', '50%', '90%'], []);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
 
   useEffect(() => {
     if (status === 'en_route') {
       setIsExpanded(false);
-      bottomSheetRef.current?.snapToIndex(0);
+      bottomSheetRef.current?.snapToIndex(1);
     } else {
       bottomSheetRef.current?.close();
     }
@@ -24,9 +24,9 @@ export function EnRouteSheet() {
   const toggleAccordion = () => {
     setIsExpanded(!isExpanded);
     if (!isExpanded) {
-      bottomSheetRef.current?.snapToIndex(1);
+      bottomSheetRef.current?.snapToIndex(2);
     } else {
-      bottomSheetRef.current?.snapToIndex(0);
+      bottomSheetRef.current?.snapToIndex(1);
     }
   };
 
@@ -40,7 +40,7 @@ export function EnRouteSheet() {
     <>
       <BottomSheet
       ref={bottomSheetRef}
-      index={status === 'en_route' ? (isExpanded ? 1 : 0) : -1}
+      index={status === 'en_route' ? (isExpanded ? 2 : 1) : -1}
       snapPoints={snapPoints}
       enablePanDownToClose={false}
       enableDynamicSizing={false}

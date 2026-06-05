@@ -24,7 +24,25 @@ import { cn } from "@/lib/utils";
 
 interface LogsTableProps {
   data: StatusLogEntry[];
+  showActionColumn?: boolean;
 }
+
+const ActionBadge = ({ action }: { action: LogAction }) => {
+  const styles: Record<LogAction, string> = {
+    DISPATCHED: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-850",
+    COMPLETED: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-850",
+    ARRIVED: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-850",
+    STARTED: "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-850",
+    ENDED: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900/30 dark:text-slate-300 dark:border-slate-850",
+    NONE: "bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-900/30 dark:text-slate-300 dark:border-slate-850",
+  };
+
+  return (
+    <Badge variant="outline" className={cn("px-2 py-0.5 font-bold text-[10px] tracking-wide uppercase", styles[action])}>
+      {action}
+    </Badge>
+  );
+};
 
 const StatusBadge = ({ status }: { status: LogStatus }) => {
   const styles: Record<LogStatus, string> = {
@@ -41,7 +59,7 @@ const StatusBadge = ({ status }: { status: LogStatus }) => {
   );
 };
 
-export function LogsTable({ data }: LogsTableProps) {
+export function LogsTable({ data, showActionColumn = true }: LogsTableProps) {
   const columns: ColumnDef<StatusLogEntry>[] = [
     {
       id: "dateTime",
@@ -90,11 +108,21 @@ export function LogsTable({ data }: LogsTableProps) {
       header: "STATUS",
       cell: ({ row }) => <StatusBadge status={row.getValue("status") as LogStatus} />,
     },
+    {
+      accessorKey: "action",
+      header: "ACTION",
+      cell: ({ row }) => <ActionBadge action={row.getValue("action") as LogAction} />,
+    },
   ];
 
   const table = useReactTable({
     data,
     columns,
+    state: {
+      columnVisibility: {
+        action: showActionColumn,
+      },
+    },
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });

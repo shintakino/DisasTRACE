@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { supportSettings, faqs, users } from "@/db/schema";
+import { supportSettings, faqs, users, auditLogs } from "@/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
+import crypto from "crypto";
 
 const SupportSettingsUpdateSchema = z.object({
   phone: z.string().min(1, "Phone hotline is required"),
@@ -102,6 +103,15 @@ export async function PUT(req: NextRequest) {
       .set(updatePayload)
       .where(eq(supportSettings.id, 'current'))
       .returning();
+
+    // Insert audit log
+    await db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      action: `Updated support settings (Hotline: ${phone}, Email: ${email})`,
+      entityType: "SETTINGS",
+      entityId: "current",
+    });
 
     return NextResponse.json({
       success: true,

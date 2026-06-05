@@ -256,7 +256,15 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             
             <View className="absolute top-1 right-1 w-6 h-6 bg-white rounded-full items-center justify-center">
-              <View className="w-4 h-4 bg-[#1E3A8A] rounded-full" />
+              <View className={`w-4 h-4 rounded-full ${
+                role === 'ambulance_responder'
+                  ? (profile?.dutyStatus === 'ON_DUTY'
+                      ? 'bg-green-500'
+                      : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                        ? 'bg-red-500'
+                        : 'bg-slate-400')
+                  : 'bg-green-500'
+              }`} />
             </View>
           </View>
 

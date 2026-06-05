@@ -8,19 +8,53 @@ interface MapMarkerProps {
   status: string;
   label: string;
   isSelected?: boolean;
+  hospitalAddress?: string;
+  hospitalPhone?: string | null;
+  caters?: boolean;
 }
 
-export function MapMarker({ type, status, label, isSelected }: MapMarkerProps) {
+export function MapMarker({ 
+  type, 
+  status, 
+  label, 
+  isSelected,
+  hospitalAddress,
+  hospitalPhone,
+  caters = true
+}: MapMarkerProps) {
   if (type === "hospital") {
     return (
       <div className="relative group cursor-pointer flex flex-col items-center">
-        {/* Label */}
-        <div className="absolute -top-8 px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-          {label}
+        {/* Google Maps-style Hover Preview Card */}
+        <div className="absolute bottom-full mb-2 w-64 p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xl opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 z-50 flex flex-col gap-1.5 text-slate-800 text-left">
+          <div className="text-xs font-black text-slate-900 leading-tight">{label}</div>
+          <div className="text-[10px] text-slate-500 font-medium leading-normal">{hospitalAddress || "Baliwag City, Bulacan"}</div>
+          
+          <div className="h-px bg-slate-100 my-1" />
+          
+          {hospitalPhone && (
+            <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-600">
+              <span className="text-[#1E3A8A] font-black uppercase tracking-wider">Tel:</span>
+              <span>{hospitalPhone}</span>
+            </div>
+          )}
+          
+          <div className="flex items-center mt-0.5">
+            <span className={cn(
+              "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border",
+              caters 
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                : "bg-red-50 text-red-700 border-red-200"
+            )}>
+              {caters ? "Caters to Emergency" : "Limited Availability"}
+            </span>
+          </div>
+          {/* Small Arrow down */}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-white" />
         </div>
 
         {/* Marker Icon */}
-        <div className="relative z-10 p-1.5 rounded-full border-2 bg-blue-600 border-blue-200 text-white shadow-lg">
+        <div className="relative z-10 p-1.5 rounded-full border-2 bg-blue-600 border-blue-200 text-white shadow-lg group-hover:scale-110 transition-transform">
           <Hospital size={16} fill="currentColor" />
         </div>
       </div>

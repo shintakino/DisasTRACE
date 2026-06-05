@@ -16,9 +16,10 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("query")?.toLowerCase();
+    const role = searchParams.get("role");
 
     // Query real audit logs from the database
-    const dbLogs = await db
+    const queryBuilder = db
       .select({
         id: auditLogs.id,
         userName: users.fullName,
@@ -27,8 +28,13 @@ export async function GET(request: Request) {
         createdAt: auditLogs.createdAt,
       })
       .from(auditLogs)
-      .innerJoin(users, eq(auditLogs.userId, users.id))
-      .orderBy(desc(auditLogs.createdAt));
+      .innerJoin(users, eq(auditLogs.userId, users.id));
+
+    if (role && role !== "all") {
+      queryBuilder.where(eq(users.role, role as any));
+    }
+
+    const dbLogs = await queryBuilder.orderBy(desc(auditLogs.createdAt));
 
     let mapped = dbLogs.map((log) => ({
       id: log.id,

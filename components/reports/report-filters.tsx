@@ -99,10 +99,10 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
           onValueChange={(val) => setStatus((val || "all") as ReportStatus | "all")}
         >
           <SelectTrigger className="h-10">
-            <SelectValue placeholder="All Status" />
+            <SelectValue placeholder="All Statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="COMPLETED">Completed</SelectItem>
             <SelectItem value="ONGOING">Ongoing</SelectItem>
             <SelectItem value="RESPONDING">Responding</SelectItem>

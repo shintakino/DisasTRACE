@@ -50,11 +50,32 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-export function IncidentTrends({ data }: { data: IncidentTrend[] }) {
+export function IncidentTrends({ 
+  data,
+  year = String(new Date().getFullYear()),
+  onYearChange
+}: { 
+  data: IncidentTrend[];
+  year?: string;
+  onYearChange?: (year: string) => void;
+}) {
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 3 }, (_, i) => String(currentYear - i));
+
   return (
     <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
         <CardTitle className="text-2xl font-bold text-[#1E293B]">Incident Summary</CardTitle>
+        <Select value={year} onValueChange={(val) => onYearChange?.(val || "")}>
+          <SelectTrigger className="w-[110px] bg-[#F8FAFC] border-[#E2E8F0] h-9 rounded-lg text-sm font-medium">
+            <SelectValue placeholder="Year" />
+          </SelectTrigger>
+          <SelectContent>
+            {years.map((y) => (
+              <SelectItem key={y} value={y}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 p-6 pt-0">
         <ChartContainer config={chartConfig} className="h-full w-full min-h-[220px]">
@@ -143,7 +164,7 @@ export function IncidentTrends({ data }: { data: IncidentTrend[] }) {
 
 export function IncidentDistribution({ 
   data, 
-  period = "monthly", 
+  period = "Monthly", 
   onPeriodChange 
 }: { 
   data: IncidentDistributionType[], 
@@ -159,9 +180,9 @@ export function IncidentDistribution({
             <SelectValue placeholder="Period" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="monthly">Monthly</SelectItem>
-            <SelectItem value="weekly">Weekly</SelectItem>
-            <SelectItem value="yearly">Yearly</SelectItem>
+            <SelectItem value="Monthly">Monthly</SelectItem>
+            <SelectItem value="Weekly">Weekly</SelectItem>
+            <SelectItem value="Yearly">Yearly</SelectItem>
           </SelectContent>
         </Select>
       </CardHeader>
@@ -197,6 +218,7 @@ export function IncidentDistribution({
                 outerRadius="80%"
                 stroke="none"
                 labelLine={false}
+                isAnimationActive={false}
                 label={({ cx, cy, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 }) => {
                   const RADIAN = Math.PI / 180;
                   // Position labels slightly further out (70%) for the larger chart

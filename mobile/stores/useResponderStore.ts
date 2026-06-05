@@ -306,12 +306,14 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
       const res = await response.json();
       if (res.success) {
+        const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
+        SecureStore.setItemAsync('disas_trace_drafts', JSON.stringify(nextDrafts)).catch(() => {});
         set((state) => ({
           isSubmittingReport: false,
           showReportSuccess: true,
           lastSubmittedSummary: summary,
           submittedIncidentIds: [...state.submittedIncidentIds, idToSubmit],
-          drafts: state.drafts.filter(d => d.incidentId !== idToSubmit)
+          drafts: nextDrafts
         }));
       } else {
         console.error('Failed to submit report:', res.error);
@@ -334,12 +336,14 @@ export const useResponderStore = create<ResponderState>((set) => ({
         }
       });
 
+      const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
+      SecureStore.setItemAsync('disas_trace_drafts', JSON.stringify(nextDrafts)).catch(() => {});
       set((state) => ({
         isSubmittingReport: false,
         showReportSuccess: true,
         lastSubmittedSummary: summary,
         submittedIncidentIds: [...state.submittedIncidentIds, idToSubmit],
-        drafts: state.drafts.filter(d => d.incidentId !== idToSubmit)
+        drafts: nextDrafts
       }));
     }
   },
@@ -385,12 +389,19 @@ export const useResponderStore = create<ResponderState>((set) => ({
       incidentDetails: incident
     };
 
+    let newDrafts: DraftForm[] = [];
     if (existingDraftIndex >= 0) {
-      const newDrafts = [...state.drafts];
+      newDrafts = [...state.drafts];
       newDrafts[existingDraftIndex] = newDraft;
-      return { drafts: newDrafts };
+    } else {
+      newDrafts = [...state.drafts, newDraft];
     }
-    return { drafts: [...state.drafts, newDraft] };
+    
+    SecureStore.setItemAsync('disas_trace_drafts', JSON.stringify(newDrafts)).catch(err => {
+      console.error('[useResponderStore] Failed to save drafts:', err);
+    });
+
+    return { drafts: newDrafts };
   }),
 
   openFormForIncident: (incident) => set({
@@ -438,8 +449,15 @@ export const useResponderStore = create<ResponderState>((set) => ({
       } else {
         set({ offlineQueue: [] });
       }
+
+      const storedDrafts = await SecureStore.getItemAsync('disas_trace_drafts');
+      if (storedDrafts) {
+        set({ drafts: JSON.parse(storedDrafts) });
+      } else {
+        set({ drafts: [] });
+      }
     } catch (e) {
-      console.error('[useResponderStore] Failed to load offline queue from SecureStore:', e);
+      console.error('[useResponderStore] Failed to load offline data from SecureStore:', e);
     }
   },
 

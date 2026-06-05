@@ -8,13 +8,59 @@ import { useResponderStore } from '../../stores/useResponderStore';
 import { supabase } from '../../lib/supabase';
 
 
+import * as Location from 'expo-location';
+
 export default function MapScreen() {
-  const { profile, role } = useAuthStatus();
+  const { profile, role, isLoaded, user } = useAuthStatus();
   const { activeDispatch, status } = useResponderStore();
   const [selectedHospital, setSelectedHospital] = useState<any>(null);
   const isMarkerPress = useRef(false);
 
   const [hospitals, setHospitals] = useState<any[]>([]);
+  const [userLocation, setUserLocation] = useState<[number, number]>([120.880, 14.940]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let subscription: { remove: () => void } | null = null;
+
+    async function startTracking() {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const current = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          if (current && current.coords && isMounted) {
+            setUserLocation([current.coords.longitude, current.coords.latitude]);
+          }
+
+          subscription = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.Balanced,
+              timeInterval: 10000,
+              distanceInterval: 10,
+            },
+            (loc) => {
+              if (loc && loc.coords && isMounted) {
+                setUserLocation([loc.coords.longitude, loc.coords.latitude]);
+              }
+            }
+          );
+        }
+      } catch (e) {
+        console.error('[MapScreen] Failed to watch user location:', e);
+      }
+    }
+
+    startTracking();
+
+    return () => {
+      isMounted = false;
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fetchHospitals = async () => {
@@ -35,8 +81,11 @@ export default function MapScreen() {
         console.error("Error fetching mobile map hospitals:", err);
       }
     };
-    fetchHospitals();
-  }, []);
+
+    if (isLoaded && user) {
+      fetchHospitals();
+    }
+  }, [isLoaded, user]);
 
   const getInitials = (name: string) => {
     return name
@@ -81,16 +130,15 @@ export default function MapScreen() {
               key={h.id}
               id={`hospital-${h.id}`}
               lngLat={[h.lng, h.lat]}
+              onPress={() => {
+                isMarkerPress.current = true;
+                setSelectedHospital(h);
+                setTimeout(() => {
+                  isMarkerPress.current = false;
+                }, 300);
+              }}
             >
-              <TouchableOpacity 
-                activeOpacity={0.8}
-                onPress={() => {
-                  isMarkerPress.current = true;
-                  setSelectedHospital(h);
-                  setTimeout(() => {
-                    isMarkerPress.current = false;
-                  }, 300);
-                }}
+              <View 
                 className={`flex-row items-center bg-white p-1 pr-3 rounded-full border shadow-sm ${isSelected ? 'border-blue-400 shadow-blue-200 scale-105' : 'border-slate-200'}`}
               >
                 <View className={`w-7 h-7 rounded-full items-center justify-center ${isSelected ? 'bg-blue-600' : 'bg-[#DC2626]'}`}>
@@ -99,12 +147,12 @@ export default function MapScreen() {
                 <Text className={`ml-2 text-[10px] font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>
                   {h.name}
                 </Text>
-              </TouchableOpacity>
+              </View>
             </Marker>
           );
         })}
 
-        <Marker id="userLocation" lngLat={[120.880, 14.940]}>
+        <Marker id="userLocation" lngLat={userLocation}>
           <View className="items-center justify-center relative">
             <View className="absolute w-8 h-8 rounded-full bg-red-500/30 animate-ping" />
             <View className="p-1 rounded-full border-2 border-red-200 bg-red-500 shadow-lg">

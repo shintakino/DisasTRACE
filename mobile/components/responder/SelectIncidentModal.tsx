@@ -30,7 +30,7 @@ export function SelectIncidentModal({ visible, onClose }: SelectIncidentModalPro
         .from('incidents')
         .select('id, status, created_at, assigned_ambulance, request_id')
         .eq('responder_id', userId)
-        .eq('status', 'RESOLVED');
+        .in('status', ['RESOLVED', 'ARRIVED']);
 
       if (incError) throw incError;
 

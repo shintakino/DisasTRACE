@@ -12,20 +12,29 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { DashboardData, DashboardDataSchema } from "@/types/dashboard";
+import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
 
 export default function DashboardPage() {
   const { role, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [period, setPeriod] = useState("monthly");
+  const [period, setPeriod] = useState("Monthly");
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
+
+  const handleReportClick = (reportId: string) => {
+    setSelectedReportId(reportId);
+    setIsReportSheetOpen(true);
+  };
 
   useEffect(() => {
     async function fetchDashboardData() {
       try {
         const [kpiRes, trendRes, reportRes, responderRes] = await Promise.all([
           fetch('/api/dashboard/kpis'),
-          fetch(`/api/dashboard/trends?period=${period}`),
+          fetch(`/api/dashboard/trends?period=${period}&year=${year}`),
           fetch('/api/dashboard/reports'),
           fetch('/api/dashboard/responders'),
         ]);
@@ -79,7 +88,7 @@ export default function DashboardPage() {
         setError("You do not have permission to view this dashboard.");
       }
     }
-  }, [period, role, authLoading]);
+  }, [period, year, role, authLoading]);
 
   if (loading) {
     return (
@@ -123,49 +132,69 @@ export default function DashboardPage() {
   // Render CDRRMO Super Admin Layout
   if (role?.toLowerCase() === 'cdrrmo_super_admin') {
     return (
-      <div className="h-full overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:scrollbar-default">
-        <div className="shrink-0">
-          <KpiCards data={data.kpis} />
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0">
-          <IncidentTrends data={data.trends} />
-          <IncidentDistribution 
-            data={data.distribution} 
-            period={period}
-            onPeriodChange={(val) => setPeriod(val || "monthly")}
-          />
+      <>
+        <div className="h-full overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:scrollbar-default">
+          <div className="shrink-0">
+            <KpiCards data={data.kpis} />
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0">
+            <IncidentTrends 
+              data={data.trends} 
+              year={year}
+              onYearChange={setYear}
+            />
+            <IncidentDistribution 
+              data={data.distribution} 
+              period={period}
+              onPeriodChange={(val) => setPeriod(val || "monthly")}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0 pb-4">
+            <RecentReports reports={data.reports} onReportClick={handleReportClick} />
+            <ResponderStatus responders={data.responders} />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0 pb-4">
-          <RecentReports reports={data.reports} />
-          <ResponderStatus responders={data.responders} />
-        </div>
-      </div>
+        <ReportDetailSheet 
+          reportId={selectedReportId}
+          isOpen={isReportSheetOpen}
+          onClose={() => setIsReportSheetOpen(false)}
+        />
+      </>
     );
   }
 
   // Render PACC Admin Layout
   if (role?.toLowerCase() === 'pacc_admin') {
     return (
-      <div className="h-full overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:scrollbar-default">
-        <div className="shrink-0">
-          <KpiCards data={data.kpis} />
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[450px] shrink-0">
-          <RecentReports reports={data.reports} />
-          <IncidentDistribution 
-            data={data.distribution} 
-            period={period}
-            onPeriodChange={(val) => setPeriod(val || "monthly")}
-          />
+      <>
+        <div className="h-full overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:scrollbar-default">
+          <div className="shrink-0">
+            <KpiCards data={data.kpis} />
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[450px] shrink-0">
+            <RecentReports reports={data.reports} onReportClick={handleReportClick} />
+            <IncidentDistribution 
+              data={data.distribution} 
+              period={period}
+              onPeriodChange={(val) => setPeriod(val || "monthly")}
+            />
+          </div>
+
+          <div className="w-full pb-4 shrink-0">
+            <PACCResponderGrid responders={data.responders} />
+          </div>
         </div>
 
-        <div className="w-full pb-4 shrink-0">
-          <PACCResponderGrid responders={data.responders} />
-        </div>
-      </div>
+        <ReportDetailSheet 
+          reportId={selectedReportId}
+          isOpen={isReportSheetOpen}
+          onClose={() => setIsReportSheetOpen(false)}
+        />
+      </>
     );
   }
 

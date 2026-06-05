@@ -77,11 +77,10 @@ export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="super_admin">Super Admin</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="pacc">PACC</SelectItem>
-                    <SelectItem value="responder">Responder</SelectItem>
-                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="cdrrmo_super_admin">Super Admin</SelectItem>
+                    <SelectItem value="pacc_admin">PACC Admin</SelectItem>
+                    <SelectItem value="ambulance_responder">Responder</SelectItem>
+                    <SelectItem value="public_user">Public User</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

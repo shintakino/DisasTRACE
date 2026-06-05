@@ -379,6 +379,26 @@ export default function VerificationPage() {
 
   const selectedRequest = requests.find((r) => r.id === selectedId) || null
   const activeAlerts = requests.filter((r) => r.status === "PENDING" || needsManualDispatch(r))
+  const hasEmergency = activeAlerts.some(r => r.nature === "EMERGENCY" || needsManualDispatch(r))
+
+  // Loop sound alerts while there are active unhandled reports
+  useEffect(() => {
+    if (isLoading || isMuted) return;
+
+    const hasActiveAlerts = activeAlerts.length > 0;
+    if (!hasActiveAlerts) return;
+
+    // Play initial sound immediately
+    playAlertSound(hasEmergency ? "emergency" : "warning");
+
+    const intervalId = setInterval(() => {
+      playAlertSound(hasEmergency ? "emergency" : "warning");
+    }, 4500); // Siren rhythm loop
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [activeAlerts.length, hasEmergency, isLoading, isMuted]);
 
   if (isLoading) {
     return (
@@ -389,7 +409,7 @@ export default function VerificationPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-88px)] overflow-hidden bg-[#F3F4F6]">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F3F4F6]">
       {/* Real-time Triage Alert HUD */}
       {activeAlerts.length > 0 && (
         <div className="bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white px-6 py-2.5 flex items-center justify-between shadow-lg relative overflow-hidden shrink-0 border-b border-red-700">

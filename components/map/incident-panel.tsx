@@ -1,11 +1,14 @@
 "use client";
 
-import { ScrollArea } from "@/components/ui/scroll-area";
+import * as React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapIncident, MapSummary, IncidentStatus } from "@/types/map";
-import { Calendar, ArrowRight, Activity, Flame, Car, ShieldAlert, Clock, MapPin } from "lucide-react";
+import { Calendar as CalendarIcon, ArrowRight, Activity, Flame, Car, ShieldAlert, Clock, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as UICalendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 interface IncidentPanelProps {
   summary: MapSummary;
@@ -14,6 +17,7 @@ interface IncidentPanelProps {
   selectedIncidentId?: string;
   filter: string;
   onFilterChange: (filter: string) => void;
+  onOpenDetails?: (id: string) => void;
 }
 
 export function IncidentPanel({
@@ -23,19 +27,53 @@ export function IncidentPanel({
   selectedIncidentId,
   filter,
   onFilterChange,
+  onOpenDetails,
 }: IncidentPanelProps) {
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(undefined);
+
+  // Auto-scroll list when an incident pin is selected on the map
+  React.useEffect(() => {
+    if (selectedIncidentId) {
+      const element = document.getElementById(`incident-card-${selectedIncidentId}`);
+      if (element) {
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+      }
+    }
+  }, [selectedIncidentId]);
+
   const filteredIncidents = incidents.filter((incident) => {
-    if (filter === "ALL") return true;
-    if (filter === "STANDBY") return incident.status === "STANDBY";
-    return incident.status === filter;
+    // 1. Status Filter
+    let statusMatch = true;
+    if (filter === "ALL") statusMatch = true;
+    else if (filter === "STANDBY") statusMatch = incident.status === "STANDBY";
+    else statusMatch = incident.status === filter;
+
+    if (!statusMatch) return false;
+
+    // 2. Date Filter
+    if (selectedDate) {
+      const incidentDate = new Date(incident.createdAt);
+      return (
+        incidentDate.getFullYear() === selectedDate.getFullYear() &&
+        incidentDate.getMonth() === selectedDate.getMonth() &&
+        incidentDate.getDate() === selectedDate.getDate()
+      );
+    }
+
+    return true;
   });
 
-  const currentDate = new Date().toLocaleDateString("en-US", {
-    timeZone: "Asia/Manila",
-    month: "2-digit",
-    day: "2-digit",
-    year: "numeric",
-  }).replace(/\//g, ".");
+  const displayDateStr = selectedDate 
+    ? format(selectedDate, "MM.dd.yyyy") 
+    : new Date().toLocaleDateString("en-US", {
+        timeZone: "Asia/Manila",
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      }).replace(/\//g, ".");
 
   return (
     <div className="flex flex-col h-full w-[400px] border-r bg-white shadow-xl z-10">
@@ -45,10 +83,32 @@ export function IncidentPanel({
           <h1 className="text-xl font-black text-slate-900 tracking-tight">Incident Reports</h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Real-time Command Feed</p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-full text-slate-600 text-[10px] font-black border border-slate-200 shadow-sm">
-          <Calendar size={12} className="text-slate-400" />
-          <span>{currentDate}</span>
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 text-[10px] font-black border border-slate-200 shadow-sm transition-colors cursor-pointer outline-none">
+              <CalendarIcon size={12} className="text-slate-400" />
+              <span>{selectedDate ? format(selectedDate, "MM.dd.yyyy") : "ALL DATES"}</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0 z-50 bg-white shadow-2xl border border-slate-100 rounded-2xl" align="end">
+            <div className="p-2 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider pl-1">Filter by Date</span>
+              {selectedDate && (
+                <button 
+                  onClick={() => setSelectedDate(undefined)} 
+                  className="text-[9px] font-bold text-red-500 hover:text-red-700 uppercase pr-1 cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <UICalendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Summary Cards */}
@@ -93,7 +153,7 @@ export function IncidentPanel({
       </div>
 
       {/* Incident List */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-4">
           <AnimatePresence mode="popLayout">
             {filteredIncidents.map((incident, index) => (
@@ -103,11 +163,13 @@ export function IncidentPanel({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2, delay: index * 0.05 }}
+                id={`incident-card-${incident.id}`}
               >
                 <IncidentCard
                   incident={incident}
                   isSelected={selectedIncidentId === incident.id}
                   onClick={() => onSelectIncident(incident)}
+                  onOpenDetails={onOpenDetails}
                 />
               </motion.div>
             ))}
@@ -123,7 +185,7 @@ export function IncidentPanel({
             </motion.div>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
@@ -154,10 +216,12 @@ function IncidentCard({
   incident,
   isSelected,
   onClick,
+  onOpenDetails,
 }: {
   incident: MapIncident;
   isSelected: boolean;
   onClick: () => void;
+  onOpenDetails?: (id: string) => void;
 }) {
   const getIncidentIcon = (type: string) => {
     const t = type.toLowerCase();
@@ -177,7 +241,7 @@ function IncidentCard({
   return (
     <div
       className={cn(
-        "relative group cursor-pointer transition-all rounded-2xl border bg-white overflow-hidden",
+        "relative group cursor-pointer transition-all rounded-2xl border bg-white overflow-hidden flex flex-col",
         isSelected 
           ? "border-slate-900 shadow-xl ring-1 ring-slate-900 translate-x-1" 
           : "border-slate-100 shadow-sm hover:border-slate-200 hover:shadow-md hover:-translate-y-0.5"
@@ -187,7 +251,7 @@ function IncidentCard({
       {/* Status Accent Line */}
       <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusColors[incident.status])} />
 
-      <div className="p-5 pl-6">
+      <div className="p-5 pl-6 flex-1">
         <div className="flex justify-between items-start mb-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -239,6 +303,20 @@ function IncidentCard({
           </div>
         </div>
       </div>
+
+      {isSelected && onOpenDetails && (
+        <div className="px-5 pb-5 pt-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetails(incident.id);
+            }}
+            className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer border-none shadow-md hover:shadow-lg"
+          >
+            View Full Report Details
+          </button>
+        </div>
+      )}
     </div>
   );
 }

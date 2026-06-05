@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { incidents } from "@/db/schema/incidents";
 import { createClient } from "@/lib/supabase-server";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides } from "@/lib/dispatch-engine";
 
 export async function GET(req: NextRequest) {
@@ -35,6 +35,15 @@ export async function GET(req: NextRequest) {
       const incident = await db.query.incidents.findFirst({
         where: eq(incidents.requestId, r.id),
       });
+
+      // Count actual prior reports in the database
+      const priorCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(verificationRequests)
+        .where(
+          sql`${verificationRequests.residentId} = ${r.resident.id} AND ${verificationRequests.id} != ${r.id}`
+        );
+      const priorReportsCount = priorCount[0]?.count ? Number(priorCount[0].count) : 0;
 
       // Convert peopleInvolved enum string or text count to a number robustly
       let peopleCount = 0;
@@ -68,7 +77,7 @@ export async function GET(req: NextRequest) {
           fullName: r.resident.fullName,
           phone: r.resident.phone || "No phone provided",
           address: r.resident.address || "No address recorded",
-          priorReports: 3, // Mock/Default standing score since not stored in DB
+          priorReports: priorReportsCount,
           isVerified: r.resident.verificationStatus === 'APPROVED',
         },
         incident: incident ? {
@@ -120,7 +129,7 @@ export async function POST(req: NextRequest) {
 
     // Determine initial status based on request nature (we will try to auto-dispatch first if critical)
     const severityLevel = severity || 'Medium';
-    const requestNature = nature || 'EMERGENCY';
+    const requestNature = (nature || 'EMERGENCY').toUpperCase() as 'EMERGENCY' | 'NON-EMERGENCY';
 
     // Insert into database
     const [newRequest] = await db.insert(verificationRequests).values({

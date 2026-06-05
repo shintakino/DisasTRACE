@@ -182,7 +182,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={false} className="h-screen overflow-hidden w-full">
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-[88px] shrink-0 items-center justify-between gap-2 px-10 border-b bg-white transition-all">
@@ -197,7 +197,7 @@ export default function DashboardLayout({
             <UserMenu role={role as UserRole} getRoleLabel={getRoleLabel} />
           </div>
         </header>
-        <main className="flex-1 overflow-hidden bg-[#F3F4F6] p-6">
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#F3F4F6] p-6">
           {children}
         </main>
       </SidebarInset>

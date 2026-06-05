@@ -93,6 +93,11 @@ export const PACC_NAV: NavItem[] = [
     url: "/verification",
     icon: ShieldCheck,
   },
+  {
+    title: "Support & FAQs",
+    url: "/help",
+    icon: HelpCircle,
+  },
 ]
 
 export type UserRole = 'cdrrmo_super_admin' | 'pacc_admin' | 'ambulance_responder' | 'public_user'

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { faqs, users } from "@/db/schema";
+import { faqs, users, auditLogs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+import crypto from "crypto";
 
 export async function DELETE(
   req: NextRequest,
@@ -42,6 +43,15 @@ export async function DELETE(
 
     // Delete FAQ from database
     await db.delete(faqs).where(eq(faqs.id, id));
+
+    // Insert audit log
+    await db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      action: `Deleted FAQ: "${existing.question}"`,
+      entityType: "FAQ",
+      entityId: id,
+    });
 
     return NextResponse.json({
       success: true,

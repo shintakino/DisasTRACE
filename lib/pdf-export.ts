@@ -7,6 +7,7 @@
  */
 
 import { ReportEntry, DetailedIncidentReport } from "@/types/reports";
+import { UserManagementEntry } from "@/types/users";
 
 /**
  * Format date helper
@@ -225,7 +226,7 @@ export async function exportReportsSummaryPDF(
     doc.text("Approved and Noted By:", 120, finalY);
     doc.line(120, finalY + 15, 185, finalY + 15); // Signature Line
     doc.setFont("helvetica", "bold");
-    doc.text("SUPERINTENDENT / CHIEF", 120, finalY + 20);
+    doc.text("LDRRMO IV", 120, finalY + 20);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.text("Baliwag Disaster Risk Reduction & Management Office", 120, finalY + 24);
@@ -577,6 +578,209 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     return true;
   } catch (error) {
     console.error("Failed to generate single report PDF:", error);
+    throw error;
+  }
+}
+
+/**
+ * Exports a summary list of user accounts as a beautifully formatted PDF
+ */
+export async function exportUsersListPDF(
+  users: UserManagementEntry[],
+  filters: { search?: string; role?: string; status?: string } = {}
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const { jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
+
+    // --- Branded Header Styles ---
+    doc.setFillColor(30, 58, 138); // #1E3A8A Navy
+    doc.rect(0, 0, pageWidth, 40, "F");
+
+    doc.setFillColor(239, 68, 68); // #EF4444 Red
+    doc.rect(0, 40, pageWidth, 2, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("CDRRMO BALIWAG CITY", 14, 15);
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(147, 197, 253); // text-blue-300
+    doc.text("PUBLIC ASSISTANCE AND COMMAND CENTER (PACC)", 14, 21);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(255, 255, 255);
+    doc.text("USER ACCOUNTS REGISTRY LOGS", 14, 32);
+
+    // --- Document Meta Information ---
+    doc.setTextColor(75, 85, 99); // Gray-600
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("DATE GENERATED:", 14, 52);
+    doc.setFont("helvetica", "normal");
+    doc.text(new Date().toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric" }), 47, 52);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL USERS:", 14, 58);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${users.length} Accounts Listed`, 47, 58);
+
+    // Filters text
+    const activeFilters = [];
+    if (filters.search) activeFilters.push(`Search: "${filters.search}"`);
+    if (filters.role) {
+      const labels: Record<string, string> = {
+        public_user: "PUBLIC USER",
+        ambulance_responder: "RESPONDER",
+        pacc_admin: "PACC ADMIN",
+        cdrrmo_super_admin: "SUPER ADMIN",
+      };
+      activeFilters.push(`Role: ${labels[filters.role] || filters.role}`);
+    }
+    if (filters.status) activeFilters.push(`Status: ${filters.status}`);
+    const filterText = activeFilters.length > 0 ? activeFilters.join(" | ") : "None";
+
+    doc.setFont("helvetica", "bold");
+    doc.text("FILTERS APPLIED:", 120, 52);
+    doc.setFont("helvetica", "normal");
+    doc.text(filterText, 154, 52);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("REGISTRY TYPE:", 120, 58);
+    doc.setFont("helvetica", "normal");
+    doc.text("OFFICIAL REGISTERED USERS", 154, 58);
+
+    // Divider line
+    doc.setDrawColor(229, 231, 235); // Gray-200
+    doc.line(14, 64, pageWidth - 14, 64);
+
+    // --- Users Table ---
+    const tableColumns = [
+      { header: "FULL NAME", dataKey: "fullName" },
+      { header: "EMAIL ADDRESS", dataKey: "email" },
+      { header: "ROLE", dataKey: "role" },
+      { header: "STATUS", dataKey: "status" },
+      { header: "JOINED DATE", dataKey: "joinedDate" },
+      { header: "LAST ACTIVE", dataKey: "lastActive" },
+    ];
+
+    const roleLabels: Record<string, string> = {
+      public_user: "PUBLIC USER",
+      ambulance_responder: "RESPONDER",
+      pacc_admin: "PACC ADMIN",
+      cdrrmo_super_admin: "SUPER ADMIN",
+    };
+
+    const tableRows = users.map((u) => ({
+      fullName: u.fullName,
+      email: u.email,
+      role: roleLabels[u.role] || u.role,
+      status: u.status,
+      joinedDate: u.joinedDate,
+      lastActive: u.lastActive,
+    }));
+
+    autoTable(doc, {
+      startY: 70,
+      columns: tableColumns,
+      body: tableRows,
+      theme: "striped",
+      styles: {
+        fontSize: 8.5,
+        font: "helvetica",
+        cellPadding: 4,
+        valign: "middle",
+      },
+      headStyles: {
+        fillColor: [30, 58, 138], // Navy Blue #1E3A8A
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 9,
+      },
+      columnStyles: {
+        fullName: { fontStyle: "bold", cellWidth: 35 },
+        email: { cellWidth: 45 },
+        role: { cellWidth: 28 },
+        status: { fontStyle: "bold", cellWidth: 24 },
+        joinedDate: { cellWidth: 28 },
+        lastActive: { cellWidth: 28 },
+      },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.column.dataKey === "status") {
+          const val = data.cell.raw as string;
+          if (val === "ACTIVE") {
+            data.cell.styles.textColor = [22, 163, 74]; // Green-600
+          } else if (val === "SUSPENDED") {
+            data.cell.styles.textColor = [217, 119, 6]; // Yellow-600
+          } else if (val === "DEACTIVATED") {
+            data.cell.styles.textColor = [220, 38, 38]; // Red-600
+          }
+        }
+      },
+      didDrawPage: (data) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(156, 163, 175); // Gray-400
+        
+        doc.setDrawColor(229, 231, 235);
+        doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
+        
+        doc.text("CDRRMO Baliwag City DisasTRACE Platform - User Registry Log", 14, pageHeight - 10);
+        
+        const pageText = `Page ${data.pageNumber} of ${doc.internal.pages.length - 1}`;
+        doc.text(pageText, pageWidth - 14 - doc.getTextWidth(pageText), pageHeight - 10);
+      },
+    });
+
+    // --- Sign-off Section ---
+    let finalY = (doc as any).lastAutoTable.finalY + 15;
+    if (finalY + 35 > pageHeight) {
+      doc.addPage();
+      finalY = 25;
+    }
+
+    doc.setTextColor(75, 85, 99);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+
+    doc.text("Verified and Compiled By:", 14, finalY);
+    doc.line(14, finalY + 15, 75, finalY + 15);
+    doc.setFont("helvetica", "bold");
+    doc.text("CDRRMO ADMINISTRATOR", 14, finalY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Public Assistance and Command Center", 14, finalY + 24);
+
+    doc.setFontSize(9);
+    doc.text("Approved and Noted By:", 120, finalY);
+    doc.line(120, finalY + 15, 185, finalY + 15);
+    doc.setFont("helvetica", "bold");
+    doc.text("LDRRMO IV", 120, finalY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Baliwag Disaster Risk Reduction & Management Office", 120, finalY + 24);
+
+    const filename = `CDRRMO_UsersList_Summary_${new Date().toISOString().slice(0, 10)}.pdf`;
+    doc.save(filename);
+    return true;
+  } catch (error) {
+    console.error("Failed to generate Users PDF:", error);
     throw error;
   }
 }

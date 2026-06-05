@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { CameraView, useCameraPermissions, FlashMode } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, FlashlightOff, RefreshCw, Sun, Camera as CameraIcon } from 'lucide-react-native';
+import { ChevronLeft, Zap, ZapOff, RefreshCw, Sun, Camera as CameraIcon } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import * as Haptics from 'expo-haptics';
 
@@ -102,7 +102,11 @@ export default function CameraScreen() {
           {/* Bottom Actions */}
           <View style={styles.bottomBar}>
             <TouchableOpacity style={styles.smallActionBtn} onPress={toggleFlash} activeOpacity={0.7}>
-              <FlashlightOff size={20} color="#FFF" />
+              {flash === 'on' ? (
+                <Zap size={20} color="#FFF" fill="#FFF" />
+              ) : (
+                <ZapOff size={20} color="#FFF" />
+              )}
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.captureOuterRing} onPress={takePicture} disabled={isCapturing} activeOpacity={0.7}>

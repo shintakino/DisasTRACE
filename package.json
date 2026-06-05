@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:reset": "tsx scripts/reset-auth.ts && tsx scripts/drop-schema.ts && tsx scripts/migrate.ts && tsx scripts/setup-db-functions.ts && tsx scripts/apply-rbac.ts && tsx scripts/seed-supabase.ts"
+    "db:setup": "tsx scripts/setup-fresh.ts",
+    "db:reset": "tsx scripts/reset-auth.ts && tsx scripts/clean-storage.ts && tsx scripts/drop-schema.ts && tsx scripts/migrate.ts && tsx scripts/setup-db-functions.ts && tsx scripts/apply-rbac.ts && tsx scripts/seed-supabase.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

@@ -22,14 +22,24 @@ export async function GET(request: Request) {
       }, { status: 403 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const yearParam = searchParams.get('year');
+    const targetYear = yearParam ? parseInt(yearParam) : null;
+    const isYearValid = targetYear && !isNaN(targetYear);
+
     // 1. Fetch real incident type distribution from database
-    const dbDistribution = await db
+    const distQuery = db
       .select({
         type: verificationRequests.type,
         count: sql<number>`count(*)`
       })
-      .from(verificationRequests)
-      .groupBy(verificationRequests.type);
+      .from(verificationRequests);
+
+    if (isYearValid) {
+      distQuery.where(sql`extract(year from ${verificationRequests.createdAt}) = ${targetYear}`);
+    }
+
+    const dbDistribution = await distQuery.groupBy(verificationRequests.type);
 
     // Map database enum types to dashboard display names and specific brand colors
     const typeColorMap: Record<string, { name: string; fill: string }> = {
@@ -66,13 +76,19 @@ export async function GET(request: Request) {
     }
 
     // 2. Fetch real incident trends grouped by month and type from database
-    const dbTrends = await db
+    const trendsQuery = db
       .select({
         month: sql<string>`to_char(${verificationRequests.createdAt}, 'Mon')`,
         type: verificationRequests.type,
         count: sql<number>`count(*)`
       })
-      .from(verificationRequests)
+      .from(verificationRequests);
+
+    if (isYearValid) {
+      trendsQuery.where(sql`extract(year from ${verificationRequests.createdAt}) = ${targetYear}`);
+    }
+
+    const dbTrends = await trendsQuery
       .groupBy(
         sql`to_char(${verificationRequests.createdAt}, 'Mon')`,
         sql`extract(month from ${verificationRequests.createdAt})`,

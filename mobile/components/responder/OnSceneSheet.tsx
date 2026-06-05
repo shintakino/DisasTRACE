@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Activity, Truck, ThumbsDown, Info } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -59,16 +59,19 @@ export function OnSceneSheet() {
     return 'End Sharing'; // default
   };
 
+  const snapPoints = useMemo(() => ['15%', '50%', '90%'], []);
+
   return (
     <BottomSheet
       ref={bottomSheetRef}
-      index={status === 'on_scene' ? 0 : -1}
-      enableDynamicSizing={true}
+      index={status === 'on_scene' ? 1 : -1}
+      snapPoints={snapPoints}
+      enableDynamicSizing={false}
       enablePanDownToClose={false}
       handleIndicatorStyle={{ backgroundColor: '#CBD5E1', width: 40 }}
       backgroundStyle={{ borderRadius: 24 }}
     >
-      <BottomSheetView className="px-6 pt-2 pb-12">
+      <BottomSheetScrollView className="px-6 pt-2 pb-12">
         
         <View className="flex-row items-center mb-4">
           <View className="bg-red-200 px-3 py-1.5 rounded-full">
@@ -158,7 +161,7 @@ export function OnSceneSheet() {
           </Text>
         </TouchableOpacity>
 
-      </BottomSheetView>
+      </BottomSheetScrollView>
     </BottomSheet>
   );
 }

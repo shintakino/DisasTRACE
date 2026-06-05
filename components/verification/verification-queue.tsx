@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { VerificationRequest, VerificationStatus } from "@/types/verification"
 import { formatDistanceToNow } from "date-fns"
@@ -124,7 +123,13 @@ export function VerificationQueue({
 
       <div className="font-semibold text-sm mt-2">Queue List</div>
 
-      <ScrollArea className="flex-1 -mx-4 px-4">
+      <div 
+        className="flex-1 -mx-4 px-4 overflow-y-auto pacc-queue-scroll pr-2"
+        style={{
+          scrollbarWidth: "thin",
+          scrollbarColor: "oklch(0.708 0 0 / 40%) transparent"
+        }}
+      >
         <div className="flex flex-col gap-3 py-2">
           {sortedRequests.map((request) => (
             <Card
@@ -166,7 +171,7 @@ export function VerificationQueue({
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

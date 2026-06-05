@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ShieldAlert, CheckCircle, Navigation } from 'lucide-react-native';
@@ -16,10 +16,107 @@ export default function PendingScreen() {
   
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isAccepted, setIsAccepted] = useState(false); // Simulate acceptance
+  const [isSecuringResponder, setIsSecuringResponder] = useState(false);
+  const incidentChannelRef = useRef<any>(null);
+
+  const setupIncidentSubscription = (requestId: string) => {
+    if (incidentChannelRef.current) return; // Already subscribed
+
+    console.log('[PendingScreen] Subscribing to incident changes for request ID:', requestId);
+    const incidentChannel = supabase
+      .channel(`incident-responder-${requestId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'incidents',
+          filter: `request_id=eq.${requestId}`,
+        },
+        (incPayload) => {
+          const newIncident = incPayload.new as any;
+          console.log('[PendingScreen] Incident update received in sub:', newIncident);
+          if (newIncident && newIncident.responder_id) {
+            console.log('[PendingScreen] Responder assigned:', newIncident.responder_id);
+            useEmergencyReportStore.setState((state) => ({
+              report: {
+                ...state.report,
+                incidentId: newIncident.id
+              }
+            }));
+            setIsSecuringResponder(false);
+            setIsAccepted(true);
+            supabase.removeChannel(incidentChannel);
+            incidentChannelRef.current = null;
+          }
+        }
+      )
+      .subscribe();
+
+    incidentChannelRef.current = incidentChannel;
+  };
+
+  // Check current status on mount (in case it was already verified when opening the screen)
+  useEffect(() => {
+    const requestId = report.id as string;
+    if (!requestId) return;
+
+    let active = true;
+
+    async function checkCurrentStatus() {
+      try {
+        const { data: request, error: reqError } = await supabase
+          .from('verification_requests')
+          .select('status')
+          .eq('id', requestId)
+          .maybeSingle();
+
+        if (reqError || !request || !active) return;
+
+        if (request.status === 'VERIFIED') {
+          // Check incident
+          const { data: incident } = await supabase
+            .from('incidents')
+            .select('*')
+            .eq('request_id', requestId)
+            .maybeSingle();
+
+          if (!active) return;
+
+          if (incident) {
+            useEmergencyReportStore.setState((state) => ({
+              report: {
+                ...state.report,
+                incidentId: incident.id
+              }
+            }));
+
+            if (incident.responder_id) {
+              setIsAccepted(true);
+            } else {
+              setIsSecuringResponder(true);
+              setupIncidentSubscription(requestId);
+            }
+          } else {
+            setIsSecuringResponder(true);
+            setupIncidentSubscription(requestId);
+          }
+        }
+      } catch (err) {
+        console.error('[PendingScreen] Error checking current status:', err);
+      }
+    }
+
+    checkCurrentStatus();
+
+    return () => {
+      active = false;
+    };
+  }, [report.id]);
 
   // Real-time verification request listener
   useEffect(() => {
-    const requestId = report.id;
+    const requestId = report.id as string;
     if (!requestId) return;
 
     console.log('[PendingScreen] Subscribing to status changes for request ID:', requestId);
@@ -37,7 +134,7 @@ export default function PendingScreen() {
          async (payload) => {
           console.log('[PendingScreen] Verification request update received:', payload.new);
           if (payload.new && payload.new.status === 'VERIFIED') {
-            const fetchIncidentWithRetry = async (retriesLeft = 5, delayMs = 500): Promise<boolean> => {
+            const fetchIncidentWithRetry = async (retriesLeft = 5, delayMs = 500): Promise<any> => {
               try {
                 const { data: incident, error } = await supabase
                   .from('incidents')
@@ -57,7 +154,7 @@ export default function PendingScreen() {
                       incidentId: incident.id
                     }
                   }));
-                  return true;
+                  return incident;
                 }
               } catch (err) {
                 console.error('[PendingScreen] Try-catch error querying incident:', err);
@@ -69,11 +166,21 @@ export default function PendingScreen() {
                 return fetchIncidentWithRetry(retriesLeft - 1, delayMs);
               }
               console.warn('[PendingScreen] Failed to find incident after maximum retries.');
-              return false;
+              return null;
             };
 
-            await fetchIncidentWithRetry();
-            setIsAccepted(true);
+            const incident = await fetchIncidentWithRetry();
+            if (incident) {
+              if (incident.responder_id) {
+                setIsAccepted(true);
+              } else {
+                setIsSecuringResponder(true);
+                setupIncidentSubscription(requestId);
+              }
+            } else {
+              setIsSecuringResponder(true);
+              setupIncidentSubscription(requestId);
+            }
           } else if (payload.new && payload.new.status === 'REJECTED') {
             // Tactile haptic feedback
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
@@ -163,6 +270,10 @@ export default function PendingScreen() {
 
     return () => {
       supabase.removeChannel(channel);
+      if (incidentChannelRef.current) {
+        supabase.removeChannel(incidentChannelRef.current);
+        incidentChannelRef.current = null;
+      }
     };
   }, [report.id]);
 
@@ -232,9 +343,12 @@ export default function PendingScreen() {
 
   return (
     <View style={styles.container}>
-      <TransmissionLoader visible={isTransmitting} statusText={transmissionStatus} />
+      <TransmissionLoader 
+        visible={isTransmitting || isSecuringResponder} 
+        statusText={isSecuringResponder ? 'Report verified. Securing nearest responder...' : transmissionStatus} 
+      />
       
-      {!isTransmitting && (
+      {!isTransmitting && !isSecuringResponder && (
         <View style={styles.content}>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>AWAITING VERIFICATION</Text>

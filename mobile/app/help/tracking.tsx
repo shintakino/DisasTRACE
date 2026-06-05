@@ -15,6 +15,7 @@ const EXPANDED_HEIGHT = height * 0.85;
 export default function TrackingScreen() {
   const router = useRouter();
   const report = useEmergencyReportStore((state) => state.report);
+  const [isCameraCentered, setIsCameraCentered] = useState(true);
   
   const targetLocation = {
     latitude: report.latitude || 14.954,
@@ -55,7 +56,7 @@ export default function TrackingScreen() {
   const handleResolutionRedirect = () => {
     const currentResponder = assignedResponderRef.current;
     const vehicleId = currentResponder?.full_name 
-      ? `AMB-${currentResponder.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 3)}${currentResponder.id ? `-${currentResponder.id.slice(-3).toUpperCase()}` : ""}` 
+      ? `AMB-${currentResponder.full_name.trim().split(/\s+/).map((n: string) => n ? n[0] : '').join("").toUpperCase().slice(0, 3)}${currentResponder.id ? `-${currentResponder.id.slice(-3).toUpperCase()}` : ""}` 
       : "AMB-001";
 
     useEmergencyReportStore.setState((state) => ({
@@ -665,12 +666,19 @@ export default function TrackingScreen() {
         mapStyle="https://tiles.openfreemap.org/styles/dark"
         logo={false}
         attribution={true}
+        onRegionWillChange={(event) => {
+          if ((event as any).properties?.isUserGesture) {
+            setIsCameraCentered(false);
+          }
+        }}
       >
-        <Camera
-          center={[region.longitude, region.latitude]}
-          zoom={14}
-          duration={1000}
-        />
+        {isCameraCentered && (
+          <Camera
+            center={[region.longitude, region.latitude]}
+            zoom={14}
+            duration={1000}
+          />
+        )}
         
         {/* Ambulance Location */}
         <Marker id="ambulanceMarker" lngLat={[ambulanceLocation.longitude, ambulanceLocation.latitude]}>
@@ -680,7 +688,7 @@ export default function TrackingScreen() {
             </View>
             <Text className="ml-2 text-[10px] font-bold text-slate-700">
               {assignedResponder?.full_name 
-                ? `AMB-${assignedResponder.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 3)}${assignedResponder.id ? `-${assignedResponder.id.slice(-3).toUpperCase()}` : ""}` 
+                ? `AMB-${assignedResponder.full_name.trim().split(/\s+/).map((n: string) => n ? n[0] : '').join("").toUpperCase().slice(0, 3)}${assignedResponder.id ? `-${assignedResponder.id.slice(-3).toUpperCase()}` : ""}` 
                 : "AMB-001"}
             </Text>
           </View>
@@ -735,6 +743,20 @@ export default function TrackingScreen() {
           />
         </GeoJSONSource>
       </Map>
+
+      {/* Recenter Map Button */}
+      {!isCameraCentered && (
+        <View className="absolute right-6 top-[130px] pointer-events-auto" style={{ zIndex: 999 }}>
+          <TouchableOpacity
+            onPress={() => setIsCameraCentered(true)}
+            activeOpacity={0.85}
+            className="px-4 py-2.5 bg-blue-900 rounded-full shadow-lg border border-blue-700 items-center justify-center flex-row space-x-2"
+          >
+            <Navigation size={16} color="white" strokeWidth={2.5} />
+            <Text className="text-white text-xs font-bold">Recenter</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Top Header Overlay */}
       <View style={styles.topHeader}>
@@ -792,7 +814,7 @@ export default function TrackingScreen() {
               <View style={styles.ambulancePillText}>
                 <Text style={[styles.ambulanceUnitText, isTransporting && { color: '#065F46' }]}>
                   {assignedResponder?.full_name 
-                    ? `AMB-${assignedResponder.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 3)}${assignedResponder.id ? `-${assignedResponder.id.slice(-3).toUpperCase()}` : ""}` 
+                    ? `AMB-${assignedResponder.full_name.trim().split(/\s+/).map((n: string) => n ? n[0] : '').join("").toUpperCase().slice(0, 3)}${assignedResponder.id ? `-${assignedResponder.id.slice(-3).toUpperCase()}` : ""}` 
                     : "AMB-001"}
                 </Text>
                 <Text style={[styles.ambulanceStatusText, isTransporting && { color: '#047857' }]}>
@@ -853,20 +875,6 @@ export default function TrackingScreen() {
                   <Text style={styles.crewYears}>
                     {assignedResponder?.phone || "0917-123-4567"}
                   </Text>
-                  <View style={styles.verifiedBadge}>
-                    <CheckCircle2 color="#1E3A8A" size={12} style={{marginRight: 4}} />
-                    <Text style={styles.verifiedText}>Verified</Text>
-                  </View>
-                </View>
-                
-                {/* Paramedic */}
-                <View style={styles.crewCard}>
-                  <Text style={styles.crewRole}>PARAMEDIC</Text>
-                  <View style={styles.crewAvatar}>
-                    <Text style={styles.crewAvatarText}>CG</Text>
-                  </View>
-                  <Text style={styles.crewName} numberOfLines={1}>Guanzing, Chris</Text>
-                  <Text style={styles.crewYears}>Serving since 2020</Text>
                   <View style={styles.verifiedBadge}>
                     <CheckCircle2 color="#1E3A8A" size={12} style={{marginRight: 4}} />
                     <Text style={styles.verifiedText}>Verified</Text>

@@ -8,7 +8,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const tab = resolvedParams.tab || "profile";
 
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full bg-white">
+    <div className="flex h-full w-full bg-white">
       {/* Sidebar Navigation */}
       <div className="w-[280px] border-r border-[#E2E8F0] p-6 hidden md:block shrink-0">
         <div className="text-[10px] uppercase font-bold text-muted-foreground mb-4">

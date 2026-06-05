@@ -21,7 +21,13 @@ const item = {
   show: { opacity: 1, y: 0 }
 };
 
-export function RecentReports({ reports }: { reports: RecentReport[] }) {
+export function RecentReports({ 
+  reports,
+  onReportClick
+}: { 
+  reports: RecentReport[];
+  onReportClick?: (id: string) => void;
+}) {
   return (
     <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
       <CardHeader className="p-6 pb-2">
@@ -39,7 +45,8 @@ export function RecentReports({ reports }: { reports: RecentReport[] }) {
               <motion.div 
                 key={report.id} 
                 variants={item}
-                className="p-3 rounded-xl bg-[#F8FAFC] border border-[#F1F5F9] flex flex-col gap-1.5 hover:shadow-sm transition-shadow duration-200"
+                onClick={() => onReportClick?.(report.id)}
+                className="p-3 rounded-xl bg-[#F8FAFC] border border-[#F1F5F9] flex flex-col gap-1.5 hover:shadow-sm cursor-pointer hover:bg-[#F1F5F9]/80 transition-all duration-200"
               >
                 <div className="flex flex-col gap-0">
                   <span className="text-[9px] font-semibold text-[#64748B] uppercase tracking-tight">{report.vehicleId}</span>

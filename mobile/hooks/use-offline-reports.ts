@@ -192,7 +192,7 @@ export function useOfflineReports() {
     };
 
     syncOfflineQueueAndDrafts();
-  }, [isOnline, offlineQueue.length, drafts.length, syncing, dequeueAction, setSyncingQueue]);
+  }, [isOnline, offlineQueue.length, drafts.length, dequeueAction, setSyncingQueue]);
 
   // Method to save drafts offline
   const bufferReportOffline = async (report: {

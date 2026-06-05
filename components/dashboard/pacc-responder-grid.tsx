@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Responder } from "@/types/dashboard";
@@ -22,6 +23,8 @@ const item = {
 };
 
 export function PACCResponderGrid({ responders = [] }: { responders?: Responder[] }) {
+  const router = useRouter();
+
   const getStatusStyle = (status: string) => {
     switch (status.toUpperCase()) {
       case 'DISPATCHED':
@@ -53,7 +56,8 @@ export function PACCResponderGrid({ responders = [] }: { responders?: Responder[
                 key={responder.id}
                 variants={item}
                 whileHover={{ scale: 1.02, translateY: -2 }}
-                className="flex flex-col items-center justify-center p-4 rounded-3xl border border-[#F1F5F9] bg-white shadow-sm select-none"
+                onClick={() => router.push('/logs')}
+                className="flex flex-col items-center justify-center p-4 rounded-3xl border border-[#F1F5F9] bg-white shadow-sm select-none cursor-pointer hover:bg-[#F8FAFC] transition-all duration-200"
               >
                 <Avatar className="size-16 mb-4 ring-4 ring-[#F1F5F9] ring-offset-2 pointer-events-none">
                   <AvatarFallback className="bg-[#15286A] text-white text-2xl font-bold">

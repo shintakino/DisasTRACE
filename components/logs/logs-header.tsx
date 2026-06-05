@@ -70,7 +70,7 @@ export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
           <PopoverContent className="w-80 p-4" align="end">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status Type</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</label>
                 <Select value={status} onValueChange={handleStatusChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Statuses" />

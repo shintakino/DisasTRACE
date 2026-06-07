@@ -132,21 +132,23 @@ export default function MapScreen() {
               lngLat={[h.lng, h.lat]}
               onPress={() => {
                 isMarkerPress.current = true;
-                setSelectedHospital(h);
+                setSelectedHospital((prev: any) => prev?.id === h.id ? null : h);
                 setTimeout(() => {
                   isMarkerPress.current = false;
                 }, 300);
               }}
             >
               <View 
-                className={`flex-row items-center bg-white p-1 pr-3 rounded-full border shadow-sm ${isSelected ? 'border-blue-400 shadow-blue-200 scale-105' : 'border-slate-200'}`}
+                className={`flex-row items-center bg-white p-1 rounded-full border shadow-sm ${isSelected ? 'pr-3 border-blue-400 shadow-blue-200 scale-105' : 'border-slate-200'}`}
               >
                 <View className={`w-7 h-7 rounded-full items-center justify-center ${isSelected ? 'bg-blue-600' : 'bg-[#DC2626]'}`}>
                   <Hospital color="white" size={14} variant="Bold" />
                 </View>
-                <Text className={`ml-2 text-[10px] font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>
-                  {h.name}
-                </Text>
+                {isSelected && (
+                  <Text className="ml-2 text-[10px] font-bold text-blue-700">
+                    {h.name}
+                  </Text>
+                )}
               </View>
             </Marker>
           );

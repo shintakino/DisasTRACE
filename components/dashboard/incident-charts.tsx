@@ -52,28 +52,26 @@ const chartConfig = {
 
 export function IncidentTrends({ 
   data,
-  year = String(new Date().getFullYear()),
-  onYearChange
+  filter = "this_year",
+  onFilterChange
 }: { 
   data: IncidentTrend[];
-  year?: string;
-  onYearChange?: (year: string) => void;
+  filter?: string;
+  onFilterChange?: (filter: string) => void;
 }) {
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 3 }, (_, i) => String(currentYear - i));
-
   return (
     <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
         <CardTitle className="text-2xl font-bold text-[#1E293B]">Incident Summary</CardTitle>
-        <Select value={year} onValueChange={(val) => onYearChange?.(val || "")}>
-          <SelectTrigger className="w-[110px] bg-[#F8FAFC] border-[#E2E8F0] h-9 rounded-lg text-sm font-medium">
-            <SelectValue placeholder="Year" />
+        <Select value={filter} onValueChange={(val) => onFilterChange?.(val || "")}>
+          <SelectTrigger className="w-[120px] bg-[#F8FAFC] border-[#E2E8F0] h-9 rounded-lg text-sm font-medium">
+            <SelectValue placeholder="Filter" />
           </SelectTrigger>
           <SelectContent>
-            {years.map((y) => (
-              <SelectItem key={y} value={y}>{y}</SelectItem>
-            ))}
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="this_week">This Week</SelectItem>
+            <SelectItem value="this_month">This Month</SelectItem>
+            <SelectItem value="this_year">This Year</SelectItem>
           </SelectContent>
         </Select>
       </CardHeader>
@@ -164,26 +162,26 @@ export function IncidentTrends({
 
 export function IncidentDistribution({ 
   data, 
-  period = "Monthly", 
-  onPeriodChange 
+  filter = "this_month", 
+  onFilterChange 
 }: { 
   data: IncidentDistributionType[], 
-  period?: string,
-  onPeriodChange?: (value: string | null) => void
+  filter?: string,
+  onFilterChange?: (value: string) => void
 }) {
   return (
     <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
-        <CardTitle className="text-2xl font-bold text-[#1E293B]">Incident Summary</CardTitle>
-        <Select value={period} onValueChange={onPeriodChange}>
-          <SelectTrigger className="w-[110px] bg-[#F8FAFC] border-[#E2E8F0] h-9 rounded-lg text-sm font-medium">
-            <SelectValue placeholder="Period" />
+        <CardTitle className="text-2xl font-bold text-[#1E293B]">Incident Distribution</CardTitle>
+        <Select value={filter} onValueChange={(val) => onFilterChange?.(val || "")}>
+          <SelectTrigger className="w-[120px] bg-[#F8FAFC] border-[#E2E8F0] h-9 rounded-lg text-sm font-medium">
+            <SelectValue placeholder="Filter" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Daily">Daily</SelectItem>
-            <SelectItem value="Weekly">Weekly</SelectItem>
-            <SelectItem value="Monthly">Monthly</SelectItem>
-            <SelectItem value="Yearly">Yearly</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="this_week">This Week</SelectItem>
+            <SelectItem value="this_month">This Month</SelectItem>
+            <SelectItem value="this_year">This Year</SelectItem>
           </SelectContent>
         </Select>
       </CardHeader>

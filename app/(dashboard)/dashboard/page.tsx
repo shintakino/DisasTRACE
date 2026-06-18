@@ -20,8 +20,8 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [period, setPeriod] = useState("Monthly");
-  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [trendFilter, setTrendFilter] = useState("this_year");
+  const [distFilter, setDistFilter] = useState("this_month");
 
   const handleReportClick = (reportId: string) => {
     router.push(`/map?select=${reportId}`);
@@ -32,7 +32,7 @@ export default function DashboardPage() {
       try {
         const [kpiRes, trendRes, reportRes, responderRes] = await Promise.all([
           fetch('/api/dashboard/kpis'),
-          fetch(`/api/dashboard/trends?period=${period}&year=${year}`),
+          fetch(`/api/dashboard/trends?trendFilter=${trendFilter}&distFilter=${distFilter}`),
           fetch('/api/dashboard/reports'),
           fetch('/api/dashboard/responders'),
         ]);
@@ -86,7 +86,7 @@ export default function DashboardPage() {
         setError("You do not have permission to view this dashboard.");
       }
     }
-  }, [period, year, role, authLoading]);
+  }, [trendFilter, distFilter, role, authLoading]);
 
   if (loading) {
     return (
@@ -139,13 +139,13 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0">
             <IncidentTrends 
               data={data.trends} 
-              year={year}
-              onYearChange={setYear}
+              filter={trendFilter}
+              onFilterChange={setTrendFilter}
             />
             <IncidentDistribution 
               data={data.distribution} 
-              period={period}
-              onPeriodChange={(val) => setPeriod(val || "monthly")}
+              filter={distFilter}
+              onFilterChange={setDistFilter}
             />
           </div>
 
@@ -171,8 +171,8 @@ export default function DashboardPage() {
             <RecentReports reports={data.reports} onReportClick={handleReportClick} />
             <IncidentDistribution 
               data={data.distribution} 
-              period={period}
-              onPeriodChange={(val) => setPeriod(val || "monthly")}
+              filter={distFilter}
+              onFilterChange={setDistFilter}
             />
           </div>
 

@@ -59,10 +59,8 @@ export async function GET(request: Request) {
       'Unknown Cause': { name: 'Unknown Cause', fill: '#9B058C' },
     };
 
-    const hasRealData = dbDistribution.some(d => Number(d.count) > 0);
-    
     // Dynamic distribution computation
-    let distribution = Object.entries(typeColorMap).map(([key, info]) => {
+    const distribution = Object.entries(typeColorMap).map(([key, info]) => {
       const dbMatch = dbDistribution.find(d => d.type === key);
       return {
         name: info.name,
@@ -70,47 +68,6 @@ export async function GET(request: Request) {
         fill: info.fill,
       };
     });
-
-    // Fallback safety to keep UI beautiful if no incidents recorded yet
-    if (!hasRealData) {
-      if (normalizedDistFilter === 'today') {
-        distribution = [
-          { name: 'Vehicular Collision', value: 2, fill: '#15286A' },
-          { name: 'Medical Emergency', value: 1, fill: '#A80107' },
-          { name: 'Structural Failure', value: 0, fill: '#E77F00' },
-          { name: 'Fire / Explosion', value: 0, fill: '#0F4503' },
-          { name: 'Flood / Water', value: 1, fill: '#2803A2' },
-          { name: 'Unknown Cause', value: 0, fill: '#9B058C' },
-        ];
-      } else if (normalizedDistFilter === 'this_week') {
-        distribution = [
-          { name: 'Vehicular Collision', value: 8, fill: '#15286A' },
-          { name: 'Medical Emergency', value: 4, fill: '#A80107' },
-          { name: 'Structural Failure', value: 1, fill: '#E77F00' },
-          { name: 'Fire / Explosion', value: 1, fill: '#0F4503' },
-          { name: 'Flood / Water', value: 3, fill: '#2803A2' },
-          { name: 'Unknown Cause', value: 0, fill: '#9B058C' },
-        ];
-      } else if (normalizedDistFilter === 'this_month') {
-        distribution = [
-          { name: 'Vehicular Collision', value: 24, fill: '#15286A' },
-          { name: 'Medical Emergency', value: 12, fill: '#A80107' },
-          { name: 'Structural Failure', value: 5, fill: '#E77F00' },
-          { name: 'Fire / Explosion', value: 2, fill: '#0F4503' },
-          { name: 'Flood / Water', value: 9, fill: '#2803A2' },
-          { name: 'Unknown Cause', value: 2, fill: '#9B058C' },
-        ];
-      } else { // this_year
-        distribution = [
-          { name: 'Vehicular Collision', value: 142, fill: '#15286A' },
-          { name: 'Medical Emergency', value: 89, fill: '#A80107' },
-          { name: 'Structural Failure', value: 33, fill: '#E77F00' },
-          { name: 'Fire / Explosion', value: 18, fill: '#0F4503' },
-          { name: 'Flood / Water', value: 61, fill: '#2803A2' },
-          { name: 'Unknown Cause', value: 11, fill: '#9B058C' },
-        ];
-      }
-    }
 
     // 2. Fetch real incident trends grouped by period and type from database
     let trends: any[] = [];
@@ -168,17 +125,6 @@ export async function GET(request: Request) {
           }
         }
       });
-
-      if (!hasRealData) {
-        trends = [
-          { month: '12 AM', vehicular: 1, medical: 2, structural: 0, fire: 0, water: 0, unknown: 0 },
-          { month: '4 AM', vehicular: 0, medical: 1, structural: 0, fire: 0, water: 0, unknown: 0 },
-          { month: '8 AM', vehicular: 3, medical: 4, structural: 1, fire: 1, water: 2, unknown: 0 },
-          { month: '12 PM', vehicular: 5, medical: 3, structural: 2, fire: 0, water: 1, unknown: 1 },
-          { month: '4 PM', vehicular: 4, medical: 5, structural: 1, fire: 2, water: 3, unknown: 0 },
-          { month: '8 PM', vehicular: 2, medical: 3, structural: 0, fire: 1, water: 1, unknown: 0 },
-        ];
-      }
     } else if (normalizedTrendFilter === 'this_week') {
       const dbTrends = await db
         .select({
@@ -215,18 +161,6 @@ export async function GET(request: Request) {
           }
         }
       });
-
-      if (!hasRealData) {
-        trends = [
-          { month: 'Mon', vehicular: 3, medical: 2, structural: 1, fire: 0, water: 2, unknown: 0 },
-          { month: 'Tue', vehicular: 4, medical: 3, structural: 2, fire: 1, water: 1, unknown: 1 },
-          { month: 'Wed', vehicular: 5, medical: 4, structural: 0, fire: 0, water: 3, unknown: 0 },
-          { month: 'Thu', vehicular: 2, medical: 1, structural: 1, fire: 1, water: 2, unknown: 0 },
-          { month: 'Fri', vehicular: 6, medical: 5, structural: 3, fire: 2, water: 4, unknown: 1 },
-          { month: 'Sat', vehicular: 8, medical: 6, structural: 1, fire: 1, water: 1, unknown: 0 },
-          { month: 'Sun', vehicular: 5, medical: 4, structural: 2, fire: 0, water: 2, unknown: 0 },
-        ];
-      }
     } else if (normalizedTrendFilter === 'this_month') {
       const dbTrends = await db
         .select({
@@ -262,16 +196,6 @@ export async function GET(request: Request) {
           }
         }
       });
-
-      if (!hasRealData) {
-        trends = [
-          { month: 'Wk 1', vehicular: 12, medical: 5, structural: 2, fire: 1, water: 4, unknown: 1 },
-          { month: 'Wk 2', vehicular: 15, medical: 8, structural: 4, fire: 2, water: 3, unknown: 2 },
-          { month: 'Wk 3', vehicular: 9, medical: 6, structural: 1, fire: 0, water: 5, unknown: 0 },
-          { month: 'Wk 4', vehicular: 14, medical: 7, structural: 3, fire: 1, water: 2, unknown: 1 },
-          { month: 'Wk 5', vehicular: 6, medical: 4, structural: 1, fire: 0, water: 1, unknown: 0 },
-        ];
-      }
     } else {
       // this_year (default)
       const dbTrends = await db
@@ -309,23 +233,6 @@ export async function GET(request: Request) {
           }
         }
       });
-
-      if (!hasRealData) {
-        trends = [
-          { month: 'Jan', vehicular: 24, medical: 15, structural: 8, fire: 4, water: 12, unknown: 3 },
-          { month: 'Feb', vehicular: 18, medical: 12, structural: 5, fire: 2, water: 8, unknown: 1 },
-          { month: 'Mar', vehicular: 30, medical: 20, structural: 10, fire: 5, water: 15, unknown: 4 },
-          { month: 'Apr', vehicular: 22, medical: 14, structural: 6, fire: 3, water: 10, unknown: 2 },
-          { month: 'May', vehicular: 28, medical: 18, structural: 9, fire: 4, water: 13, unknown: 3 },
-          { month: 'Jun', vehicular: 35, medical: 22, structural: 12, fire: 6, water: 18, unknown: 5 },
-          { month: 'Jul', vehicular: 0, medical: 0, structural: 0, fire: 0, water: 0, unknown: 0 },
-          { month: 'Aug', vehicular: 0, medical: 0, structural: 0, fire: 0, water: 0, unknown: 0 },
-          { month: 'Sep', vehicular: 0, medical: 0, structural: 0, fire: 0, water: 0, unknown: 0 },
-          { month: 'Oct', vehicular: 0, medical: 0, structural: 0, fire: 0, water: 0, unknown: 0 },
-          { month: 'Nov', vehicular: 0, medical: 0, structural: 0, fire: 0, water: 0, unknown: 0 },
-          { month: 'Dec', vehicular: 0, medical: 0, structural: 0, fire: 0, water: 0, unknown: 0 },
-        ];
-      }
     }
 
     return NextResponse.json({ data: { trends, distribution } });

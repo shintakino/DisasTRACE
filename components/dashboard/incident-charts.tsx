@@ -71,7 +71,12 @@ export function IncidentTrends({
         <CardTitle className="text-2xl font-bold text-[#1E293B]">Incident Summary</CardTitle>
         <Select value={filter} onValueChange={(val) => onFilterChange?.(val || "")}>
           <SelectTrigger className="w-[120px] bg-[#F8FAFC] border-[#E2E8F0] h-9 rounded-lg text-sm font-medium">
-            <SelectValue placeholder="Filter" />
+            <SelectValue placeholder="Filter">
+              {filter === "today" && "Today"}
+              {filter === "this_week" && "This Week"}
+              {filter === "this_month" && "This Month"}
+              {filter === "this_year" && "This Year"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="today">Today</SelectItem>
@@ -194,7 +199,12 @@ export function IncidentDistribution({
         <CardTitle className="text-2xl font-bold text-[#1E293B]">Incident Distribution</CardTitle>
         <Select value={filter} onValueChange={(val) => onFilterChange?.(val || "")}>
           <SelectTrigger className="w-[120px] bg-[#F8FAFC] border-[#E2E8F0] h-9 rounded-lg text-sm font-medium">
-            <SelectValue placeholder="Filter" />
+            <SelectValue placeholder="Filter">
+              {filter === "today" && "Today"}
+              {filter === "this_week" && "This Week"}
+              {filter === "this_month" && "This Month"}
+              {filter === "this_year" && "This Year"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="today">Today</SelectItem>

@@ -54,6 +54,13 @@ export async function proxy(request: NextRequest) {
         }
       }
 
+      // Role-based route protection for Incident Request Verification
+      if (request.nextUrl.pathname.startsWith("/verification")) {
+        if (role !== "pacc_admin") {
+          return NextResponse.redirect(new URL("/unauthorized-platform", request.url));
+        }
+      }
+
       // Redirect authenticated users from root or sign-in to dashboard
       if (request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/sign-in")) {
         return NextResponse.redirect(new URL("/dashboard", request.url));

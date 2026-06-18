@@ -82,24 +82,27 @@ export function ReportDetailSheet({
               {/* Header: Responders and Close Button */}
               <div className="w-full flex justify-between items-start mb-6">
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-[#1A237E] text-white flex items-center justify-center font-bold text-sm">
-                      RB
+                  {report.responderName && report.responderName !== "None Assigned" ? (
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-[#1A237E] text-white flex items-center justify-center font-bold text-sm">
+                        {report.responderName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-bold text-[#1A237E] text-sm leading-tight">{report.responderName}</p>
+                        <p className="text-[#1A237E]/70 text-[10px] font-bold uppercase tracking-wider">Responder</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-[#1A237E] text-sm leading-tight">Renzy Bastes</p>
-                      <p className="text-[#1A237E]/70 text-[10px] font-bold uppercase tracking-wider">Responder</p>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center font-bold text-sm border border-dashed border-slate-200">
+                        --
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-400 text-sm leading-tight">No Responder Assigned</p>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Incident Log</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-[#1A237E] text-white flex items-center justify-center font-bold text-sm">
-                      CG
-                    </div>
-                    <div>
-                      <p className="font-bold text-[#1A237E] text-sm leading-tight">Christopher Guanzing</p>
-                      <p className="text-[#1A237E]/70 text-[10px] font-bold uppercase tracking-wider">Responder</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button

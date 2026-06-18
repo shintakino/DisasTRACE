@@ -31,6 +31,7 @@ export type IncidentDistribution = z.infer<typeof IncidentDistributionSchema>;
 
 export const RecentReportSchema = z.object({
   id: z.string(),
+  requestId: z.string(),
   vehicleId: z.string(),
   origin: z.string(),
   destination: z.string(),

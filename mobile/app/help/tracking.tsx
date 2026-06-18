@@ -660,10 +660,10 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Dark Map View */}
+      {/* Light Map View */}
       <Map 
         style={styles.map} 
-        mapStyle="https://tiles.openfreemap.org/styles/dark"
+        mapStyle="https://tiles.openfreemap.org/styles/liberty"
         logo={false}
         attribution={true}
         onRegionWillChange={(event) => {
@@ -682,15 +682,8 @@ export default function TrackingScreen() {
         
         {/* Ambulance Location */}
         <Marker id="ambulanceMarker" lngLat={[ambulanceLocation.longitude, ambulanceLocation.latitude]}>
-          <View className="flex-row items-center bg-white p-1 pr-3 rounded-full border border-slate-200 shadow-sm">
-            <View className="w-7 h-7 rounded-full items-center justify-center bg-blue-600">
-              <Navigation color="white" size={14} fill="white" />
-            </View>
-            <Text className="ml-2 text-[10px] font-bold text-slate-700">
-              {assignedResponder?.full_name 
-                ? `AMB-${assignedResponder.full_name.trim().split(/\s+/).map((n: string) => n ? n[0] : '').join("").toUpperCase().slice(0, 3)}${assignedResponder.id ? `-${assignedResponder.id.slice(-3).toUpperCase()}` : ""}` 
-                : "AMB-001"}
-            </Text>
+          <View className="w-9 h-9 rounded-full items-center justify-center bg-blue-600 border-2 border-white shadow-lg">
+            <Navigation color="white" size={16} fill="white" />
           </View>
         </Marker>
 

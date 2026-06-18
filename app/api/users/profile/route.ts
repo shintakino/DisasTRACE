@@ -11,6 +11,7 @@ const ProfileUpdateSchema = z.object({
   phone: z.string().optional(),
   position: z.string().optional(),
   address: z.string().optional(),
+  email: z.string().email().optional(),
 });
 
 export async function PATCH(req: Request) {
@@ -29,7 +30,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Invalid payload", details: result.error.format() }, { status: 400 });
     }
 
-    const { firstName, lastName, phone, position, address } = result.data;
+    const { firstName, lastName, phone, position, address, email } = result.data;
 
     // 1. Fetch current db user details to compute values if missing
     const dbUser = await db.query.users.findFirst({
@@ -38,6 +39,16 @@ export async function PATCH(req: Request) {
 
     if (!dbUser) {
       return NextResponse.json({ error: "User profile not found" }, { status: 404 });
+    }
+
+    // Check email uniqueness if email is changed
+    if (email !== undefined && email.toLowerCase() !== dbUser.email.toLowerCase()) {
+      const emailExists = await db.query.users.findFirst({
+        where: eq(users.email, email.toLowerCase()),
+      });
+      if (emailExists) {
+        return NextResponse.json({ error: "Email already in use" }, { status: 400 });
+      }
     }
 
     // 2. Build full name and address updates
@@ -59,6 +70,7 @@ export async function PATCH(req: Request) {
 
     if (phone !== undefined) updatePayload.phone = phone;
     if (address !== undefined) updatePayload.address = address;
+    if (email !== undefined) updatePayload.email = email.toLowerCase();
     // Map position to address column for administrative web profiles if address is omitted
     if (position !== undefined && address === undefined) {
       updatePayload.address = position;
@@ -81,12 +93,19 @@ export async function PATCH(req: Request) {
     if (position !== undefined) metaUpdates.position = position;
     if (address !== undefined) metaUpdates.address = address;
 
-    await adminClient.auth.admin.updateUserById(user.id, {
+    const authUpdates: any = {
       user_metadata: {
         ...user.user_metadata,
         ...metaUpdates,
       }
-    });
+    };
+
+    if (email !== undefined) {
+      authUpdates.email = email.toLowerCase();
+      authUpdates.email_confirm = true;
+    }
+
+    await adminClient.auth.admin.updateUserById(user.id, authUpdates);
 
     return NextResponse.json({
       success: true,

@@ -27,6 +27,7 @@ export async function GET() {
     const activeIncidents = await db
       .select({
         id: incidents.id,
+        requestId: verificationRequests.requestId,
         vehicleId: incidents.assignedAmbulance,
         destination: verificationRequests.locationDescription,
         createdAt: incidents.createdAt,
@@ -38,6 +39,7 @@ export async function GET() {
 
     const mapped = activeIncidents.map((i) => ({
       id: i.id,
+      requestId: i.requestId,
       vehicleId: i.vehicleId || "AMB-001",
       origin: "CDRRMO HQ",
       destination: i.destination || "Baliwag City",

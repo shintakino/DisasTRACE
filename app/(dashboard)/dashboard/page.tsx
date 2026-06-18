@@ -12,21 +12,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { DashboardData, DashboardDataSchema } from "@/types/dashboard";
-import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const { role, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState("Monthly");
   const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-  const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
 
   const handleReportClick = (reportId: string) => {
-    setSelectedReportId(reportId);
-    setIsReportSheetOpen(true);
+    router.push(`/map?select=${reportId}`);
   };
 
   useEffect(() => {
@@ -156,12 +154,6 @@ export default function DashboardPage() {
             <ResponderStatus responders={data.responders} />
           </div>
         </div>
-
-        <ReportDetailSheet 
-          reportId={selectedReportId}
-          isOpen={isReportSheetOpen}
-          onClose={() => setIsReportSheetOpen(false)}
-        />
       </>
     );
   }
@@ -188,12 +180,6 @@ export default function DashboardPage() {
             <PACCResponderGrid responders={data.responders} />
           </div>
         </div>
-
-        <ReportDetailSheet 
-          reportId={selectedReportId}
-          isOpen={isReportSheetOpen}
-          onClose={() => setIsReportSheetOpen(false)}
-        />
       </>
     );
   }

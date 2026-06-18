@@ -14,6 +14,7 @@ export const ResidentInfoSchema = z.object({
   address: z.string(),
   priorReports: z.number(),
   isVerified: z.boolean(),
+  reliabilityScore: z.number().optional(),
 });
 export type ResidentInfo = z.infer<typeof ResidentInfoSchema>;
 

@@ -36,6 +36,88 @@ export async function GET(req: NextRequest) {
       where: eq(users.id, user.id),
     });
 
+    const category = searchParams.get("category") || "responder";
+
+    if (category === "user") {
+      const whereConditions: any[] = [];
+      if (userProfile && userProfile.role === 'public_user') {
+        whereConditions.push(eq(verificationRequests.residentId, user.id));
+      }
+
+      const dbRequests = await db
+        .select({
+          id: verificationRequests.id,
+          requestId: verificationRequests.requestId,
+          residentName: users.fullName,
+          type: verificationRequests.type,
+          status: verificationRequests.status,
+          createdAt: verificationRequests.createdAt,
+          location: verificationRequests.locationDescription,
+          imageUrl: verificationRequests.imageUrl,
+          nature: verificationRequests.nature,
+          severity: verificationRequests.severity,
+          peopleInvolved: verificationRequests.peopleInvolved,
+        })
+        .from(verificationRequests)
+        .innerJoin(users, eq(verificationRequests.residentId, users.id))
+        .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
+        .orderBy(desc(verificationRequests.createdAt));
+
+      let filtered = [...dbRequests].map((r) => ({
+        id: r.id,
+        requestId: r.requestId,
+        responderName: r.residentName,
+        type: r.type,
+        status: r.status, // PENDING, VERIFIED, REJECTED, DUPLICATE
+        date: new Date(r.createdAt).toLocaleDateString("en-US", {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        time: new Date(r.createdAt).toLocaleTimeString("en-US", {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        location: r.location || "Baliwag City",
+        residentPhotoUrl: r.imageUrl,
+        natureOfCall: r.nature,
+        severityLevel: r.severity,
+        peopleInvolved: (() => {
+          if (!r.peopleInvolved || r.peopleInvolved === 'None') return 0;
+          const match = r.peopleInvolved.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 1;
+        })(),
+        crewFindings: "User Submitted Report. No crew findings recorded.",
+        scenePhotos: [],
+      }));
+
+      if (search) {
+        filtered = filtered.filter(
+          (r) =>
+            r.responderName.toLowerCase().includes(search) ||
+            r.type.toLowerCase().includes(search) ||
+            r.id.toLowerCase().includes(search) ||
+            (r.requestId && r.requestId.toLowerCase().includes(search))
+        );
+      }
+
+      if (type) {
+        filtered = filtered.filter((r) => r.type === type);
+      }
+
+      if (status) {
+        filtered = filtered.filter((r) => r.status === status);
+      }
+
+      return NextResponse.json({
+        data: filtered,
+        total: filtered.length,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      });
+    }
+
     const whereConditions: any[] = [];
 
     if (userProfile) {

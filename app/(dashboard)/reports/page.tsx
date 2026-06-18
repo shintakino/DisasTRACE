@@ -11,12 +11,13 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function ReportsPage() {
+  const [category, setCategory] = React.useState<"user" | "responder">("responder");
   const [data, setData] = React.useState<ReportEntry[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [filters, setFilters] = React.useState<ReportFilter>({});
   const [selectedReportId, setSelectedReportId] = React.useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<"all" | ReportStatus>("all");
+  const [activeTab, setActiveTab] = React.useState<string>("all");
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
 
   const handleFilterChange = React.useCallback((newFilters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => {
@@ -25,18 +26,18 @@ export default function ReportsPage() {
       // Preserve the status from activeTab
       return {
         ...resolved,
-        status: activeTab === "all" ? undefined : activeTab,
+        status: activeTab === "all" ? undefined : activeTab as any,
       };
     });
     // Reset selection when filters change to avoid index mismatches
     setRowSelection({});
   }, [activeTab]);
 
-  const handleTabChange = (tab: "all" | ReportStatus) => {
+  const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setFilters(prev => ({
       ...prev,
-      status: tab === "all" ? undefined : tab
+      status: tab === "all" ? undefined : tab as any
     }));
     setRowSelection({});
   };
@@ -45,6 +46,7 @@ export default function ReportsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      params.append("category", category);
       if (filters.search) params.append("search", filters.search);
       if (filters.type) params.append("type", filters.type);
       if (filters.status) params.append("status", filters.status);
@@ -58,7 +60,7 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, category]);
 
   React.useEffect(() => {
     fetchReports();
@@ -107,8 +109,44 @@ export default function ReportsPage() {
         <div>
           <h2 className="text-3xl font-black tracking-tight text-slate-800 uppercase">Reports Management</h2>
           <p className="text-slate-500 font-medium text-sm">
-            Review and audit historical incident reports from responders.
+            {category === "responder"
+              ? "Review and audit historical post-incident reports from ambulance responders."
+              : "Review and audit historical emergency/incident reports submitted by residents."}
           </p>
+        </div>
+        <div className="flex bg-slate-200/80 rounded-full p-1 border border-slate-300/50 shadow-sm shrink-0">
+          <button
+            onClick={() => {
+              setCategory("responder");
+              setActiveTab("all");
+              setFilters({});
+              setRowSelection({});
+            }}
+            className={cn(
+              "px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all duration-300",
+              category === "responder"
+                ? "bg-[#1E3A8A] text-white shadow-md"
+                : "text-slate-600 hover:text-slate-800 hover:bg-slate-300/30"
+            )}
+          >
+            Responder Submitted Reports
+          </button>
+          <button
+            onClick={() => {
+              setCategory("user");
+              setActiveTab("all");
+              setFilters({});
+              setRowSelection({});
+            }}
+            className={cn(
+              "px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all duration-300",
+              category === "user"
+                ? "bg-[#1E3A8A] text-white shadow-md"
+                : "text-slate-600 hover:text-slate-800 hover:bg-slate-300/30"
+            )}
+          >
+            User Submitted Reports
+          </button>
         </div>
       </div>
 
@@ -117,11 +155,16 @@ export default function ReportsPage() {
         
         <div className="px-6 py-4 border-b border-slate-100 bg-white">
           <div className="flex bg-slate-100/80 rounded-xl p-1 gap-1">
-            {(["all", "RESPONDING", "ONGOING", "COMPLETED"] as const).map((tab) => {
+            {(category === "responder"
+              ? (["all", "RESPONDING", "ONGOING", "COMPLETED"] as const)
+              : (["all", "PENDING", "VERIFIED", "REJECTED", "DUPLICATE"] as const)
+            ).map((tab) => {
               const isActive = activeTab === tab;
               const getBgColor = (t: string) => {
-                if (t === "RESPONDING") return "bg-[#10B981]";
-                if (t === "ONGOING") return "bg-[#F59E0B]";
+                if (t === "RESPONDING" || t === "VERIFIED") return "bg-[#10B981]";
+                if (t === "ONGOING" || t === "PENDING") return "bg-[#F59E0B]";
+                if (t === "REJECTED") return "bg-[#EF4444]";
+                if (t === "DUPLICATE") return "bg-slate-500";
                 return "bg-[#1E3A8A]";
               };
               
@@ -136,7 +179,7 @@ export default function ReportsPage() {
                       : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                   )}
                 >
-                  {tab === "all" ? "All Reports" : tab}
+                  {tab === "all" ? (category === "responder" ? "All Responder Submitted" : "All User Submitted") : tab}
                 </button>
               );
             })}
@@ -154,6 +197,7 @@ export default function ReportsPage() {
         ) : (
           <ReportsTable
             data={data}
+            category={category}
             onViewDetails={handleViewDetails}
             rowSelection={rowSelection}
             onRowSelectionChange={setRowSelection}

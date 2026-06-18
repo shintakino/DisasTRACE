@@ -101,7 +101,7 @@ export function useBroadcastTracker(
           const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
           // Geofence coordinate locking for developer testing convenience
-          if (isDevMode && (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00)) {
+          if (isDevMode && (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00)) {
             if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
               lat = activeDispatch.coordinates.latitude;
               lng = activeDispatch.coordinates.longitude;
@@ -227,7 +227,7 @@ export function useBroadcastTracker(
           let lat = pos.latitude;
           let lng = pos.longitude;
 
-          if (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00) {
+          if (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00) {
             if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
               lat = activeDispatch.coordinates.latitude;
               lng = activeDispatch.coordinates.longitude;

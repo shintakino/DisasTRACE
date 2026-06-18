@@ -51,7 +51,9 @@ begin
     address,
     id_type,
     created_at, 
-    updated_at
+    updated_at,
+    responder_type,
+    barangay
   )
   values (
     new.id::text,
@@ -63,18 +65,20 @@ begin
     new.email,
     user_role,
     case 
-      when user_role in ('public_user', 'ambulance_responder') then 'PENDING'
+      when user_role in ('public_user') then 'PENDING'
       else 'APPROVED'
     end,
     case 
-      when user_role in ('public_user', 'ambulance_responder') then 'PENDING'
+      when user_role in ('public_user') then 'PENDING'
       else 'ACTIVE'
     end,
     (new.raw_user_meta_data::jsonb)->>'phone',
     (new.raw_user_meta_data::jsonb)->>'address',
     (new.raw_user_meta_data::jsonb)->>'id_type',
     now(),
-    now()
+    now(),
+    (new.raw_user_meta_data::jsonb)->>'responder_type',
+    (new.raw_user_meta_data::jsonb)->>'barangay'
   );
   return new;
 end;

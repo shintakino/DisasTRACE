@@ -26,6 +26,8 @@ export async function GET() {
         email: users.email,
         role: users.role,
         status: users.status,
+        responderType: users.responderType,
+        barangay: users.barangay,
       })
       .from(users)
       .where(eq(users.role, "ambulance_responder"));
@@ -45,6 +47,8 @@ export async function GET() {
         email: r.email,
         role: "RESPONDER",
         status: mappedStatus,
+        responderType: r.responderType,
+        barangay: r.barangay,
       };
     });
 

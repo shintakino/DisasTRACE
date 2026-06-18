@@ -99,7 +99,7 @@ export function VerificationQueue({
         <SummaryCard
           label="Pending"
           count={counts.PENDING}
-          color="#E0F2FE"
+          color="#FFEDD5"
           isActive={filter === "PENDING"}
           onClick={() => onFilterChange("PENDING")}
         />

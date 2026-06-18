@@ -39,6 +39,7 @@ export default function RosterPage() {
     mobileNumber: '',
     province: 'Bulacan',
     city: 'Baliwag City',
+    responderType: 'cdrrmo_hq', // 'cdrrmo_hq' | 'barangay'
     barangay: '',
     street: '',
     password: '',
@@ -161,12 +162,12 @@ export default function RosterPage() {
       setBanAction('SUSPENDED')
     }
   }
-
-  const handleAddResponder = async (e: React.FormEvent) => {
+  const handleAddResponder = async (e: React.FormEvent) => {
     e.preventDefault()
     setAddError('')
     
-    if (!newResponder.firstName || !newResponder.surname || !newResponder.gender || !newResponder.email || !newResponder.mobileNumber || !newResponder.barangay || !newResponder.street || !newResponder.password) {
+    const isBarangay = newResponder.responderType === 'barangay';
+    if (!newResponder.firstName || !newResponder.surname || !newResponder.gender || !newResponder.email || !newResponder.mobileNumber || (isBarangay && !newResponder.barangay) || !newResponder.street || !newResponder.password) {
       setAddError("Please fill in all required fields.")
       return
     }
@@ -177,7 +178,9 @@ export default function RosterPage() {
     }
     
     const fullName = `${newResponder.surname}, ${newResponder.firstName}${newResponder.middleName ? ' ' + newResponder.middleName : ''}${newResponder.suffixName ? ' ' + newResponder.suffixName : ''}`
-    const fullAddress = `${newResponder.street}, ${newResponder.barangay}, ${newResponder.city}, ${newResponder.province}`
+    const fullAddress = isBarangay 
+      ? `${newResponder.street}, ${newResponder.barangay}, ${newResponder.city}, ${newResponder.province}`
+      : `${newResponder.street}, CDRRMO HQ, ${newResponder.city}, ${newResponder.province}`;
 
     try {
       const response = await fetch("/api/users", {
@@ -190,6 +193,8 @@ export default function RosterPage() {
           role: "ambulance_responder",
           phone: newResponder.mobileNumber,
           address: fullAddress,
+          responderType: newResponder.responderType,
+          barangay: isBarangay ? newResponder.barangay : undefined,
         }),
       })
 
@@ -200,6 +205,7 @@ export default function RosterPage() {
         setNewResponder({
           firstName: '', middleName: '', surname: '', suffixName: '', gender: '',
           email: '', mobileNumber: '', province: 'Bulacan', city: 'Baliwag City',
+          responderType: 'cdrrmo_hq',
           barangay: '', street: '', password: '', confirmPassword: ''
         })
       } else {
@@ -364,9 +370,8 @@ export default function RosterPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="max-w-2xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
           
           <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
@@ -391,7 +396,7 @@ export default function RosterPage() {
                   <User className="w-5 h-5 text-[#2B4C9B]" />
                   <h3 className="font-bold text-[#1e1b4b] text-lg">Personal Information</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">First Name <span className="text-red-500">*</span></label>
                     <Input 
@@ -430,7 +435,7 @@ export default function RosterPage() {
                       className="h-12 rounded-xl border-slate-200 bg-slate-50 focus-visible:ring-[#2B4C9B] focus-visible:bg-white transition-colors px-4"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-1 md:col-span-2 lg:col-span-4">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Gender <span className="text-red-500">*</span></label>
                     <Select value={newResponder.gender} onValueChange={(v) => setNewResponder({ ...newResponder, gender: v || '' })}>
                       <SelectTrigger className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 focus:ring-[#2B4C9B] focus:bg-white transition-colors px-4">
@@ -450,7 +455,7 @@ export default function RosterPage() {
                   <MapPin className="w-5 h-5 text-[#2B4C9B]" />
                   <h3 className="font-bold text-[#1e1b4b] text-lg">Contact & Address</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Email Address <span className="text-red-500">*</span></label>
                     <Input 
@@ -472,7 +477,43 @@ export default function RosterPage() {
                       className="h-12 rounded-xl border-slate-200 bg-slate-50 focus-visible:ring-[#2B4C9B] focus-visible:bg-white transition-colors px-4"
                     />
                   </div>
-                  
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Responder Type <span className="text-red-500">*</span></label>
+                    <Select value={newResponder.responderType} onValueChange={(v) => setNewResponder({ ...newResponder, responderType: v || 'cdrrmo_hq', barangay: v === 'cdrrmo_hq' ? '' : newResponder.barangay })}>
+                      <SelectTrigger className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 focus:ring-[#2B4C9B] focus:bg-white transition-colors px-4">
+                        <SelectValue placeholder="Select Type" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-200 shadow-xl">
+                        <SelectItem value="cdrrmo_hq" className="cursor-pointer rounded-lg mx-1 my-0.5">CDRRMO HQ</SelectItem>
+                        <SelectItem value="barangay" className="cursor-pointer rounded-lg mx-1 my-0.5">Barangay</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newResponder.responderType === 'barangay' && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Assigned Barangay <span className="text-red-500">*</span></label>
+                      <Select value={newResponder.barangay} onValueChange={(v) => setNewResponder({ ...newResponder, barangay: v || '' })}>
+                        <SelectTrigger className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 focus:ring-[#2B4C9B] focus:bg-white transition-colors px-4">
+                          <SelectValue placeholder="Select Barangay" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-slate-200 shadow-xl max-h-60">
+                          {barangays.map(b => (
+                            <SelectItem key={b} value={b} className="cursor-pointer rounded-lg mx-1 my-0.5">{b}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Street / House No. <span className="text-red-500">*</span></label>
+                    <Input 
+                      required
+                      placeholder="e.g. 7 Poblacion"
+                      value={newResponder.street}
+                      onChange={(e) => setNewResponder({ ...newResponder, street: e.target.value })}
+                      className="h-12 rounded-xl border-slate-200 bg-slate-50 focus-visible:ring-[#2B4C9B] focus-visible:bg-white transition-colors px-4"
+                    />
+                  </div>
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Province <span className="text-red-500">*</span></label>
                     <Input 
@@ -489,30 +530,6 @@ export default function RosterPage() {
                       className="h-12 rounded-xl border-slate-200 bg-slate-100 text-slate-500 font-medium px-4 opacity-70"
                     />
                   </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Barangay <span className="text-red-500">*</span></label>
-                    <Select value={newResponder.barangay} onValueChange={(v) => setNewResponder({ ...newResponder, barangay: v || '' })}>
-                      <SelectTrigger className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 focus:ring-[#2B4C9B] focus:bg-white transition-colors px-4">
-                        <SelectValue placeholder="Select Barangay" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-slate-200 shadow-xl max-h-60">
-                        {barangays.map(b => (
-                          <SelectItem key={b} value={b} className="cursor-pointer rounded-lg mx-1 my-0.5">{b}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Street / House No. <span className="text-red-500">*</span></label>
-                    <Input 
-                      required
-                      placeholder="e.g. 7 Poblacion"
-                      value={newResponder.street}
-                      onChange={(e) => setNewResponder({ ...newResponder, street: e.target.value })}
-                      className="h-12 rounded-xl border-slate-200 bg-slate-50 focus-visible:ring-[#2B4C9B] focus-visible:bg-white transition-colors px-4"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -521,7 +538,7 @@ export default function RosterPage() {
                   <ShieldCheck className="w-5 h-5 text-[#2B4C9B]" />
                   <h3 className="font-bold text-[#1e1b4b] text-lg">Security Settings</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Password <span className="text-red-500">*</span></label>
                     <Input 

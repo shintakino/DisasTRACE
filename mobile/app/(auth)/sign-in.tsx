@@ -10,7 +10,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { role } = useLocalSearchParams<{ role: string }>();
   const [showPassword, setShowPassword] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
@@ -191,7 +190,7 @@ export default function SignInScreen() {
 
             <View className="flex-row justify-center mt-6">
               <Text className="text-gray-500">Don't have an account? </Text>
-              <Link href={{ pathname: "/(auth)/sign-up", params: { role } }} asChild>
+              <Link href="/(auth)/sign-up" asChild>
                 <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Text className="text-[#EF4444] font-bold">Sign Up</Text>
                 </TouchableOpacity>

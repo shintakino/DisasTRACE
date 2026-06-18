@@ -25,6 +25,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const role = user.app_metadata?.role;
+    if (role !== "pacc_admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await req.json();
     const result = TriageSchema.safeParse(body);
 

@@ -132,6 +132,10 @@ export default function ProfileScreen() {
   }, [user, role, draftsLength]);
 
   const handleSelectAvatar = async () => {
+    if (!isResponder) {
+      Alert.alert('Access Denied', 'Only ambulance responders are permitted to modify their profile picture.');
+      return;
+    }
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
@@ -231,8 +235,8 @@ export default function ProfileScreen() {
           <View className="relative mr-5">
             <TouchableOpacity 
               onPress={handleSelectAvatar}
-              disabled={uploadingAvatar}
-              activeOpacity={0.7}
+              disabled={!isResponder || uploadingAvatar}
+              activeOpacity={isResponder ? 0.7 : 1.0}
               className="w-24 h-24 rounded-full border border-white items-center justify-center overflow-hidden bg-white/10"
             >
               {user?.user_metadata?.avatar_url ? (
@@ -249,9 +253,11 @@ export default function ProfileScreen() {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 </View>
               ) : (
-                <View className="absolute bottom-0 right-0 left-0 bg-black/40 py-0.5 items-center">
-                  <Text className="text-[9px] text-white font-bold uppercase tracking-wider">Edit</Text>
-                </View>
+                isResponder && (
+                  <View className="absolute bottom-0 right-0 left-0 bg-black/40 py-0.5 items-center">
+                    <Text className="text-[9px] text-white font-bold uppercase tracking-wider">Edit</Text>
+                  </View>
+                )
               )}
             </TouchableOpacity>
             

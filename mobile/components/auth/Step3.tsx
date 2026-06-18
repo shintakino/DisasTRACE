@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,21 +33,83 @@ export default function Step3({ onNext, onBack }: Props) {
   const idCardUri = watch('idCardUri');
   const idCardType = watch('idCardType');
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.6, // Significant compression for 5-8MB images
-      allowsMultipleSelection: false,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-      
-      // If image is still too large, we could use expo-image-manipulator here
-      // but 'quality: 0.6' in ImagePicker is usually enough to drop 8MB to < 1MB
-      setValue('idCardUri', asset.uri, { shouldValidate: true });
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Denied',
+        'We need camera access to capture your ID photo. You can still upload an existing image from your gallery.',
+        [
+          { text: 'Use Gallery', onPress: pickFromGallery },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+      return;
     }
+
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.6,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setValue('idCardUri', asset.uri, { shouldValidate: true });
+      }
+    } catch (err) {
+      console.error('Error taking photo:', err);
+      Alert.alert('Error', 'An error occurred while launching the camera.');
+    }
+  };
+
+  const pickFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Denied',
+        'We need gallery access to select your ID photo.'
+      );
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.6,
+        allowsMultipleSelection: false,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setValue('idCardUri', asset.uri, { shouldValidate: true });
+      }
+    } catch (err) {
+      console.error('Error picking image from gallery:', err);
+      Alert.alert('Error', 'An error occurred while accessing the gallery.');
+    }
+  };
+
+  const handleSelectImageSource = () => {
+    Alert.alert(
+      "Upload ID Card",
+      "Choose a method to upload your government-issued ID",
+      [
+        {
+          text: "Take Photo (Camera)",
+          onPress: takePhoto,
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: pickFromGallery,
+        },
+        {
+          text: "Cancel",
+          style: "cancel"
+        }
+      ]
+    );
   };
 
   const onSubmit = (stepData: VerificationType) => {
@@ -60,7 +122,7 @@ export default function Step3({ onNext, onBack }: Props) {
       <View>
         <Text className="text-gray-700 font-bold mb-2 ml-1">Upload ID Card *</Text>
         <TouchableOpacity 
-          onPress={pickImage}
+          onPress={handleSelectImageSource}
           className={`h-40 bg-gray-50 rounded-xl border-2 border-dashed ${errors.idCardUri ? 'border-red-500' : 'border-gray-300'} items-center justify-center overflow-hidden`}
         >
           {idCardUri ? (
@@ -72,7 +134,7 @@ export default function Step3({ onNext, onBack }: Props) {
           ) : (
             <View className="items-center">
               <Camera color="#9CA3AF" size={32} />
-              <Text className="text-gray-500 mt-2 font-medium">Tap to upload ID</Text>
+              <Text className="text-gray-500 mt-2 font-medium">Tap to upload or take a photo of ID</Text>
               <Text className="text-gray-400 text-xs mt-1">JPEG/PNG, max 25MB</Text>
             </View>
           )}

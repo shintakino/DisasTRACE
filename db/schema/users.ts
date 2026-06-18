@@ -31,6 +31,8 @@ export const users = pgTable('users', {
   locationGeom: geometryPoint('location_geom'),
   otpCode: varchar('otp_code', { length: 255 }),
   otpExpiresAt: timestamp('otp_expires_at', { withTimezone: true }),
+  responderType: text('responder_type', { enum: ['barangay', 'cdrrmo_hq'] }),
+  barangay: varchar('barangay', { length: 255 }),
 }, (table) => ({
   locationGeomGistIdx: index('users_location_geom_gist_idx').using('gist', table.locationGeom),
 }));

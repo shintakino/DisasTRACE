@@ -54,7 +54,76 @@ export async function GET(
       .limit(1);
 
     if (results.length === 0) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+      // 2. If not found, check verification_requests (user report)
+      const userReq = await db.query.verificationRequests.findFirst({
+        where: or(
+          eq(verificationRequests.id, id),
+          eq(verificationRequests.requestId, id)
+        ),
+        with: {
+          resident: true,
+        }
+      });
+
+      if (!userReq) {
+        return NextResponse.json({ error: "Report not found" }, { status: 404 });
+      }
+
+      // Check if there is an associated incident and responder
+      const incident = await db.query.incidents.findFirst({
+        where: eq(incidents.requestId, userReq.id),
+      });
+
+      let responderName = "None Assigned";
+      let vehicleId = "N/A";
+      if (incident && incident.responderId) {
+        const responder = await db.query.users.findFirst({
+          where: eq(users.id, incident.responderId),
+        });
+        if (responder) {
+          responderName = responder.fullName;
+          vehicleId = incident.assignedAmbulance || "AMB-001";
+        }
+      }
+
+      const formatted = {
+        id: userReq.requestId || userReq.id,
+        incidentId: incident?.id || userReq.id,
+        responderName: responderName,
+        vehicleId: vehicleId,
+        type: userReq.type,
+        status: userReq.status, // PENDING, VERIFIED, REJECTED, DUPLICATE
+        date: new Date(userReq.createdAt).toLocaleDateString("en-US", {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        time: new Date(userReq.createdAt).toLocaleTimeString("en-US", {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        location: userReq.locationDescription || "Baliwag City",
+        residentReportDescription: userReq.locationDescription || "Awaiting detail logs.",
+        residentPhotoUrl: userReq.imageUrl,
+        crewFindings: "No responder findings available yet (User Submitted Report).",
+        natureOfCall: userReq.nature,
+        severityLevel: userReq.severity,
+        peopleInvolved: (() => {
+          if (!userReq.peopleInvolved || userReq.peopleInvolved === 'None') return 0;
+          const match = userReq.peopleInvolved.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 1;
+        })(),
+        scenePhotos: [],
+        logs: [
+          { action: "Incident Reported by Resident", time: new Date(userReq.createdAt).toLocaleTimeString() },
+          ...(userReq.status === "VERIFIED" ? [{ action: "Incident Verified by Dispatcher", time: new Date(userReq.updatedAt).toLocaleTimeString() }] : []),
+          ...(userReq.status === "REJECTED" ? [{ action: "Incident Rejected by Dispatcher", time: new Date(userReq.updatedAt).toLocaleTimeString() }] : []),
+          ...(userReq.status === "DUPLICATE" ? [{ action: "Incident Merged as Duplicate", time: new Date(userReq.updatedAt).toLocaleTimeString() }] : []),
+        ],
+        participants: [],
+      };
+
+      return NextResponse.json(formatted);
     }
 
     const r = results[0];

@@ -5,6 +5,7 @@ import { MoveRight, MapPin } from "lucide-react";
 import { RecentReport } from "@/types/dashboard";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from "motion/react";
+import { format } from "date-fns";
 
 const container = {
   hidden: { opacity: 0 },
@@ -48,9 +49,14 @@ export function RecentReports({
                 onClick={() => onReportClick?.(report.id)}
                 className="p-3 rounded-xl bg-[#F8FAFC] border border-[#F1F5F9] flex flex-col gap-1.5 hover:shadow-sm cursor-pointer hover:bg-[#F1F5F9]/80 transition-all duration-200"
               >
-                <div className="flex flex-col gap-0">
-                  <span className="text-[9px] font-semibold text-[#64748B] uppercase tracking-tight">{report.vehicleId}</span>
-                  <span className="text-base font-bold text-[#1E293B] leading-tight">{report.id}</span>
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-semibold text-[#64748B] uppercase tracking-tight">{report.vehicleId}</span>
+                    <span className="text-[10px] text-[#64748B] font-medium">
+                      {format(new Date(report.timestamp), "MMM d, yyyy · h:mm a")}
+                    </span>
+                  </div>
+                  <span className="text-base font-bold text-[#1E293B] leading-tight">{report.requestId}</span>
                 </div>
                 
                 <div className="flex items-center gap-2">

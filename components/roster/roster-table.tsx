@@ -76,11 +76,16 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
       },
     },
     {
-      accessorKey: "role",
-      header: "ROLE",
-      cell: ({ row }) => (
-        <div className="font-medium text-[#111827] uppercase">{row.getValue("role")}</div>
-      ),
+      accessorKey: "responderType",
+      header: "TYPE / ASSIGNMENT",
+      cell: ({ row }) => {
+        const type = row.original.responderType
+        const barangay = row.original.barangay
+        if (type === 'barangay') {
+          return <div className="font-medium text-[#111827]">Barangay ({barangay || 'Unassigned'})</div>
+        }
+        return <div className="font-medium text-[#111827]">CDRRMO HQ</div>
+      },
     },
     {
       id: "actions",

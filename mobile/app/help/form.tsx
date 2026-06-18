@@ -134,7 +134,7 @@ export default function FormScreen() {
 
       // Geofence enforcement: DisasTRACE is only active within the municipality of Baliwag City
       const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
-      const isOutsideBaliwag = lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00;
+      const isOutsideBaliwag = lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00;
 
       if (isOutsideBaliwag) {
         if (isDevMode) {

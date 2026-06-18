@@ -175,7 +175,7 @@ export default function UsersApprovalPage() {
   return (
     <div className="flex h-[calc(100vh-140px)] bg-white border rounded-xl overflow-hidden shadow-sm">
       {/* Master View: Queue */}
-      <div className="w-80 shrink-0">
+      <div className="w-80 shrink-0 h-full">
         <ApprovalQueue
           applicants={applicants}
           selectedId={selectedApplicant?.id}
@@ -185,7 +185,7 @@ export default function UsersApprovalPage() {
       </div>
 
       {/* Detail View: Applicant Details & Actions */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full">
         {selectedApplicant ? (
           <>
             <div className="flex-1 overflow-hidden">

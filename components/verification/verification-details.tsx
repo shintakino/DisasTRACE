@@ -29,7 +29,7 @@ export function VerificationDetails({ request }: VerificationDetailsProps) {
   const displayStatus = isPendingDispatch ? "EMERGENCY (PENDING DISPATCH)" : request.status;
 
   return (
-    <div className="flex-1 flex flex-col p-6 overflow-y-auto">
+    <div className="flex-1 flex flex-col p-6 overflow-y-auto bg-white">
       <div className="flex justify-between items-start mb-6">
         <div>
           <h2 className="text-2xl font-bold">{request.requestId}</h2>

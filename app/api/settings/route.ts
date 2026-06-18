@@ -9,7 +9,7 @@ import { z } from "zod";
 import crypto from "crypto";
 
 const SettingsUpdateSchema = z.object({
-  dispatchOfferTimeoutSeconds: z.number().int().min(10, "Minimum timeout is 10 seconds").max(120, "Maximum timeout is 120 seconds"),
+  dispatchOfferTimeoutSeconds: z.number().int().min(5, "Minimum timeout is 5 seconds").max(120, "Maximum timeout is 120 seconds"),
 });
 
 export async function GET(req: NextRequest) {

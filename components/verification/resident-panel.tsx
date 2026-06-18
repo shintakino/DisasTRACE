@@ -108,7 +108,14 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
             <History className="w-4 h-4 text-muted-foreground mt-0.5" />
             <div className="text-sm">
               <div className="text-muted-foreground text-[10px] uppercase font-bold">Account Standing</div>
-              <div className="font-medium">{resident.priorReports} prior reports</div>
+              <div className="font-medium">
+                {resident.reliabilityScore !== undefined ? (
+                  resident.reliabilityScore >= 80 ? "Good Standing" :
+                  resident.reliabilityScore >= 50 ? "Fair Standing" : "Poor Standing"
+                ) : (
+                  resident.priorReports >= 5 ? "Good Standing" : "New Account"
+                )} ({resident.priorReports} reports)
+              </div>
             </div>
           </div>
         </div>
@@ -120,12 +127,15 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
           </div>
           <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full bg-green-500"
-              style={{ width: `${Math.min(100, (resident.priorReports / 5) * 100)}%` }}
+              className={`h-full ${
+                (resident.reliabilityScore ?? 100) >= 80 ? "bg-green-500" :
+                (resident.reliabilityScore ?? 100) >= 50 ? "bg-amber-500" : "bg-red-500"
+              }`}
+              style={{ width: `${resident.reliabilityScore ?? 100}%` }}
             />
           </div>
           <div className="text-[10px] text-muted-foreground mt-2 text-center italic">
-            Based on historical accuracy of reports
+            Based on historical accuracy of reports ({resident.reliabilityScore ?? 100}% reliable)
           </div>
         </Card>
       </div>

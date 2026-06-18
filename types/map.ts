@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-export const IncidentStatusSchema = z.enum(["NEW", "ONGOING", "COMPLETED", "STANDBY"]);
+export const IncidentStatusSchema = z.enum([
+  "NEW", "ONGOING", "COMPLETED", "STANDBY",
+  "PENDING", "VERIFIED", "REJECTED", "DUPLICATE"
+]);
 export type IncidentStatus = z.infer<typeof IncidentStatusSchema>;
 
 export const MapIncidentSchema = z.object({
@@ -15,6 +18,12 @@ export const MapIncidentSchema = z.object({
   lng: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  category: z.enum(["user", "responder"]),
+  submittedDate: z.string().optional(),
+  submittedTime: z.string().optional(),
+  lastUpdated: z.string().optional(),
+  reporterName: z.string().optional().nullable(),
+  reporterPhone: z.string().optional().nullable(),
 });
 export type MapIncident = z.infer<typeof MapIncidentSchema>;
 

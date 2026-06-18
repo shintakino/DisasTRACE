@@ -6,7 +6,8 @@ import { systemSettings } from "@/db/schema/system_settings";
 import { eq, ne, and, notInArray, sql } from "drizzle-orm";
 
 // Haversine formula to compute distance in kilometers
-function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+// Haversine formula to compute distance in kilometers
+export function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Earth's radius in km
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -44,7 +45,7 @@ export async function autoDispatchIncident(
 
     if (isDevMode) {
       // Mock request coordinates in Baliwag if outside (for developer off-site testing convenience)
-      if (reqLat < 14.90 || reqLat > 15.00 || reqLng < 120.80 || reqLng > 121.00) {
+      if (reqLat < 14.90 || reqLat > 15.05 || reqLng < 120.80 || reqLng > 121.00) {
         reqLat = 14.945;
         reqLng = 120.895;
       }
@@ -58,8 +59,7 @@ export async function autoDispatchIncident(
         where: and(
           eq(users.role, "ambulance_responder"),
           eq(users.status, "ACTIVE"),
-          eq(users.dutyStatus, "ON_DUTY"),
-          eq(users.email, "responder@disastrace.com")
+          eq(users.dutyStatus, "ON_DUTY")
         ),
       });
     } else {
@@ -110,17 +110,12 @@ export async function autoDispatchIncident(
         let resLng = responder.lastLongitude !== null ? Number(responder.lastLongitude) : 120.9011;
 
         if (isDevMode) {
-          // Mock coordinates in Baliwag if responder is outside the city (for developer off-site testing convenience)
-          if (resLat < 14.90 || resLat > 15.00 || resLng < 120.80 || resLng > 121.00) {
-            resLat = 14.954;
-            resLng = 120.902;
-          }
-
-          // Force seeded responder@disastrace.com to be within 1.2km of request coordinates (~250m) for off-site developer testing
-          if (responder.email === "responder@disastrace.com") {
-            resLat = reqLat + 0.0015;
-            resLng = reqLng + 0.0015;
-          }
+          // Deterministic offset to keep coordinates close but separate and sorted
+          const offsetIndex = responder.email.includes("responder")
+            ? (Number(responder.email.replace(/[^0-9]/g, '')) || 1)
+            : (responder.id.charCodeAt(0) % 5 + 1);
+          resLat = reqLat + 0.0015 * offsetIndex;
+          resLng = reqLng + 0.0015 * offsetIndex;
         }
 
         const distanceKm = calculateHaversineDistance(
@@ -230,7 +225,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
     let reqLng = request.longitude;
 
     // Mock request coordinates in Baliwag if outside (for developer off-site testing convenience)
-    if (reqLat < 14.90 || reqLat > 15.00 || reqLng < 120.80 || reqLng > 121.00) {
+    if (reqLat < 14.90 || reqLat > 15.05 || reqLng < 120.80 || reqLng > 121.00) {
       reqLat = 14.945;
       reqLng = 120.895;
     }
@@ -243,8 +238,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         where: and(
           eq(users.role, "ambulance_responder"),
           eq(users.status, "ACTIVE"),
-          eq(users.dutyStatus, "ON_DUTY"),
-          eq(users.email, "responder@disastrace.com")
+          eq(users.dutyStatus, "ON_DUTY")
         ),
       });
     } else {
@@ -296,16 +290,13 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         let resLat = responder.lastLatitude !== null ? Number(responder.lastLatitude) : 14.9516;
         let resLng = responder.lastLongitude !== null ? Number(responder.lastLongitude) : 120.9011;
 
-        // Mock coordinates in Baliwag if responder is outside the city
-        if (resLat < 14.90 || resLat > 15.00 || resLng < 120.80 || resLng > 121.00) {
-          resLat = 14.954;
-          resLng = 120.902;
-        }
-
-        // Force seeded responder@disastrace.com to be within 1.2km of request coordinates (~250m) for off-site developer testing
-        if (responder.email === "responder@disastrace.com") {
-          resLat = reqLat + 0.0015;
-          resLng = reqLng + 0.0015;
+        if (isDevMode) {
+          // Deterministic offset to keep coordinates close but separate and sorted
+          const offsetIndex = responder.email.includes("responder")
+            ? (Number(responder.email.replace(/[^0-9]/g, '')) || 1)
+            : (responder.id.charCodeAt(0) % 5 + 1);
+          resLat = reqLat + 0.0015 * offsetIndex;
+          resLng = reqLng + 0.0015 * offsetIndex;
         }
 
         const distanceKm = calculateHaversineDistance(
@@ -362,6 +353,8 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
   }
 }
 
+const DISPATCH_GRACE_PERIOD_MS = 4000; // 4s leeway grace period to offset network/cellular transit latency
+
 export async function checkAndCascadeExpiredOffers() {
   try {
     const now = new Date();
@@ -372,7 +365,13 @@ export async function checkAndCascadeExpiredOffers() {
     });
 
     for (const incident of expiredIncidents) {
-      if (!incident.offerExpiresAt || incident.offerExpiresAt > now) {
+      if (!incident.offerExpiresAt) {
+        continue;
+      }
+
+      // Allow a leeway grace period for the responder to submit the accept request
+      const offerExpiresAtWithGrace = new Date(incident.offerExpiresAt.getTime() + DISPATCH_GRACE_PERIOD_MS);
+      if (offerExpiresAtWithGrace > now) {
         continue;
       }
 

@@ -28,7 +28,7 @@ export async function POST(
     }
 
     const role = user.app_metadata?.role;
-    if (role !== "pacc_admin" && role !== "cdrrmo_super_admin") {
+    if (role !== "pacc_admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

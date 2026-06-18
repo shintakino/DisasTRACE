@@ -87,7 +87,7 @@ export function IncidentTrends({
               tickMargin={10}
               axisLine={false}
               tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }}
-              tickFormatter={(value) => value.slice(0, 3)}
+              tickFormatter={(value) => value}
             />
             <ChartTooltip 
               content={
@@ -180,8 +180,9 @@ export function IncidentDistribution({
             <SelectValue placeholder="Period" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Monthly">Monthly</SelectItem>
+            <SelectItem value="Daily">Daily</SelectItem>
             <SelectItem value="Weekly">Weekly</SelectItem>
+            <SelectItem value="Monthly">Monthly</SelectItem>
             <SelectItem value="Yearly">Yearly</SelectItem>
           </SelectContent>
         </Select>

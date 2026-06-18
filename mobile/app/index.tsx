@@ -125,13 +125,6 @@ export default function EntryScreen() {
     prepare();
   }, [isLoaded, isSignedIn, verificationStatus]);
 
-  const handleRoleSelect = (role: 'public_user' | 'ambulance_responder') => {
-    router.push({
-      pathname: '/(auth)/sign-in',
-      params: { role }
-    });
-  };
-
   const glowStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
     transform: [{ scale: glowScale.value }],
@@ -194,41 +187,23 @@ export default function EntryScreen() {
 
       {!isSignedIn && (
         <Animated.View style={[styles.bottomCard, cardStyle]}>
-          <Text style={styles.title}>Identify Your Role</Text>
-          <Text style={styles.subtitle}>Select how you will use DisasTRACE</Text>
+          <Text style={styles.title}>The Pulse of Safety</Text>
+          <Text style={styles.subtitle}>Welcome to DisasTRACE Emergency Portal</Text>
 
           <TouchableOpacity
-            style={styles.roleCard}
-            onPress={() => handleRoleSelect('public_user')}
-            activeOpacity={0.7}
+            style={styles.signInButton}
+            onPress={() => router.push('/(auth)/sign-in')}
+            activeOpacity={0.8}
           >
-            <View style={[styles.iconContainer, { backgroundColor: '#E0F2FE' }]}>
-              <Home size={28} color="#0369A1" strokeWidth={1.5} />
-            </View>
-            <View style={styles.cardText}>
-              <Text style={styles.cardTitle}>Resident</Text>
-              <Text style={styles.cardDescription}>
-                I need assistance or want to report an incident.
-              </Text>
-            </View>
-            <ChevronRight size={20} color="#94A3B8" />
+            <Text style={styles.signInButtonText}>Sign In</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.roleCard}
-            onPress={() => handleRoleSelect('ambulance_responder')}
-            activeOpacity={0.7}
+            style={styles.signUpButton}
+            onPress={() => router.push('/(auth)/sign-up')}
+            activeOpacity={0.8}
           >
-            <View style={[styles.iconContainer, { backgroundColor: '#FEE2E2' }]}>
-              <Ambulance size={28} color="#B91C1C" strokeWidth={1.5} />
-            </View>
-            <View style={styles.cardText}>
-              <Text style={styles.cardTitle}>Responder</Text>
-              <Text style={styles.cardDescription}>
-                I am part of the emergency response team.
-              </Text>
-            </View>
-            <ChevronRight size={20} color="#94A3B8" />
+            <Text style={styles.signUpButtonText}>Sign Up</Text>
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -303,36 +278,36 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginBottom: 16,
   },
-  roleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#F8FAFC',
+  signInButton: {
+    backgroundColor: '#15286A',
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginTop: 8,
+    shadowColor: '#15286A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  cardText: {
-    flex: 1,
+  signInButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 2,
+  signUpButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#15286A',
+    borderRadius: 16,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cardDescription: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 16,
+  signUpButtonText: {
+    color: '#15286A',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

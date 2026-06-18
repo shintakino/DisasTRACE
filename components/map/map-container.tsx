@@ -148,6 +148,9 @@ export function MapContainer({
               status={incident.status}
               label={incident.caseId}
               isSelected={selectedIncidentId === incident.id}
+              reporterName={incident.reporterName}
+              reporterPhone={incident.reporterPhone}
+              destination={incident.destination}
             />
           </Marker>
         ))}

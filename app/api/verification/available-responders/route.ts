@@ -14,7 +14,7 @@ export async function GET() {
     }
 
     const role = user.app_metadata?.role;
-    if (role !== "pacc_admin" && role !== "cdrrmo_super_admin") {
+    if (role !== "pacc_admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -49,21 +49,30 @@ export async function GET() {
         status,
         lat: r.lastLatitude,
         lng: r.lastLongitude,
+        responderType: r.responderType,
       };
     });
 
     // Split standard CDRRMO HQ responders vs Barangay Rescue Units
-    const cdrrmo = mappedResponders.filter(
-      (r) =>
+    const cdrrmo = mappedResponders.filter((r) => {
+      if (r.responderType) {
+        return r.responderType === "cdrrmo_hq";
+      }
+      return (
         !r.fullName.toLowerCase().includes("barangay") &&
         !r.fullName.toLowerCase().includes("rescue")
-    );
+      );
+    });
 
-    const barangay = mappedResponders.filter(
-      (r) =>
+    const barangay = mappedResponders.filter((r) => {
+      if (r.responderType) {
+        return r.responderType === "barangay";
+      }
+      return (
         r.fullName.toLowerCase().includes("barangay") ||
         r.fullName.toLowerCase().includes("rescue")
-    );
+      );
+    });
 
     return NextResponse.json({
       success: true,

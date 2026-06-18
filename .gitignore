@@ -46,3 +46,5 @@ next-env.d.ts
 .vscode
 *.log
 package-lock.json
+/scratch
+

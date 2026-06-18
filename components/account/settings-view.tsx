@@ -55,8 +55,8 @@ export function SettingsView() {
   }, [user, role]);
 
   const handleUpdateDispatchSettings = async () => {
-    if (dispatchTimeout < 10 || dispatchTimeout > 120) {
-      toast.error("Manual dispatch countdown must be between 10 and 120 seconds.");
+    if (dispatchTimeout < 5 || dispatchTimeout > 120) {
+      toast.error("Manual dispatch countdown must be between 5 and 120 seconds.");
       return;
     }
     setDispatchLoading(true);
@@ -282,7 +282,7 @@ export function SettingsView() {
                     <Input 
                       id="dispatchTimeout" 
                       type="number"
-                      min={10}
+                      min={5}
                       max={120}
                       value={dispatchTimeout}
                       onChange={(e) => setDispatchTimeout(parseInt(e.target.value) || 30)}
@@ -294,7 +294,7 @@ export function SettingsView() {
                     </div>
                   </div>
                   <p className="text-[11px] text-[#64748B] font-medium leading-normal">
-                    Must be a value between 10 seconds (minimum required for basic device notification delay) and 120 seconds.
+                    Must be a value between 5 seconds (minimum required for basic device notification delay) and 120 seconds.
                   </p>
                 </div>
 

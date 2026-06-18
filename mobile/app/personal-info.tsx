@@ -12,6 +12,7 @@ export default function PersonalInfoScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Initialize form details
@@ -20,12 +21,18 @@ export default function PersonalInfoScreen() {
       setFirstName(user.user_metadata?.first_name || profile?.fullName?.split(' ')[0] || '');
       setLastName(user.user_metadata?.last_name || profile?.fullName?.split(' ').slice(1).join(' ') || '');
       setPhone(user.user_metadata?.phone || '');
+      setEmail(user.email || '');
     }
   }, [user, profile]);
 
   const handleSaveChanges = async () => {
     if (!firstName.trim() || !lastName.trim()) {
       Alert.alert('Validation Error', 'First name and Last name are required.');
+      return;
+    }
+
+    if (role === 'ambulance_responder' && !email.trim()) {
+      Alert.alert('Validation Error', 'Email address is required.');
       return;
     }
 
@@ -49,6 +56,7 @@ export default function PersonalInfoScreen() {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           phone: phone.trim(),
+          email: role === 'ambulance_responder' ? email.trim() : undefined,
         }),
       });
 
@@ -135,8 +143,20 @@ export default function PersonalInfoScreen() {
             <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Account Information</Text>
             
             <View className="mb-4">
-              <Text className="text-sm text-slate-500 mb-1">Email Address</Text>
-              <Text className="text-base font-semibold text-slate-800">{user?.email || 'No email provided'}</Text>
+              <Text className="text-sm font-semibold text-[#334155] mb-2">Email Address</Text>
+              {role === 'ambulance_responder' ? (
+                <TextInput 
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!loading}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
+                  placeholder="Enter your email address"
+                />
+              ) : (
+                <Text className="text-base font-semibold text-slate-800 ml-1">{user?.email || 'No email provided'}</Text>
+              )}
             </View>
             
             <View className="mb-2">

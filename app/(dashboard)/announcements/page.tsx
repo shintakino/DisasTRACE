@@ -19,6 +19,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
+export interface AnnouncementDraft {
+  id: string;
+  title: string;
+  body: string;
+  targetRole: "all" | "ambulance_responder" | "public_user";
+  lastSaved: string;
+}
+
 export default function AnnouncementsPage() {
   const { role } = useAuth();
   const isAuthorized = role?.toLowerCase() === "cdrrmo_super_admin" || role?.toLowerCase() === "pacc_admin";
@@ -28,6 +36,46 @@ export default function AnnouncementsPage() {
   const [targetRole, setTargetRole] = useState<"all" | "ambulance_responder" | "public_user">("all");
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+
+  const [drafts, setDrafts] = useState<AnnouncementDraft[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("announcement_drafts");
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+
+  const handleSaveDraft = () => {
+    if (!title.trim() || !body.trim()) {
+      toast.error("Please fill in both the Title and Content before saving.");
+      return;
+    }
+    const newDraft: AnnouncementDraft = {
+      id: Math.random().toString(),
+      title: title.trim(),
+      body: body.trim(),
+      targetRole,
+      lastSaved: new Date().toISOString(),
+    };
+    const updatedDrafts = [newDraft, ...drafts];
+    setDrafts(updatedDrafts);
+    localStorage.setItem("announcement_drafts", JSON.stringify(updatedDrafts));
+    toast.success("Draft saved successfully!");
+  };
+
+  const handleLoadDraft = (draft: AnnouncementDraft) => {
+    setTitle(draft.title);
+    setBody(draft.body);
+    setTargetRole(draft.targetRole);
+    toast.info("Draft loaded into compose panel.");
+  };
+
+  const handleDeleteDraft = (id: string) => {
+    const updatedDrafts = drafts.filter(d => d.id !== id);
+    setDrafts(updatedDrafts);
+    localStorage.setItem("announcement_drafts", JSON.stringify(updatedDrafts));
+    toast.success("Draft deleted.");
+  };
 
   // Mock list of recent announcements sent to make the page feel alive and functional
   const [recentBroadcasts, setRecentBroadcasts] = useState([
@@ -167,18 +215,18 @@ export default function AnnouncementsPage() {
     <div className="flex-1 flex flex-col p-6 space-y-6 bg-[#F8FAFC] overflow-y-auto">
       
       {/* Title Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-[#1A237E] to-[#15286A] text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 opacity-10 flex items-center pr-10 pointer-events-none">
-          <Megaphone className="size-48" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-gradient-to-r from-[#1A237E] to-[#15286A] text-white p-4 sm:p-6 rounded-3xl shadow-lg relative overflow-hidden shrink-0">
+        <div className="hidden sm:flex absolute right-0 top-0 bottom-0 opacity-10 items-center pr-6 md:pr-10 pointer-events-none">
+          <Megaphone className="size-36 md:size-48" />
         </div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
             <div className="bg-white/20 p-2 rounded-2xl">
-              <Megaphone className="size-6 text-yellow-300" />
+              <Megaphone className="size-5 sm:size-6 text-yellow-300" />
             </div>
-            <h1 className="text-2xl font-black tracking-tight">Mass Broadcast Center</h1>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight">Mass Broadcast Center</h1>
           </div>
-          <p className="text-blue-100 text-sm max-w-xl leading-relaxed">
+          <p className="text-blue-100 text-xs sm:text-sm max-w-xl leading-relaxed">
             Draft, scope, and dispatch instant critical notices and official system announcements directly to resident and responder mobile clients.
           </p>
         </div>
@@ -293,21 +341,34 @@ export default function AnnouncementsPage() {
                 </label>
               </div>
 
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                disabled={isBroadcasting || !title.trim() || !body.trim() || !isConfirmed}
-                className="w-full bg-[#1A237E] hover:bg-[#15286A] text-white rounded-2xl py-6 font-bold shadow-md shadow-blue-900/10 flex items-center justify-center gap-2 text-sm select-none"
-              >
-                {isBroadcasting ? (
-                  <span>Broadcasting Live...</span>
-                ) : (
-                  <>
-                    <Send className="size-4" />
-                    <span>Broadcast Mass Announcement</span>
-                  </>
-                )}
-              </Button>
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSaveDraft}
+                  disabled={isBroadcasting || !title.trim() || !body.trim()}
+                  className="flex-1 border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl py-6 font-bold flex items-center justify-center gap-2 text-sm select-none"
+                >
+                  <Clock className="size-4 text-slate-400" />
+                  <span>Save as Draft</span>
+                </Button>
+                
+                <Button
+                  type="submit"
+                  disabled={isBroadcasting || !title.trim() || !body.trim() || !isConfirmed}
+                  className="flex-1 bg-[#1A237E] hover:bg-[#15286A] text-white rounded-2xl py-6 font-bold shadow-md shadow-blue-950/20 flex items-center justify-center gap-2 text-sm select-none"
+                >
+                  {isBroadcasting ? (
+                    <span>Broadcasting Live...</span>
+                  ) : (
+                    <>
+                      <Send className="size-4" />
+                      <span>Broadcast Alert</span>
+                    </>
+                  )}
+                </Button>
+              </div>
 
             </form>
           </CardContent>
@@ -374,6 +435,53 @@ export default function AnnouncementsPage() {
               </div>
             </CardContent>
           </Card>
+          {/* Saved Drafts List */}
+          {drafts.length > 0 && (
+            <Card className="border-none shadow-md rounded-3xl overflow-hidden bg-white">
+              <CardHeader className="p-6 pb-2 border-b border-slate-50">
+                <CardTitle className="text-[#1A237E] font-bold text-lg flex items-center gap-2">
+                  <Clock className="size-5 text-indigo-500" />
+                  Saved Drafts ({drafts.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                  {drafts.map((d) => (
+                    <div key={d.id} className="border border-slate-100 rounded-2xl p-4 hover:bg-slate-50/50 transition-all flex flex-col gap-2">
+                      <div className="flex flex-wrap justify-between items-center gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wider ${getTargetBadgeStyle(d.targetRole)}`}>
+                          {getTargetLabel(d.targetRole)}
+                        </span>
+                        <span className="text-slate-400 text-[10px] font-medium">
+                          {formatTime(d.lastSaved)}
+                        </span>
+                      </div>
+                      <h4 className="text-slate-800 text-sm font-bold leading-tight">{d.title}</h4>
+                      <p className="text-slate-500 text-xs line-clamp-2 leading-relaxed mb-1">{d.body}</p>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteDraft(d.id)}
+                          className="h-7 px-3 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50 font-bold text-[10px] uppercase tracking-wider transition-colors"
+                        >
+                          Delete
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleLoadDraft(d)}
+                          className="h-7 px-4 rounded-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-[10px] uppercase tracking-wider transition-colors"
+                        >
+                          Load Draft
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Recent Broadcast History */}
           <Card className="border-none shadow-md rounded-3xl overflow-hidden bg-white">

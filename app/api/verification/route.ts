@@ -15,9 +15,9 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Check for PACC Admin or CDRRMO Super Admin role
+    // Check for PACC Admin role
     const role = user?.app_metadata?.role;
-    if (role !== "pacc_admin" && role !== "cdrrmo_super_admin") {
+    if (role !== "pacc_admin") {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -44,6 +44,18 @@ export async function GET(req: NextRequest) {
           sql`${verificationRequests.residentId} = ${r.resident.id} AND ${verificationRequests.id} != ${r.id}`
         );
       const priorReportsCount = priorCount[0]?.count ? Number(priorCount[0].count) : 0;
+
+      // Count actual rejected reports in the database
+      const rejectedCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(verificationRequests)
+        .where(
+          sql`${verificationRequests.residentId} = ${r.resident.id} AND ${verificationRequests.id} != ${r.id} AND ${verificationRequests.status} = 'REJECTED'`
+        );
+      const rejectedReportsCount = rejectedCount[0]?.count ? Number(rejectedCount[0].count) : 0;
+
+      // Calculate Reliability Score: starts at 100, subtracts 33 per rejected report, min 0
+      const reliabilityScore = Math.max(0, 100 - (rejectedReportsCount * 33));
 
       // Convert peopleInvolved enum string or text count to a number robustly
       let peopleCount = 0;
@@ -79,6 +91,7 @@ export async function GET(req: NextRequest) {
           address: r.resident.address || "No address recorded",
           priorReports: priorReportsCount,
           isVerified: r.resident.verificationStatus === 'APPROVED',
+          reliabilityScore,
         },
         incident: incident ? {
           id: incident.id,

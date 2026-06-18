@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { IncidentPanel } from "@/components/map/incident-panel";
 import { MapContainer } from "@/components/map/map-container";
 import { useMapData } from "@/hooks/use-map-data";
@@ -12,10 +13,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
 
-export default function MapPage() {
+function MapPageContent() {
   const { incidents, responders, hospitals, summary, isLoading, error } = useMapData();
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
   const [filter, setFilter] = useState("ALL");
+  const [category, setCategory] = useState<"user" | "responder">("user");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   // Layer visibility state (requests vs reports)
@@ -25,6 +27,26 @@ export default function MapPage() {
   // Full Report Detail Modal State
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
+
+  const searchParams = useSearchParams();
+  const selectParam = searchParams.get("select");
+
+  useEffect(() => {
+    if (selectParam && incidents.length > 0) {
+      const incident = incidents.find((i) => i.id === selectParam);
+      if (incident) {
+        setSelectedIncidentId(selectParam);
+        setCategory(incident.category);
+        
+        // Ensure layer is visible
+        if (incident.category === "user") {
+          setShowRequests(true);
+        } else if (incident.category === "responder") {
+          setShowReports(true);
+        }
+      }
+    }
+  }, [selectParam, incidents]);
 
   const handleSelectIncident = (incident: MapIncident | string) => {
     const id = typeof incident === "string" ? incident : incident.id;
@@ -38,11 +60,8 @@ export default function MapPage() {
 
   // Filter incidents based on checkbox visibility toggles
   const displayedIncidents = incidents.filter((incident) => {
-    const isRequest = incident.status === "NEW" || incident.status === "STANDBY";
-    const isReport = incident.status === "ONGOING" || incident.status === "COMPLETED";
-    
-    if (isRequest) return showRequests;
-    if (isReport) return showReports;
+    if (incident.category === "user") return showRequests;
+    if (incident.category === "responder") return showReports;
     return true;
   });
 
@@ -95,6 +114,8 @@ export default function MapPage() {
               filter={filter}
               onFilterChange={setFilter}
               onOpenDetails={handleOpenDetails}
+              category={category}
+              onCategoryChange={setCategory}
             />
           </div>
 
@@ -152,5 +173,32 @@ export default function MapPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function MapPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
+        <div className="w-[400px] h-full border-r p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-20 w-full" />
+            ))}
+          </div>
+          <Skeleton className="h-10 w-full" />
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 h-full bg-muted/20">
+          <Skeleton className="w-full h-full" />
+        </div>
+      </div>
+    }>
+      <MapPageContent />
+    </Suspense>
   );
 }

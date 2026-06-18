@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
 import { auditLogs } from "@/db/schema/audit_logs";
-import { eq } from "drizzle-orm";
+import { statusLogs } from "@/db/schema/status_logs";
+import { notifications } from "@/db/schema/notifications";
+import { feedbacks } from "@/db/schema/feedbacks";
+import { reports } from "@/db/schema/reports";
+import { incidents } from "@/db/schema/incidents";
+import { verificationRequests } from "@/db/schema/verification_requests";
+import { eq, inArray } from "drizzle-orm";
 import { createClient, createAdminClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import crypto from "crypto";
@@ -79,6 +85,8 @@ export async function POST(req: NextRequest) {
       role: z.enum(["public_user", "ambulance_responder", "pacc_admin", "cdrrmo_super_admin"]),
       phone: z.string().optional(),
       address: z.string().optional(),
+      responderType: z.enum(["barangay", "cdrrmo_hq"]).optional(),
+      barangay: z.string().optional(),
     });
 
     const result = CreateUserSchema.safeParse(body);
@@ -86,7 +94,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid payload", details: result.error.format() }, { status: 400 });
     }
 
-    const { fullName, email, password, role, phone, address } = result.data;
+    const { fullName, email, password, role, phone, address, responderType, barangay } = result.data;
     const adminClient = createAdminClient();
 
     // Create the user in Supabase Auth via the service-role client
@@ -100,7 +108,9 @@ export async function POST(req: NextRequest) {
         full_name: fullName,
         phone,
         address,
-        role
+        role,
+        responder_type: responderType,
+        barangay,
       }
     });
 
@@ -124,7 +134,12 @@ export async function POST(req: NextRequest) {
     } else if (createdUser && role === 'ambulance_responder') {
       // Direct approve responders created by admin
       await db.update(users)
-        .set({ status: 'ACTIVE', verificationStatus: 'APPROVED' })
+        .set({ 
+          status: 'ACTIVE', 
+          verificationStatus: 'APPROVED',
+          responderType: responderType || null,
+          barangay: responderType === 'barangay' ? barangay || null : null
+        })
         .where(eq(users.id, createdUser.id));
       createdUser.status = 'ACTIVE';
       createdUser.verificationStatus = 'APPROVED';
@@ -241,10 +256,54 @@ export async function DELETE(req: NextRequest) {
 
     const adminClient = createAdminClient();
 
-    // Delete user profile in local db
+    // 1. Delete feedbacks
+    await db.delete(feedbacks).where(eq(feedbacks.userId, id));
+
+    // 2. Delete notifications
+    await db.delete(notifications).where(eq(notifications.userId, id));
+
+    // 3. Delete status logs
+    await db.delete(statusLogs).where(eq(statusLogs.userId, id));
+
+    // 4. Delete audit logs where the user is the performer (i.e. userId)
+    await db.delete(auditLogs).where(eq(auditLogs.userId, id));
+
+    // 5. Handle incidents and reports referencing this user as a responder
+    await db.update(incidents)
+      .set({ responderId: null })
+      .where(eq(incidents.responderId, id));
+
+    await db.update(incidents)
+      .set({ currentOfferResponderId: null })
+      .where(eq(incidents.currentOfferResponderId, id));
+
+    await db.delete(reports).where(eq(reports.responderId, id));
+
+    // 6. Handle verification requests, incidents, and reports if this user is a resident
+    const residentRequests = await db.select({ id: verificationRequests.id })
+      .from(verificationRequests)
+      .where(eq(verificationRequests.residentId, id));
+
+    if (residentRequests.length > 0) {
+      const requestIds = residentRequests.map(r => r.id);
+
+      const relatedIncidents = await db.select({ id: incidents.id })
+        .from(incidents)
+        .where(inArray(incidents.requestId, requestIds));
+
+      if (relatedIncidents.length > 0) {
+        const incidentIds = relatedIncidents.map(i => i.id);
+        await db.delete(reports).where(inArray(reports.incidentId, incidentIds));
+        await db.delete(incidents).where(inArray(incidents.id, incidentIds));
+      }
+
+      await db.delete(verificationRequests).where(eq(verificationRequests.residentId, id));
+    }
+
+    // 7. Delete user profile in local db
     await db.delete(users).where(eq(users.id, id));
 
-    // Delete user in Supabase auth via adminClient
+    // 8. Delete user in Supabase auth via adminClient
     await adminClient.auth.admin.deleteUser(id);
 
     // Insert audit log

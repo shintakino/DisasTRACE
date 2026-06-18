@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
+import { verificationRequests } from "@/db/schema/verification_requests";
 import { eq, and } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
-import { cascadeIncident } from "@/lib/dispatch-engine";
+import { cascadeIncident, calculateHaversineDistance } from "@/lib/dispatch-engine";
 
 const RespondSchema = z.object({
   incidentId: z.string().uuid(),
@@ -21,15 +22,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify user role
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id),
-    });
-
-    if (!dbUser || dbUser.role !== 'ambulance_responder') {
-      return NextResponse.json({ error: "Forbidden: Responder access required" }, { status: 403 });
-    }
-
     const body = await req.json();
     const result = RespondSchema.safeParse(body);
 
@@ -39,10 +31,19 @@ export async function POST(req: NextRequest) {
 
     const { incidentId, action } = result.data;
 
-    // Fetch the incident
-    const incident = await db.query.incidents.findFirst({
+    // Parallelize user role and incident queries to reduce latency
+    const dbUserPromise = db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+    const incidentPromise = db.query.incidents.findFirst({
       where: eq(incidents.id, incidentId),
     });
+
+    const [dbUser, incident] = await Promise.all([dbUserPromise, incidentPromise]);
+
+    if (!dbUser || dbUser.role !== 'ambulance_responder') {
+      return NextResponse.json({ error: "Forbidden: Responder access required" }, { status: 403 });
+    }
 
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 });
@@ -64,6 +65,37 @@ export async function POST(req: NextRequest) {
       const suffix = dbUser.id.slice(-3).toUpperCase();
       const vehicleId = `AMB-${initials || "001"}-${suffix}`;
 
+      // Recalculate ETA immediately after dispatch acceptance using responder's actual current location and incident coordinates
+      const request = await db.query.verificationRequests.findFirst({
+        where: eq(verificationRequests.id, incident.requestId),
+      });
+
+      let recalculatedEta = incident.etaMinutes;
+      if (request) {
+        let resLat = dbUser.lastLatitude !== null ? Number(dbUser.lastLatitude) : 14.9516;
+        let resLng = dbUser.lastLongitude !== null ? Number(dbUser.lastLongitude) : 120.9011;
+        
+        const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+        let reqLat = request.latitude;
+        let reqLng = request.longitude;
+
+        if (isDevMode) {
+          if (reqLat < 14.90 || reqLat > 15.05 || reqLng < 120.80 || reqLng > 121.00) {
+            reqLat = 14.945;
+            reqLng = 120.895;
+          }
+          // Deterministic offset to keep coordinates close but separate and sorted
+          const offsetIndex = dbUser.email.includes("responder")
+            ? (Number(dbUser.email.replace(/[^0-9]/g, '')) || 1)
+            : (dbUser.id.charCodeAt(0) % 5 + 1);
+          resLat = reqLat + 0.0015 * offsetIndex;
+          resLng = reqLng + 0.0015 * offsetIndex;
+        }
+
+        const distanceKm = calculateHaversineDistance(reqLat, reqLng, resLat, resLng);
+        recalculatedEta = Math.max(2, Math.round(distanceKm * 5));
+      }
+
       // 1. Accept dispatch: Update incident state
       const [updatedIncident] = await db.update(incidents)
         .set({
@@ -72,6 +104,7 @@ export async function POST(req: NextRequest) {
           currentOfferResponderId: null,
           offerExpiresAt: null,
           assignedAmbulance: vehicleId,
+          etaMinutes: recalculatedEta,
         })
         .where(eq(incidents.id, incidentId))
         .returning();

@@ -26,6 +26,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const role = user.app_metadata?.role;
+    if (role !== "pacc_admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     // 1. Fetch the request to verify existence and check details
     const existingReq = await db.query.verificationRequests.findFirst({
       where: eq(verificationRequests.id, id),

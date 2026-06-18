@@ -395,7 +395,11 @@ export default function HomeScreen() {
           </View>
           
           <View className="flex-row space-x-2">
-            <TouchableOpacity className="p-2" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity 
+              className="p-2" 
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={() => router.push('/support')}
+            >
               <HelpCircle size={24} color="white" />
             </TouchableOpacity>
             <TouchableOpacity 
@@ -429,8 +433,8 @@ export default function HomeScreen() {
                   <Text className="text-white font-black text-xl tracking-tighter">{initials}</Text>
                 )}
               </View>
-              <View className="absolute top-0 -right-1 bg-white rounded-full p-0.5 shadow-sm">
-                <Check size={8} color="#1E3A8A" strokeWidth={5} />
+              <View className="absolute top-0 -right-1 bg-emerald-500 rounded-full p-1 shadow-md border border-white">
+                <Check size={8} color="white" strokeWidth={5} />
               </View>
             </View>
 
@@ -445,8 +449,9 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View className="bg-white/20 px-3 py-1 rounded-full border border-white/5">
-            <Text className="text-white text-[10px] font-black tracking-widest uppercase">Online</Text>
+          <View className="bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/30 flex-row items-center space-x-1">
+            <View className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <Text className="text-emerald-400 text-[10px] font-black tracking-widest uppercase">Online</Text>
           </View>
         </View>
       </View>
@@ -489,7 +494,7 @@ export default function HomeScreen() {
             
             <TouchableOpacity 
               className="bg-[#1E3A8A] rounded-xl py-2.5 items-center shadow-sm active:bg-blue-900"
-              onPress={() => console.log('Contact Us pressed')}
+              onPress={() => router.push('/contact-us' as any)}
             >
               <Text className="text-white font-bold text-sm">Contact Us</Text>
             </TouchableOpacity>

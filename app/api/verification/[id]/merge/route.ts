@@ -28,7 +28,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify user role in the users table is pacc_admin or cdrrmo_super_admin
+    // Verify user role in the users table is pacc_admin
     const dbUser = await db.query.users.findFirst({
       where: eq(users.id, user.id),
     });
@@ -37,7 +37,7 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (dbUser.role !== "pacc_admin" && dbUser.role !== "cdrrmo_super_admin") {
+    if (dbUser.role !== "pacc_admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

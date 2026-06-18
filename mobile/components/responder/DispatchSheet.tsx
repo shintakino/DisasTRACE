@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -18,6 +18,7 @@ export function DispatchSheet() {
   const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds || 30;
   const insets = useSafeAreaInsets();
   const progress = useSharedValue(100);
+  const [accepting, setAccepting] = useState(false);
   
   // Start off-screen at the top.
   const translateY = useSharedValue(-800);
@@ -149,44 +150,14 @@ export function DispatchSheet() {
         </View>
 
         {/* Actions Button Row */}
-        <View className="flex-row space-x-3">
+        <View className="flex-row">
           <TouchableOpacity 
-            className="bg-slate-100 rounded-[20px] py-4 items-center active:bg-slate-200"
-            style={{ flex: 1 }}
+            className="bg-[#B91C1C] rounded-[20px] py-4 items-center shadow-lg shadow-[#B91C1C]/30 active:bg-red-800 flex-1 flex-row justify-center"
+            disabled={accepting}
             onPress={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               progress.value = 100; // Cancel animation
-              try {
-                const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-                const { data: { session } } = await supabase.auth.getSession();
-                const reqHeaders: any = { 'Content-Type': 'application/json' };
-                if (session?.access_token) {
-                  reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
-                }
-
-                await fetch(`${apiUrl}/api/incidents/respond`, {
-                  method: 'POST',
-                  headers: reqHeaders,
-                  body: JSON.stringify({
-                    incidentId: activeDispatch?.id,
-                    action: 'REJECT'
-                  })
-                });
-              } catch (err) {
-                console.error("Failed to decline dispatch offer:", err);
-              }
-              completeIncident(); // Clear offer
-            }}
-          >
-            <Text className="text-slate-600 font-bold text-[16px] tracking-wide">Decline</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            className="bg-[#B91C1C] rounded-[20px] py-4 items-center shadow-lg shadow-[#B91C1C]/30 active:bg-red-800"
-            style={{ flex: 2 }}
-            onPress={async () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              progress.value = 100; // Cancel animation
+              setAccepting(true);
               try {
                 const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
                 const { data: { session } } = await supabase.auth.getSession();
@@ -208,15 +179,21 @@ export function DispatchSheet() {
                   acceptDispatch();
                 } else {
                   alert(res.error || "Failed to accept dispatch.");
+                  setAccepting(false);
                 }
               } catch (err) {
                 console.error("Failed to accept dispatch offer:", err);
                 // Fallback to local state so UX remains intact during dev
                 acceptDispatch();
+                setAccepting(false);
               }
             }}
           >
-            <Text className="text-white font-bold text-[16px] tracking-wide">Accept Dispatch</Text>
+            {accepting ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text className="text-white font-bold text-[16px] tracking-wide">Accept Dispatch</Text>
+            )}
           </TouchableOpacity>
         </View>
 

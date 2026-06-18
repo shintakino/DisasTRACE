@@ -59,11 +59,24 @@ export function useAuthStatus() {
         return;
       }
 
-      const metaStatus = currentUser.app_metadata?.verification_status;
-      const normalizedStatus = typeof metaStatus === 'string'
-        ? metaStatus.toLowerCase() as VerificationStatus
-        : undefined;
-      setVerificationStatus(normalizedStatus || 'pending');
+      // Check if we can preserve the current verification status if it is already approved
+      // to prevent random resets due to transient offline query failures
+      setVerificationStatus((prev) => {
+        if (prev === 'approved') return 'approved';
+        
+        // Otherwise, inspect app_metadata status
+        const appStatus = currentUser.app_metadata?.status;
+        if (appStatus === 'ACTIVE' || appStatus === 'active') {
+          return 'approved';
+        }
+        
+        const metaStatus = currentUser.app_metadata?.verification_status;
+        const normalizedStatus = typeof metaStatus === 'string'
+          ? metaStatus.toLowerCase() as VerificationStatus
+          : undefined;
+          
+        return normalizedStatus || 'pending';
+      });
     }
   };
 

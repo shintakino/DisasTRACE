@@ -18,17 +18,23 @@ interface IncidentPanelProps {
   filter: string;
   onFilterChange: (filter: string) => void;
   onOpenDetails?: (id: string) => void;
+  category?: "user" | "responder";
+  onCategoryChange?: (category: "user" | "responder") => void;
 }
 
 export function IncidentPanel({
-  summary,
+  summary: externalSummary,
   incidents,
   onSelectIncident,
   selectedIncidentId,
   filter,
   onFilterChange,
   onOpenDetails,
+  category: externalCategory,
+  onCategoryChange,
 }: IncidentPanelProps) {
+  const [internalCategory, setInternalCategory] = React.useState<"user" | "responder">("user");
+  const category = externalCategory !== undefined ? externalCategory : internalCategory;
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(undefined);
 
   // Auto-scroll list when an incident pin is selected on the map
@@ -44,11 +50,47 @@ export function IncidentPanel({
     }
   }, [selectedIncidentId]);
 
+  // Handle category tab toggle
+  const handleCategoryChange = (cat: "user" | "responder") => {
+    if (onCategoryChange) {
+      onCategoryChange(cat);
+    } else {
+      setInternalCategory(cat);
+    }
+    onFilterChange("ALL");
+  };
+
+  // Client-side statistics calculations for high-fidelity widgets
+  const stats = React.useMemo(() => {
+    const userPending = incidents.filter(i => i.category === "user" && i.status === "PENDING").length;
+    const userVerified = incidents.filter(i => i.category === "user" && i.status === "VERIFIED").length;
+    const userRejected = incidents.filter(i => i.category === "user" && i.status === "REJECTED").length;
+    const userDuplicate = incidents.filter(i => i.category === "user" && i.status === "DUPLICATE").length;
+
+    const respOngoing = incidents.filter(i => i.category === "responder" && i.status === "ONGOING").length;
+    const respCompleted = incidents.filter(i => i.category === "responder" && i.status === "COMPLETED").length;
+
+    return {
+      user: {
+        PENDING: userPending,
+        VERIFIED: userVerified,
+        REJECTED: userRejected,
+        DUPLICATE: userDuplicate,
+      },
+      responder: {
+        ONGOING: respOngoing,
+        COMPLETED: respCompleted,
+      }
+    };
+  }, [incidents]);
+
   const filteredIncidents = incidents.filter((incident) => {
+    // 0. Category Filter
+    if (incident.category !== category) return false;
+
     // 1. Status Filter
     let statusMatch = true;
     if (filter === "ALL") statusMatch = true;
-    else if (filter === "STANDBY") statusMatch = incident.status === "STANDBY";
     else statusMatch = incident.status === filter;
 
     if (!statusMatch) return false;
@@ -78,76 +120,137 @@ export function IncidentPanel({
   return (
     <div className="flex flex-col h-full w-[400px] border-r bg-white shadow-xl z-10">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-6 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-20">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">Incident Reports</h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Real-time Command Feed</p>
+      <div className="flex flex-col px-6 pt-6 pb-4 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-20 gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-black text-slate-900 tracking-tight">Incident Reports</h1>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Real-time Command Feed</p>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 text-[10px] font-black border border-slate-200 shadow-sm transition-colors cursor-pointer outline-none">
+                <CalendarIcon size={12} className="text-slate-400" />
+                <span>{selectedDate ? format(selectedDate, "MM.dd.yyyy") : "ALL DATES"}</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 z-50 bg-white shadow-2xl border border-slate-100 rounded-2xl" align="end">
+              <div className="p-2 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider pl-1">Filter by Date</span>
+                {selectedDate && (
+                  <button 
+                    onClick={() => setSelectedDate(undefined)} 
+                    className="text-[9px] font-bold text-red-500 hover:text-red-700 uppercase pr-1 cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <UICalendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 text-[10px] font-black border border-slate-200 shadow-sm transition-colors cursor-pointer outline-none">
-              <CalendarIcon size={12} className="text-slate-400" />
-              <span>{selectedDate ? format(selectedDate, "MM.dd.yyyy") : "ALL DATES"}</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0 z-50 bg-white shadow-2xl border border-slate-100 rounded-2xl" align="end">
-            <div className="p-2 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider pl-1">Filter by Date</span>
-              {selectedDate && (
-                <button 
-                  onClick={() => setSelectedDate(undefined)} 
-                  className="text-[9px] font-bold text-red-500 hover:text-red-700 uppercase pr-1 cursor-pointer"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <UICalendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
+
+        {/* Category Toggles (User vs Responder) */}
+        <div className="flex bg-slate-100 rounded-xl p-1 gap-1 border border-slate-200/50">
+          <button
+            onClick={() => handleCategoryChange("user")}
+            className={cn(
+              "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200",
+              category === "user"
+                ? "bg-[#1E3A8A] text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+            )}
+          >
+            User Submitted Reports
+          </button>
+          <button
+            onClick={() => handleCategoryChange("responder")}
+            className={cn(
+              "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200",
+              category === "responder"
+                ? "bg-[#1E3A8A] text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+            )}
+          >
+            Responder Submitted Reports
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Cards with descriptive label */}
+      <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100">
+        <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2.5 block">
+          Overall Incident Statistics
+        </span>
+        {category === "user" ? (
+          <div className="grid grid-cols-4 gap-2">
+            <SummaryCard
+              label="PENDING"
+              count={stats.user.PENDING}
+              className="bg-orange-50 text-orange-700 border-orange-100"
+              accent="bg-orange-500"
             />
-          </PopoverContent>
-        </Popover>
+            <SummaryCard
+              label="VERIFIED"
+              count={stats.user.VERIFIED}
+              className="bg-green-50 text-green-700 border-green-100"
+              accent="bg-green-500"
+            />
+            <SummaryCard
+              label="REJECTED"
+              count={stats.user.REJECTED}
+              className="bg-red-50 text-red-700 border-red-100"
+              accent="bg-red-500"
+            />
+            <SummaryCard
+              label="DUPLICATE"
+              count={stats.user.DUPLICATE}
+              className="bg-slate-50 text-slate-700 border-slate-100"
+              accent="bg-slate-500"
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <SummaryCard
+              label="ONGOING"
+              count={stats.responder.ONGOING}
+              className="bg-orange-50 text-orange-700 border-orange-100"
+              accent="bg-orange-500"
+            />
+            <SummaryCard
+              label="COMPLETED"
+              count={stats.responder.COMPLETED}
+              className="bg-emerald-50 text-emerald-700 border-emerald-100"
+              accent="bg-emerald-500"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-3 px-6 py-6 bg-slate-50/50">
-        <SummaryCard
-          label="NEW"
-          count={summary.new}
-          className="bg-blue-50 text-blue-700 border-blue-100"
-          accent="bg-blue-500"
-        />
-        <SummaryCard
-          label="ONGOING"
-          count={summary.ongoing}
-          className="bg-orange-50 text-orange-700 border-orange-100"
-          accent="bg-orange-500"
-        />
-        <SummaryCard
-          label="COMPLETED"
-          count={summary.completed}
-          className="bg-emerald-50 text-emerald-700 border-emerald-100"
-          accent="bg-emerald-500"
-        />
-        <SummaryCard
-          label="STANDBY"
-          count={summary.standby}
-          className="bg-amber-50 text-amber-700 border-amber-100"
-          accent="bg-amber-500"
-        />
-      </div>
-
-      {/* Filter Tabs */}
+      {/* Filter Tabs with descriptive label */}
       <div className="px-6 py-4 border-b border-slate-100">
+        <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2.5 block">
+          Incident Status Overview
+        </span>
         <Tabs value={filter} onValueChange={onFilterChange} className="w-full">
           <TabsList className="flex w-full bg-slate-100/80 p-1 rounded-xl h-11">
             <TabTrigger value="ALL">ALL</TabTrigger>
-            <TabTrigger value="NEW">NEW</TabTrigger>
-            <TabTrigger value="ONGOING">ONGOING</TabTrigger>
-            <TabTrigger value="COMPLETED">COMPLETED</TabTrigger>
-            <TabTrigger value="STANDBY">STANDBY</TabTrigger>
+            {category === "user" ? (
+              <>
+                <TabTrigger value="PENDING">PENDING</TabTrigger>
+                <TabTrigger value="VERIFIED">VERIFIED</TabTrigger>
+                <TabTrigger value="REJECTED">REJECTED</TabTrigger>
+              </>
+            ) : (
+              <>
+                <TabTrigger value="ONGOING">ONGOING</TabTrigger>
+                <TabTrigger value="COMPLETED">COMPLETED</TabTrigger>
+              </>
+            )}
           </TabsList>
         </Tabs>
       </div>
@@ -231,11 +334,15 @@ function IncidentCard({
     return <ShieldAlert size={14} className="text-slate-500" />;
   };
 
-  const statusColors: Record<IncidentStatus, string> = {
+  const statusColors: Record<string, string> = {
     NEW: "bg-blue-500",
     ONGOING: "bg-orange-500",
     COMPLETED: "bg-emerald-500",
     STANDBY: "bg-amber-500",
+    PENDING: "bg-orange-500",
+    VERIFIED: "bg-green-500",
+    REJECTED: "bg-red-500",
+    DUPLICATE: "bg-slate-500",
   };
 
   return (
@@ -249,19 +356,19 @@ function IncidentCard({
       onClick={onClick}
     >
       {/* Status Accent Line */}
-      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusColors[incident.status])} />
+      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusColors[incident.status] || "bg-slate-400")} />
 
       <div className="p-5 pl-6 flex-1">
         <div className="flex justify-between items-start mb-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
-                {incident.vehicleId || "STANDBY UNIT"}
+                {incident.category === "user" ? "Resident Request" : (incident.vehicleId && incident.vehicleId !== "NONE" ? incident.vehicleId : "Dispatched Ambulance")}
               </span>
               <div className="h-1 w-1 rounded-full bg-slate-200" />
               <div className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-50 rounded text-[9px] font-bold text-slate-500 border border-slate-100">
                 <Clock size={10} />
-                <span>2m ago</span>
+                <span>{incident.submittedTime || "Just now"}</span>
               </div>
             </div>
             <div className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -272,7 +379,7 @@ function IncidentCard({
           
           <div className={cn(
             "px-2 py-1 rounded-full text-[9px] font-black tracking-widest uppercase text-white shadow-sm",
-            statusColors[incident.status]
+            statusColors[incident.status] || "bg-slate-500"
           )}>
             {incident.status}
           </div>
@@ -298,8 +405,20 @@ function IncidentCard({
             </div>
             <div className="flex flex-col">
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter leading-none mb-0.5">Destination</span>
-              <span className="text-[11px] font-black text-slate-900 truncate max-w-[300px]">{incident.destination}, Baliwag City</span>
+              <span className="text-[11px] font-black text-slate-900 truncate max-w-[300px]">{incident.destination}</span>
             </div>
+          </div>
+        </div>
+
+        {/* Date Submitted and Last Updated Grid */}
+        <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-[10px] text-slate-500">
+          <div>
+            <span className="font-bold uppercase tracking-wider block text-[8px] text-slate-400">Date Submitted</span>
+            <span className="font-medium text-slate-700">{incident.submittedDate || "N/A"}</span>
+          </div>
+          <div>
+            <span className="font-bold uppercase tracking-wider block text-[8px] text-slate-400">Last Updated</span>
+            <span className="font-medium text-slate-700">{incident.lastUpdated || "N/A"}</span>
           </div>
         </div>
       </div>

@@ -14,8 +14,7 @@ import Step4 from '../../components/auth/Step4';
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const role = (params.role as string) || 'public_user';
+  const role = 'public_user';
   
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -24,12 +23,9 @@ export default function SignUpScreen() {
   const [isAutoConfirmed, setIsAutoConfirmed] = useState(false);
   const { data, reset, updateData } = useSignUpStore();
 
-  // Synchronize dynamic search param role into the Zustand store on mount
   useEffect(() => {
-    if (role) {
-      updateData({ role: role as any });
-    }
-  }, [role]);
+    updateData({ role: 'public_user' });
+  }, []);
 
   const handleRegister = async () => {
     setLoading(true);
@@ -172,15 +168,9 @@ export default function SignUpScreen() {
           
           <View className="flex-1 items-center justify-center mr-8 flex-row space-x-2">
             <Text className="font-bold text-lg text-white">Create Account</Text>
-            <View className={`px-2.5 py-0.5 rounded-full border ${
-              role === 'ambulance_responder' 
-                ? 'bg-red-500/20 border-red-500/30' 
-                : 'bg-blue-500/20 border-blue-500/30'
-            }`}>
-              <Text className={`text-[10px] font-black tracking-widest uppercase ${
-                role === 'ambulance_responder' ? 'text-red-400' : 'text-blue-400'
-              }`}>
-                {role === 'ambulance_responder' ? 'Responder' : 'Resident'}
+            <View className="px-2.5 py-0.5 rounded-full border bg-blue-500/20 border-blue-500/30">
+              <Text className="text-[10px] font-black tracking-widest uppercase text-blue-400">
+                Resident
               </Text>
             </View>
           </View>

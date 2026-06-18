@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Responder } from "@/types/dashboard";
@@ -23,7 +22,6 @@ const item = {
 };
 
 export function ResponderStatus({ responders = [] }: { responders?: Responder[] }) {
-  const router = useRouter();
   const [constraints, setConstraints] = React.useState({ left: 0, right: 0 });
   const containerRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -61,13 +59,6 @@ export function ResponderStatus({ responders = [] }: { responders?: Responder[] 
       window.removeEventListener("resize", updateConstraints);
     };
   }, [responders, x]);
-
-  const handleResponderClick = (e: React.MouseEvent) => {
-    // If they were dragging/swiping, don't trigger click navigation
-    // (A simple gesture distance threshold check is good, but in standard Framer Motion,
-    // if a drag occurred, the click event behaves normally or we can just proceed with redirect)
-    router.push('/logs');
-  };
 
   const canDrag = constraints.left < 0;
 
@@ -112,8 +103,7 @@ export function ResponderStatus({ responders = [] }: { responders?: Responder[] 
                   key={responder.id}
                   variants={item}
                   whileHover={{ scale: 1.02, translateY: -2 }}
-                  onClick={handleResponderClick}
-                  className="flex flex-col items-center justify-center p-4 rounded-3xl border border-[#F1F5F9] w-[160px] md:w-[180px] shrink-0 bg-white shadow-sm select-none h-full cursor-pointer hover:bg-[#F8FAFC] transition-all duration-200"
+                  className="flex flex-col items-center justify-center p-4 rounded-3xl border border-[#F1F5F9] w-[160px] md:w-[180px] shrink-0 bg-white shadow-sm select-none h-full"
                 >
                   <Avatar className="size-16 mb-4 ring-4 ring-[#F1F5F9] ring-offset-2 pointer-events-none">
                     <AvatarFallback className="bg-[#15286A] text-white text-2xl font-bold">

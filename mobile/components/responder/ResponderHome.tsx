@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, Platform, StatusBar, TouchableOpacity } from 'react-native';
+import { View, Text, Platform, StatusBar, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Play, Pause } from 'lucide-react-native';
@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
 import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
+import * as Notifications from 'expo-notifications';
 
 // Helper to calculate distance in meters
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -42,6 +43,48 @@ export function ResponderHome() {
   const { status, activeDispatch, targetHospital, setTargetHospital } = useResponderStore();
   const { profile, user, role } = useAuthStatus();
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Configure notifications permissions and foreground notification behavior
+  useEffect(() => {
+    async function configureNotifications() {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        console.warn('[Notifications] Permission to send local alerts was not granted.');
+        return;
+      }
+
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldVibrate: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+          shouldSetBadge: false,
+        } as any),
+      });
+
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('emergency-alerts', {
+          name: 'Emergency Alerts',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250, 250, 250],
+          lightColor: '#EF4444',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+        });
+      }
+    }
+
+    configureNotifications();
+  }, []);
 
   // Fetch and subscribe to unread notification count
   useEffect(() => {
@@ -415,6 +458,20 @@ export function ResponderHome() {
                 attachmentUrl,
               }
             });
+
+            // Trigger emergency local notification alert immediately
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: '🚨 EMERGENCY DISPATCH OFFER',
+                body: `New emergency request: ${typeOfEmergency} at ${locationName}. You have 30s to accept.`,
+                sound: true,
+                priority: Notifications.AndroidNotificationPriority.MAX,
+                android: {
+                  channelId: 'emergency-alerts',
+                },
+              } as any,
+              trigger: null,
+            });
           } else if (inc && inc.responder_id === user.id && inc.status === 'EN_ROUTE') {
             console.log('[ResponderHome] Responder has been manually dispatched! Auto-accepting and transitioning directly to EN_ROUTE.');
             
@@ -485,6 +542,20 @@ export function ResponderHome() {
                 assignedAmbulance: inc.assigned_ambulance || myVehicleId,
                 attachmentUrl,
               }
+            });
+
+            // Trigger emergency local notification alert immediately
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: '🚨 DIRECT EMERGENCY DISPATCH',
+                body: `You have been dispatched to: ${typeOfEmergency} at ${locationName}. Proceed immediately!`,
+                sound: true,
+                priority: Notifications.AndroidNotificationPriority.MAX,
+                android: {
+                  channelId: 'emergency-alerts',
+                },
+              } as any,
+              trigger: null,
             });
           }
         }
@@ -568,7 +639,7 @@ export function ResponderHome() {
             const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
             // Geofence coordinate locking for developer testing convenience
-            if (isDevMode && (lat < 14.90 || lat > 15.00 || lng < 120.80 || lng > 121.00)) {
+            if (isDevMode && (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00)) {
               if (status === 'on_scene' && activeDispatch?.coordinates) {
                 lat = activeDispatch.coordinates.latitude;
                 lng = activeDispatch.coordinates.longitude;
@@ -700,7 +771,7 @@ export function ResponderHome() {
       {/* Map Layer */}
       <Map
         style={{ flex: 1 }}
-        mapStyle="https://tiles.openfreemap.org/styles/dark"
+        mapStyle="https://tiles.openfreemap.org/styles/liberty"
         logo={false}
         attribution={false}
         onPress={() => {
@@ -758,21 +829,27 @@ export function ResponderHome() {
             {/* Pulsing Aura */}
             <View className="absolute w-14 h-14 rounded-full bg-blue-500/20" />
             
-            {/* Floating Vehicle Pill Identifier */}
-            <View className="flex-row items-center bg-white py-1 px-2.5 rounded-full border border-blue-200 shadow-lg">
-              <View className="w-6 h-6 rounded-full items-center justify-center bg-blue-600">
-                <Truck color="white" size={11} fill="white" />
-              </View>
-              <Text className="ml-1.5 text-[9px] font-extrabold text-blue-900 uppercase tracking-wider">
-                {activeDispatch?.assignedAmbulance || myVehicleId}
-              </Text>
+            {/* Simple Vehicle Icon */}
+            <View className="w-9 h-9 rounded-full items-center justify-center bg-blue-600 border-2 border-white shadow-lg">
+              <Truck color="white" size={16} fill="white" />
             </View>
           </View>
         </Marker>
 
         {/* Destination Marker */}
         {activeDispatch && status !== 'to_hospital' && (
-          <Marker id="incidentLocation" lngLat={[activeDispatch.coordinates.longitude, activeDispatch.coordinates.latitude]}>
+          <Marker 
+            id="incidentLocation" 
+            lngLat={[activeDispatch.coordinates.longitude, activeDispatch.coordinates.latitude]}
+            onPress={() => {
+              isMarkerPress.current = true;
+              Alert.alert(
+                "Incident & Reporter Details",
+                `Incident: ${activeDispatch.type}\nReporter: ${activeDispatch.reporterName}\nLocation: ${activeDispatch.locationName}\nNature: ${activeDispatch.natureOfCall}\nPeople Involved: ${activeDispatch.peopleInvolved}`,
+                [{ text: "Close", onPress: () => { isMarkerPress.current = false; } }]
+              );
+            }}
+          >
             <View className="items-center justify-center relative">
               {status === 'en_route' && (
                 <View className="absolute w-16 h-16 rounded-full border border-red-500/50 bg-red-500/10 border-dashed animate-pulse" />
@@ -860,7 +937,10 @@ export function ResponderHome() {
           </View>
           
           <View className="flex-row space-x-2">
-            <TouchableOpacity className="w-10 h-10 rounded-full bg-blue-900/40 items-center justify-center backdrop-blur-md border border-blue-800/50">
+            <TouchableOpacity 
+              className="w-10 h-10 rounded-full bg-blue-900/40 items-center justify-center backdrop-blur-md border border-blue-800/50"
+              onPress={() => router.push('/support')}
+            >
               <HelpCircle size={20} color="white" />
             </TouchableOpacity>
             <TouchableOpacity 
@@ -944,8 +1024,8 @@ export function ResponderHome() {
                   <View className="w-14 h-14 rounded-full border border-white/30 items-center justify-center bg-blue-900/80 backdrop-blur-md">
                     <Text className="text-white font-black text-xl">{initials}</Text>
                   </View>
-                  <View className="absolute top-0 right-0 bg-white rounded-full p-0.5 shadow-sm">
-                    <Check size={10} color="#1E3A8A" strokeWidth={4} />
+                  <View className="absolute top-0 right-0 bg-emerald-500 rounded-full p-1 shadow-md border border-white">
+                    <Check size={8} color="white" strokeWidth={5} />
                   </View>
                 </View>
                 <View className="ml-3 flex-1">

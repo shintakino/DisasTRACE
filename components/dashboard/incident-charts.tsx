@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { IncidentTrend, IncidentDistribution as IncidentDistributionType } from "@/types/dashboard"
+import { ShieldCheck, BarChart2 } from "lucide-react"
 
 // Unified color configuration with PRECISE hex codes provided by the user
 const chartConfig = {
@@ -59,6 +60,11 @@ export function IncidentTrends({
   filter?: string;
   onFilterChange?: (filter: string) => void;
 }) {
+  const totalIncidents = data.reduce((sum, item) => {
+    return sum + (item.vehicular || 0) + (item.medical || 0) + (item.structural || 0) + (item.fire || 0) + (item.water || 0) + (item.unknown || 0);
+  }, 0);
+  const isEmpty = totalIncidents === 0;
+
   return (
     <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
@@ -75,7 +81,16 @@ export function IncidentTrends({
           </SelectContent>
         </Select>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 p-6 pt-0">
+      <CardContent className="flex-1 min-h-0 p-6 pt-0 flex flex-col justify-center">
+        {isEmpty ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-12 h-12 rounded-full bg-[#F1F5F9] flex items-center justify-center mb-4">
+              <BarChart2 className="w-6 h-6 text-[#94A3B8]" />
+            </div>
+            <p className="text-[#64748B] text-sm font-bold">No incident logs recorded</p>
+            <p className="text-[#94A3B8] text-xs mt-1">No requests have been verified or logged during this period.</p>
+          </div>
+        ) : (
         <ChartContainer config={chartConfig} className="h-full w-full min-h-[220px]">
           <BarChart accessibilityLayer data={data} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -155,6 +170,7 @@ export function IncidentTrends({
             />
           </BarChart>
         </ChartContainer>
+        )}
       </CardContent>
     </Card>
   )
@@ -169,6 +185,9 @@ export function IncidentDistribution({
   filter?: string,
   onFilterChange?: (value: string) => void
 }) {
+  const totalValue = data.reduce((sum, item) => sum + (item.value || 0), 0);
+  const isEmpty = totalValue === 0;
+
   return (
     <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
@@ -206,6 +225,15 @@ export function IncidentDistribution({
           })}
         </div>
         <div className="relative w-full sm:w-[60%] flex justify-center items-center h-full min-h-0">
+        {isEmpty ? (
+          <div className="flex flex-col items-center justify-center text-center p-4">
+            <div className="w-16 h-16 rounded-full bg-[#ECFDF5] flex items-center justify-center mb-4 border border-[#A7F3D0] animate-pulse">
+              <ShieldCheck className="w-8 h-8 text-[#059669]" />
+            </div>
+            <p className="text-[#065F46] text-sm font-bold">0 Incidents Reported</p>
+            <p className="text-[#047857] text-[11px] font-medium mt-1">Area is secure. Center is standing by.</p>
+          </div>
+        ) : (
           <ChartContainer config={chartConfig} className="aspect-square w-full max-h-[280px]">
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent hideLabel />} />
@@ -257,6 +285,7 @@ export function IncidentDistribution({
               </Pie>
             </PieChart>
           </ChartContainer>
+          )}
         </div>
       </CardContent>
     </Card>

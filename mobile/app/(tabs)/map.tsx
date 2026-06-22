@@ -101,9 +101,10 @@ export default function MapScreen() {
   const address = profile?.address || 'Baliwag City, Bulacan';
 
   return (
-    <View className="flex-1 bg-[#16203A]">
+    <View className="flex-1 bg-slate-50">
+      <StatusBar barStyle="dark-content" />
       <View className="absolute top-0 w-full z-10 px-6" style={{ paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 20 : 60 }} pointerEvents="none">
-        <Text className="text-3xl font-bold text-white shadow-sm">Incident Map</Text>
+        <Text className="text-3xl font-black text-slate-900 tracking-tight shadow-sm">Incident Map</Text>
       </View>
 
       <Map
@@ -164,9 +165,9 @@ export default function MapScreen() {
         </Marker>
       </Map>
 
-      <View className="absolute bottom-28 w-full px-6">
-        <View className="bg-white rounded-3xl p-6 shadow-xl flex-row items-center">
-          <View className="w-12 border-t-2 border-slate-200 absolute top-3 left-1/2 -translate-x-6" />
+      <View className="absolute bottom-28 w-full px-4">
+        <View className="bg-white/95 backdrop-blur-xl rounded-[32px] p-6 shadow-2xl border border-slate-200/50 flex-row items-center">
+          <View className="w-12 border-t-[3px] border-slate-200 absolute top-3 left-1/2 -translate-x-6 rounded-full" />
           
           {selectedHospital ? (
             <React.Fragment>

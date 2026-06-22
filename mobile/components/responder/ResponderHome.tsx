@@ -764,9 +764,9 @@ export function ResponderHome() {
   };
 
   return (
-    <View className="flex-1 bg-[#16203A]">
+    <View className="flex-1 bg-slate-50">
       <OfflineBanner />
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Map Layer */}
       <Map
@@ -925,32 +925,32 @@ export function ResponderHome() {
       <View className="absolute top-0 w-full" style={{ paddingTop: (StatusBar.currentHeight || 24) + 12 }} pointerEvents="box-none">
         
         {/* Top Header */}
-        <View className="px-6 flex-row justify-between items-start pointer-events-auto">
-          <View className="flex-row items-center bg-blue-900/40 p-2 pl-1 pr-4 rounded-full backdrop-blur-md border border-blue-800/50">
-            <View className="w-8 h-8 rounded-full bg-white items-center justify-center mr-2 shadow-sm">
-              <MapPin size={16} color="#1E3A8A" fill="#1E3A8A" />
+        <View className="px-4 flex-row justify-between items-start pointer-events-auto">
+          <View className="flex-row items-center bg-white/95 p-2 pl-2 pr-4 rounded-full backdrop-blur-xl border border-slate-200/80 shadow-sm">
+            <View className="w-8 h-8 rounded-full bg-blue-50 items-center justify-center mr-2">
+              <MapPin size={16} color="#1E3A8A" fill="#DBEAFE" />
             </View>
             <View>
-              <Text className="text-white/80 text-[10px] uppercase font-semibold">Your Location</Text>
-              <Text className="text-white text-sm font-bold">Baliwag City</Text>
+              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Your Location</Text>
+              <Text className="text-slate-900 text-sm font-black tracking-tight">Baliwag City</Text>
             </View>
           </View>
           
           <View className="flex-row space-x-2">
             <TouchableOpacity 
-              className="w-10 h-10 rounded-full bg-blue-900/40 items-center justify-center backdrop-blur-md border border-blue-800/50"
+              className="w-12 h-12 rounded-full bg-white/95 items-center justify-center backdrop-blur-xl border border-slate-200/80 shadow-sm"
               onPress={() => router.push('/support')}
             >
-              <HelpCircle size={20} color="white" />
+              <HelpCircle size={22} color="#64748B" />
             </TouchableOpacity>
             <TouchableOpacity 
-              className="w-10 h-10 rounded-full bg-blue-900/40 items-center justify-center backdrop-blur-md border border-blue-800/50 relative"
+              className="w-12 h-12 rounded-full bg-white/95 items-center justify-center backdrop-blur-xl border border-slate-200/80 shadow-sm relative"
               onPress={() => router.push('/notifications')}
             >
-              <Bell size={20} color="white" />
+              <Bell size={22} color="#64748B" />
               {unreadCount > 0 && (
-                <View className="absolute top-1 right-1 flex h-[16px] w-[16px] min-w-[16px] items-center justify-center rounded-full bg-red-500 border border-white">
-                  <Text className="text-white text-[7px] font-black px-0.5 text-center leading-none">
+                <View className="absolute top-1.5 right-1.5 flex h-[18px] w-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 border-2 border-white">
+                  <Text className="text-white text-[8px] font-black px-0.5 text-center leading-none">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </Text>
                 </View>
@@ -1016,69 +1016,66 @@ export function ResponderHome() {
         )}
 
         {/* Profile Card / Dispatch Badge */}
-        <View className="px-6 mt-6 pointer-events-auto">
+        <View className="px-4 mt-4 pointer-events-auto">
           {status === 'idle' && (
-            <View className="flex-row items-center justify-between bg-transparent">
+            <View className="flex-row items-center justify-between bg-white/95 backdrop-blur-xl rounded-3xl p-4 shadow-xl border border-slate-200/50">
               <View className="flex-row items-center flex-1 mr-3">
                 <View className="relative">
-                  <View className="w-14 h-14 rounded-full border border-white/30 items-center justify-center bg-blue-900/80 backdrop-blur-md">
-                    <Text className="text-white font-black text-xl">{initials}</Text>
+                  <View className="w-12 h-12 rounded-full items-center justify-center bg-[#1E3A8A] shadow-sm">
+                    <Text className="text-white font-black text-lg">{initials}</Text>
                   </View>
-                  <View className="absolute top-0 right-0 bg-emerald-500 rounded-full p-1 shadow-md border border-white">
+                  <View className="absolute top-0 right-0 bg-emerald-500 rounded-full p-1 shadow-md border-2 border-white">
                     <Check size={8} color="white" strokeWidth={5} />
                   </View>
                 </View>
                 <View className="ml-3 flex-1">
-                  <Text className="text-white text-lg font-bold shadow-sm" numberOfLines={1}>{name}</Text>
-                  <Text className="text-white/70 text-xs font-medium tracking-wider">EMP-2026-0012</Text>
+                  <Text className="text-slate-900 text-lg font-black tracking-tight" numberOfLines={1}>{name}</Text>
+                  <Text className="text-slate-500 text-[11px] font-bold tracking-widest uppercase mt-0.5">EMP-2026-0012</Text>
                 </View>
               </View>
               <View className={`px-3 py-1.5 rounded-full border flex-row items-center shadow-sm shrink-0 ${
                 profile?.dutyStatus === 'ON_DUTY'
-                  ? "bg-green-500/20 border-green-400/40"
+                  ? "bg-green-50 border-green-200"
                   : profile?.dutyStatus === 'ACTIVE_DISPATCH'
-                    ? "bg-red-500/20 border-red-400/40"
-                    : "bg-slate-500/20 border-slate-400/40"
+                    ? "bg-red-50 border-red-200"
+                    : "bg-slate-50 border-slate-200"
               }`}>
                 <View className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
                   profile?.dutyStatus === 'ON_DUTY'
-                    ? "bg-green-400"
+                    ? "bg-green-500"
                     : profile?.dutyStatus === 'ACTIVE_DISPATCH'
-                      ? "bg-red-400"
-                      : "bg-slate-400"
+                      ? "bg-red-500"
+                      : "bg-slate-500"
                 }`} />
-                <Text className={`text-[10px] font-black uppercase tracking-widest ${
+                <Text className={`text-[9px] font-black uppercase tracking-widest ${
                   profile?.dutyStatus === 'ON_DUTY'
-                    ? "text-green-400"
+                    ? "text-green-600"
                     : profile?.dutyStatus === 'ACTIVE_DISPATCH'
-                      ? "text-red-400"
-                      : "text-slate-400"
+                      ? "text-red-600"
+                      : "text-slate-600"
                 }`}>
                   {profile?.dutyStatus === 'ACTIVE_DISPATCH'
                     ? "Active Dispatch"
                     : profile?.dutyStatus === 'ON_DUTY'
-                      ? "On Duty (Standby)"
+                      ? "On Duty"
                       : "Off Duty"}
                 </Text>
               </View>
             </View>
           )}
 
-          {/* DEV ONLY: Manual dispatch trigger */}
-
-
           {status !== 'idle' && activeDispatch && (
-            <View className="flex-row items-center justify-between bg-transparent">
+            <View className="flex-row items-center justify-between bg-white/95 backdrop-blur-xl rounded-3xl p-4 shadow-xl border border-slate-200/50">
               <View>
                 <View className="flex-row items-center">
-                  <Text className="text-white text-2xl font-black shadow-sm tracking-tight">{myVehicleId}</Text>
-                  <View className="ml-3 bg-white px-3 py-1 rounded-full shadow-sm">
+                  <Text className="text-slate-900 text-2xl font-black tracking-tight">{myVehicleId}</Text>
+                  <View className="ml-3 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 shadow-sm">
                     <Text className="text-[#1E3A8A] text-[10px] font-black tracking-widest uppercase">
                       {status === 'en_route' ? 'Dispatched' : status === 'dispatch_offered' ? 'Incoming' : status === 'to_hospital' ? 'To Hospital' : 'On Scene'}
                     </Text>
                   </View>
                 </View>
-                <Text className="text-white/80 text-xs font-medium tracking-wider mt-1">{activeDispatch.id}</Text>
+                <Text className="text-slate-500 text-xs font-bold tracking-wider mt-1">{activeDispatch.id}</Text>
               </View>
             </View>
           )}

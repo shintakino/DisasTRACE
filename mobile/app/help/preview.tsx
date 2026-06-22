@@ -58,7 +58,7 @@ export default function PreviewScreen() {
 
   return (
     <View style={styles.container}>
-      <Image source={{ uri: photoUri }} style={styles.fullImage} resizeMode="cover" />
+      <Image source={{ uri: photoUri }} style={styles.fullImage} resizeMode="contain" />
       
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.cancelBtn} onPress={handleRetake} activeOpacity={0.7}>

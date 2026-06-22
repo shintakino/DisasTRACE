@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   HelpCircle,
   Megaphone,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react"
 
@@ -66,6 +67,11 @@ export const CDRRMO_NAV: NavItem[] = [
     icon: ClipboardList,
   },
   {
+    title: "Support Messages",
+    url: "/messages",
+    icon: MessageSquare,
+  },
+  {
     title: "Support & FAQs",
     url: "/help",
     icon: HelpCircle,
@@ -94,6 +100,11 @@ export const PACC_NAV: NavItem[] = [
     icon: ShieldCheck,
   },
   {
+    title: "Support Messages",
+    url: "/messages",
+    icon: MessageSquare,
+  },
+  {
     title: "Support & FAQs",
     url: "/help",
     icon: HelpCircle,
@@ -106,3 +117,4 @@ export const getNavItems = (role: UserRole | string | undefined): NavItem[] => {
   if (role === 'pacc_admin') return PACC_NAV
   return CDRRMO_NAV
 }
+

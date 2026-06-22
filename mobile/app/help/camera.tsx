@@ -5,6 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { ChevronLeft, Zap, ZapOff, RefreshCw, Sun, Camera as CameraIcon } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
 
 export default function CameraScreen() {
@@ -43,13 +44,45 @@ export default function CameraScreen() {
       setIsCapturing(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       try {
+        const currentOrientation = await ScreenOrientation.getOrientationAsync();
+        
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.7,
+          quality: 0.8,
           base64: false,
           exif: true,
         });
+        
         if (photo) {
-          setPhotoUri(photo.uri);
+          let actions: ImageManipulator.Action[] = [];
+          
+          // Force rotation based on the physical screen orientation if the hardware captured it as portrait
+          const isPortraitCapture = photo.width < photo.height;
+          
+          if (isPortraitCapture) {
+            if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT) {
+              actions = [{ rotate: 90 }];
+            } else if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT) {
+              actions = [{ rotate: -90 }];
+            } else if (currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
+              actions = [{ rotate: 180 }];
+            }
+          }
+
+          // If EXIF says it needs rotation (and we haven't manually overridden it), apply EXIF
+          if (actions.length === 0 && photo.exif && photo.exif.Orientation) {
+            const exifOrientation = photo.exif.Orientation;
+            if (exifOrientation === 6) actions = [{ rotate: 90 }];
+            else if (exifOrientation === 3) actions = [{ rotate: 180 }];
+            else if (exifOrientation === 8) actions = [{ rotate: 270 }];
+          }
+
+          const manipResult = await ImageManipulator.manipulateAsync(
+            photo.uri,
+            actions,
+            { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          
+          setPhotoUri(manipResult.uri);
           router.push('/help/preview');
         }
       } catch (e) {

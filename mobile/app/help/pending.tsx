@@ -336,11 +336,17 @@ export default function PendingScreen() {
           onPress: async () => {
             try {
               if (report.id) {
-                // Cancel the verification request
-                await supabase
-                  .from('verification_requests')
-                  .update({ status: 'CANCELLED' })
-                  .eq('id', report.id);
+                const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                await fetch(`${apiUrl}/verification/cancel`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session?.access_token}`
+                  },
+                  body: JSON.stringify({ id: report.id })
+                });
               }
             } catch (err) {
               console.error('[PendingScreen] Failed to cancel report:', err);

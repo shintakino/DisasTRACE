@@ -40,24 +40,48 @@ export default function ContactUsScreen() {
       return;
     }
 
-    setSubmitting(false);
     setSubmitting(true);
     
     try {
-      // Simulate submission delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const reqHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (session?.access_token) {
+        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch(`${apiUrl}/api/support/messages`, {
+        method: 'POST',
+        headers: reqHeaders,
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          subject: subject.trim(),
+          message: message.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message.');
+      }
       
       Alert.alert(
         'Feedback Sent',
         'Thank you! Your message has been sent to CDRRMO Baliwag. We will review your feedback and get back to you if needed.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('[ContactUs] Submit error:', err);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      Alert.alert('Error', err.message || 'Failed to send message. Please try again.');
     } finally {
       setSubmitting(false);
     }
+
   };
 
   return (

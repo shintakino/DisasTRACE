@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Platform, StatusBar, TouchableOpacity } from 'react-native';
+import { View, Text, Platform, StatusBar, TouchableOpacity, Image } from 'react-native';
 import { Map, Camera, Marker } from '@maplibre/maplibre-react-native';
 import { MapPin } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
@@ -165,77 +165,89 @@ export default function MapScreen() {
         </Marker>
       </Map>
 
-      <View className="absolute bottom-28 w-full px-4">
-        <View className="bg-white/95 backdrop-blur-xl rounded-[32px] p-6 shadow-2xl border border-slate-200/50 flex-row items-center">
-          <View className="w-12 border-t-[3px] border-slate-200 absolute top-3 left-1/2 -translate-x-6 rounded-full" />
+      <View className="absolute bottom-0 w-full">
+        <View className="bg-white rounded-t-[32px] pt-4 pb-24 px-6 shadow-2xl shadow-indigo-900/20 border border-slate-100 flex-col">
+          {/* Handle bar for bottom sheet aesthetic */}
+          <View className="w-12 h-1 bg-slate-200 rounded-full self-center mb-5" />
           
-          {selectedHospital ? (
-            <React.Fragment>
-              <View className="w-16 h-16 bg-blue-50 rounded-2xl items-center justify-center mr-4">
-                <Hospital size={32} color="#1E3A8A" variant="Bold" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-lg font-bold text-[#1E3A8A] mb-1">{selectedHospital.name}</Text>
-                <Text className="text-sm font-medium text-[#1E3A8A]">{selectedHospital.address} · {selectedHospital.phone}</Text>
-              </View>
-            </React.Fragment>
-          ) : activeDispatch ? (
-            <React.Fragment>
-              <View className="w-16 h-16 bg-[#EF4444] rounded-full items-center justify-center mr-4 relative">
-                <Text className="text-white text-xl font-black">{activeDispatch.reporterInitials || 'R'}</Text>
-                <View className="absolute top-0 right-0 w-5 h-5 bg-white rounded-full items-center justify-center">
-                  <View className="w-3.5 h-3.5 bg-[#EF4444] rounded-full" />
+          <View className="flex-row items-center">
+            {selectedHospital ? (
+              <React.Fragment>
+                <View className="w-16 h-16 bg-blue-50 rounded-full items-center justify-center mr-4 border-2 border-white shadow-sm">
+                  <Hospital size={30} color="#312e81" variant="Bold" />
                 </View>
-              </View>
-              <View className="flex-1 pt-1">
-                <Text className="text-lg font-bold text-[#EF4444]">{activeDispatch.type}</Text>
-                <Text className="text-sm font-medium text-slate-700 mt-1" numberOfLines={1}>{activeDispatch.locationName}</Text>
-                <Text className="text-xs font-bold text-slate-500 mt-1">Active Incident: {activeDispatch.id}</Text>
-              </View>
-            </React.Fragment>
-          ) : (
-            <React.Fragment>
-              <View className="w-16 h-16 bg-[#1E3A8A] rounded-full items-center justify-center mr-4 relative">
-                <Text className="text-white text-xl font-bold">{initials}</Text>
-                <View className="absolute top-0 right-0 w-5 h-5 bg-white rounded-full items-center justify-center">
-                  <View className={`w-3.5 h-3.5 rounded-full ${
-                    role === 'ambulance_responder'
-                      ? (profile?.dutyStatus === 'ON_DUTY'
-                        ? 'bg-green-500'
+                <View className="flex-1">
+                  <Text className="text-lg font-black text-[#312e81] mb-0.5">{selectedHospital.name}</Text>
+                  <Text className="text-sm font-medium text-[#4338ca] opacity-90">{selectedHospital.address}</Text>
+                  <Text className="text-xs font-medium text-[#4f46e5] opacity-80 mt-0.5">{selectedHospital.phone}</Text>
+                </View>
+              </React.Fragment>
+            ) : activeDispatch ? (
+              <React.Fragment>
+                <View className="w-16 h-16 bg-[#ef4444] rounded-full items-center justify-center mr-4 border-2 border-white shadow-sm relative">
+                  <Text className="text-white text-2xl font-black">{activeDispatch.reporterInitials || 'R'}</Text>
+                  <View className="absolute bottom-0 right-0 w-4 h-4 bg-white rounded-full items-center justify-center shadow-sm">
+                    <View className="w-2.5 h-2.5 bg-[#ef4444] rounded-full" />
+                  </View>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-lg font-black text-[#7f1d1d]">{activeDispatch.type}</Text>
+                  <Text className="text-sm font-medium text-[#991b1b] opacity-90 mt-0.5" numberOfLines={1}>{activeDispatch.locationName}</Text>
+                  <Text className="text-xs font-bold text-[#b91c1c] opacity-80 mt-0.5">Active Incident: {activeDispatch.id}</Text>
+                </View>
+              </React.Fragment>
+            ) : (
+              <React.Fragment>
+                <View className="w-16 h-16 bg-[#312e81] rounded-full items-center justify-center mr-4 border-2 border-white shadow-sm relative">
+                  {user?.user_metadata?.avatar_url ? (
+                    <Image 
+                      source={{ uri: user.user_metadata.avatar_url }} 
+                      style={{ width: '100%', height: '100%', borderRadius: 32 }} 
+                    />
+                  ) : (
+                    <Text className="text-white text-2xl font-black">{initials}</Text>
+                  )}
+                  <View className="absolute bottom-0 right-0 w-4 h-4 bg-white rounded-full items-center justify-center shadow-sm">
+                    <View className={`w-2.5 h-2.5 rounded-full ${
+                      role === 'ambulance_responder'
+                        ? (profile?.dutyStatus === 'ON_DUTY'
+                          ? 'bg-emerald-500'
+                          : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                            ? 'bg-red-500'
+                            : 'bg-slate-400')
+                        : 'bg-emerald-500'
+                    }`} />
+                  </View>
+                </View>
+                <View className="flex-1 justify-center">
+                  <Text className="text-[17px] font-bold text-[#2e1065]">{displayName}</Text>
+                  <Text className="text-[15px] font-medium text-[#4c1d95] mt-0.5" numberOfLines={1}>{address}</Text>
+                  {role === 'ambulance_responder' ? (
+                    <Text className={`text-[13px] font-bold mt-0.5 ${
+                      profile?.dutyStatus === 'ON_DUTY'
+                        ? 'text-emerald-600'
                         : profile?.dutyStatus === 'ACTIVE_DISPATCH'
-                          ? 'bg-red-500'
-                          : 'bg-slate-400')
-                      : 'bg-green-500'
-                  }`} />
-                </View>
-              </View>
-              <View className="flex-1 pt-1">
-                <Text className="text-lg font-bold text-[#1E3A8A]">{displayName}</Text>
-                <Text className="text-sm font-medium text-slate-500 mt-1" numberOfLines={1}>{address}</Text>
-                {role === 'ambulance_responder' ? (
-                  <Text className={`text-xs font-bold mt-1 ${
-                    profile?.dutyStatus === 'ON_DUTY'
-                      ? 'text-green-600'
-                      : profile?.dutyStatus === 'ACTIVE_DISPATCH'
-                        ? 'text-red-600'
-                        : 'text-slate-500'
-                  }`}>
-                    Responder Status: {
-                      profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                          ? 'text-red-600'
+                          : 'text-slate-500'
+                    }`}>
+                      {profile?.dutyStatus === 'ACTIVE_DISPATCH'
                         ? 'Active Dispatch'
                         : profile?.dutyStatus === 'ON_DUTY'
                           ? 'On Duty (Standby)'
-                          : 'Off Duty'
-                    }
-                  </Text>
-                ) : (
-                  <Text className="text-xs font-bold mt-1 text-green-600">
-                    Verification: Approved
-                  </Text>
-                )}
-              </View>
-            </React.Fragment>
-          )}
+                          : 'Off Duty'}
+                    </Text>
+                  ) : (
+                    <Text className="text-[13px] font-medium text-[#5b21b6] opacity-80 mt-0.5">
+                      Since Sun 6:41pm
+                    </Text>
+                  )}
+                </View>
+              </React.Fragment>
+            )}
+          </View>
+          
+          {/* Subtle divider below profile section as seen in reference */}
+          <View className="w-full h-[1px] bg-slate-100 mt-6" />
         </View>
       </View>
     </View>

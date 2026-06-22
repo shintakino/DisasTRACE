@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { CameraView, useCameraPermissions, FlashMode } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { ChevronLeft, Zap, ZapOff, RefreshCw, Sun, Camera as CameraIcon } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +14,15 @@ export default function CameraScreen() {
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [isCapturing, setIsCapturing] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+  
+  useFocusEffect(
+    React.useCallback(() => {
+      ScreenOrientation.unlockAsync();
+      return () => {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      };
+    }, [])
+  );
   
   const setPhotoUri = useEmergencyReportStore(state => state.setPhotoUri);
 
@@ -36,6 +46,7 @@ export default function CameraScreen() {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.7,
           base64: false,
+          exif: true,
         });
         if (photo) {
           setPhotoUri(photo.uri);

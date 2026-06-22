@@ -102,6 +102,7 @@ export function useAuthStatus() {
       if (session?.user) {
         checkVerification(session.user, session);
       } else {
+        setRole('public_user');
         setVerificationStatus('loading');
         setIsLoaded(true);
       }

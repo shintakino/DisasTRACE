@@ -293,6 +293,12 @@ export default function PendingScreen() {
   }, [isAccepted]);
 
   useEffect(() => {
+    // Check if we already have an incidentId or it's verified from a past session
+    if (report.incidentId || isAccepted) {
+      setIsTransmitting(false);
+      return;
+    }
+
     // Simulate Transmission
     const timer1 = setTimeout(() => {
       setTransmissionStatus('Transmitting coordinates to PACC Command Center...');
@@ -306,7 +312,7 @@ export default function PendingScreen() {
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, []);
+  }, [report.incidentId, isAccepted]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -327,7 +333,23 @@ export default function PendingScreen() {
         { 
           text: "Yes, Cancel", 
           style: "destructive", 
-          onPress: () => router.navigate('/(tabs)')
+          onPress: async () => {
+            try {
+              if (report.id) {
+                // Cancel the verification request
+                await supabase
+                  .from('verification_requests')
+                  .update({ status: 'CANCELLED' })
+                  .eq('id', report.id);
+              }
+            } catch (err) {
+              console.error('[PendingScreen] Failed to cancel report:', err);
+            } finally {
+              // Clean up and return to home
+              useEmergencyReportStore.getState().resetReport();
+              router.replace('/(tabs)');
+            }
+          }
         }
       ]
     );

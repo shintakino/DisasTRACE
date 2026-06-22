@@ -139,8 +139,12 @@ export default function NotificationsScreen() {
         // Redirection to profile settings
         router.replace('/(tabs)/profile');
       } else if (item.type === 'incident_resolved') {
-        // Redirection back to base screen
-        router.replace('/(tabs)');
+        // Redirection to the specific incident report if available, else fallback
+        if (item.metadata?.incidentId) {
+          router.replace(`/(tabs)/reports/${item.metadata.incidentId}`);
+        } else {
+          router.replace('/(tabs)/reports');
+        }
       } else if (item.type === 'report_audited') {
         // Redirection to reports list (under profile stats)
         router.replace('/(tabs)/profile');

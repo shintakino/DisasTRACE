@@ -74,13 +74,17 @@ export function useOfflineReports() {
                   
                   if (error) throw error;
                 } else {
-                  // Fire a standard REST request using fetch against the specified endpoint
                   const response = await fetch(`${apiUrl}${action.endpoint}`, {
                     method: action.method,
                     headers,
                     body: JSON.stringify(action.payload),
                   });
                   if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                      console.log(`[useOfflineReports] Dropping unauthorized state change action ${action.id}`);
+                      await dequeueAction(action.id);
+                      continue;
+                    }
                     throw new Error(`REST action returned status ${response.status}`);
                   }
                 }
@@ -92,6 +96,11 @@ export function useOfflineReports() {
                   body: JSON.stringify(action.payload),
                 });
                 if (!response.ok) {
+                  if (response.status === 401 || response.status === 403) {
+                    console.log(`[useOfflineReports] Dropping unauthorized telemetry action ${action.id}`);
+                    await dequeueAction(action.id);
+                    continue;
+                  }
                   throw new Error(`Telemetry sync returned status ${response.status}`);
                 }
               }

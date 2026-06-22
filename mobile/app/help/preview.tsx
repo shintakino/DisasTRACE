@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { X, Send } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 
@@ -8,6 +9,15 @@ export default function PreviewScreen() {
   const router = useRouter();
   const photoUri = useEmergencyReportStore((state) => state.report.photoUri);
   const [isUploading, setIsUploading] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      ScreenOrientation.unlockAsync();
+      return () => {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      };
+    }, [])
+  );
 
   const handleRetake = () => {
     // Clear just the photo URI and go back to camera

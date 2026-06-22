@@ -240,10 +240,10 @@ export default function DetailsScreen() {
         </View>
         
         <TouchableOpacity 
-          style={[styles.submitBtn, (!what || !where || !when || !how) && styles.submitBtnDisabled]} 
+          style={[styles.submitBtn, (!what || !where || !when || !how || showAnalyzing || showSubmitted) && styles.submitBtnDisabled]} 
           onPress={handleSubmit} 
           activeOpacity={0.8}
-          disabled={!what || !where || !when || !how}
+          disabled={!what || !where || !when || !how || showAnalyzing || showSubmitted}
         >
           <Text style={styles.submitBtnText}>Submit Report</Text>
         </TouchableOpacity>
@@ -252,7 +252,7 @@ export default function DetailsScreen() {
       </ScrollView>
 
       {/* Analyzing Modal */}
-      <Modal visible={showAnalyzing} transparent animationType="fade">
+      <Modal visible={showAnalyzing} transparent animationType="fade" onRequestClose={() => {}}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.analyzingIconBox}>
@@ -296,7 +296,7 @@ export default function DetailsScreen() {
       </Modal>
 
       {/* Submitted Modal */}
-      <Modal visible={showSubmitted} transparent animationType="fade">
+      <Modal visible={showSubmitted} transparent animationType="fade" onRequestClose={() => {}}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { padding: 32 }]}>
             <TouchableOpacity style={styles.closeModalBtn} onPress={handleFinish}>

@@ -79,8 +79,8 @@ export default function MyReportsScreen() {
 
   const filteredReports = reports.filter((r) => {
     if (activeTab === 'All') return true;
-    if (activeTab === 'Active') return r.status === 'ONGOING' || r.status === 'RESPONDING';
-    return r.status === 'COMPLETED';
+    if (activeTab === 'Active') return r.status === 'ONGOING' || r.status === 'RESPONDING' || r.status === 'PENDING' || r.status === 'VERIFIED';
+    return r.status === 'COMPLETED' || r.status === 'REJECTED' || r.status === 'DUPLICATE' || r.status === 'RESOLVED';
   });
 
   // Group reports for resident view

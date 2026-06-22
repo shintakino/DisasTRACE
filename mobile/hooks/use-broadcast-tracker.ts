@@ -89,6 +89,7 @@ export function useBroadcastTracker(
 
     // Start location updates on a 3-second fixed interval
     const intervalId = setInterval(async () => {
+      if (!active) return;
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') return;
@@ -218,6 +219,7 @@ export function useBroadcastTracker(
 
     // Call it once immediately for fast initial sync
     const initialSync = async () => {
+      if (!active) return;
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') return;

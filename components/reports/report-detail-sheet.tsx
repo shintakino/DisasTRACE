@@ -505,15 +505,22 @@ export function ReportDetailSheet({
                         </div>
 
                         {/* Handoff & Team */}
-                        <div>
-                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Handoff Details</h4>
-                          <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">PCR Accomplished By</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.accomplishedBy || "N/A"} (License: {pcr.handoffSignatures?.accomplishedByLicense || "N/A"})</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Hospital</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingHospital || "N/A"} (Arrival: {pcr.handoffSignatures?.arrivalTime || "N/A"})</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Physician</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingPhysician || "N/A"} (License: {pcr.handoffSignatures?.receivingPhysicianLicense || "N/A"})</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Referred To</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.referredTo || "N/A"} (License: {pcr.handoffSignatures?.referredToLicense || "N/A"})</span></div>
-                          </div>
-                        </div>
+                        {(() => {
+                          const isRefused = pcr.liabilityRelease?.refused === true;
+                          const isResolvedOnScene = !pcr.dispatchInfo?.hospitalArrTime || pcr.dispatchInfo?.hospitalArrTime === '';
+                          const defaultNa = isRefused ? "N/A (Refused Transport)" : (isResolvedOnScene ? "N/A (Resolved on Scene)" : "N/A");
+                          return (
+                            <div>
+                              <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Handoff Details</h4>
+                              <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
+                                <div className="flex justify-between"><span className="text-slate-500 font-medium">PCR Accomplished By</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.accomplishedBy || "N/A"} (License: {pcr.handoffSignatures?.accomplishedByLicense || "N/A"})</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Hospital</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingHospital || defaultNa} (Arrival: {pcr.handoffSignatures?.arrivalTime || defaultNa})</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Physician</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingPhysician || defaultNa} (License: {pcr.handoffSignatures?.receivingPhysicianLicense || defaultNa})</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500 font-medium">Referred To</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.referredTo || defaultNa} (License: {pcr.handoffSignatures?.referredToLicense || defaultNa})</span></div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Responding Team */}
                         {pcr.respondingTeam && (

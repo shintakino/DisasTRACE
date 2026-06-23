@@ -1117,11 +1117,38 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.setTextColor(75, 85, 99);
     doc.setFontSize(8.5);
 
+    const isRefused = lr.refused === true;
+    const isResolvedOnScene = !di.hospitalArrTime || di.hospitalArrTime === '';
+
+    const receivingHospitalText = hs.receivingHospital
+      ? hs.receivingHospital
+      : isRefused
+        ? "N/A (Refused Transport)"
+        : isResolvedOnScene
+          ? "N/A (Resolved on Scene)"
+          : "N/A";
+
+    const receivingPhysicianText = hs.receivingPhysician
+      ? hs.receivingPhysician
+      : isRefused
+        ? "N/A (Refused Transport)"
+        : isResolvedOnScene
+          ? "N/A (Resolved on Scene)"
+          : "N/A";
+
+    const arrivalTimeText = hs.arrivalTime
+      ? hs.arrivalTime
+      : isRefused
+        ? "N/A (Refused Transport)"
+        : isResolvedOnScene
+          ? "N/A (Resolved on Scene)"
+          : "N/A";
+
     // Row 1 (y=191)
     doc.setFont("helvetica", "bold").text("PCR Accomplished By:", 18, 191);
     doc.setFont("helvetica", "normal").text(hs.accomplishedBy || "Ambulance Team Leader", 55, 191);
     doc.setFont("helvetica", "bold").text("Receiving Physician:", 110, 191);
-    doc.setFont("helvetica", "normal").text(hs.receivingPhysician || "Dr. Attending / MD", 145, 191);
+    doc.setFont("helvetica", "normal").text(receivingPhysicianText, 145, 191);
 
     // Row 2 (y=197)
     doc.setFont("helvetica", "bold").text("Acc. License No:", 18, 197);
@@ -1131,9 +1158,9 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
 
     // Row 3 (y=203)
     doc.setFont("helvetica", "bold").text("Receiving Hospital:", 18, 203);
-    doc.setFont("helvetica", "normal").text(hs.receivingHospital || "BDH / District Hospital", 55, 203);
+    doc.setFont("helvetica", "normal").text(receivingHospitalText, 55, 203);
     doc.setFont("helvetica", "bold").text("Arrival Time:", 110, 203);
-    doc.setFont("helvetica", "normal").text(hs.arrivalTime || "N/A", 145, 203);
+    doc.setFont("helvetica", "normal").text(arrivalTimeText, 145, 203);
 
     // Row 4 (y=209)
     doc.setFont("helvetica", "bold").text("Referred To:", 18, 209);

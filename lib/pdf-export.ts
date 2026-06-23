@@ -834,7 +834,7 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     // Draw box for profile
     doc.setFillColor(249, 250, 251);
     doc.setDrawColor(203, 213, 225);
-    doc.rect(14, 35, pageWidth - 28, 48, "FD");
+    doc.rect(14, 35, pageWidth - 28, 52, "FD");
 
     doc.setTextColor(75, 85, 99);
     doc.setFont("helvetica", "normal");
@@ -850,6 +850,10 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.setFont("helvetica", "normal").text(di.sceneDprtTime || "N/A", 42, 53);
     doc.setFont("helvetica", "bold").text("Hosp. Arrival:", 18, 59);
     doc.setFont("helvetica", "normal").text(di.hospitalArrTime || "N/A", 42, 59);
+    doc.setFont("helvetica", "bold").text("Date of Travel:", 18, 65);
+    doc.setFont("helvetica", "normal").text(di.date || "N/A", 42, 65);
+    doc.setFont("helvetica", "bold").text("Unit Assigned:", 18, 71);
+    doc.setFont("helvetica", "normal").text(di.unit || "N/A", 42, 71);
 
     // Emergency Type & Patient Details (Right Columns)
     const et = pcr.emergencyType || {};
@@ -869,9 +873,9 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
 
     // Site of Incident
     const ii = pcr.incidentInfo || {};
-    doc.setFont("helvetica", "bold").text("Site of Incident:", 18, 74);
+    doc.setFont("helvetica", "bold").text("Site of Incident:", 18, 77);
     const siteLines = doc.splitTextToSize(ii.siteOfIncident || "Baliwag City", 55);
-    doc.setFont("helvetica", "normal").text(siteLines, 18, 78);
+    doc.setFont("helvetica", "normal").text(siteLines, 18, 81);
 
     // --- Section 2: Initial Assessment ---
     doc.setTextColor(30, 58, 138);
@@ -908,6 +912,8 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.setFont("helvetica", "normal").text(airway.status || "Open", 168, 98);
     doc.setFont("helvetica", "bold").text("Airway Interv:", 145, 104);
     doc.setFont("helvetica", "normal").text(airway.intervention || "None", 168, 104);
+    doc.setFont("helvetica", "bold").text("GCS Points:", 145, 110);
+    doc.setFont("helvetica", "normal").text(String(pcr.gcsPoints || "15"), 168, 110);
 
     doc.setFont("helvetica", "bold").text("Breathing Type:", 18, 120);
     doc.setFont("helvetica", "normal").text(breathing.status || "No Dyspnea", 42, 120);
@@ -985,6 +991,36 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.setFont("helvetica", "bold").text("Events to Injury:", 18, 220);
     const eventLines = doc.splitTextToSize(sh.eventsLeadingToInjury || "N/A", pageWidth - 65);
     doc.setFont("helvetica", "normal").text(eventLines, 45, 220);
+
+    // --- Section 4.5: Pain Assessment ---
+    doc.setTextColor(30, 58, 138);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("PAIN ASSESSMENT", 14, 237);
+
+    doc.setFillColor(255, 255, 255);
+    doc.rect(14, 240, pageWidth - 28, 20, "D");
+
+    const pa = pcr.painAssessment || {};
+    doc.setTextColor(75, 85, 99);
+    doc.setFontSize(8);
+
+    doc.setFont("helvetica", "bold").text("Location:", 18, 245);
+    doc.setFont("helvetica", "normal").text(pa.location || "N/A", 35, 245);
+    doc.setFont("helvetica", "bold").text("Onset:", 18, 251);
+    doc.setFont("helvetica", "normal").text(pa.onset || "Gradual", 35, 251);
+    doc.setFont("helvetica", "bold").text("Radiation:", 18, 257);
+    doc.setFont("helvetica", "normal").text(pa.radiation || "None", 35, 257);
+
+    doc.setFont("helvetica", "bold").text("Time:", 80, 245);
+    doc.setFont("helvetica", "normal").text(pa.time || "N/A", 102, 245);
+    doc.setFont("helvetica", "bold").text("Quality:", 80, 251);
+    doc.setFont("helvetica", "normal").text(pa.quality || "Aching", 102, 251);
+
+    doc.setFont("helvetica", "bold").text("Provocation:", 140, 245);
+    doc.setFont("helvetica", "normal").text(pa.provocation || "None", 162, 245);
+    doc.setFont("helvetica", "bold").text("Severity (1-10):", 140, 251);
+    doc.setFont("helvetica", "normal").text(String(pa.severity || "5"), 162, 251);
 
     // Footer Page 1
     doc.setFont("helvetica", "normal");
@@ -1074,26 +1110,46 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.text("HANDOFF & SIGNATURES", 14, 182);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(14, 185, pageWidth - 28, 40, "D");
+    doc.rect(14, 185, pageWidth - 28, 44, "D");
 
     const hs = pcr.handoffSignatures || {};
     const rt = pcr.respondingTeam || {};
     doc.setTextColor(75, 85, 99);
-    doc.setFontSize(8);
+    doc.setFontSize(8.5);
 
+    // Row 1 (y=191)
     doc.setFont("helvetica", "bold").text("PCR Accomplished By:", 18, 191);
-    doc.setFont("helvetica", "normal").text(hs.accomplishedBy || "Ambulance Team Leader", 50, 191);
-    doc.setFont("helvetica", "bold").text("Receiving Hospital:", 18, 197);
-    doc.setFont("helvetica", "normal").text(hs.receivingHospital || "BDH / District Hospital", 50, 197);
-    doc.setFont("helvetica", "bold").text("Receiving Physician:", 18, 203);
-    doc.setFont("helvetica", "normal").text(hs.receivingPhysician || "Dr. Attending / MD", 50, 203);
+    doc.setFont("helvetica", "normal").text(hs.accomplishedBy || "Ambulance Team Leader", 55, 191);
+    doc.setFont("helvetica", "bold").text("Receiving Physician:", 110, 191);
+    doc.setFont("helvetica", "normal").text(hs.receivingPhysician || "Dr. Attending / MD", 145, 191);
 
-    doc.setFont("helvetica", "bold").text("Team Leader:", 110, 191);
-    doc.setFont("helvetica", "normal").text(rt.teamLeader || "N/A", 130, 191);
-    doc.setFont("helvetica", "bold").text("Team Members:", 110, 197);
-    doc.setFont("helvetica", "normal").text(rt.teamMembers || "N/A", 130, 197);
-    doc.setFont("helvetica", "bold").text("Driver Name:", 110, 203);
-    doc.setFont("helvetica", "normal").text(rt.driver || "N/A", 130, 203);
+    // Row 2 (y=197)
+    doc.setFont("helvetica", "bold").text("Acc. License No:", 18, 197);
+    doc.setFont("helvetica", "normal").text(hs.accomplishedByLicense || hs.licenseNo || "N/A", 55, 197);
+    doc.setFont("helvetica", "bold").text("Phys. License No:", 110, 197);
+    doc.setFont("helvetica", "normal").text(hs.receivingPhysicianLicense || "N/A", 145, 197);
+
+    // Row 3 (y=203)
+    doc.setFont("helvetica", "bold").text("Receiving Hospital:", 18, 203);
+    doc.setFont("helvetica", "normal").text(hs.receivingHospital || "BDH / District Hospital", 55, 203);
+    doc.setFont("helvetica", "bold").text("Arrival Time:", 110, 203);
+    doc.setFont("helvetica", "normal").text(hs.arrivalTime || "N/A", 145, 203);
+
+    // Row 4 (y=209)
+    doc.setFont("helvetica", "bold").text("Referred To:", 18, 209);
+    doc.setFont("helvetica", "normal").text(hs.referredTo || "N/A", 55, 209);
+    doc.setFont("helvetica", "bold").text("Ref. License No:", 110, 209);
+    doc.setFont("helvetica", "normal").text(hs.referredToLicense || "N/A", 145, 209);
+
+    // Row 5 (y=215)
+    doc.setFont("helvetica", "bold").text("Team Leader:", 18, 215);
+    doc.setFont("helvetica", "normal").text(rt.teamLeader || "N/A", 55, 215);
+    doc.setFont("helvetica", "bold").text("Team Members:", 110, 215);
+    doc.setFont("helvetica", "normal").text(rt.teamMembers || "N/A", 145, 215);
+
+    // Row 6 (y=221)
+    doc.setFont("helvetica", "bold").text("Ambulance Driver:", 18, 221);
+    doc.setFont("helvetica", "normal").text(rt.driver || "N/A", 55, 221);
 
     // Footer Page 2
     doc.setFont("helvetica", "normal");
@@ -1163,6 +1219,8 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
 
     doc.setFont("helvetica", "bold").text("Name of Driver:", 18, 42);
     doc.setFont("helvetica", "normal").text(ticket.driverName || "Ambulance Driver", 55, 42);
+    doc.setFont("helvetica", "bold").text("Date of Travel:", 110, 42);
+    doc.setFont("helvetica", "normal").text(ticket.date || (ticket.tripLog && ticket.tripLog.date) || "N/A", 145, 42);
 
     doc.setFont("helvetica", "bold").text("Gov Car / Plate No:", 18, 50);
     doc.setFont("helvetica", "normal").text(ticket.vehiclePlate || "AMB-001", 55, 50);
@@ -1258,8 +1316,9 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
     doc.line(18, sigY + 16, 75, sigY + 16);
     doc.setFont("helvetica", "bold");
     doc.text(ticket.driverName || "Ambulance Driver", 18, sigY + 20);
-
     doc.setFont("helvetica", "normal");
+    doc.text(`Cellphone: ${ticket.signatures?.driverPhone || "N/A"}`, 18, sigY + 25);
+
     doc.text("Authorized Chief/Representative:", 110, sigY + 6);
     doc.line(110, sigY + 16, 185, sigY + 16);
     doc.setFont("helvetica", "bold");

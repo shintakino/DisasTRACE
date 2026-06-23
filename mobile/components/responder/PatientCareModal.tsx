@@ -19,7 +19,7 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
   const [patientGender, setPatientGender] = useState(data?.patientGender || 'Male');
 
   const [dispatchInfo, setDispatchInfo] = useState(data?.dispatchInfo || {
-    hqDprtTime: '', hqArrTime: '', sceneDprtTime: '', sceneArrTime: '', hospitalDprtTime: '', hospitalArrTime: ''
+    hqDprtTime: '', hqArrTime: '', sceneDprtTime: '', sceneArrTime: '', hospitalDprtTime: '', hospitalArrTime: '', date: '', unit: ''
   });
 
   const [emergencyType, setEmergencyType] = useState(data?.emergencyType || {
@@ -32,7 +32,7 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
 
   const [initialAssessment, setInitialAssessment] = useState(data?.initialAssessment || {
     loc: 'Alert', spinalInjury: 'No',
-    circulation: { pulse: 'Present', bleeding: 'No', bleedingLocation: '', controlled: 'Yes' },
+    circulation: { pulse: 'Present', pulseQuality: 'Strong', bleeding: 'No', bleedingLocation: '', controlled: 'Yes', bleedingControlMethod: 'None' },
     airway: { status: 'Open', intervention: 'None' },
     trachea: 'Normal & Stable',
     breathing: { status: 'No Dyspnea', oxygen: 'O2 not required', lpm: '', delivery: 'NC', breathSounds: 'Clear Breath Sounds' }
@@ -42,6 +42,12 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
     { time: '', bp: '', pr: '', o2_sat: '', rr: '', temp: '', pupil: 'PEARR', skin: 'Warm' }
   ]);
 
+  const [painAssessment, setPainAssessment] = useState(data?.painAssessment || {
+    location: '', onset: 'Gradual', provocation: 'None', quality: 'Aching', radiation: 'None', severity: '5', time: ''
+  });
+
+  const [gcsPoints, setGcsPoints] = useState(data?.gcsPoints || '');
+
   const [sampleHistory, setSampleHistory] = useState(data?.sampleHistory || {
     allergies: 'None', medications: 'None', pastMedicalHistory: '', lastOralIntake: '', eventsLeadingToInjury: ''
   });
@@ -50,11 +56,15 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
   const [narrativeReport, setNarrativeReport] = useState(data?.narrativeReport || '');
 
   const [handoffSignatures, setHandoffSignatures] = useState(data?.handoffSignatures || {
-    accomplishedBy: '', receivingHospital: '', referredTo: '', receivingPhysician: '', licenseNo: '', arrivalTime: ''
+    accomplishedBy: '', accomplishedByLicense: '', receivingHospital: '', referredTo: '', referredToLicense: '', receivingPhysician: '', receivingPhysicianLicense: '', licenseNo: '', arrivalTime: ''
   });
 
   const [liabilityRelease, setLiabilityRelease] = useState(data?.liabilityRelease || {
     refused: false, refusalType: 'Refusal to consent to treatment', signature: '', witnessedBy: '', witnessAddress: ''
+  });
+
+  const [respondingTeam, setRespondingTeam] = useState(data?.respondingTeam || {
+    teamLeader: '', teamMembers: '', driver: ''
   });
 
   const handleSave = () => {
@@ -69,11 +79,14 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
       incidentInfo,
       initialAssessment,
       vitalsLogs,
+      painAssessment,
+      gcsPoints: gcsPoints ? parseInt(gcsPoints) : null,
       sampleHistory,
       traumaMarkers,
       narrativeReport,
       handoffSignatures,
-      liabilityRelease
+      liabilityRelease,
+      respondingTeam
     });
     onClose();
   };
@@ -155,8 +168,18 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
           </View>
 
           {/* Dispatch Info */}
-          <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Dispatch Information (Times)</Text>
+          <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Dispatch Information</Text>
           <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-3">
+            <View className="flex-row space-x-3">
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Date</Text>
+                <TextInput value={dispatchInfo.date} onChangeText={(val) => setDispatchInfo({...dispatchInfo, date: val})} placeholder="2026-06-23" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Responding Unit</Text>
+                <TextInput value={dispatchInfo.unit} onChangeText={(val) => setDispatchInfo({...dispatchInfo, unit: val})} placeholder="AMB-001" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+            </View>
             <View className="flex-row space-x-3">
               <View className="flex-1">
                 <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">HQ Depart</Text>
@@ -208,46 +231,94 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
             <View className="flex-row space-x-3">
               <View className="flex-1">
                 <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">LOC</Text>
-                <TextInput value={initialAssessment.loc} onChangeText={(val) => setInitialAssessment({...initialAssessment, loc: val})} placeholder="Alert / Verbal / Pain" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+                <TextInput value={initialAssessment.loc} onChangeText={(val) => setInitialAssessment({...initialAssessment, loc: val})} placeholder="Alert" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
               </View>
               <View className="flex-1">
                 <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Spinal Injury</Text>
-                <TextInput value={initialAssessment.spinalInjury} onChangeText={(val) => setInitialAssessment({...initialAssessment, spinalInjury: val})} placeholder="Yes / No" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+                <TextInput value={initialAssessment.spinalInjury} onChangeText={(val) => setInitialAssessment({...initialAssessment, spinalInjury: val})} placeholder="No" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">GCS Points</Text>
+                <TextInput value={gcsPoints} onChangeText={setGcsPoints} keyboardType="numeric" placeholder="15" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
               </View>
             </View>
+
             <View className="border-t border-slate-100 pt-3">
-              <Text className="text-[#1E3A8A] font-bold text-[10px] tracking-wider uppercase mb-2">Circulation</Text>
-              <View className="flex-row space-x-3">
+              <Text className="text-[#1E3A8A] font-bold text-[10px] tracking-wider uppercase mb-2">Circulation & Bleeding</Text>
+              <View className="flex-row space-x-2 mb-2">
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Pulse</Text>
                   <TextInput value={initialAssessment.circulation.pulse} onChangeText={(val) => setInitialAssessment({...initialAssessment, circulation: {...initialAssessment.circulation, pulse: val}})} placeholder="Present" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
                 </View>
                 <View className="flex-1">
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Pulse Quality</Text>
+                  <TextInput value={initialAssessment.circulation.pulseQuality} onChangeText={(val) => setInitialAssessment({...initialAssessment, circulation: {...initialAssessment.circulation, pulseQuality: val}})} placeholder="Strong" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                </View>
+              </View>
+              <View className="flex-row space-x-2 mb-2">
+                <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Bleeding</Text>
                   <TextInput value={initialAssessment.circulation.bleeding} onChangeText={(val) => setInitialAssessment({...initialAssessment, circulation: {...initialAssessment.circulation, bleeding: val}})} placeholder="No" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
                 </View>
+                <View className="flex-1">
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Bleeding Location</Text>
+                  <TextInput value={initialAssessment.circulation.bleedingLocation} onChangeText={(val) => setInitialAssessment({...initialAssessment, circulation: {...initialAssessment.circulation, bleedingLocation: val}})} placeholder="N/A" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                </View>
+              </View>
+              <View className="flex-row space-x-2">
+                <View className="flex-1">
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Controlled?</Text>
+                  <TextInput value={initialAssessment.circulation.controlled} onChangeText={(val) => setInitialAssessment({...initialAssessment, circulation: {...initialAssessment.circulation, controlled: val}})} placeholder="Yes" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Control Method</Text>
+                  <TextInput value={initialAssessment.circulation.bleedingControlMethod} onChangeText={(val) => setInitialAssessment({...initialAssessment, circulation: {...initialAssessment.circulation, bleedingControlMethod: val}})} placeholder="Direct Pressure" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                </View>
               </View>
             </View>
+
             <View className="border-t border-slate-100 pt-3">
-              <Text className="text-[#1E3A8A] font-bold text-[10px] tracking-wider uppercase mb-2">Airway & Breathing</Text>
-              <View className="flex-row space-x-3 mb-2">
+              <Text className="text-[#1E3A8A] font-bold text-[10px] tracking-wider uppercase mb-2">Airway & Trachea</Text>
+              <View className="flex-row space-x-2">
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Airway Status</Text>
                   <TextInput value={initialAssessment.airway.status} onChangeText={(val) => setInitialAssessment({...initialAssessment, airway: {...initialAssessment.airway, status: val}})} placeholder="Open" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Breathing Status</Text>
-                  <TextInput value={initialAssessment.breathing.status} onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, status: val}})} placeholder="No Dyspnea" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Airway Interv.</Text>
+                  <TextInput value={initialAssessment.airway.intervention} onChangeText={(val) => setInitialAssessment({...initialAssessment, airway: {...initialAssessment.airway, intervention: val}})} placeholder="None" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Trachea Status</Text>
+                  <TextInput value={initialAssessment.trachea} onChangeText={(val) => setInitialAssessment({...initialAssessment, trachea: val})} placeholder="Normal" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
                 </View>
               </View>
-              <View className="flex-row space-x-3">
+            </View>
+
+            <View className="border-t border-slate-100 pt-3">
+              <Text className="text-[#1E3A8A] font-bold text-[10px] tracking-wider uppercase mb-2">Breathing & Oxygen</Text>
+              <View className="flex-row space-x-2 mb-2">
                 <View className="flex-1">
-                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">O2 Delivery</Text>
-                  <TextInput value={initialAssessment.breathing.oxygen} onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, oxygen: val}})} placeholder="NC / NRM / Not Req" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Breathing Type</Text>
+                  <TextInput value={initialAssessment.breathing.status} onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, status: val}})} placeholder="No Dyspnea" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Breath Sounds</Text>
+                  <TextInput value={initialAssessment.breathing.breathSounds} onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, breathSounds: val}})} placeholder="Clear" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                </View>
+              </View>
+              <View className="flex-row space-x-2">
+                <View className="flex-1">
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Oxygen Support</Text>
+                  <TextInput value={initialAssessment.breathing.oxygen} onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, oxygen: val}})} placeholder="Not Req" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
                 </View>
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Flow Rate (LPM)</Text>
-                  <TextInput value={initialAssessment.breathing.lpm} onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, lpm: val}})} placeholder="6 LPM" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                  <TextInput value={initialAssessment.breathing.lpm} onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, lpm: val}})} placeholder="0" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Delivery Device</Text>
+                  <TextInput value={initialAssessment.breathing.delivery} onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, delivery: val}})} placeholder="NC" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
                 </View>
               </View>
             </View>
@@ -313,6 +384,45 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
               </View>
             </View>
           ))}
+
+          {/* Pain Assessment */}
+          <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Pain Assessment</Text>
+          <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-3">
+            <View className="flex-row space-x-2">
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Pain Location</Text>
+                <TextInput value={painAssessment.location} onChangeText={(val) => setPainAssessment({...painAssessment, location: val})} placeholder="Chest, Left Arm" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Assessment Time</Text>
+                <TextInput value={painAssessment.time} onChangeText={(val) => setPainAssessment({...painAssessment, time: val})} placeholder="10:12 AM" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+            </View>
+            <View className="flex-row space-x-2">
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Onset</Text>
+                <TextInput value={painAssessment.onset} onChangeText={(val) => setPainAssessment({...painAssessment, onset: val})} placeholder="Sudden / Gradual" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Provocation</Text>
+                <TextInput value={painAssessment.provocation} onChangeText={(val) => setPainAssessment({...painAssessment, provocation: val})} placeholder="Movement / None" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+            </View>
+            <View className="flex-row space-x-2">
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Quality</Text>
+                <TextInput value={painAssessment.quality} onChangeText={(val) => setPainAssessment({...painAssessment, quality: val})} placeholder="Aching / Stabbing" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Radiation</Text>
+                <TextInput value={painAssessment.radiation} onChangeText={(val) => setPainAssessment({...painAssessment, radiation: val})} placeholder="None / Localized" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="w-16">
+                <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Sev (1-10)</Text>
+                <TextInput value={painAssessment.severity} onChangeText={(val) => setPainAssessment({...painAssessment, severity: val})} keyboardType="numeric" placeholder="5" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs text-center" />
+              </View>
+            </View>
+          </View>
 
           {/* SAMPLE History */}
           <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">SAMPLE History</Text>
@@ -381,17 +491,62 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
           {/* Signatures & Handoff */}
           <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Signatures & Handoff</Text>
           <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-3">
+            <View className="flex-row space-x-3">
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">PCR Accomplished By</Text>
+                <TextInput value={handoffSignatures.accomplishedBy} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, accomplishedBy: val})} placeholder="Responder Name" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Acc. License No</Text>
+                <TextInput value={handoffSignatures.accomplishedByLicense} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, accomplishedByLicense: val})} placeholder="Lic-12345" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+            </View>
+            <View className="flex-row space-x-3">
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Receiving Hospital</Text>
+                <TextInput value={handoffSignatures.receivingHospital} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, receivingHospital: val})} placeholder="Baliwag District Hospital" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Arrival Time</Text>
+                <TextInput value={handoffSignatures.arrivalTime} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, arrivalTime: val})} placeholder="10:30 AM" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+            </View>
+            <View className="flex-row space-x-3">
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Receiving Physician</Text>
+                <TextInput value={handoffSignatures.receivingPhysician} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, receivingPhysician: val})} placeholder="Dr. Jane Smith" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Phys. License No</Text>
+                <TextInput value={handoffSignatures.receivingPhysicianLicense} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, receivingPhysicianLicense: val})} placeholder="Lic-67890" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+            </View>
+            <View className="flex-row space-x-3">
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Referred To</Text>
+                <TextInput value={handoffSignatures.referredTo} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, referredTo: val})} placeholder="Hospital Name" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Ref. License No</Text>
+                <TextInput value={handoffSignatures.referredToLicense} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, referredToLicense: val})} placeholder="Lic-54321" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+            </View>
+          </View>
+
+          {/* Responding Team */}
+          <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Responding Team</Text>
+          <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-3">
             <View>
-              <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">PCR Accomplished By</Text>
-              <TextInput value={handoffSignatures.accomplishedBy} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, accomplishedBy: val})} placeholder="Responder Name / License" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
+              <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Team Leader</Text>
+              <TextInput value={respondingTeam.teamLeader} onChangeText={(val) => setRespondingTeam({...respondingTeam, teamLeader: val})} placeholder="Team Leader Name" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
             </View>
             <View>
-              <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Receiving Hospital</Text>
-              <TextInput value={handoffSignatures.receivingHospital} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, receivingHospital: val})} placeholder="Baliwag District Hospital" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
+              <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Team Members</Text>
+              <TextInput value={respondingTeam.teamMembers} onChangeText={(val) => setRespondingTeam({...respondingTeam, teamMembers: val})} placeholder="Member 1, Member 2" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
             </View>
             <View>
-              <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Receiving Physician</Text>
-              <TextInput value={handoffSignatures.receivingPhysician} onChangeText={(val) => setHandoffSignatures({...handoffSignatures, receivingPhysician: val})} placeholder="Dr. Jane Smith" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
+              <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Ambulance Driver</Text>
+              <TextInput value={respondingTeam.driver} onChangeText={(val) => setRespondingTeam({...respondingTeam, driver: val})} placeholder="Driver Name" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
             </View>
           </View>
         </ScrollView>

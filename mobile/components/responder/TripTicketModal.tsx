@@ -16,6 +16,8 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
   const [passengerName, setPassengerName] = useState(data?.passengerName || '');
   const [placesVisited, setPlacesVisited] = useState(data?.placesVisited || '');
   const [purpose, setPurpose] = useState(data?.purpose || '');
+  const [date, setDate] = useState(data?.date || '');
+  const [driverPhone, setDriverPhone] = useState(data?.signatures?.driverPhone || '');
 
   const [tripLog, setTripLog] = useState(data?.tripLog || {
     departureOffice: '', arrivalScene: '', departureScene: '', arrivalOffice: '', distance: ''
@@ -35,6 +37,7 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
 
   const handleSave = () => {
     onSave({
+      date,
       driverName,
       vehiclePlate,
       passengerName,
@@ -43,7 +46,11 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
       tripLog,
       gasolineConsumed,
       lubricants,
-      speedometer
+      speedometer,
+      signatures: {
+        ...data?.signatures,
+        driverPhone
+      }
     });
     onClose();
   };
@@ -66,9 +73,15 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
           {/* Trip Details */}
           <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Trip & Vehicle Details</Text>
           <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-3">
-            <View>
-              <Text className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-1">Name of Driver</Text>
-              <TextInput value={driverName} onChangeText={setDriverName} placeholder="Driver Name" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
+            <View className="flex-row space-x-3">
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-1">Name of Driver</Text>
+                <TextInput value={driverName} onChangeText={setDriverName} placeholder="Driver Name" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-1">Date of Travel</Text>
+                <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
             </View>
             <View>
               <Text className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-1">Gov Car Plate No.</Text>
@@ -164,6 +177,10 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Lube Oil (L)</Text>
                 <TextInput value={lubricants.lubeOil} onChangeText={(val) => setLubricants({...lubricants, lubeOil: val})} placeholder="0" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
               </View>
+              <View className="flex-1">
+                <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Grease (kg)</Text>
+                <TextInput value={lubricants.grease} onChangeText={(val) => setLubricants({...lubricants, grease: val})} placeholder="0" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+              </View>
             </View>
             <View>
               <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Speedometer Begin Reading</Text>
@@ -172,6 +189,15 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
             <View>
               <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Remarks</Text>
               <TextInput value={speedometer.remarks} onChangeText={(val) => setSpeedometer({...speedometer, remarks: val})} placeholder="Engine normal. No issues." className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
+            </View>
+          </View>
+
+          {/* Driver Contact */}
+          <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Driver Contact</Text>
+          <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-3">
+            <View>
+              <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Driver Cellphone Number</Text>
+              <TextInput value={driverPhone} onChangeText={setDriverPhone} keyboardType="phone-pad" placeholder="0917-123-4567" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
             </View>
           </View>
         </ScrollView>

@@ -7,6 +7,7 @@ import { ReportSubmittedModal } from './ReportSubmittedModal';
 import * as Haptics from 'expo-haptics';
 import { PatientCareModal } from './PatientCareModal';
 import { TripTicketModal } from './TripTicketModal';
+import { useAuthStatus } from '../../hooks/use-auth-status';
 
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -60,6 +61,7 @@ function InlineDropdown({
 
 export function IncidentReportForm() {
   const { status, setStatus, activeDispatch, isSubmittingReport, submitReport, saveDraft, drafts } = useResponderStore();
+  const { profile } = useAuthStatus();
   
   const [natureOfCall, setNatureOfCall] = useState('Emergency');
   const [typeOfEmergency, setTypeOfEmergency] = useState('Medical Emergency');
@@ -167,6 +169,9 @@ export function IncidentReportForm() {
     if (activeDispatch) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+      const responderName = profile?.fullName || 'Ambulance Responder';
+      const todayDate = new Date().toISOString().split('T')[0];
+
       // Auto-generate PCRs for patients that don't have explicit pcrDetails
       const finalPcrList = patients.map((p, idx) => {
         if (p.pcrDetails) return p.pcrDetails;
@@ -178,6 +183,8 @@ export function IncidentReportForm() {
           patientAge: null,
           patientGender: 'Male',
           dispatchInfo: {
+            date: todayDate,
+            unit: activeDispatch.assignedAmbulance || 'AMB-001',
             hqDprtTime: '', hqArrTime: '',
             sceneDprtTime: '', sceneArrTime: '',
             hospitalDprtTime: '', hospitalArrTime: ''
@@ -193,7 +200,7 @@ export function IncidentReportForm() {
           initialAssessment: {
             loc: p.status.includes('Conscious') ? 'Alert' : 'Unconscious/Unresponsive',
             spinalInjury: '-',
-            circulation: { pulse: 'Present', bleeding: '-', bleedingLocation: '', controlled: 'Yes' },
+            circulation: { pulse: 'Present', pulseQuality: 'Strong', bleeding: '-', bleedingLocation: '', controlled: 'Yes', bleedingControlMethod: 'None' },
             airway: { status: 'Open', intervention: 'None' },
             trachea: 'Normal & Stable',
             breathing: { status: 'No Dyspnea', oxygen: 'O2 not required', lpm: '', delivery: 'NC', breathSounds: 'Clear Breath Sounds' }
@@ -201,21 +208,39 @@ export function IncidentReportForm() {
           vitalsLogs: [
             { time: '', bp: p.bp, pr: p.hr, o2_sat: p.spo2, rr: '', temp: '', pupil: 'PEARR', skin: 'Warm' }
           ],
+          painAssessment: {
+            location: '', onset: 'Gradual', provocation: 'None', quality: 'Aching', radiation: 'None', severity: '5', time: ''
+          },
+          gcsPoints: 15,
           sampleHistory: {
             allergies: 'None', medications: 'None', pastMedicalHistory: '', lastOralIntake: '', eventsLeadingToInjury: ''
           },
           traumaMarkers: [],
           narrativeReport: `Incident Report for Patient ${idx + 1}.`,
           handoffSignatures: {
-            accomplishedBy: '', receivingHospital: '', referredTo: '', receivingPhysician: '', licenseNo: '', arrivalTime: ''
+            accomplishedBy: responderName,
+            accomplishedByLicense: 'Lic-12345',
+            receivingHospital: '',
+            referredTo: '',
+            referredToLicense: '',
+            receivingPhysician: '',
+            receivingPhysicianLicense: '',
+            licenseNo: 'Lic-12345',
+            arrivalTime: ''
           },
           liabilityRelease: {
             refused: false, refusalType: 'Refusal to consent to treatment', signature: '', witnessedBy: '', witnessedAddress: ''
+          },
+          respondingTeam: {
+            teamLeader: responderName,
+            teamMembers: 'Responder Crew',
+            driver: 'Ambulance Driver'
           }
         };
       });
 
       const finalTripTicket = tripTicketData || {
+        date: todayDate,
         driverName: 'Ambulance Driver',
         vehiclePlate: activeDispatch.assignedAmbulance || 'AMB-001',
         passengerName: 'Responder Crew',
@@ -224,7 +249,8 @@ export function IncidentReportForm() {
         tripLog: { departureOffice: '', arrivalScene: '', departureScene: '', arrivalOffice: '', distance: '' },
         gasolineConsumed: { balance: '', issued: '', purchase: '', total: '', deduction: '', balanceEnd: '' },
         lubricants: { carOil: '', lubeOil: '', grease: '' },
-        speedometer: { beginning: '', remarks: '' }
+        speedometer: { beginning: '', remarks: '' },
+        signatures: { driverPhone: '', driverSignature: '', authorizedRepSignature: '' }
       };
 
       const formData = {

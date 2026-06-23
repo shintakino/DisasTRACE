@@ -301,6 +301,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
           description: formData?.description || 'Incident resolved.',
           scenePhotos: formData?.scenePhotos || [],
           participants: formData?.patients || [],
+          patientCareReports: formData?.patientCareReports || [],
+          driverTripTicket: formData?.driverTripTicket || null,
         })
       });
 
@@ -333,6 +335,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
           description: formData?.description || 'Incident resolved.',
           scenePhotos: formData?.scenePhotos || [],
           participants: formData?.patients || [],
+          patientCareReports: formData?.patientCareReports || [],
+          driverTripTicket: formData?.driverTripTicket || null,
         }
       });
 

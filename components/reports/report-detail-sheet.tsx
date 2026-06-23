@@ -431,7 +431,7 @@ export function ReportDetailSheet({
                         <div>
                           <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Initial Assessment</h4>
                           <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">LOC Status</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.loc || "Alert"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">LOC Status</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.loc || "Alert"} (GCS: {pcr.gcsPoints || "15"} pts)</span></div>
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">Spinal Injury</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.spinalInjury || "No"}</span></div>
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">Trachea</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.trachea || "Normal & Stable"}</span></div>
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">Pulse</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.circulation?.pulse || "Present"}</span></div>
@@ -483,6 +483,19 @@ export function ReportDetailSheet({
                           </div>
                         </div>
 
+                        {/* Pain Assessment */}
+                        {pcr.painAssessment && (
+                          <div>
+                            <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Pain Assessment</h4>
+                            <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
+                              <div className="flex justify-between"><span className="text-slate-500 font-medium">Location</span><span className="font-bold text-[#1A237E]">{pcr.painAssessment.location || "N/A"}</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500 font-medium">Onset / Quality</span><span className="font-bold text-[#1A237E]">{pcr.painAssessment.onset || "Gradual"} / {pcr.painAssessment.quality || "Aching"}</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500 font-medium">Severity</span><span className="font-bold text-[#1A237E]">{pcr.painAssessment.severity || "5"} / 10</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500 font-medium">Radiation / Time</span><span className="font-bold text-[#1A237E]">{pcr.painAssessment.radiation || "None"} @ {pcr.painAssessment.time || "N/A"}</span></div>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Narrative Report */}
                         <div>
                           <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Narrative Report</h4>
@@ -495,11 +508,24 @@ export function ReportDetailSheet({
                         <div>
                           <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Handoff Details</h4>
                           <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Hospital</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingHospital || "N/A"}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Physician</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingPhysician || "N/A"}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">PCR Accomplished By</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.accomplishedBy || "N/A"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">PCR Accomplished By</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.accomplishedBy || "N/A"} (License: {pcr.handoffSignatures?.accomplishedByLicense || "N/A"})</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Hospital</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingHospital || "N/A"} (Arrival: {pcr.handoffSignatures?.arrivalTime || "N/A"})</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Physician</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingPhysician || "N/A"} (License: {pcr.handoffSignatures?.receivingPhysicianLicense || "N/A"})</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Referred To</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.referredTo || "N/A"} (License: {pcr.handoffSignatures?.referredToLicense || "N/A"})</span></div>
                           </div>
                         </div>
+
+                        {/* Responding Team */}
+                        {pcr.respondingTeam && (
+                          <div>
+                            <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Responding Team</h4>
+                            <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
+                              <div className="flex justify-between"><span className="text-slate-500 font-medium">Team Leader</span><span className="font-bold text-[#1A237E]">{pcr.respondingTeam.teamLeader || "N/A"}</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500 font-medium">Team Members</span><span className="font-bold text-[#1A237E]">{pcr.respondingTeam.teamMembers || "N/A"}</span></div>
+                              <div className="flex justify-between"><span className="text-slate-500 font-medium">Ambulance Driver</span><span className="font-bold text-[#1A237E]">{pcr.respondingTeam.driver || "N/A"}</span></div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -530,7 +556,8 @@ export function ReportDetailSheet({
                   <div>
                     <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Vehicle & Driver Info</h4>
                     <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Driver Name</span><span className="font-bold text-slate-800">{report.driverTripTicket.driverName || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Driver Name</span><span className="font-bold text-slate-800">{report.driverTripTicket.driverName || "N/A"} {report.driverTripTicket.signatures?.driverPhone ? `(Phone: ${report.driverTripTicket.signatures.driverPhone})` : ""}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Date of Travel</span><span className="font-bold text-slate-800">{report.driverTripTicket.date || "N/A"}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Vehicle Plate</span><span className="font-bold text-slate-800">{report.driverTripTicket.vehiclePlate || "N/A"}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Passengers</span><span className="font-bold text-slate-800">{report.driverTripTicket.passengerName || "N/A"}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Places Visited</span><span className="font-bold text-slate-800">{report.driverTripTicket.placesVisited || "N/A"}</span></div>

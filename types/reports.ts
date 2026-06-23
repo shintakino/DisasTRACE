@@ -65,5 +65,7 @@ export const DetailedIncidentReportSchema = z.object({
       triageStatus: z.string(),
     })
   ).optional(),
+  patientCareReports: z.array(z.any()).optional(),
+  driverTripTicket: z.any().optional(),
 });
 export type DetailedIncidentReport = z.infer<typeof DetailedIncidentReportSchema>;

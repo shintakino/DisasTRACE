@@ -26,9 +26,11 @@ export function ReportDetailSheet({
 }: ReportDetailSheetProps) {
   const [report, setReport] = React.useState<DetailedIncidentReport | null>(null);
   const [loading, setLoading] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<"incident" | "resident">("resident");
+  const [activeTab, setActiveTab] = React.useState<"incident" | "resident" | "patient_care" | "trip_ticket">("resident");
   const [expandedImage, setExpandedImage] = React.useState<string | null>(null);
   const [exporting, setExporting] = React.useState(false);
+  const [selectedPcrIdx, setSelectedPcrIdx] = React.useState(0);
+
 
   const handleSingleReportExport = async () => {
     if (!report) return;
@@ -138,26 +140,49 @@ export function ReportDetailSheet({
               <p className="text-[#1A237E]/80 font-bold text-[10px] mb-8 tracking-wider">{report.vehicleId}</p>
 
               {/* Tabs */}
-              <div className="flex items-center gap-1 mb-8 text-[11px] font-black w-full max-w-[320px] mx-auto uppercase tracking-wide">
-                <button
-                  onClick={() => setActiveTab("incident")}
-                  className={cn(
-                    "flex-1 py-2.5 px-2 text-center rounded-full transition-colors",
-                    activeTab === "incident" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
-                  )}
-                >
-                  Incident Information
-                </button>
+              <div className="flex flex-wrap items-center justify-center gap-1.5 mb-8 text-[10px] font-black w-full max-w-[420px] mx-auto uppercase tracking-wide">
                 <button
                   onClick={() => setActiveTab("resident")}
                   className={cn(
-                    "flex-1 py-2.5 px-2 text-center rounded-full transition-colors",
+                    "flex-1 min-w-[80px] py-2 px-1 text-center rounded-full transition-colors",
                     activeTab === "resident" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
                   )}
                 >
                   From Resident
                 </button>
+                <button
+                  onClick={() => setActiveTab("incident")}
+                  className={cn(
+                    "flex-1 min-w-[80px] py-2 px-1 text-center rounded-full transition-colors",
+                    activeTab === "incident" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Crew Findings
+                </button>
+                {report.patientCareReports && report.patientCareReports.length > 0 && (
+                  <button
+                    onClick={() => { setActiveTab("patient_care"); setSelectedPcrIdx(0); }}
+                    className={cn(
+                      "flex-1 min-w-[80px] py-2 px-1 text-center rounded-full transition-colors",
+                      activeTab === "patient_care" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
+                    )}
+                  >
+                    Patient Care
+                  </button>
+                )}
+                {report.driverTripTicket && (
+                  <button
+                    onClick={() => setActiveTab("trip_ticket")}
+                    className={cn(
+                      "flex-1 min-w-[80px] py-2 px-1 text-center rounded-full transition-colors",
+                      activeTab === "trip_ticket" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
+                    )}
+                  >
+                    Trip Ticket
+                  </button>
+                )}
               </div>
+
 
               {/* Tab Content */}
               {activeTab === "resident" && (
@@ -347,6 +372,206 @@ export function ReportDetailSheet({
                   </div>
                 </div>
               )}
+
+              {activeTab === "patient_care" && report.patientCareReports && report.patientCareReports.length > 0 && (
+                <div className="w-full space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                  {/* Multi-patient Selector */}
+                  {report.patientCareReports.length > 1 && (
+                    <div className="flex flex-wrap gap-1.5 justify-center mb-4">
+                      {report.patientCareReports.map((p: any, idx: number) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedPcrIdx(idx)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-colors",
+                            selectedPcrIdx === idx ? "bg-[#1E3A8A] text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                          )}
+                        >
+                          Patient {idx + 1}: {p.patientName || "N/A"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {(() => {
+                    const pcr = report.patientCareReports[selectedPcrIdx];
+                    if (!pcr) return <p className="text-slate-400 text-xs">No Patient Care Report found.</p>;
+                    return (
+                      <div className="space-y-6 text-left">
+                        {/* Header card with export */}
+                        <div className="flex justify-between items-center bg-[#E8EAF6] p-4 rounded-2xl border border-blue-100">
+                          <div>
+                            <p className="text-[#1A237E] font-black text-sm">{pcr.patientName || "Unnamed Patient"}</p>
+                            <p className="text-slate-500 text-[10px] font-bold">PRE-HOSPITAL CARE REPORT · {pcr.patientAge ? `${pcr.patientAge} yrs` : "Age N/A"} · {pcr.patientGender || "Gender N/A"}</p>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              const { exportPatientCareReportPDF } = await import("@/lib/pdf-export");
+                              await exportPatientCareReportPDF(pcr, report.id, selectedPcrIdx + 1);
+                            }}
+                            className="h-8 px-3 rounded-full bg-[#1A237E] text-white hover:bg-blue-800 transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
+                          >
+                            <FileDown className="h-3.5 w-3.5" />
+                            <span>PDF</span>
+                          </button>
+                        </div>
+
+                        {/* Patient Profile */}
+                        <div>
+                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Patient Profile</h4>
+                          <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Address</span><span className="font-bold text-[#1A237E]">{pcr.patientAddress || "N/A"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Contact</span><span className="font-bold text-[#1A237E]">{pcr.patientContact || "N/A"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Call Type</span><span className="font-bold text-[#1A237E]">{pcr.emergencyType?.callType || "Medical"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Chief Complaint</span><span className="font-bold text-[#1A237E]">{pcr.incidentInfo?.chiefComplaints || "N/A"}</span></div>
+                          </div>
+                        </div>
+
+                        {/* Initial Assessment */}
+                        <div>
+                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Initial Assessment</h4>
+                          <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">LOC Status</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.loc || "Alert"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Spinal Injury</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.spinalInjury || "No"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Trachea</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.trachea || "Normal & Stable"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Pulse</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.circulation?.pulse || "Present"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Bleeding</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.circulation?.bleeding || "No"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Airway</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.airway?.status || "Open"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Breathing</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.breathing?.status || "No Dyspnea"} ({pcr.initialAssessment?.breathing?.oxygen || "O2 not required"})</span></div>
+                          </div>
+                        </div>
+
+                        {/* Vitals logs table */}
+                        {pcr.vitalsLogs && pcr.vitalsLogs.length > 0 && (
+                          <div>
+                            <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Vitals Log</h4>
+                            <div className="border border-[#E8EAF6] rounded-3xl overflow-hidden shadow-sm bg-white">
+                              <table className="w-full border-collapse text-left text-xs">
+                                <thead>
+                                  <tr className="bg-slate-50 border-b border-[#E8EAF6] text-[#1A237E] font-black uppercase tracking-wider text-[9px]">
+                                    <th className="py-2.5 px-3">Time</th>
+                                    <th className="py-2.5 px-3">BP</th>
+                                    <th className="py-2.5 px-3">PR</th>
+                                    <th className="py-2.5 px-3">O2 Sat</th>
+                                    <th className="py-2.5 px-3">Skin</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pcr.vitalsLogs.map((log: any, idx: number) => (
+                                    <tr key={idx} className="border-b border-[#E8EAF6] last:border-0 font-bold text-slate-700">
+                                      <td className="py-2.5 px-3">{log.time || "--"}</td>
+                                      <td className="py-2.5 px-3">{log.bp || "--"}</td>
+                                      <td className="py-2.5 px-3">{log.pr || "--"}</td>
+                                      <td className="py-2.5 px-3">{log.o2_sat || "--"}%</td>
+                                      <td className="py-2.5 px-3 text-slate-500">{log.skin || "--"}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* SAMPLE History */}
+                        <div>
+                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">SAMPLE History</h4>
+                          <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Allergies</span><span className="font-bold text-[#1A237E]">{pcr.sampleHistory?.allergies || "None"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Medications</span><span className="font-bold text-[#1A237E]">{pcr.sampleHistory?.medications || "None"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Past History</span><span className="font-bold text-[#1A237E]">{pcr.sampleHistory?.pastMedicalHistory || "None"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Last Intake</span><span className="font-bold text-[#1A237E]">{pcr.sampleHistory?.lastOralIntake || "N/A"}</span></div>
+                          </div>
+                        </div>
+
+                        {/* Narrative Report */}
+                        <div>
+                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Narrative Report</h4>
+                          <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white text-xs leading-relaxed text-slate-600 font-medium">
+                            {pcr.narrativeReport || "No narrative report details provided."}
+                          </div>
+                        </div>
+
+                        {/* Handoff & Team */}
+                        <div>
+                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Handoff Details</h4>
+                          <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Hospital</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingHospital || "N/A"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Physician</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingPhysician || "N/A"}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">PCR Accomplished By</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.accomplishedBy || "N/A"}</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {activeTab === "trip_ticket" && report.driverTripTicket && (
+                <div className="w-full space-y-6 animate-in fade-in zoom-in-95 duration-200 text-left">
+                  {/* Header card with export */}
+                  <div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border border-amber-100">
+                    <div>
+                      <p className="text-amber-800 font-black text-sm">Driver's Trip Ticket</p>
+                      <p className="text-slate-500 text-[10px] font-bold">VEHICLE LOGS & FUEL CONTROLS · {report.driverTripTicket.vehiclePlate || "N/A"}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const { exportDriverTripTicketPDF } = await import("@/lib/pdf-export");
+                        await exportDriverTripTicketPDF(report.driverTripTicket, report.id);
+                      }}
+                      className="h-8 px-3 rounded-full bg-amber-700 text-white hover:bg-amber-800 transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
+                    >
+                      <FileDown className="h-3.5 w-3.5" />
+                      <span>PDF</span>
+                    </button>
+                  </div>
+
+                  {/* Trip Details */}
+                  <div>
+                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Vehicle & Driver Info</h4>
+                    <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Driver Name</span><span className="font-bold text-slate-800">{report.driverTripTicket.driverName || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Vehicle Plate</span><span className="font-bold text-slate-800">{report.driverTripTicket.vehiclePlate || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Passengers</span><span className="font-bold text-slate-800">{report.driverTripTicket.passengerName || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Places Visited</span><span className="font-bold text-slate-800">{report.driverTripTicket.placesVisited || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Purpose</span><span className="font-bold text-slate-800">{report.driverTripTicket.purpose || "N/A"}</span></div>
+                    </div>
+                  </div>
+
+                  {/* Trip Logs */}
+                  <div>
+                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Logistics Logs</h4>
+                    <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Departure Office</span><span className="font-bold text-slate-800">{report.driverTripTicket.tripLog?.departureOffice || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Arrival Scene</span><span className="font-bold text-slate-800">{report.driverTripTicket.tripLog?.arrivalScene || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Departure Scene</span><span className="font-bold text-slate-800">{report.driverTripTicket.tripLog?.departureScene || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Arrival Office</span><span className="font-bold text-slate-800">{report.driverTripTicket.tripLog?.arrivalOffice || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Distance Travelled</span><span className="font-bold text-slate-800">{report.driverTripTicket.tripLog?.distance || "0"} km</span></div>
+                    </div>
+                  </div>
+
+                  {/* Fuel Controls */}
+                  <div>
+                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Gasoline & Oil Consumed</h4>
+                    <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Balance in Tank</span><span className="font-bold text-slate-800">{report.driverTripTicket.gasolineConsumed?.balance || "0"} Liters</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Issued stock</span><span className="font-bold text-slate-800">{report.driverTripTicket.gasolineConsumed?.issued || "0"} Liters</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Total Fuel Balance</span><span className="font-bold text-slate-800">{report.driverTripTicket.gasolineConsumed?.total || "0"} Liters</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Trip Deduction</span><span className="font-bold text-slate-800">{report.driverTripTicket.gasolineConsumed?.deduction || "0"} Liters</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">End Balance</span><span className="font-bold text-slate-800">{report.driverTripTicket.gasolineConsumed?.balanceEnd || "0"} Liters</span></div>
+                    </div>
+                  </div>
+
+                  {/* Remarks */}
+                  <div>
+                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Trip Remarks</h4>
+                    <div className="border border-amber-100 rounded-3xl p-4 bg-white text-xs leading-relaxed text-slate-600 font-medium font-medium">
+                      {report.driverTripTicket.remarks || "No trip remarks logged."}
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
           </ScrollArea>
         ) : (

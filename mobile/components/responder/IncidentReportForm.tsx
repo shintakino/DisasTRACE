@@ -5,6 +5,9 @@ import { ChevronLeft, Info, ChevronDown, Minus, Plus, FolderDown, Check } from '
 import { useResponderStore } from '../../stores/useResponderStore';
 import { ReportSubmittedModal } from './ReportSubmittedModal';
 import * as Haptics from 'expo-haptics';
+import { PatientCareModal } from './PatientCareModal';
+import { TripTicketModal } from './TripTicketModal';
+
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -62,12 +65,17 @@ export function IncidentReportForm() {
   const [typeOfEmergency, setTypeOfEmergency] = useState('Medical Emergency');
   const [severityLevel, setSeverityLevel] = useState('Medium');
   
-  const [patients, setPatients] = useState([
-    { id: 1, status: 'Stable — Conscious', bp: '120/80', hr: '', spo2: '' },
+  const [patients, setPatients] = useState<any[]>([
+    { id: 1, status: 'Stable — Conscious', bp: '120/80', hr: '', spo2: '', pcrDetails: null },
   ]);
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [crewNotes, setCrewNotes] = useState('');
+
+  const [activePcrPatientIndex, setActivePcrPatientIndex] = useState<number | null>(null);
+  const [isTripTicketOpen, setIsTripTicketOpen] = useState(false);
+  const [tripTicketData, setTripTicketData] = useState<any>(null);
+
 
   React.useEffect(() => {
     if (status === 'report_filling' && activeDispatch) {
@@ -81,14 +89,16 @@ export function IncidentReportForm() {
         setSeverityLevel(existingDraft.formData.severityLevel || 'Medium');
         setCrewNotes(existingDraft.formData.crewNotes || '');
         setPatients(existingDraft.formData.patients || [
-          { id: 1, status: 'Stable — Conscious', bp: '', hr: '', spo2: '' }
+          { id: 1, status: 'Stable — Conscious', bp: '', hr: '', spo2: '', pcrDetails: null }
         ]);
+        setTripTicketData(existingDraft.formData.tripTicketData || null);
       } else {
         console.log('[IncidentReportForm] Initializing fresh form from active dispatch pre-fills:', activeDispatch);
         setNatureOfCall(activeDispatch.natureOfCall || 'Emergency');
         setTypeOfEmergency(activeDispatch.typeOfEmergency || activeDispatch.type || 'Medical Emergency');
         setSeverityLevel('Medium');
         setCrewNotes('');
+        setTripTicketData(null);
         
         // Match the number of people involved from resident findings
         const count = activeDispatch.peopleInvolved || 1;
@@ -97,12 +107,14 @@ export function IncidentReportForm() {
           status: 'Stable — Conscious',
           bp: '',
           hr: '',
-          spo2: ''
+          spo2: '',
+          pcrDetails: null
         }));
         setPatients(initialPatients);
       }
     }
   }, [status, activeDispatch, drafts]);
+
 
   const toggleDropdown = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -115,7 +127,7 @@ export function IncidentReportForm() {
 
   const addPatient = () => {
     const newId = patients.length > 0 ? Math.max(...patients.map(p => p.id)) + 1 : 1;
-    setPatients([...patients, { id: newId, status: 'Stable — Conscious', bp: '', hr: '', spo2: '' }]);
+    setPatients([...patients, { id: newId, status: 'Stable — Conscious', bp: '', hr: '', spo2: '', pcrDetails: null }]);
   };
 
   const removePatient = (id?: number) => {
@@ -134,24 +146,100 @@ export function IncidentReportForm() {
 
   const handleSaveDraft = () => {
     if (activeDispatch) {
-      saveDraft(activeDispatch, { natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes });
+      saveDraft(activeDispatch, { natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, tripTicketData });
       setStatus('idle');
+    }
+  };
+
+  const handleSavePcr = (pcrData: any) => {
+    if (activePcrPatientIndex !== null) {
+      setPatients(patients.map((p, idx) => idx === activePcrPatientIndex ? {
+        ...p,
+        bp: pcrData.vitalsLogs?.[0]?.bp || p.bp,
+        hr: pcrData.vitalsLogs?.[0]?.pr || p.hr,
+        spo2: pcrData.vitalsLogs?.[0]?.o2_sat || p.spo2,
+        pcrDetails: pcrData
+      } : p));
     }
   };
 
   const handleSubmit = () => {
     if (activeDispatch) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Auto-generate PCRs for patients that don't have explicit pcrDetails
+      const finalPcrList = patients.map((p, idx) => {
+        if (p.pcrDetails) return p.pcrDetails;
+        
+        return {
+          patientName: `Patient ${idx + 1}`,
+          patientAddress: activeDispatch.locationName || '',
+          patientContact: '',
+          patientAge: null,
+          patientGender: 'Male',
+          dispatchInfo: {
+            hqDprtTime: '', hqArrTime: '',
+            sceneDprtTime: '', sceneArrTime: '',
+            hospitalDprtTime: '', hospitalArrTime: ''
+          },
+          emergencyType: {
+            callType: natureOfCall === 'Emergency' ? 'Medical' : 'Transfer',
+            arrivalPerson: 'Bystander'
+          },
+          incidentInfo: {
+            siteOfIncident: activeDispatch.locationName || '',
+            chiefComplaints: typeOfEmergency
+          },
+          initialAssessment: {
+            loc: p.status.includes('Conscious') ? 'Alert' : 'Unconscious/Unresponsive',
+            spinalInjury: '-',
+            circulation: { pulse: 'Present', bleeding: '-', bleedingLocation: '', controlled: 'Yes' },
+            airway: { status: 'Open', intervention: 'None' },
+            trachea: 'Normal & Stable',
+            breathing: { status: 'No Dyspnea', oxygen: 'O2 not required', lpm: '', delivery: 'NC', breathSounds: 'Clear Breath Sounds' }
+          },
+          vitalsLogs: [
+            { time: '', bp: p.bp, pr: p.hr, o2_sat: p.spo2, rr: '', temp: '', pupil: 'PEARR', skin: 'Warm' }
+          ],
+          sampleHistory: {
+            allergies: 'None', medications: 'None', pastMedicalHistory: '', lastOralIntake: '', eventsLeadingToInjury: ''
+          },
+          traumaMarkers: [],
+          narrativeReport: `Incident Report for Patient ${idx + 1}.`,
+          handoffSignatures: {
+            accomplishedBy: '', receivingHospital: '', referredTo: '', receivingPhysician: '', licenseNo: '', arrivalTime: ''
+          },
+          liabilityRelease: {
+            refused: false, refusalType: 'Refusal to consent to treatment', signature: '', witnessedBy: '', witnessedAddress: ''
+          }
+        };
+      });
+
+      const finalTripTicket = tripTicketData || {
+        driverName: 'Ambulance Driver',
+        vehiclePlate: activeDispatch.assignedAmbulance || 'AMB-001',
+        passengerName: 'Responder Crew',
+        placesVisited: activeDispatch.locationName || 'Baliwag City',
+        purpose: 'Emergency Response',
+        tripLog: { departureOffice: '', arrivalScene: '', departureScene: '', arrivalOffice: '', distance: '' },
+        gasolineConsumed: { balance: '', issued: '', purchase: '', total: '', deduction: '', balanceEnd: '' },
+        lubricants: { carOil: '', lubeOil: '', grease: '' },
+        speedometer: { beginning: '', remarks: '' }
+      };
+
       const formData = {
         natureOfCall,
         typeOfEmergency,
         severityLevel,
         patients,
         description: crewNotes.trim() || `Crew findings on scene: ${natureOfCall} call. Emergency type identified as ${typeOfEmergency}. Severity level: ${severityLevel}. Treated ${patients.length} patient(s) on scene.`,
+        patientCareReports: finalPcrList,
+        driverTripTicket: finalTripTicket
       };
       submitReport(activeDispatch.id, formData);
     }
   };
+
 
   return (
     <Modal
@@ -352,6 +440,13 @@ export function IncidentReportForm() {
                         />
                       </View>
                     </View>
+
+                    <TouchableOpacity 
+                      onPress={() => setActivePcrPatientIndex(index)}
+                      className="bg-blue-50 border border-blue-200 rounded-xl py-2.5 px-3 flex-row justify-center items-center mt-3"
+                    >
+                      <Text className="text-[#1E3A8A] font-bold text-xs">Fill Pre-Hospital Care Report (Detailed)</Text>
+                    </TouchableOpacity>
                   </View>
                 ))}
 
@@ -362,7 +457,15 @@ export function IncidentReportForm() {
                   <Plus color="white" size={20} />
                   <Text className="text-white font-bold ml-2">Add Patient</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity 
+                  onPress={() => setIsTripTicketOpen(true)}
+                  className="bg-amber-50 border border-amber-200 rounded-2xl py-4 flex-row justify-center items-center mt-4 mb-8"
+                >
+                  <Text className="text-amber-800 font-bold text-base">Fill Driver's Trip Ticket</Text>
+                </TouchableOpacity>
               </View>
+
 
             </View>
           </ScrollView>
@@ -405,6 +508,26 @@ export function IncidentReportForm() {
       
       {/* Report Submitted Modal */}
       <ReportSubmittedModal />
+
+      {activePcrPatientIndex !== null && (
+        <PatientCareModal
+          visible={activePcrPatientIndex !== null}
+          onClose={() => setActivePcrPatientIndex(null)}
+          patientIndex={activePcrPatientIndex}
+          data={patients[activePcrPatientIndex]?.pcrDetails}
+          onSave={handleSavePcr}
+        />
+      )}
+
+      {isTripTicketOpen && (
+        <TripTicketModal
+          visible={isTripTicketOpen}
+          onClose={() => setIsTripTicketOpen(false)}
+          data={tripTicketData}
+          onSave={setTripTicketData}
+        />
+      )}
     </Modal>
   );
 }
+

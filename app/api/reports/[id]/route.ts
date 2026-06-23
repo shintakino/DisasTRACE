@@ -4,8 +4,10 @@ import { reports } from "@/db/schema/reports";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
+import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
 import { eq, or } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+
 
 export async function GET(
   req: NextRequest,
@@ -128,6 +130,18 @@ export async function GET(
 
     const r = results[0];
 
+    // Fetch associated Patient Care Reports and Driver Trip Ticket
+    const patientCare = await db
+      .select()
+      .from(patientCareReports)
+      .where(eq(patientCareReports.incidentId, r.incidentId));
+
+    const tripTicket = await db
+      .select()
+      .from(driverTripTickets)
+      .where(eq(driverTripTickets.incidentId, r.incidentId))
+      .limit(1);
+
     // Format output matching DetailedIncidentReport typescript contract
     const formatted = {
       id: r.id,
@@ -163,9 +177,12 @@ export async function GET(
         { action: "Report Logs Submitted", time: new Date(r.createdAt).toLocaleTimeString() },
       ],
       participants: Array.isArray(r.participants) ? r.participants : [],
+      patientCareReports: patientCare || [],
+      driverTripTicket: tripTicket[0] || null,
     };
 
     return NextResponse.json(formatted);
+
   } catch (error) {
     console.error("Error in GET /api/reports/[id]:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

@@ -5,6 +5,7 @@ import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
+import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
 import { eq, and, or, like, desc } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
@@ -15,7 +16,39 @@ const SubmitReportSchema = z.object({
   description: z.string().optional(),
   scenePhotos: z.array(z.string()).optional(),
   participants: z.array(z.any()).optional(),
+  patientCareReports: z.array(z.object({
+    patientName: z.string(),
+    patientAddress: z.string().optional().nullable(),
+    patientContact: z.string().optional().nullable(),
+    patientAge: z.number().optional().nullable(),
+    patientGender: z.string().optional().nullable(),
+    dispatchInfo: z.any().optional().nullable(),
+    emergencyType: z.any().optional().nullable(),
+    incidentInfo: z.any().optional().nullable(),
+    initialAssessment: z.any().optional().nullable(),
+    vitalsLogs: z.array(z.any()).optional().nullable(),
+    sampleHistory: z.any().optional().nullable(),
+    traumaMarkers: z.array(z.any()).optional().nullable(),
+    narrativeReport: z.string().optional().nullable(),
+    handoffSignatures: z.any().optional().nullable(),
+    liabilityRelease: z.any().optional().nullable(),
+    respondingTeam: z.any().optional().nullable(),
+  })).optional(),
+  driverTripTicket: z.object({
+    driverName: z.string(),
+    vehiclePlate: z.string(),
+    passengerName: z.string().optional().nullable(),
+    placesVisited: z.string().optional().nullable(),
+    purpose: z.string().optional().nullable(),
+    tripLog: z.any().optional().nullable(),
+    gasolineConsumed: z.any().optional().nullable(),
+    lubricants: z.any().optional().nullable(),
+    speedometer: z.any().optional().nullable(),
+    remarks: z.string().optional().nullable(),
+    signatures: z.any().optional().nullable(),
+  }).optional(),
 });
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -252,6 +285,58 @@ export async function POST(req: NextRequest) {
       scenePhotos: scenePhotos || [],
       participants: participants || [],
     }).returning();
+
+    // 2.1. Insert Patient Care Reports (if provided)
+    if (body.patientCareReports && Array.isArray(body.patientCareReports)) {
+      for (let i = 0; i < body.patientCareReports.length; i++) {
+        const pcr = body.patientCareReports[i];
+        const pcrId = `PCR-${year}-${randNum}-${i + 1}`;
+        await db.insert(patientCareReports).values({
+          id: pcrId,
+          incidentId,
+          patientName: pcr.patientName,
+          patientAddress: pcr.patientAddress || null,
+          patientContact: pcr.patientContact || null,
+          patientAge: pcr.patientAge || null,
+          patientGender: pcr.patientGender || null,
+          dispatchInfo: pcr.dispatchInfo || null,
+          emergencyType: pcr.emergencyType || null,
+          incidentInfo: pcr.incidentInfo || null,
+          initialAssessment: pcr.initialAssessment || null,
+          vitalsLogs: pcr.vitalsLogs || null,
+          sampleHistory: pcr.sampleHistory || null,
+          traumaMarkers: pcr.traumaMarkers || null,
+          narrativeReport: pcr.narrativeReport || null,
+          handoffSignatures: pcr.handoffSignatures || null,
+          liabilityRelease: pcr.liabilityRelease || null,
+          respondingTeam: pcr.respondingTeam || null,
+        });
+      }
+      console.log(`Successfully saved ${body.patientCareReports.length} patient care report(s).`);
+    }
+
+    // 2.2. Insert Driver Trip Ticket (if provided)
+    if (body.driverTripTicket) {
+      const dtt = body.driverTripTicket;
+      const dttId = `DTT-${year}-${randNum}`;
+      await db.insert(driverTripTickets).values({
+        id: dttId,
+        incidentId,
+        driverName: dtt.driverName,
+        vehiclePlate: dtt.vehiclePlate,
+        passengerName: dtt.passengerName || null,
+        placesVisited: dtt.placesVisited || null,
+        purpose: dtt.purpose || null,
+        tripLog: dtt.tripLog || null,
+        gasolineConsumed: dtt.gasolineConsumed || null,
+        lubricants: dtt.lubricants || null,
+        speedometer: dtt.speedometer || null,
+        remarks: dtt.remarks || null,
+        signatures: dtt.signatures || null,
+      });
+      console.log(`Successfully saved driver trip ticket.`);
+    }
+
 
     // 3. Update parent incident to RESOLVED and set resolvedAt
     await db.update(incidents)

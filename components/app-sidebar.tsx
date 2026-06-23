@@ -72,7 +72,7 @@ export function AppSidebar() {
           </div>
         </Link>
       </SidebarHeader>
-      <SidebarContent className="p-0">
+      <SidebarContent className="p-0 sidebar-scroll">
         <SidebarGroup className="p-0">
           <SidebarGroupContent className="p-0">
             <SidebarMenu className="gap-8 flex flex-col items-center group-data-[state=expanded]:items-start py-6">

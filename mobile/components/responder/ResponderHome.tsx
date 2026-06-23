@@ -813,7 +813,7 @@ export function ResponderHome() {
             id="routeLine" 
             type="line"
             paint={{
-              'line-color': status === 'to_hospital' ? '#FFFFFF' : '#3B82F6',
+              'line-color': '#3B82F6',
               'line-width': 4
             }}
             layout={{

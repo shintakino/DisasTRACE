@@ -730,7 +730,7 @@ export default function TrackingScreen() {
             id="routeFill"
             type="line"
             paint={{
-              'line-color': isTransporting ? '#10B981' : '#3B82F6',
+              'line-color': '#3B82F6',
               'line-width': 3,
             }}
           />

@@ -564,7 +564,7 @@ export function ReportDetailSheet({
                     <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Vehicle & Driver Info</h4>
                     <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Driver Name</span><span className="font-bold text-slate-800">{report.driverTripTicket.driverName || "N/A"} {report.driverTripTicket.signatures?.driverPhone ? `(Phone: ${report.driverTripTicket.signatures.driverPhone})` : ""}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Date of Travel</span><span className="font-bold text-slate-800">{report.driverTripTicket.date || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Date of Travel</span><span className="font-bold text-slate-800">{report.driverTripTicket.tripLog?.date || "N/A"}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Vehicle Plate</span><span className="font-bold text-slate-800">{report.driverTripTicket.vehiclePlate || "N/A"}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Passengers</span><span className="font-bold text-slate-800">{report.driverTripTicket.passengerName || "N/A"}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Places Visited</span><span className="font-bold text-slate-800">{report.driverTripTicket.placesVisited || "N/A"}</span></div>

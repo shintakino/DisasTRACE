@@ -82,7 +82,8 @@ export function IncidentReportForm() {
   React.useEffect(() => {
     if (status === 'report_filling' && activeDispatch) {
       // 1. Check if there is an existing local draft for this incident
-      const existingDraft = drafts.find(d => d.incidentId === activeDispatch.id);
+      const currentDrafts = useResponderStore.getState().drafts;
+      const existingDraft = currentDrafts.find(d => d.incidentId === activeDispatch.id);
       
       if (existingDraft && existingDraft.formData) {
         console.log('[IncidentReportForm] Loading existing draft data:', existingDraft);
@@ -115,7 +116,26 @@ export function IncidentReportForm() {
         setPatients(initialPatients);
       }
     }
-  }, [status, activeDispatch, drafts]);
+  }, [status, activeDispatch?.id]);
+
+  // Background Auto-Save Effect
+  React.useEffect(() => {
+    if (status === 'report_filling' && activeDispatch) {
+      const timer = setTimeout(() => {
+        console.log('[IncidentReportForm] Auto-saving draft in background...');
+        saveDraft(activeDispatch, { 
+          natureOfCall, 
+          typeOfEmergency, 
+          severityLevel, 
+          patients, 
+          crewNotes, 
+          tripTicketData 
+        });
+      }, 1500); // 1.5s debounce
+      
+      return () => clearTimeout(timer);
+    }
+  }, [natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, tripTicketData, status, activeDispatch?.id]);
 
 
   const toggleDropdown = (id: string) => {

@@ -10,43 +10,15 @@ import { eq, and, or, like, desc } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import crypto from "crypto";
+import { PatientCareReportPayloadSchema, DriverTripTicketPayloadSchema } from "@/types/reports";
 
 const SubmitReportSchema = z.object({
   incidentId: z.string().uuid(),
   description: z.string().optional(),
   scenePhotos: z.array(z.string()).optional(),
   participants: z.array(z.any()).optional(),
-  patientCareReports: z.array(z.object({
-    patientName: z.string(),
-    patientAddress: z.string().optional().nullable(),
-    patientContact: z.string().optional().nullable(),
-    patientAge: z.number().optional().nullable(),
-    patientGender: z.string().optional().nullable(),
-    dispatchInfo: z.any().optional().nullable(),
-    emergencyType: z.any().optional().nullable(),
-    incidentInfo: z.any().optional().nullable(),
-    initialAssessment: z.any().optional().nullable(),
-    vitalsLogs: z.array(z.any()).optional().nullable(),
-    sampleHistory: z.any().optional().nullable(),
-    traumaMarkers: z.array(z.any()).optional().nullable(),
-    narrativeReport: z.string().optional().nullable(),
-    handoffSignatures: z.any().optional().nullable(),
-    liabilityRelease: z.any().optional().nullable(),
-    respondingTeam: z.any().optional().nullable(),
-  })).optional(),
-  driverTripTicket: z.object({
-    driverName: z.string(),
-    vehiclePlate: z.string(),
-    passengerName: z.string().optional().nullable(),
-    placesVisited: z.string().optional().nullable(),
-    purpose: z.string().optional().nullable(),
-    tripLog: z.any().optional().nullable(),
-    gasolineConsumed: z.any().optional().nullable(),
-    lubricants: z.any().optional().nullable(),
-    speedometer: z.any().optional().nullable(),
-    remarks: z.string().optional().nullable(),
-    signatures: z.any().optional().nullable(),
-  }).optional(),
+  patientCareReports: z.array(PatientCareReportPayloadSchema).optional(),
+  driverTripTicket: DriverTripTicketPayloadSchema.optional().nullable(),
 });
 
 

@@ -55,15 +55,23 @@ export default function CameraScreen() {
         if (photo) {
           let actions: ImageManipulator.Action[] = [];
           
-          // Force rotation based on the physical screen orientation if the hardware captured it as portrait
-          const isPortraitCapture = photo.width < photo.height;
+          // Force rotation based on the physical screen orientation vs photo aspect ratio
+          const isPhotoPortrait = photo.width < photo.height;
           
-          if (isPortraitCapture) {
+          if (isPhotoPortrait) {
             if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT) {
               actions = [{ rotate: 90 }];
             } else if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT) {
               actions = [{ rotate: -90 }];
             } else if (currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
+              actions = [{ rotate: 180 }];
+            }
+          } else {
+            if (currentOrientation === ScreenOrientation.Orientation.PORTRAIT_UP) {
+              actions = [{ rotate: 90 }];
+            } else if (currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
+              actions = [{ rotate: 270 }];
+            } else if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT) {
               actions = [{ rotate: 180 }];
             }
           }

@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, Platform, StatusBar, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
-import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Play, Pause } from 'lucide-react-native';
+import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Play, Pause, LogOut } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
 import { useResponderStore, checkConnectivity } from '../../stores/useResponderStore';
 import { useAuthStatus } from '../../hooks/use-auth-status';
@@ -937,6 +937,16 @@ export function ResponderHome() {
           </View>
           
           <View className="flex-row space-x-2">
+            {process.env.EXPO_PUBLIC_DEV_MODE === 'true' && (
+              <TouchableOpacity 
+                className="w-12 h-12 rounded-full bg-red-600 items-center justify-center border border-red-700 shadow-sm"
+                onPress={async () => {
+                  await supabase.auth.signOut();
+                }}
+              >
+                <LogOut size={20} color="white" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity 
               className="w-12 h-12 rounded-full bg-white/95 items-center justify-center backdrop-blur-xl border border-slate-200/80 shadow-sm"
               onPress={() => router.push('/support')}

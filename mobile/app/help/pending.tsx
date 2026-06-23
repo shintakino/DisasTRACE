@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ShieldAlert, CheckCircle, Navigation } from 'lucide-react-native';
+import { ShieldAlert, CheckCircle, Navigation, LogOut } from 'lucide-react-native';
 import { TransmissionLoader } from '../../components/help/TransmissionLoader';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
@@ -371,6 +371,34 @@ export default function PendingScreen() {
 
   return (
     <View style={styles.container}>
+      {process.env.EXPO_PUBLIC_DEV_MODE === 'true' && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 50,
+            right: 20,
+            backgroundColor: '#DC2626', // bg-red-600
+            paddingVertical: 8,
+            paddingHorizontal: 12,
+            borderRadius: 8,
+            zIndex: 100,
+            flexDirection: 'row',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+            elevation: 5,
+          }}
+          onPress={async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await supabase.auth.signOut();
+          }}
+        >
+          <LogOut size={14} color="#FFF" style={{ marginRight: 6 }} />
+          <Text style={{ color: '#FFF', fontSize: 11, fontStyle: 'normal', fontWeight: 'bold' }}>Dev Logout</Text>
+        </TouchableOpacity>
+      )}
       <TransmissionLoader 
         visible={isTransmitting || isSecuringResponder} 
         statusText={isSecuringResponder ? 'Report verified. Securing nearest responder...' : transmissionStatus} 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Modal, Alert } from 'react-native';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { useRouter } from 'expo-router';
-import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPin, CheckCircle2, Truck, Navigation } from 'lucide-react-native';
+import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPin, CheckCircle2, Truck, Navigation, LogOut } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
@@ -753,6 +753,34 @@ export default function TrackingScreen() {
 
       {/* Top Header Overlay */}
       <View style={styles.topHeader}>
+        {process.env.EXPO_PUBLIC_DEV_MODE === 'true' && (
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              backgroundColor: '#DC2626', // bg-red-600
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+              zIndex: 20,
+              flexDirection: 'row',
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 3.84,
+              elevation: 5,
+            }}
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await supabase.auth.signOut();
+            }}
+          >
+            <LogOut size={14} color="#FFF" style={{ marginRight: 6 }} />
+            <Text style={{ color: '#FFF', fontSize: 11, fontWeight: 'bold' }}>Dev Logout</Text>
+          </TouchableOpacity>
+        )}
         <Text style={styles.title}>Ambulance Tracker</Text>
         <Text style={styles.subtitle}>
           {isTransporting 

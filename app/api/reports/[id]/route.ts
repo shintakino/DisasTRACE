@@ -115,6 +115,12 @@ export async function GET(
           const match = userReq.peopleInvolved.match(/\d+/);
           return match ? parseInt(match[0], 10) : 1;
         })(),
+        residentPeopleInvolved: (() => {
+          if (userReq.peopleInvolved === '1-2 Persons') return 2;
+          if (userReq.peopleInvolved === '3-5 Persons') return 4;
+          if (userReq.peopleInvolved === '6+ Persons') return 6;
+          return 0;
+        })(),
         scenePhotos: [],
         logs: [
           { action: "Incident Reported by Resident", time: new Date(userReq.createdAt).toLocaleTimeString() },
@@ -166,9 +172,21 @@ export async function GET(
       natureOfCall: r.natureOfCall,
       severityLevel: r.severityLevel,
       peopleInvolved: (() => {
+        if (patientCare && patientCare.length > 0) {
+          return patientCare.length;
+        }
+        if (Array.isArray(r.participants) && r.participants.length > 0) {
+          return r.participants.length;
+        }
         if (!r.peopleInvolved || r.peopleInvolved === 'None') return 0;
         const match = r.peopleInvolved.match(/\d+/);
         return match ? parseInt(match[0], 10) : 1;
+      })(),
+      residentPeopleInvolved: (() => {
+        if (r.peopleInvolved === '1-2 Persons') return 2;
+        if (r.peopleInvolved === '3-5 Persons') return 4;
+        if (r.peopleInvolved === '6+ Persons') return 6;
+        return 0;
       })(),
       scenePhotos: Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
       logs: [

@@ -12,6 +12,10 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed
 
+- Resolved patient count discrepancy between Resident reports and Crew findings in the CDRRMO dashboard by using the count of physical Patient Care Reports as the source of truth.
+- Upgraded the Patient Care Report PDF export to use dynamic page overflow controls on Page 1, preventing long fields from overlapping the footer.
+- Fixed TypeScript compiler errors in the reports route.
+
 - Project context research.
 - Design system implementation (01-design-system.md).
 - Feature 02: Authentication & RBAC (Web) - Supabase Auth setup, role-based route protection via JWT claims, high-fidelity custom sign-in page, and seeded test accounts (Admin, PACC, Responder, User).

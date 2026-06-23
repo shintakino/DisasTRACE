@@ -320,7 +320,7 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     doc.setFont("helvetica", "normal").text(report.severityLevel || "Critical", 55, 87);
 
     doc.setFont("helvetica", "bold").text("People Involved:", 18, 95);
-    doc.setFont("helvetica", "normal").text(`${report.peopleInvolved || 0} Person(s)`, 55, 95);
+    doc.setFont("helvetica", "normal").text(`${report.peopleInvolved || 0} Person(s) (Resident reported: ${report.residentPeopleInvolved || report.peopleInvolved || 0})`, 55, 95);
 
     // Right Column Info
     doc.setFont("helvetica", "bold").text("Dispatch Nature:", 110, 63);
@@ -803,6 +803,27 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     const pageHeight = doc.internal.pageSize.height;
     const pageWidth = doc.internal.pageSize.width;
 
+    const drawPCRPageHeader = (d: any, title: string) => {
+      d.setFillColor(30, 58, 138); // Navy
+      d.rect(0, 0, pageWidth, 20, "F");
+      d.setFillColor(239, 68, 68); // Red
+      d.rect(0, 20, pageWidth, 1.5, "F");
+
+      d.setTextColor(255, 255, 255);
+      d.setFont("helvetica", "bold");
+      d.setFontSize(11);
+      d.text(title, 14, 12);
+    };
+
+    const checkPCRPageOverflow = (d: any, currentY: number, heightNeeded: number, title: string) => {
+      if (currentY + heightNeeded > pageHeight - 20) {
+        d.addPage();
+        drawPCRPageHeader(d, title);
+        return 28;
+      }
+      return currentY;
+    };
+
     // PAGE 1: PRE-HOSPITAL CARE REPORT (PC1 - FRONT)
     // --- Header ---
     doc.setFillColor(30, 58, 138); // Navy
@@ -831,17 +852,25 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.setFontSize(9);
     doc.text("DISPATCH INFORMATION & PATIENT PROFILE", 14, 32);
 
+    const di = pcr.dispatchInfo || {};
+    const et = pcr.emergencyType || {};
+    const ii = pcr.incidentInfo || {};
+
+    const siteLines = doc.splitTextToSize(ii.siteOfIncident || "Baliwag City", 80);
+    const addrLines = doc.splitTextToSize(pcr.patientAddress || "N/A", 80);
+
+    const boxHeight1 = Math.max(46 + siteLines.length * 4, 43 + addrLines.length * 4, 52);
+
     // Draw box for profile
     doc.setFillColor(249, 250, 251);
     doc.setDrawColor(203, 213, 225);
-    doc.rect(14, 35, pageWidth - 28, 52, "FD");
+    doc.rect(14, 35, pageWidth - 28, boxHeight1, "FD");
 
     doc.setTextColor(75, 85, 99);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
 
     // Dispatch Details (Left Column)
-    const di = pcr.dispatchInfo || {};
     doc.setFont("helvetica", "bold").text("HQ Departure:", 18, 41);
     doc.setFont("helvetica", "normal").text(di.hqDprtTime || "N/A", 42, 41);
     doc.setFont("helvetica", "bold").text("Scene Arrival:", 18, 47);
@@ -855,101 +884,111 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.setFont("helvetica", "bold").text("Unit Assigned:", 18, 71);
     doc.setFont("helvetica", "normal").text(di.unit || "N/A", 42, 71);
 
-    // Emergency Type & Patient Details (Right Columns)
-    const et = pcr.emergencyType || {};
-    doc.setFont("helvetica", "bold").text("Emergency Call Type:", 80, 41);
-    doc.setFont("helvetica", "normal").text(et.callType || "Medical", 112, 41);
-    doc.setFont("helvetica", "bold").text("Person at Arrival:", 80, 47);
-    doc.setFont("helvetica", "normal").text(et.arrivalPerson || "Bystander", 112, 47);
-
-    doc.setFont("helvetica", "bold").text("Patient Name:", 80, 56);
-    doc.setFont("helvetica", "normal").text(pcr.patientName || "N/A", 112, 56);
-    doc.setFont("helvetica", "bold").text("Age / Gender:", 80, 62);
-    doc.setFont("helvetica", "normal").text(`${pcr.patientAge || "N/A"} / ${pcr.patientGender || "Male"}`, 112, 62);
-    doc.setFont("helvetica", "bold").text("Contact No:", 80, 68);
-    doc.setFont("helvetica", "normal").text(pcr.patientContact || "N/A", 112, 68);
-    doc.setFont("helvetica", "bold").text("Home Address:", 80, 74);
-    doc.setFont("helvetica", "normal").text(pcr.patientAddress || "N/A", 112, 74);
-
     // Site of Incident
-    const ii = pcr.incidentInfo || {};
     doc.setFont("helvetica", "bold").text("Site of Incident:", 18, 77);
-    const siteLines = doc.splitTextToSize(ii.siteOfIncident || "Baliwag City", 55);
     doc.setFont("helvetica", "normal").text(siteLines, 18, 81);
 
-    // --- Section 2: Initial Assessment ---
-    doc.setTextColor(30, 58, 138);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text("INITIAL ASSESSMENT", 14, 90);
+    // Emergency Type & Patient Details (Right Columns)
+    doc.setFont("helvetica", "bold").text("Emergency Call Type:", 110, 41);
+    doc.setFont("helvetica", "normal").text(et.callType || "Medical", 145, 41);
+    doc.setFont("helvetica", "bold").text("Person at Arrival:", 110, 47);
+    doc.setFont("helvetica", "normal").text(et.arrivalPerson || "Bystander", 145, 47);
 
-    doc.setFillColor(255, 255, 255);
-    doc.rect(14, 93, pageWidth - 28, 42, "D");
+    doc.setFont("helvetica", "bold").text("Patient Name:", 110, 56);
+    doc.setFont("helvetica", "normal").text(pcr.patientName || "N/A", 145, 56);
+    doc.setFont("helvetica", "bold").text("Age / Gender:", 110, 62);
+    doc.setFont("helvetica", "normal").text(`${pcr.patientAge || "N/A"} / ${pcr.patientGender || "Male"}`, 145, 62);
+    doc.setFont("helvetica", "bold").text("Contact No:", 110, 68);
+    doc.setFont("helvetica", "normal").text(pcr.patientContact || "N/A", 145, 68);
+    doc.setFont("helvetica", "bold").text("Home Address:", 110, 74);
+    doc.setFont("helvetica", "normal").text(addrLines, 110, 78);
+
+    let y = 35 + boxHeight1 + 6;
 
     const ia = pcr.initialAssessment || {};
     const circ = ia.circulation || {};
     const airway = ia.airway || {};
     const breathing = ia.breathing || {};
 
+    const bleedText = `${circ.bleeding || "No"} (Loc: ${circ.bleedingLocation || "N/A"})`;
+    const bleedLines = doc.splitTextToSize(bleedText, 38);
+
+    const boxHeight2 = Math.max(42, 33 + bleedLines.length * 4);
+
+    y = checkPCRPageOverflow(doc, y, 6 + boxHeight2 + 10, "PRE-HOSPITAL CARE REPORT");
+
+    // --- Section 2: Initial Assessment ---
+    doc.setTextColor(30, 58, 138);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("INITIAL ASSESSMENT", 14, y);
+
+    doc.setFillColor(255, 255, 255);
+    doc.rect(14, y + 3, pageWidth - 28, boxHeight2, "D");
+
     doc.setTextColor(75, 85, 99);
     doc.setFontSize(8);
     
-    doc.setFont("helvetica", "bold").text("LOC Status:", 18, 98);
-    doc.setFont("helvetica", "normal").text(ia.loc || "Alert", 42, 98);
-    doc.setFont("helvetica", "bold").text("Spinal Injury:", 18, 104);
-    doc.setFont("helvetica", "normal").text(ia.spinalInjury || "No", 42, 104);
-    doc.setFont("helvetica", "bold").text("Trachea:", 18, 110);
-    doc.setFont("helvetica", "normal").text(ia.trachea || "Normal & Stable", 42, 110);
+    doc.setFont("helvetica", "bold").text("LOC Status:", 18, y + 8);
+    doc.setFont("helvetica", "normal").text(ia.loc || "Alert", 42, y + 8);
+    doc.setFont("helvetica", "bold").text("Spinal Injury:", 18, y + 14);
+    doc.setFont("helvetica", "normal").text(ia.spinalInjury || "No", 42, y + 14);
+    doc.setFont("helvetica", "bold").text("Trachea:", 18, y + 20);
+    doc.setFont("helvetica", "normal").text(ia.trachea || "Normal & Stable", 42, y + 20);
 
-    doc.setFont("helvetica", "bold").text("Pulse status:", 80, 98);
-    doc.setFont("helvetica", "normal").text(circ.pulse || "Present", 102, 98);
-    doc.setFont("helvetica", "bold").text("Bleeding Logs:", 80, 104);
-    doc.setFont("helvetica", "normal").text(`${circ.bleeding || "No"} (Location: ${circ.bleedingLocation || "N/A"})`, 102, 104);
-    doc.setFont("helvetica", "bold").text("Controlled:", 80, 110);
-    doc.setFont("helvetica", "normal").text(circ.controlled || "Yes", 102, 110);
+    doc.setFont("helvetica", "bold").text("Pulse status:", 80, y + 8);
+    doc.setFont("helvetica", "normal").text(circ.pulse || "Present", 102, y + 8);
+    doc.setFont("helvetica", "bold").text("Bleeding Logs:", 80, y + 14);
+    doc.setFont("helvetica", "normal").text(bleedLines, 102, y + 14);
+    doc.setFont("helvetica", "bold").text("Controlled:", 80, y + 20 + (bleedLines.length - 1) * 4);
+    doc.setFont("helvetica", "normal").text(circ.controlled || "Yes", 102, y + 20 + (bleedLines.length - 1) * 4);
 
-    doc.setFont("helvetica", "bold").text("Airway Status:", 145, 98);
-    doc.setFont("helvetica", "normal").text(airway.status || "Open", 168, 98);
-    doc.setFont("helvetica", "bold").text("Airway Interv:", 145, 104);
-    doc.setFont("helvetica", "normal").text(airway.intervention || "None", 168, 104);
-    doc.setFont("helvetica", "bold").text("GCS Points:", 145, 110);
-    doc.setFont("helvetica", "normal").text(String(pcr.gcsPoints || "15"), 168, 110);
+    doc.setFont("helvetica", "bold").text("Airway Status:", 145, y + 8);
+    doc.setFont("helvetica", "normal").text(airway.status || "Open", 168, y + 8);
+    doc.setFont("helvetica", "bold").text("Airway Interv:", 145, y + 14);
+    doc.setFont("helvetica", "normal").text(airway.intervention || "None", 168, y + 14);
+    doc.setFont("helvetica", "bold").text("GCS Points:", 145, y + 20);
+    doc.setFont("helvetica", "normal").text(String(pcr.gcsPoints || "15"), 168, y + 20);
 
-    doc.setFont("helvetica", "bold").text("Breathing Type:", 18, 120);
-    doc.setFont("helvetica", "normal").text(breathing.status || "No Dyspnea", 42, 120);
-    doc.setFont("helvetica", "bold").text("Oxygen Support:", 18, 126);
-    doc.setFont("helvetica", "normal").text(breathing.oxygen || "O2 not required", 42, 126);
-    doc.setFont("helvetica", "bold").text("Breath Sounds:", 80, 120);
-    doc.setFont("helvetica", "normal").text(breathing.breathSounds || "Clear Breath Sounds", 105, 120);
-    doc.setFont("helvetica", "bold").text("Flow Rate / Del:", 80, 126);
-    doc.setFont("helvetica", "normal").text(`${breathing.lpm || "0"} LPM via ${breathing.delivery || "NC"}`, 105, 126);
+    const breathingOffset = 26 + (bleedLines.length - 1) * 4;
+    doc.setFont("helvetica", "bold").text("Breathing Type:", 18, y + breathingOffset);
+    doc.setFont("helvetica", "normal").text(breathing.status || "No Dyspnea", 42, y + breathingOffset);
+    doc.setFont("helvetica", "bold").text("Oxygen Support:", 18, y + breathingOffset + 6);
+    doc.setFont("helvetica", "normal").text(breathing.oxygen || "O2 not required", 42, y + breathingOffset + 6);
+    doc.setFont("helvetica", "bold").text("Breath Sounds:", 80, y + breathingOffset);
+    doc.setFont("helvetica", "normal").text(breathing.breathSounds || "Clear Breath Sounds", 105, y + breathingOffset);
+    doc.setFont("helvetica", "bold").text("Flow Rate / Del:", 80, y + breathingOffset + 6);
+    doc.setFont("helvetica", "normal").text(`${breathing.lpm || "0"} LPM via ${breathing.delivery || "NC"}`, 105, y + breathingOffset + 6);
+
+    y = y + 3 + boxHeight2 + 6;
+    y = checkPCRPageOverflow(doc, y, 6 + 37 + 10, "PRE-HOSPITAL CARE REPORT");
 
     // --- Section 3: Vital Signs Log (Table) ---
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("VITAL SIGNS LOGS", 14, 142);
+    doc.text("VITAL SIGNS LOGS", 14, y);
 
     doc.setFillColor(243, 244, 246);
-    doc.rect(14, 145, pageWidth - 28, 6, "F");
+    doc.rect(14, y + 3, pageWidth - 28, 6, "F");
     doc.setDrawColor(203, 213, 225);
-    doc.line(14, 151, pageWidth - 14, 151);
+    doc.line(14, y + 9, pageWidth - 14, y + 9);
 
     doc.setFontSize(7.5);
     doc.setTextColor(75, 85, 99);
-    doc.text("TIME", 18, 149);
-    doc.text("BP (mmHg)", 38, 149);
-    doc.text("PR (bpm)", 58, 149);
-    doc.text("O2 SAT (%)", 78, 149);
-    doc.text("RR (cpm)", 98, 149);
-    doc.text("TEMP (°C)", 118, 149);
-    doc.text("PUPIL", 138, 149);
-    doc.text("SKIN STATUS", 158, 149);
+    doc.text("TIME", 18, y + 7);
+    doc.text("BP (mmHg)", 38, y + 7);
+    doc.text("PR (bpm)", 58, y + 7);
+    doc.text("O2 SAT (%)", 78, y + 7);
+    doc.text("RR (cpm)", 98, y + 7);
+    doc.text("TEMP (°C)", 118, y + 7);
+    doc.text("PUPIL", 138, y + 7);
+    doc.text("SKIN STATUS", 158, y + 7);
 
-    let vitalY = 151;
-    const logs = pcr.vitalsLogs || [];
+    let vitalY = y + 9;
+    const vitalsLogs = pcr.vitalsLogs || [];
     for (let i = 0; i < 4; i++) {
-      const log = logs[i] || {};
+      const log = vitalsLogs[i] || {};
       doc.line(14, vitalY + 7, pageWidth - 14, vitalY + 7);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
@@ -967,150 +1006,166 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
       vitalY += 7;
     }
 
+    y = vitalY + 6;
+
+    const sh = pcr.sampleHistory || {};
+    const eventLines = doc.splitTextToSize(sh.eventsLeadingToInjury || "N/A", pageWidth - 65);
+    const boxHeight4 = Math.max(38, 30 + eventLines.length * 4);
+
+    y = checkPCRPageOverflow(doc, y, 6 + boxHeight4 + 10, "PRE-HOSPITAL CARE REPORT");
+
     // --- Section 4: SAMPLE History ---
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("SAMPLE HISTORY", 14, 188);
+    doc.text("SAMPLE HISTORY", 14, y);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(14, 191, pageWidth - 28, 38, "D");
+    doc.rect(14, y + 3, pageWidth - 28, boxHeight4, "D");
 
-    const sh = pcr.sampleHistory || {};
     doc.setTextColor(75, 85, 99);
     doc.setFontSize(8);
 
-    doc.setFont("helvetica", "bold").text("Allergies:", 18, 196);
-    doc.setFont("helvetica", "normal").text(sh.allergies || "None", 45, 196);
-    doc.setFont("helvetica", "bold").text("Medications:", 18, 202);
-    doc.setFont("helvetica", "normal").text(sh.medications || "None", 45, 202);
-    doc.setFont("helvetica", "bold").text("Past Med History:", 18, 208);
-    doc.setFont("helvetica", "normal").text(sh.pastMedicalHistory || "None", 45, 208);
-    doc.setFont("helvetica", "bold").text("Last Oral Intake:", 18, 214);
-    doc.setFont("helvetica", "normal").text(sh.lastOralIntake || "N/A", 45, 214);
-    doc.setFont("helvetica", "bold").text("Events to Injury:", 18, 220);
-    const eventLines = doc.splitTextToSize(sh.eventsLeadingToInjury || "N/A", pageWidth - 65);
-    doc.setFont("helvetica", "normal").text(eventLines, 45, 220);
+    doc.setFont("helvetica", "bold").text("Allergies:", 18, y + 8);
+    doc.setFont("helvetica", "normal").text(sh.allergies || "None", 45, y + 8);
+    doc.setFont("helvetica", "bold").text("Medications:", 18, y + 14);
+    doc.setFont("helvetica", "normal").text(sh.medications || "None", 45, y + 14);
+    doc.setFont("helvetica", "bold").text("Past Med History:", 18, y + 20);
+    doc.setFont("helvetica", "normal").text(sh.pastMedicalHistory || "None", 45, y + 20);
+    doc.setFont("helvetica", "bold").text("Last Oral Intake:", 18, y + 26);
+    doc.setFont("helvetica", "normal").text(sh.lastOralIntake || "N/A", 45, y + 26);
+    doc.setFont("helvetica", "bold").text("Events to Injury:", 18, y + 32);
+    doc.setFont("helvetica", "normal").text(eventLines, 45, y + 32);
+
+    y = y + 3 + boxHeight4 + 6;
+    y = checkPCRPageOverflow(doc, y, 6 + 20 + 10, "PRE-HOSPITAL CARE REPORT");
 
     // --- Section 4.5: Pain Assessment ---
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("PAIN ASSESSMENT", 14, 237);
-
-    doc.setFillColor(255, 255, 255);
-    doc.rect(14, 240, pageWidth - 28, 20, "D");
+    doc.text("PAIN ASSESSMENT", 14, y);
 
     const pa = pcr.painAssessment || {};
+    doc.setFillColor(255, 255, 255);
+    doc.rect(14, y + 3, pageWidth - 28, 20, "D");
+
     doc.setTextColor(75, 85, 99);
     doc.setFontSize(8);
 
-    doc.setFont("helvetica", "bold").text("Location:", 18, 245);
-    doc.setFont("helvetica", "normal").text(pa.location || "N/A", 35, 245);
-    doc.setFont("helvetica", "bold").text("Onset:", 18, 251);
-    doc.setFont("helvetica", "normal").text(pa.onset || "Gradual", 35, 251);
-    doc.setFont("helvetica", "bold").text("Radiation:", 18, 257);
-    doc.setFont("helvetica", "normal").text(pa.radiation || "None", 35, 257);
+    doc.setFont("helvetica", "bold").text("Location:", 18, y + 8);
+    doc.setFont("helvetica", "normal").text(pa.location || "N/A", 35, y + 8);
+    doc.setFont("helvetica", "bold").text("Onset:", 18, y + 14);
+    doc.setFont("helvetica", "normal").text(pa.onset || "Gradual", 35, y + 14);
+    doc.setFont("helvetica", "bold").text("Radiation:", 18, y + 20);
+    doc.setFont("helvetica", "normal").text(pa.radiation || "None", 35, y + 20);
 
-    doc.setFont("helvetica", "bold").text("Time:", 80, 245);
-    doc.setFont("helvetica", "normal").text(pa.time || "N/A", 102, 245);
-    doc.setFont("helvetica", "bold").text("Quality:", 80, 251);
-    doc.setFont("helvetica", "normal").text(pa.quality || "Aching", 102, 251);
+    doc.setFont("helvetica", "bold").text("Time:", 80, y + 8);
+    doc.setFont("helvetica", "normal").text(pa.time || "N/A", 102, y + 8);
+    doc.setFont("helvetica", "bold").text("Quality:", 80, y + 14);
+    doc.setFont("helvetica", "normal").text(pa.quality || "Aching", 102, y + 14);
 
-    doc.setFont("helvetica", "bold").text("Provocation:", 140, 245);
-    doc.setFont("helvetica", "normal").text(pa.provocation || "None", 162, 245);
-    doc.setFont("helvetica", "bold").text("Severity (1-10):", 140, 251);
-    doc.setFont("helvetica", "normal").text(String(pa.severity || "5"), 162, 251);
-
-    // Footer Page 1
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(156, 163, 175);
-    doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12);
-    doc.text("CDRRMO Baliwag City DisasTRACE - Pre-Hospital Care Logs (Front)", 14, pageHeight - 8);
-    doc.text("Page 1 of 2", pageWidth - 28, pageHeight - 8);
+    doc.setFont("helvetica", "bold").text("Provocation:", 140, y + 8);
+    doc.setFont("helvetica", "normal").text(pa.provocation || "None", 162, y + 8);
+    doc.setFont("helvetica", "bold").text("Severity (1-10):", 140, y + 14);
+    doc.setFont("helvetica", "normal").text(String(pa.severity || "5"), 162, y + 14);
 
     // PAGE 2: PRE-HOSPITAL CARE REPORT (PC2 - BACK)
     doc.addPage();
 
-    // --- Header ---
-    doc.setFillColor(30, 58, 138); // Navy
-    doc.rect(0, 0, pageWidth, 20, "F");
-    doc.setFillColor(239, 68, 68); // Red
-    doc.rect(0, 20, pageWidth, 1.5, "F");
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("PRE-HOSPITAL CARE REPORT - CLINICAL EVALUATION & LIABILITY RELEASE", 14, 12);
+    drawPCRPageHeader(doc, "PRE-HOSPITAL CARE REPORT - CLINICAL EVALUATION & LIABILITY RELEASE");
+    let y2 = 28;
 
     // --- Section 5: Physical Injury Markers (Trauma Areas) ---
+    const tm = pcr.traumaMarkers || [];
+    const tmText = tm.length > 0 ? tm.join(", ") : "No traumatic injuries marked on body diagram.";
+    const tmLines = doc.splitTextToSize(`Identified Injury Areas: ${tmText}`, pageWidth - 36);
+    const boxHeight5 = Math.max(22, 6 + tmLines.length * 4.5);
+
+    y2 = checkPCRPageOverflow(doc, y2, 6 + boxHeight5 + 10, "PRE-HOSPITAL CARE REPORT - CLINICAL EVALUATION & LIABILITY RELEASE");
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("TRAUMA INJURY MARKERS", 14, 28);
+    doc.text("TRAUMA INJURY MARKERS", 14, y2);
 
     doc.setFillColor(249, 250, 251);
     doc.setDrawColor(203, 213, 225);
-    doc.rect(14, 31, pageWidth - 28, 22, "FD");
+    doc.rect(14, y2 + 3, pageWidth - 28, boxHeight5, "FD");
 
     doc.setTextColor(75, 85, 99);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
-    const tm = pcr.traumaMarkers || [];
-    const tmText = tm.length > 0 ? tm.join(", ") : "No traumatic injuries marked on body diagram.";
-    const tmLines = doc.splitTextToSize(`Identified Injury Areas: ${tmText}`, pageWidth - 36);
-    doc.text(tmLines, 18, 37);
+    doc.text(tmLines, 18, y2 + 9);
+
+    y2 = y2 + 3 + boxHeight5 + 6;
 
     // --- Section 6: Narrative Report ---
+    const narrativeLines = doc.splitTextToSize(pcr.narrativeReport || "No narrative report provided.", pageWidth - 36);
+    const boxHeight6 = Math.max(30, 6 + narrativeLines.length * 4.5);
+
+    y2 = checkPCRPageOverflow(doc, y2, 6 + boxHeight6 + 10, "PRE-HOSPITAL CARE REPORT - CLINICAL EVALUATION & LIABILITY RELEASE");
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("NARRATIVE REPORT", 14, 60);
+    doc.text("NARRATIVE REPORT", 14, y2);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(14, 63, pageWidth - 28, 55, "D");
+    doc.rect(14, y2 + 3, pageWidth - 28, boxHeight6, "D");
 
     doc.setTextColor(55, 65, 81);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    const narrativeLines = doc.splitTextToSize(pcr.narrativeReport || "No narrative report provided.", pageWidth - 36);
-    doc.text(narrativeLines, 18, 69);
+    doc.text(narrativeLines, 18, y2 + 9);
+
+    y2 = y2 + 3 + boxHeight6 + 6;
 
     // --- Section 7: Release of Liability ---
-    doc.setTextColor(30, 58, 138);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text("RELEASE OF LIABILITY / REFUSAL OF TREATMENT", 14, 125);
-
-    doc.setFillColor(249, 250, 251);
-    doc.rect(14, 128, pageWidth - 28, 48, "FD");
-
     const lr = pcr.liabilityRelease || {};
-    doc.setTextColor(55, 65, 81);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-
     const refText = lr.refused
       ? `REFUSAL TO CONSENT TO TREATMENT / TRANSPORT ACTIVATED:\n"I, the undersigned, have been advised that medical assistance on my or the patient's behalf is necessary and that my refusal to allow such assistance/request transport to another facility may result in death or endanger my health. I assume all responsibility for the consequences of my decision."`
       : "The patient consented to medical assistance and/or transport to the receiving medical facility. No refusal of liability occurred during response.";
     const refLines = doc.splitTextToSize(refText, pageWidth - 36);
-    doc.text(refLines, 18, 134);
 
+    let boxHeight7 = 10 + refLines.length * 4.2;
     if (lr.refused) {
-      doc.setFont("helvetica", "bold").text("Patient Signature: [SIGNED]", 18, 164);
-      doc.setFont("helvetica", "bold").text(`Witnessed By: ${lr.witnessedBy || "N/A"}`, 100, 164);
-      doc.setFont("helvetica", "bold").text(`Witness Address: ${lr.witnessAddress || "N/A"}`, 100, 170);
+      boxHeight7 += 20; // Extra height for signatures
     }
 
-    // --- Section 8: Signatures & Handoff ---
+    y2 = checkPCRPageOverflow(doc, y2, 6 + boxHeight7 + 10, "PRE-HOSPITAL CARE REPORT - CLINICAL EVALUATION & LIABILITY RELEASE");
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("HANDOFF & SIGNATURES", 14, 182);
+    doc.text("RELEASE OF LIABILITY / REFUSAL OF TREATMENT", 14, y2);
+
+    doc.setFillColor(249, 250, 251);
+    doc.rect(14, y2 + 3, pageWidth - 28, boxHeight7, "FD");
+
+    doc.setTextColor(55, 65, 81);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text(refLines, 18, y2 + 9);
+
+    if (lr.refused) {
+      doc.setFont("helvetica", "bold").text("Patient Signature: [SIGNED]", 18, y2 + 9 + refLines.length * 4.2 + 8);
+      doc.setFont("helvetica", "bold").text(`Witnessed By: ${lr.witnessedBy || "N/A"}`, 100, y2 + 9 + refLines.length * 4.2 + 8);
+      doc.setFont("helvetica", "bold").text(`Witness Address: ${lr.witnessAddress || "N/A"}`, 100, y2 + 9 + refLines.length * 4.2 + 14);
+    }
+
+    y2 = y2 + 3 + boxHeight7 + 6;
+
+    // --- Section 8: Signatures & Handoff ---
+    y2 = checkPCRPageOverflow(doc, y2, 6 + 44 + 10, "PRE-HOSPITAL CARE REPORT - CLINICAL EVALUATION & LIABILITY RELEASE");
+
+    doc.setTextColor(30, 58, 138);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("HANDOFF & SIGNATURES", 14, y2);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(14, 185, pageWidth - 28, 44, "D");
+    doc.rect(14, y2 + 3, pageWidth - 28, 44, "D");
 
     const hs = pcr.handoffSignatures || {};
     const rt = pcr.respondingTeam || {};
@@ -1144,49 +1199,59 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
           ? "N/A (Resolved on Scene)"
           : "N/A";
 
-    // Row 1 (y=191)
-    doc.setFont("helvetica", "bold").text("PCR Accomplished By:", 18, 191);
-    doc.setFont("helvetica", "normal").text(hs.accomplishedBy || "Ambulance Team Leader", 55, 191);
-    doc.setFont("helvetica", "bold").text("Receiving Physician:", 110, 191);
-    doc.setFont("helvetica", "normal").text(receivingPhysicianText, 145, 191);
+    // Row 1
+    doc.setFont("helvetica", "bold").text("PCR Accomplished By:", 18, y2 + 9);
+    doc.setFont("helvetica", "normal").text(hs.accomplishedBy || "Ambulance Team Leader", 55, y2 + 9);
+    doc.setFont("helvetica", "bold").text("Receiving Physician:", 110, y2 + 9);
+    doc.setFont("helvetica", "normal").text(receivingPhysicianText, 145, y2 + 9);
 
-    // Row 2 (y=197)
-    doc.setFont("helvetica", "bold").text("Acc. License No:", 18, 197);
-    doc.setFont("helvetica", "normal").text(hs.accomplishedByLicense || hs.licenseNo || "N/A", 55, 197);
-    doc.setFont("helvetica", "bold").text("Phys. License No:", 110, 197);
-    doc.setFont("helvetica", "normal").text(hs.receivingPhysicianLicense || "N/A", 145, 197);
+    // Row 2
+    doc.setFont("helvetica", "bold").text("Acc. License No:", 18, y2 + 15);
+    doc.setFont("helvetica", "normal").text(hs.accomplishedByLicense || hs.licenseNo || "N/A", 55, y2 + 15);
+    doc.setFont("helvetica", "bold").text("Phys. License No:", 110, y2 + 15);
+    doc.setFont("helvetica", "normal").text(hs.receivingPhysicianLicense || "N/A", 145, y2 + 15);
 
-    // Row 3 (y=203)
-    doc.setFont("helvetica", "bold").text("Receiving Hospital:", 18, 203);
-    doc.setFont("helvetica", "normal").text(receivingHospitalText, 55, 203);
-    doc.setFont("helvetica", "bold").text("Arrival Time:", 110, 203);
-    doc.setFont("helvetica", "normal").text(arrivalTimeText, 145, 203);
+    // Row 3
+    doc.setFont("helvetica", "bold").text("Receiving Hospital:", 18, y2 + 21);
+    doc.setFont("helvetica", "normal").text(receivingHospitalText, 55, y2 + 21);
+    doc.setFont("helvetica", "bold").text("Arrival Time:", 110, y2 + 21);
+    doc.setFont("helvetica", "normal").text(arrivalTimeText, 145, y2 + 21);
 
-    // Row 4 (y=209)
-    doc.setFont("helvetica", "bold").text("Referred To:", 18, 209);
-    doc.setFont("helvetica", "normal").text(hs.referredTo || "N/A", 55, 209);
-    doc.setFont("helvetica", "bold").text("Ref. License No:", 110, 209);
-    doc.setFont("helvetica", "normal").text(hs.referredToLicense || "N/A", 145, 209);
+    // Row 4
+    doc.setFont("helvetica", "bold").text("Referred To:", 18, y2 + 27);
+    doc.setFont("helvetica", "normal").text(hs.referredTo || "N/A", 55, y2 + 27);
+    doc.setFont("helvetica", "bold").text("Ref. License No:", 110, y2 + 27);
+    doc.setFont("helvetica", "normal").text(hs.referredToLicense || "N/A", 145, y2 + 27);
 
-    // Row 5 (y=215)
-    doc.setFont("helvetica", "bold").text("Team Leader:", 18, 215);
-    doc.setFont("helvetica", "normal").text(rt.teamLeader || "N/A", 55, 215);
-    doc.setFont("helvetica", "bold").text("Team Members:", 110, 215);
-    doc.setFont("helvetica", "normal").text(rt.teamMembers || "N/A", 145, 215);
+    // Row 5
+    doc.setFont("helvetica", "bold").text("Team Leader:", 18, y2 + 33);
+    doc.setFont("helvetica", "normal").text(rt.teamLeader || "N/A", 55, y2 + 33);
+    doc.setFont("helvetica", "bold").text("Team Members:", 110, y2 + 33);
+    doc.setFont("helvetica", "normal").text(rt.teamMembers || "N/A", 145, y2 + 33);
 
-    // Row 6 (y=221)
-    doc.setFont("helvetica", "bold").text("Ambulance Driver:", 18, 221);
-    doc.setFont("helvetica", "normal").text(rt.driver || "N/A", 55, 221);
+    // Row 6
+    doc.setFont("helvetica", "bold").text("Ambulance Driver:", 18, y2 + 39);
+    doc.setFont("helvetica", "normal").text(rt.driver || "N/A", 55, y2 + 39);
 
-    // Footer Page 2
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(156, 163, 175);
-    doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12);
-    doc.text("CDRRMO Baliwag City DisasTRACE - Pre-Hospital Care Logs (Back)", 14, pageHeight - 8);
-    doc.text("Page 2 of 2", pageWidth - 28, pageHeight - 8);
+    // --- Footer Page Numbers and Lines ---
+    const addPCRFooters = (d: any, patientName: string) => {
+      const totalPages = d.internal.getNumberOfPages();
+      const pageH = d.internal.pageSize.height;
+      const pageW = d.internal.pageSize.width;
+      for (let j = 1; j <= totalPages; j++) {
+        d.setPage(j);
+        d.setFont("helvetica", "normal");
+        d.setFontSize(8);
+        d.setTextColor(156, 163, 175);
+        d.line(14, pageH - 12, pageW - 14, pageH - 12);
+        d.text(`CDRRMO Baliwag City DisasTRACE - Pre-Hospital Care Logs (${j === 1 ? "Front" : "Back"})`, 14, pageH - 8);
+        d.text(`Page ${j} of ${totalPages}`, pageW - 28, pageH - 8);
+      }
+    };
 
-    doc.save(`CDRRMO_PCR_${pcr.patientName.replace(/\s+/g, "_") || reportId}.pdf`);
+    addPCRFooters(doc, pcr.patientName || "Patient");
+
+    doc.save(`CDRRMO_PCR_${(pcr.patientName || "Patient").replace(/\s+/g, "_") || reportId}.pdf`);
     return true;
   } catch (error) {
     console.error("Failed to generate Patient Care PDF:", error);
@@ -1194,9 +1259,6 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
   }
 }
 
-/**
- * Exports a high-fidelity Driver's Trip Ticket (PC3) as a PDF
- */
 export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
   if (typeof window === "undefined") return;
 
@@ -1212,7 +1274,28 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
     const pageHeight = doc.internal.pageSize.height;
     const pageWidth = doc.internal.pageSize.width;
 
-    // --- Header Banner ---
+    const drawDTTPageHeader = (d: any, title: string) => {
+      d.setFillColor(30, 58, 138); // Navy
+      d.rect(0, 0, pageWidth, 20, "F");
+      d.setFillColor(239, 68, 68); // Red
+      d.rect(0, 20, pageWidth, 1.5, "F");
+
+      d.setTextColor(255, 255, 255);
+      d.setFont("helvetica", "bold");
+      d.setFontSize(11);
+      d.text(title, 14, 12);
+    };
+
+    const checkDTTPageOverflow = (d: any, currentY: number, heightNeeded: number, title: string) => {
+      if (currentY + heightNeeded > pageHeight - 20) {
+        d.addPage();
+        drawDTTPageHeader(d, title);
+        return 28;
+      }
+      return currentY;
+    };
+
+    // First Page Banner
     doc.setFillColor(30, 58, 138); // Navy
     doc.rect(0, 0, pageWidth, 25, "F");
     doc.setFillColor(239, 68, 68); // Red
@@ -1236,9 +1319,23 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
     doc.setFontSize(9.5);
     doc.text("1. TRIP & VEHICLE DETAILS", 14, 33);
 
+    const passLines = doc.splitTextToSize(ticket.passengerName || "Responder Crew", 130);
+    const placesLines = doc.splitTextToSize(ticket.placesVisited || "Baliwag City", 130);
+    const purposeLines = doc.splitTextToSize(ticket.purpose || "Emergency Medical Response", 130);
+
+    let offset = 22;
+    const passOffset = offset;
+    offset += passLines.length * 4.5 + 1.5;
+    const placesOffset = offset;
+    offset += placesLines.length * 4.5 + 1.5;
+    const purposeOffset = offset;
+    offset += purposeLines.length * 4.5 + 1.5;
+
+    const boxHeight1 = Math.max(offset, 48);
+
     doc.setFillColor(249, 250, 251);
     doc.setDrawColor(203, 213, 225);
-    doc.rect(14, 36, pageWidth - 28, 48, "FD");
+    doc.rect(14, 36, pageWidth - 28, boxHeight1, "FD");
 
     doc.setTextColor(75, 85, 99);
     doc.setFont("helvetica", "normal");
@@ -1253,117 +1350,143 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
     doc.setFont("helvetica", "normal").text(ticket.vehiclePlate || "AMB-001", 55, 50);
 
     doc.setFont("helvetica", "bold").text("Authorized Passengers:", 18, 58);
-    doc.setFont("helvetica", "normal").text(ticket.passengerName || "Responder Crew", 55, 58);
+    doc.setFont("helvetica", "normal").text(passLines, 55, 58);
 
-    doc.setFont("helvetica", "bold").text("Places Visited:", 18, 66);
-    doc.setFont("helvetica", "normal").text(ticket.placesVisited || "Baliwag City", 55, 66);
+    doc.setFont("helvetica", "bold").text("Places Visited:", 18, 36 + placesOffset);
+    doc.setFont("helvetica", "normal").text(placesLines, 55, 36 + placesOffset);
 
-    doc.setFont("helvetica", "bold").text("Purpose of Travel:", 18, 74);
-    doc.setFont("helvetica", "normal").text(ticket.purpose || "Emergency Medical Response", 55, 74);
+    doc.setFont("helvetica", "bold").text("Purpose of Travel:", 18, 36 + purposeOffset);
+    doc.setFont("helvetica", "normal").text(purposeLines, 55, 36 + purposeOffset);
 
-    // --- Section 2: Time & Distance Logs ---
+    let y = 36 + boxHeight1 + 6;
+
+    // --- Section 2: Logistics Log (Times & Speedometer) ---
+    const sm = ticket.speedometer || {};
+    const tl = ticket.tripLog || {};
+    const remarkLines = doc.splitTextToSize(sm.remarks || "No defects reported.", pageWidth - 150 - 6);
+    const boxHeight2 = Math.max(38, 18 + remarkLines.length * 4.5);
+
+    y = checkDTTPageOverflow(doc, y, 6 + boxHeight2 + 10, "RESCUE 5 FVE - BALIWAG DRRMO OFFICE - DRIVER'S TRIP TICKET");
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
-    doc.text("2. LOGISTICS LOG (TIMES & SPEEDOMETER)", 14, 91);
+    doc.text("2. LOGISTICS LOG (TIMES & SPEEDOMETER)", 14, y);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(14, 94, pageWidth - 28, 38, "D");
-
-    const tl = ticket.tripLog || {};
-    const sm = ticket.speedometer || {};
+    doc.rect(14, y + 3, pageWidth - 28, boxHeight2, "D");
     doc.setTextColor(75, 85, 99);
 
-    doc.setFont("helvetica", "bold").text("Departure Office/Garage:", 18, 100);
-    doc.setFont("helvetica", "normal").text(tl.departureOffice || "N/A", 58, 100);
-    doc.setFont("helvetica", "bold").text("Arrival Scene:", 18, 106);
-    doc.setFont("helvetica", "normal").text(tl.arrivalScene || "N/A", 58, 106);
-    doc.setFont("helvetica", "bold").text("Departure Scene:", 18, 112);
-    doc.setFont("helvetica", "normal").text(tl.departureScene || "N/A", 58, 112);
-    doc.setFont("helvetica", "bold").text("Arrival Office/Garage:", 18, 118);
-    doc.setFont("helvetica", "normal").text(tl.arrivalOffice || "N/A", 58, 118);
+    doc.setFont("helvetica", "bold").text("Departure Office/Garage:", 18, y + 9);
+    doc.setFont("helvetica", "normal").text(tl.departureOffice || "N/A", 58, y + 9);
+    doc.setFont("helvetica", "bold").text("Arrival Scene:", 18, y + 15);
+    doc.setFont("helvetica", "normal").text(tl.arrivalScene || "N/A", 58, y + 15);
+    doc.setFont("helvetica", "bold").text("Departure Scene:", 18, y + 21);
+    doc.setFont("helvetica", "normal").text(tl.departureScene || "N/A", 58, y + 21);
+    doc.setFont("helvetica", "bold").text("Arrival Office/Garage:", 18, y + 27);
+    doc.setFont("helvetica", "normal").text(tl.arrivalOffice || "N/A", 58, y + 27);
 
-    doc.setFont("helvetica", "bold").text("Distance Travelled:", 110, 100);
-    doc.setFont("helvetica", "normal").text(`${tl.distance || "0"} km`, 150, 100);
-    doc.setFont("helvetica", "bold").text("Speedometer Begin:", 110, 106);
-    doc.setFont("helvetica", "normal").text(`${sm.beginning || "0"} km`, 150, 106);
-    doc.setFont("helvetica", "bold").text("Log Remarks:", 110, 112);
-    const remarkLines = doc.splitTextToSize(sm.remarks || "No defects reported.", pageWidth - 150 - 6);
-    doc.setFont("helvetica", "normal").text(remarkLines, 150, 112);
+    doc.setFont("helvetica", "bold").text("Distance Travelled:", 110, y + 9);
+    doc.setFont("helvetica", "normal").text(`${tl.distance || "0"} km`, 150, y + 9);
+    doc.setFont("helvetica", "bold").text("Speedometer Begin:", 110, y + 15);
+    doc.setFont("helvetica", "normal").text(`${sm.beginning || "0"} km`, 150, y + 15);
+    doc.setFont("helvetica", "bold").text("Log Remarks:", 110, y + 21);
+    doc.setFont("helvetica", "normal").text(remarkLines, 150, y + 21);
 
-    // --- Section 3: Fuel & Lubricants ---
+    y = y + 3 + boxHeight2 + 6;
+
+    // --- Section 3: Fuel Consumption & Lubricants ---
+    y = checkDTTPageOverflow(doc, y, 6 + 38 + 10, "RESCUE 5 FVE - BALIWAG DRRMO OFFICE - DRIVER'S TRIP TICKET");
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
-    doc.text("3. FUEL CONSUMPTION & LUBRICANTS", 14, 139);
+    doc.text("3. FUEL CONSUMPTION & LUBRICANTS", 14, y);
 
     doc.setFillColor(249, 250, 251);
-    doc.rect(14, 142, pageWidth - 28, 38, "FD");
+    doc.rect(14, y + 3, pageWidth - 28, 38, "FD");
 
     const gc = ticket.gasolineConsumed || {};
     const lubes = ticket.lubricants || {};
 
     doc.setTextColor(75, 85, 99);
-    doc.setFont("helvetica", "bold").text("Balance in Tank:", 18, 148);
-    doc.setFont("helvetica", "normal").text(`${gc.balance || "0"} Liters`, 48, 148);
-    doc.setFont("helvetica", "bold").text("Issued from Stock:", 18, 154);
-    doc.setFont("helvetica", "normal").text(`${gc.issued || "0"} Liters`, 48, 154);
-    doc.setFont("helvetica", "bold").text("Add. Purchase:", 18, 160);
-    doc.setFont("helvetica", "normal").text(`${gc.purchase || "0"} Liters`, 48, 160);
-    doc.setFont("helvetica", "bold").text("Total Fuel:", 18, 166);
-    doc.setFont("helvetica", "normal").text(`${gc.total || "0"} Liters`, 48, 166);
+    doc.setFont("helvetica", "bold").text("Balance in Tank:", 18, y + 9);
+    doc.setFont("helvetica", "normal").text(`${gc.balance || "0"} Liters`, 48, y + 9);
+    doc.setFont("helvetica", "bold").text("Issued from Stock:", 18, y + 15);
+    doc.setFont("helvetica", "normal").text(`${gc.issued || "0"} Liters`, 48, y + 15);
+    doc.setFont("helvetica", "bold").text("Add. Purchase:", 18, y + 21);
+    doc.setFont("helvetica", "normal").text(`${gc.purchase || "0"} Liters`, 48, y + 21);
+    doc.setFont("helvetica", "bold").text("Total Fuel:", 18, y + 27);
+    doc.setFont("helvetica", "normal").text(`${gc.total || "0"} Liters`, 48, y + 27);
 
-    doc.setFont("helvetica", "bold").text("Trip Deduction:", 80, 148);
-    doc.setFont("helvetica", "normal").text(`${gc.deduction || "0"} Liters`, 112, 148);
-    doc.setFont("helvetica", "bold").text("End Balance:", 80, 154);
-    doc.setFont("helvetica", "normal").text(`${gc.balanceEnd || "0"} Liters`, 112, 154);
+    doc.setFont("helvetica", "bold").text("Trip Deduction:", 80, y + 9);
+    doc.setFont("helvetica", "normal").text(`${gc.deduction || "0"} Liters`, 112, y + 9);
+    doc.setFont("helvetica", "bold").text("End Balance:", 80, y + 15);
+    doc.setFont("helvetica", "normal").text(`${gc.balanceEnd || "0"} Liters`, 112, y + 15);
 
-    doc.setFont("helvetica", "bold").text("Car Oil Used:", 142, 148);
-    doc.setFont("helvetica", "normal").text(`${lubes.carOil || "0"} Liters`, 172, 148);
-    doc.setFont("helvetica", "bold").text("Lube Oil Used:", 142, 154);
-    doc.setFont("helvetica", "normal").text(`${lubes.lubeOil || "0"} Liters`, 172, 154);
-    doc.setFont("helvetica", "bold").text("Grease Used:", 142, 160);
-    doc.setFont("helvetica", "normal").text(`${lubes.grease || "0"} kg`, 172, 160);
+    doc.setFont("helvetica", "bold").text("Car Oil Used:", 142, y + 9);
+    doc.setFont("helvetica", "normal").text(`${lubes.carOil || "0"} Liters`, 172, y + 9);
+    doc.setFont("helvetica", "bold").text("Lube Oil Used:", 142, y + 15);
+    doc.setFont("helvetica", "normal").text(`${lubes.lubeOil || "0"} Liters`, 172, y + 15);
+    doc.setFont("helvetica", "bold").text("Grease Used:", 142, y + 21);
+    doc.setFont("helvetica", "normal").text(`${lubes.grease || "0"} kg`, 172, y + 21);
 
-    // Remarks
+    y = y + 3 + 38 + 6;
+
+    // --- Section 4: General Remarks ---
+    const generalRemarks = doc.splitTextToSize(ticket.remarks || "No trip remarks logged. Vehicle operations completed normal scene transport parameters.", pageWidth - 36);
+    const boxHeight4 = Math.max(20, 6 + generalRemarks.length * 4.5);
+
+    y = checkDTTPageOverflow(doc, y, 6 + boxHeight4 + 10, "RESCUE 5 FVE - BALIWAG DRRMO OFFICE - DRIVER'S TRIP TICKET");
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
-    doc.text("4. GENERAL TRIP REMARKS & NOTES", 14, 187);
+    doc.text("4. GENERAL TRIP REMARKS & NOTES", 14, y);
     doc.setFillColor(255, 255, 255);
-    doc.rect(14, 190, pageWidth - 28, 20, "D");
+    doc.rect(14, y + 3, pageWidth - 28, boxHeight4, "D");
     doc.setTextColor(55, 65, 81);
     doc.setFont("helvetica", "normal");
-    const generalRemarks = doc.splitTextToSize(ticket.remarks || "No trip remarks logged. Vehicle operations completed normal scene transport parameters.", pageWidth - 36);
-    doc.text(generalRemarks, 18, 196);
+    doc.text(generalRemarks, 18, y + 9);
+
+    y = y + 3 + boxHeight4 + 6;
 
     // --- Signatures ---
-    const sigY = 222;
+    y = checkDTTPageOverflow(doc, y, 32, "RESCUE 5 FVE - BALIWAG DRRMO OFFICE - DRIVER'S TRIP TICKET");
+
     doc.setTextColor(75, 85, 99);
-    doc.line(14, sigY, pageWidth - 14, sigY);
+    doc.line(14, y, pageWidth - 14, y);
 
-    doc.text("Driver Signature:", 18, sigY + 6);
-    doc.line(18, sigY + 16, 75, sigY + 16);
+    doc.text("Driver Signature:", 18, y + 6);
+    doc.line(18, y + 16, 75, y + 16);
     doc.setFont("helvetica", "bold");
-    doc.text(ticket.driverName || "Ambulance Driver", 18, sigY + 20);
+    doc.text(ticket.driverName || "Ambulance Driver", 18, y + 20);
     doc.setFont("helvetica", "normal");
-    doc.text(`Cellphone: ${ticket.signatures?.driverPhone || "N/A"}`, 18, sigY + 25);
+    doc.text(`Cellphone: ${ticket.signatures?.driverPhone || "N/A"}`, 18, y + 25);
 
-    doc.text("Authorized Chief/Representative:", 110, sigY + 6);
-    doc.line(110, sigY + 16, 185, sigY + 16);
+    doc.text("Authorized Chief/Representative:", 110, y + 6);
+    doc.line(110, y + 16, 185, y + 16);
     doc.setFont("helvetica", "bold");
-    doc.text("CDRRMO OFFICE REPRESENTATIVE", 110, sigY + 20);
+    doc.text("CDRRMO OFFICE REPRESENTATIVE", 110, y + 20);
 
-    // Footer
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(156, 163, 175);
-    doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12);
-    doc.text("CDRRMO Baliwag City Rescue 5 FVE - Official Vehicle Trip Ticket logs", 14, pageHeight - 8);
-    doc.text("Page 1 of 1", pageWidth - 28, pageHeight - 8);
+    const addDTTFooters = (d: any) => {
+      const totalPages = d.internal.getNumberOfPages();
+      const pageH = d.internal.pageSize.height;
+      const pageW = d.internal.pageSize.width;
+      for (let j = 1; j <= totalPages; j++) {
+        d.setPage(j);
+        d.setFont("helvetica", "normal");
+        d.setFontSize(8);
+        d.setTextColor(156, 163, 175);
+        d.line(14, pageH - 12, pageW - 14, pageH - 12);
+        d.text("CDRRMO Baliwag City Rescue 5 FVE - Official Vehicle Trip Ticket logs", 14, pageH - 8);
+        d.text(`Page ${j} of ${totalPages}`, pageW - 28, pageH - 8);
+      }
+    };
 
-    doc.save(`CDRRMO_TripTicket_DTT_${reportId}.pdf`);
+    addDTTFooters(doc);
+
+    doc.save(`CDRRMO_TripTicket_DTT_&{reportId}.pdf`.replace('&', ''));
     return true;
   } catch (error) {
     console.error("Failed to generate Trip Ticket PDF:", error);
     throw error;
   }
 }
-

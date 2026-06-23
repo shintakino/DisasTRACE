@@ -206,7 +206,7 @@ export function ReportDetailSheet({
                         </div>
                         <div className="flex justify-between items-center text-[13px]">
                           <span className="text-slate-500 font-medium">People Involved</span>
-                          <span className="font-bold text-[#1A237E]">{report.peopleInvolved || 3}</span>
+                          <span className="font-bold text-[#1A237E]">{report.residentPeopleInvolved || report.peopleInvolved || 2}</span>
                         </div>
                         <div className="flex justify-between items-center text-[13px] pt-1">
                           <span className="text-slate-500 font-medium self-start">Location</span>
@@ -268,7 +268,7 @@ export function ReportDetailSheet({
                           </div>
                           <div className="flex justify-between items-center text-[13px]">
                             <span className="text-slate-500 font-medium">People Involved</span>
-                            <span className="font-bold text-[#1A237E]">{report.peopleInvolved || 3}</span>
+                            <span className="font-bold text-[#1A237E]">{report.peopleInvolved || 1}</span>
                           </div>
                           <div className="flex justify-between items-center text-[13px] pt-1">
                             <span className="text-slate-500 font-medium self-start">Location</span>

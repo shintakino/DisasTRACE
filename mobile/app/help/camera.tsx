@@ -76,8 +76,13 @@ export default function CameraScreen() {
             }
           }
 
-          // If EXIF says it needs rotation (and we haven't manually overridden it), apply EXIF
-          if (actions.length === 0 && photo.exif && photo.exif.Orientation) {
+          // If EXIF says it needs rotation (and we haven't manually overridden it), apply EXIF.
+          // Only fall back to EXIF if the device orientation was UNKNOWN, to prevent double-rotation
+          // on devices where the camera API has already rotated the physical pixel buffer.
+          if (actions.length === 0 && 
+              currentOrientation === ScreenOrientation.Orientation.UNKNOWN && 
+              photo.exif && 
+              photo.exif.Orientation) {
             const exifOrientation = photo.exif.Orientation;
             if (exifOrientation === 6) actions = [{ rotate: 90 }];
             else if (exifOrientation === 3) actions = [{ rotate: 180 }];

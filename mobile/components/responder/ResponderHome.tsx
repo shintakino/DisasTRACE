@@ -374,6 +374,10 @@ export function ResponderHome() {
 
     console.log('[ResponderHome] Setting up real-time dispatch listener for responder ID:', user.id);
 
+    // Clean up any existing channel with the same static name to avoid duplicate listener errors on login/logout
+    const existingChannel = supabase.channel('incoming-dispatches');
+    supabase.removeChannel(existingChannel);
+
     const channel = supabase
       .channel('incoming-dispatches')
       .on(

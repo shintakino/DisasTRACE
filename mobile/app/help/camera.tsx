@@ -47,64 +47,52 @@ export default function CameraScreen() {
         const currentOrientation = await ScreenOrientation.getOrientationAsync();
         
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
+          quality: 0.5,
           base64: false,
-          exif: false,
-          skipProcessing: true,
+          exif: true,
         });
         
         if (photo) {
           let actions: ImageManipulator.Action[] = [];
           
-          // Force rotation based on the physical screen orientation vs photo aspect ratio
-          const isPhotoPortrait = photo.width < photo.height;
+          // Read EXIF orientation to determine required rotation
+          const exifOrientation = photo.exif?.Orientation ?? photo.exif?.orientation;
+          let rotation = 0;
           
-          if (isPhotoPortrait) {
-            if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT) {
+          if (exifOrientation === 6 || exifOrientation === '6') {
+            rotation = 90;
+          } else if (exifOrientation === 3 || exifOrientation === '3') {
+            rotation = 180;
+          } else if (exifOrientation === 8 || exifOrientation === '8') {
+            rotation = 270;
+          }
+          
+          if (rotation !== 0) {
+            actions = [{ rotate: rotation }];
+          } else if (!exifOrientation) {
+            // Fallback if EXIF orientation is missing: use screen orientation vs photo dimensions
+            const isPhotoPortrait = photo.width < photo.height;
+            const isDevicePortrait = 
+              currentOrientation === ScreenOrientation.Orientation.PORTRAIT_UP ||
+              currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN;
+              
+            if (isDevicePortrait && !isPhotoPortrait) {
               actions = [{ rotate: 90 }];
-            } else if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT) {
-              actions = [{ rotate: -90 }];
-            } else if (currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
-              actions = [{ rotate: 180 }];
-            }
-          } else {
-            if (currentOrientation === ScreenOrientation.Orientation.PORTRAIT_UP) {
+            } else if (!isDevicePortrait && isPhotoPortrait) {
               actions = [{ rotate: 90 }];
-            } else if (currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
-              actions = [{ rotate: 270 }];
-            } else if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT) {
-              actions = [{ rotate: 180 }];
             }
           }
 
-          // If EXIF says it needs rotation (and we haven't manually overridden it), apply EXIF.
-          // Only fall back to EXIF if the device orientation was UNKNOWN, to prevent double-rotation
-          // on devices where the camera API has already rotated the physical pixel buffer.
-          if (actions.length === 0 && 
-              currentOrientation === ScreenOrientation.Orientation.UNKNOWN && 
-              photo.exif && 
-              photo.exif.Orientation) {
-            const exifOrientation = photo.exif.Orientation;
-            if (exifOrientation === 6) actions = [{ rotate: 90 }];
-            else if (exifOrientation === 3) actions = [{ rotate: 180 }];
-            else if (exifOrientation === 8) actions = [{ rotate: 270 }];
-          }
-
-          let finalUri = photo.uri;
+          // Always run ImageManipulator to compress the image and strip/normalize EXIF orientation to 1.
+          // This ensures the file size is small (~500KB-1MB) for fast uploads and resolves
+          // cross-platform rendering discrepancies in React Native <Image> and web dashboards.
+          const manipResult = await ImageManipulator.manipulateAsync(
+            photo.uri,
+            actions,
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+          );
           
-          // Only perform image manipulation if we actually have rotation actions to apply.
-          // This avoids the expensive CPU overhead of decoding, recompressing, and rewriting
-          // a high-resolution image file when no changes are needed.
-          if (actions.length > 0) {
-            const manipResult = await ImageManipulator.manipulateAsync(
-              photo.uri,
-              actions,
-              { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
-            );
-            finalUri = manipResult.uri;
-          }
-          
-          setPhotoUri(finalUri);
+          setPhotoUri(manipResult.uri);
           router.push('/help/preview');
         }
       } catch (e) {

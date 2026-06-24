@@ -73,11 +73,17 @@ export default function CameraScreen() {
             // the device orientation, to prevent double-rotating photos that are already portrait.
             if (!isMatch) {
               rotation = 90;
+            } else {
+              // Pixels are already rotated, but EXIF orientation is stale (6).
+              // We apply a dummy rotate (0 degrees) to force ImageManipulator to write a clean EXIF header with Orientation: 1.
+              actions = [{ rotate: 0 }];
             }
           } else if (exifOrientation === 8 || exifOrientation === '8') {
             // 270 degrees CW (90 CCW) rotation. Only apply if aspect ratios mismatch.
             if (!isMatch) {
               rotation = 270;
+            } else {
+              actions = [{ rotate: 0 }];
             }
           }
           

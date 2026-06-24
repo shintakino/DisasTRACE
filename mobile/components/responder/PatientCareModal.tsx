@@ -1,7 +1,160 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Plus, Trash2, Check } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Check, Calendar } from 'lucide-react-native';
+
+const getTodayDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+interface CalendarModalProps {
+  visible: boolean;
+  currentVal: string;
+  onSelect: (dateStr: string) => void;
+  onClose: () => void;
+}
+
+function CalendarModal({ visible, currentVal, onSelect, onClose }: CalendarModalProps) {
+  const initialDate = currentVal ? new Date(currentVal) : new Date();
+  const [selectedYear, setSelectedYear] = useState(
+    isNaN(initialDate.getTime()) ? new Date().getFullYear() : initialDate.getFullYear()
+  );
+  const [selectedMonth, setSelectedMonth] = useState(
+    isNaN(initialDate.getTime()) ? new Date().getMonth() : initialDate.getMonth()
+  );
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June", 
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getStartDayOfMonth = (year: number, month: number) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const daysInMonth = getDaysInMonth(selectedYear, selectedMonth);
+  const startDay = getStartDayOfMonth(selectedYear, selectedMonth);
+
+  const handlePrevMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+
+  const gridCells = [];
+  for (let i = 0; i < startDay; i++) {
+    gridCells.push({ key: `empty-${i}`, dayNum: null });
+  }
+  for (let i = 1; i <= daysInMonth; i++) {
+    gridCells.push({ key: `day-${i}`, dayNum: i });
+  }
+
+  const rows = [];
+  for (let i = 0; i < gridCells.length; i += 7) {
+    rows.push(gridCells.slice(i, i + 7));
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View className="flex-1 bg-slate-900/60 justify-center items-center p-5">
+        <View className="bg-white w-full max-w-[340px] rounded-3xl p-5 shadow-xl">
+          <View className="flex-row justify-between items-center mb-4">
+            <TouchableOpacity onPress={handlePrevMonth} className="p-2">
+              <ChevronLeft size={20} color="#1E3A8A" />
+            </TouchableOpacity>
+            <Text className="text-base font-bold text-[#1E3A8A]">
+              {monthNames[selectedMonth]} {selectedYear}
+            </Text>
+            <TouchableOpacity onPress={handleNextMonth} className="p-2">
+              <ChevronRight size={20} color="#1E3A8A" />
+            </TouchableOpacity>
+          </View>
+
+          <View className="flex-row mb-2">
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((w, idx) => (
+              <Text key={idx} className="flex-1 text-center text-[10px] font-black text-slate-400 uppercase">
+                {w}
+              </Text>
+            ))}
+          </View>
+
+          <View className="mb-4">
+            {rows.map((row, rowIdx) => (
+              <View key={rowIdx} className="flex-row my-1">
+                {row.map((cell) => {
+                  if (cell.dayNum === null) {
+                    return <View key={cell.key} className="flex-1" />;
+                  }
+
+                  const cellDateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(cell.dayNum).padStart(2, '0')}`;
+                  const isSelected = cellDateStr === currentVal;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={cell.key}
+                      onPress={() => {
+                        onSelect(cellDateStr);
+                        onClose();
+                      }}
+                      className={`flex-1 aspect-square justify-center items-center rounded-full ${isSelected ? 'bg-[#1E3A8A]' : 'bg-transparent'}`}
+                    >
+                      <Text className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-700'}`}>
+                        {cell.dayNum}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {row.length < 7 && Array.from({ length: 7 - row.length }).map((_, i) => (
+                  <View key={`pad-${i}`} className="flex-1" />
+                ))}
+              </View>
+            ))}
+          </View>
+
+          <View className="flex-row justify-between border-t border-slate-100 pt-3">
+            <TouchableOpacity
+              onPress={() => {
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                onSelect(todayStr);
+                onClose();
+              }}
+              className="py-2 px-3"
+            >
+              <Text className="text-xs font-bold text-[#1E3A8A]">Today</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onClose}
+              className="py-2 px-3"
+            >
+              <Text className="text-xs font-bold text-slate-500">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 interface PatientCareModalProps {
   visible: boolean;
@@ -17,9 +170,19 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
   const [patientContact, setPatientContact] = useState(data?.patientContact || '');
   const [patientAge, setPatientAge] = useState(data?.patientAge ? String(data.patientAge) : '');
   const [patientGender, setPatientGender] = useState(data?.patientGender || 'Male');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const [dispatchInfo, setDispatchInfo] = useState(data?.dispatchInfo || {
-    hqDprtTime: '', hqArrTime: '', sceneDprtTime: '', sceneArrTime: '', hospitalDprtTime: '', hospitalArrTime: '', date: '', unit: ''
+  const [dispatchInfo, setDispatchInfo] = useState(() => {
+    const today = getTodayDateString();
+    if (data?.dispatchInfo) {
+      return {
+        ...data.dispatchInfo,
+        date: data.dispatchInfo.date || today
+      };
+    }
+    return {
+      hqDprtTime: '', hqArrTime: '', sceneDprtTime: '', sceneArrTime: '', hospitalDprtTime: '', hospitalArrTime: '', date: today, unit: ''
+    };
   });
 
   const [emergencyType, setEmergencyType] = useState(data?.emergencyType || {
@@ -144,7 +307,13 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
             <View className="flex-row space-x-3">
               <View className="flex-1">
                 <Text className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-1">Age</Text>
-                <TextInput value={patientAge} onChangeText={setPatientAge} keyboardType="numeric" placeholder="25" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
+                <TextInput 
+                  value={patientAge} 
+                  onChangeText={(val) => setPatientAge(val.replace(/[^0-9]/g, ''))} 
+                  keyboardType="numeric" 
+                  placeholder="25" 
+                  className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" 
+                />
               </View>
               <View className="flex-1">
                 <Text className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-1">Gender</Text>
@@ -173,7 +342,15 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
             <View className="flex-row space-x-3">
               <View className="flex-1">
                 <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Date</Text>
-                <TextInput value={dispatchInfo.date} onChangeText={(val) => setDispatchInfo({...dispatchInfo, date: val})} placeholder="2026-06-23" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+                <TouchableOpacity 
+                  onPress={() => setShowDatePicker(true)}
+                  className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 flex-row items-center justify-between min-h-[38px]"
+                >
+                  <Text className="text-slate-800 font-medium text-xs">
+                    {dispatchInfo.date || 'Select Date'}
+                  </Text>
+                  <Calendar size={14} color="#64748B" />
+                </TouchableOpacity>
               </View>
               <View className="flex-1">
                 <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Responding Unit</Text>
@@ -239,7 +416,13 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
               </View>
               <View className="flex-1">
                 <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">GCS Points</Text>
-                <TextInput value={gcsPoints} onChangeText={setGcsPoints} keyboardType="numeric" placeholder="15" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+                <TextInput 
+                  value={gcsPoints} 
+                  onChangeText={(val) => setGcsPoints(val.replace(/[^0-9]/g, ''))} 
+                  keyboardType="numeric" 
+                  placeholder="15" 
+                  className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" 
+                />
               </View>
             </View>
 
@@ -355,21 +538,52 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
                 </View>
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-0.5">PR (bpm)</Text>
-                  <TextInput value={log.pr} onChangeText={(val) => updateVitalLog(idx, 'pr', val)} placeholder="80" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                  <TextInput 
+                    value={log.pr} 
+                    onChangeText={(val) => updateVitalLog(idx, 'pr', val.replace(/[^0-9]/g, ''))} 
+                    keyboardType="numeric"
+                    placeholder="80" 
+                    className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
+                  />
                 </View>
               </View>
               <View className="flex-row space-x-2">
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-0.5">O2 Sat (%)</Text>
-                  <TextInput value={log.o2_sat} onChangeText={(val) => updateVitalLog(idx, 'o2_sat', val)} placeholder="98" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                  <TextInput 
+                    value={log.o2_sat} 
+                    onChangeText={(val) => updateVitalLog(idx, 'o2_sat', val.replace(/[^0-9]/g, ''))} 
+                    keyboardType="numeric"
+                    placeholder="98" 
+                    className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
+                  />
                 </View>
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-0.5">RR (cpm)</Text>
-                  <TextInput value={log.rr} onChangeText={(val) => updateVitalLog(idx, 'rr', val)} placeholder="16" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                  <TextInput 
+                    value={log.rr} 
+                    onChangeText={(val) => updateVitalLog(idx, 'rr', val.replace(/[^0-9]/g, ''))} 
+                    keyboardType="numeric"
+                    placeholder="16" 
+                    className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
+                  />
                 </View>
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-0.5">Temp (°C)</Text>
-                  <TextInput value={log.temp} onChangeText={(val) => updateVitalLog(idx, 'temp', val)} placeholder="36.5" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                  <TextInput 
+                    value={log.temp} 
+                    onChangeText={(val) => {
+                      let cleaned = val.replace(/[^0-9.]/g, '');
+                      const parts = cleaned.split('.');
+                      if (parts.length > 2) {
+                        cleaned = parts[0] + '.' + parts.slice(1).join('');
+                      }
+                      updateVitalLog(idx, 'temp', cleaned);
+                    }} 
+                    keyboardType="numeric"
+                    placeholder="36.5" 
+                    className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
+                  />
                 </View>
               </View>
               <View className="flex-row space-x-2">
@@ -419,7 +633,16 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
               </View>
               <View className="w-16">
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Sev (1-10)</Text>
-                <TextInput value={painAssessment.severity} onChangeText={(val) => setPainAssessment({...painAssessment, severity: val})} keyboardType="numeric" placeholder="5" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs text-center" />
+                <TextInput 
+                  value={painAssessment.severity} 
+                  onChangeText={(val) => {
+                    const cleaned = val.replace(/[^0-9]/g, '');
+                    setPainAssessment({...painAssessment, severity: cleaned});
+                  }} 
+                  keyboardType="numeric" 
+                  placeholder="5" 
+                  className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs text-center" 
+                />
               </View>
             </View>
           </View>
@@ -550,6 +773,12 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
             </View>
           </View>
         </ScrollView>
+        <CalendarModal 
+          visible={showDatePicker}
+          currentVal={dispatchInfo.date}
+          onSelect={(dateStr) => setDispatchInfo({...dispatchInfo, date: dateStr})}
+          onClose={() => setShowDatePicker(false)}
+        />
       </SafeAreaView>
     </Modal>
   );

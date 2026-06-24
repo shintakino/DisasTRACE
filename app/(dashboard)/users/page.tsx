@@ -27,6 +27,7 @@ export default function UsersPage() {
   const [isManageOpen, setIsManageOpen] = React.useState(false);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [createRole, setCreateRole] = React.useState<UserRole | undefined>(undefined);
+  const [isExporting, setIsExporting] = React.useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -142,13 +143,14 @@ export default function UsersPage() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (filteredUsers.length === 0) {
       toast.error("No users available to export.");
       return;
     }
 
-    toast.promise(
+    setIsExporting(true);
+    await toast.promise(
       (async () => {
         const { exportUsersListPDF } = await import("@/lib/pdf-export");
         await exportUsersListPDF(filteredUsers, {
@@ -163,6 +165,7 @@ export default function UsersPage() {
         error: "Failed to generate PDF. Please try again.",
       }
     );
+    setIsExporting(false);
   };
 
   const handleCreateUser = async (newUser: { fullName: string; email: string; role: UserRole; password?: string }) => {
@@ -217,6 +220,7 @@ export default function UsersPage() {
             setCreateRole(role);
             setIsCreateOpen(true);
           }}
+          isExporting={isExporting}
         />
         {loading ? (
           <div className="bg-white border-x border-b p-8 rounded-b-xl">

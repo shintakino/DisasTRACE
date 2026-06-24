@@ -19,6 +19,7 @@ export default function ReportsPage() {
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<string>("all");
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
+  const [isExporting, setIsExporting] = React.useState(false);
 
   const handleFilterChange = React.useCallback((newFilters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => {
     setFilters((prev) => {
@@ -71,7 +72,7 @@ export default function ReportsPage() {
     setIsDetailOpen(true);
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     const selectedIndices = Object.keys(rowSelection).filter(key => rowSelection[key]);
     const reportsToExport = selectedIndices.length > 0
       ? selectedIndices.map(idx => data[parseInt(idx)]).filter(Boolean)
@@ -86,7 +87,8 @@ export default function ReportsPage() {
       ? `Generating PDF summary for ${reportsToExport.length} selected report(s)...`
       : `Generating PDF summary for all ${reportsToExport.length} report(s)...`;
 
-    toast.promise(
+    setIsExporting(true);
+    await toast.promise(
       (async () => {
         const { exportReportsSummaryPDF } = await import("@/lib/pdf-export");
         await exportReportsSummaryPDF(reportsToExport, {
@@ -101,6 +103,7 @@ export default function ReportsPage() {
         error: "Failed to generate PDF. Please try again.",
       }
     );
+    setIsExporting(false);
   };
 
   return (
@@ -151,7 +154,7 @@ export default function ReportsPage() {
       </div>
 
       <Card className="rounded-xl shadow-xl border-none overflow-hidden bg-white">
-        <ReportsHeader onFilterChange={handleFilterChange} onExport={handleExportPDF} />
+        <ReportsHeader onFilterChange={handleFilterChange} onExport={handleExportPDF} isExporting={isExporting} />
         
         <div className="px-6 py-4 border-b border-slate-100 bg-white">
           <div className="flex bg-slate-100/80 rounded-xl p-1 gap-1">

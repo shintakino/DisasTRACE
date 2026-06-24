@@ -346,7 +346,7 @@ export default function HomeScreen() {
 
   const { status } = useResponderStore();
 
-  if (!isLoaded || isCheckingIncident) {
+  if (!isLoaded || isCheckingIncident || !role || (role !== 'public_user' && role !== 'ambulance_responder')) {
     return (
       <View className="flex-1 bg-[#1E3A8A] justify-center items-center">
         <StatusBar barStyle="light-content" />

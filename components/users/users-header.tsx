@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, Filter, FileDown } from "lucide-react";
+import { Search, Filter, FileDown, Loader2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,9 +29,10 @@ interface UsersHeaderProps {
   onFilterChange: (filters: UserFilter) => void;
   onExport: () => void;
   onCreateAccount?: (role: UserRole) => void;
+  isExporting?: boolean;
 }
 
-export function UsersHeader({ onFilterChange, onExport, onCreateAccount }: UsersHeaderProps) {
+export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExporting }: UsersHeaderProps) {
   const [search, setSearch] = React.useState("");
   const [role, setRole] = React.useState<UserRole | "all">("all");
   const [status, setStatus] = React.useState<UserStatus | "all">("all");
@@ -125,9 +126,13 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount }: Users
           </PopoverContent>
         </Popover>
 
-        <Button onClick={onExport} className="h-10 bg-white text-[#1E3A8A] hover:bg-blue-50 font-bold gap-2 shadow-sm">
-          <FileDown className="h-4 w-4" />
-          EXPORT PDF
+        <Button onClick={onExport} disabled={isExporting} className="h-10 bg-white text-[#1E3A8A] hover:bg-blue-50 font-bold gap-2 shadow-sm disabled:opacity-50">
+          {isExporting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <FileDown className="h-4 w-4" />
+          )}
+          {isExporting ? "EXPORTING..." : "EXPORT PDF"}
         </Button>
         
         {onCreateAccount && (

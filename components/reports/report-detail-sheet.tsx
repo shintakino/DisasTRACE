@@ -9,7 +9,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { DetailedIncidentReport } from "@/types/reports";
-import { Truck, MoreVertical, X, FileDown } from "lucide-react";
+import { Truck, MoreVertical, X, FileDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -29,13 +29,15 @@ export function ReportDetailSheet({
   const [activeTab, setActiveTab] = React.useState<"incident" | "resident" | "patient_care" | "trip_ticket">("resident");
   const [expandedImage, setExpandedImage] = React.useState<string | null>(null);
   const [exporting, setExporting] = React.useState(false);
+  const [exportingPcr, setExportingPcr] = React.useState(false);
+  const [exportingDtt, setExportingDtt] = React.useState(false);
   const [selectedPcrIdx, setSelectedPcrIdx] = React.useState(0);
 
 
   const handleSingleReportExport = async () => {
     if (!report) return;
     setExporting(true);
-    toast.promise(
+    await toast.promise(
       (async () => {
         const { exportSingleIncidentReportPDF } = await import("@/lib/pdf-export");
         await exportSingleIncidentReportPDF(report);
@@ -113,8 +115,12 @@ export function ReportDetailSheet({
                     className="h-8 px-3 rounded-full bg-[#E8EAF6] text-[#1A237E] hover:bg-[#C5CAE9] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0"
                     title="Export Report to PDF"
                   >
-                    <FileDown className="h-3.5 w-3.5" />
-                    <span>PDF</span>
+                    {exporting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <FileDown className="h-3.5 w-3.5" />
+                    )}
+                    <span>{exporting ? "Generating..." : "PDF"}</span>
                   </button>
                   <button 
                     onClick={onClose}
@@ -406,13 +412,30 @@ export function ReportDetailSheet({
                           </div>
                           <button
                             onClick={async () => {
-                              const { exportPatientCareReportPDF } = await import("@/lib/pdf-export");
-                              await exportPatientCareReportPDF(pcr, report.id, selectedPcrIdx + 1);
+                              if (!report) return;
+                              setExportingPcr(true);
+                              await toast.promise(
+                                (async () => {
+                                  const { exportPatientCareReportPDF } = await import("@/lib/pdf-export");
+                                  await exportPatientCareReportPDF(pcr, report.id, selectedPcrIdx + 1);
+                                })(),
+                                {
+                                  loading: `Exporting Patient Care Report for ${pcr.patientName || "patient"}...`,
+                                  success: "Patient Care Report exported successfully.",
+                                  error: "Failed to export Patient Care Report.",
+                                }
+                              );
+                              setExportingPcr(false);
                             }}
-                            className="h-8 px-3 rounded-full bg-[#1A237E] text-white hover:bg-blue-800 transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
+                            disabled={exportingPcr}
+                            className="h-8 px-3 rounded-full bg-[#1A237E] text-white hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
                           >
-                            <FileDown className="h-3.5 w-3.5" />
-                            <span>PDF</span>
+                            {exportingPcr ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <FileDown className="h-3.5 w-3.5" />
+                            )}
+                            <span>{exportingPcr ? "Generating..." : "PDF"}</span>
                           </button>
                         </div>
 
@@ -549,13 +572,30 @@ export function ReportDetailSheet({
                     </div>
                     <button
                       onClick={async () => {
-                        const { exportDriverTripTicketPDF } = await import("@/lib/pdf-export");
-                        await exportDriverTripTicketPDF(report.driverTripTicket, report.id);
+                        if (!report) return;
+                        setExportingDtt(true);
+                        await toast.promise(
+                          (async () => {
+                            const { exportDriverTripTicketPDF } = await import("@/lib/pdf-export");
+                            await exportDriverTripTicketPDF(report.driverTripTicket, report.id);
+                          })(),
+                          {
+                            loading: "Exporting Driver's Trip Ticket to PDF...",
+                            success: "Driver's Trip Ticket exported successfully.",
+                            error: "Failed to export Driver's Trip Ticket.",
+                          }
+                        );
+                        setExportingDtt(false);
                       }}
-                      className="h-8 px-3 rounded-full bg-amber-700 text-white hover:bg-amber-800 transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
+                      disabled={exportingDtt}
+                      className="h-8 px-3 rounded-full bg-amber-700 text-white hover:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
                     >
-                      <FileDown className="h-3.5 w-3.5" />
-                      <span>PDF</span>
+                      {exportingDtt ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileDown className="h-3.5 w-3.5" />
+                      )}
+                      <span>{exportingDtt ? "Generating..." : "PDF"}</span>
                     </button>
                   </div>
 

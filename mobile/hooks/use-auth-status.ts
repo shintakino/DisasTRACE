@@ -11,7 +11,7 @@ export function useAuthStatus() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | 'loading' | 'unauthorized_platform'>('loading');
-  const [role, setRole] = useState<string>('public_user');
+  const [role, setRole] = useState<string | null>(null);
   const [profile, setProfile] = useState<{ fullName: string; address: string; dutyStatus?: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 

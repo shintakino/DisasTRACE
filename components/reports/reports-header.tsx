@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, Filter, FileDown } from "lucide-react";
+import { Search, Filter, FileDown, Loader2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,9 +22,10 @@ import { cn } from "@/lib/utils";
 interface ReportsHeaderProps {
   onFilterChange: (filters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => void;
   onExport: () => void;
+  isExporting?: boolean;
 }
 
-export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) {
+export function ReportsHeader({ onFilterChange, onExport, isExporting }: ReportsHeaderProps) {
   const [search, setSearch] = React.useState("");
   const [type, setType] = React.useState<IncidentType | "all">("all");
 
@@ -93,9 +94,13 @@ export function ReportsHeader({ onFilterChange, onExport }: ReportsHeaderProps) 
           </PopoverContent>
         </Popover>
 
-        <Button onClick={onExport} className="h-10 bg-white text-[#1E3A8A] hover:bg-blue-50 font-bold gap-2 shadow-sm">
-          <FileDown className="h-4 w-4" />
-          EXPORT PDF
+        <Button onClick={onExport} disabled={isExporting} className="h-10 bg-white text-[#1E3A8A] hover:bg-blue-50 font-bold gap-2 shadow-sm disabled:opacity-50">
+          {isExporting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <FileDown className="h-4 w-4" />
+          )}
+          {isExporting ? "EXPORTING..." : "EXPORT PDF"}
         </Button>
       </div>
     </div>

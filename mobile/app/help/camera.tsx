@@ -5,7 +5,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { ChevronLeft, Zap, ZapOff, RefreshCw, Sun, Camera as CameraIcon } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
-import * as ImageManipulator from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
 
 export default function CameraScreen() {
@@ -18,6 +17,7 @@ export default function CameraScreen() {
   
   useFocusEffect(
     React.useCallback(() => {
+      // Allow any orientation while camera is active so user can frame in landscape or portrait
       ScreenOrientation.unlockAsync();
       return () => {
         ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
@@ -44,77 +44,18 @@ export default function CameraScreen() {
       setIsCapturing(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       try {
-        const currentOrientation = await ScreenOrientation.getOrientationAsync();
-        
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.5,
           base64: false,
-          exif: true,
+          skipProcessing: true,
         });
         
         if (photo) {
-          let actions: ImageManipulator.Action[] = [];
-          
-          const isPhotoPortrait = photo.width < photo.height;
-          const isDevicePortrait = 
-            currentOrientation === ScreenOrientation.Orientation.PORTRAIT_UP ||
-            currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN;
-            
-          const exifOrientation = photo.exif?.Orientation ?? photo.exif?.orientation;
-          const isMatch = isDevicePortrait === isPhotoPortrait;
-          
-          let rotation = 0;
-          
-          if (exifOrientation === 3 || exifOrientation === '3') {
-            // Upside down rotation (180 degrees) is always safe because it preserves aspect ratio
-            rotation = 180;
-          } else if (exifOrientation === 6 || exifOrientation === '6') {
-            // 90 degrees CW rotation. Only apply if the physical photo aspect ratio does not match
-            // the device orientation, to prevent double-rotating photos that are already portrait.
-            if (!isMatch) {
-              rotation = 90;
-            } else {
-              // Pixels are already rotated, but EXIF orientation is stale (6).
-              // We apply a dummy rotate (0 degrees) to force ImageManipulator to write a clean EXIF header with Orientation: 1.
-              actions = [{ rotate: 0 }];
-            }
-          } else if (exifOrientation === 8 || exifOrientation === '8') {
-            // 270 degrees CW (90 CCW) rotation. Only apply if aspect ratios mismatch.
-            if (!isMatch) {
-              rotation = 270;
-            } else {
-              actions = [{ rotate: 0 }];
-            }
-          }
-          
-          if (rotation !== 0) {
-            actions = [{ rotate: rotation }];
-          } else if (!exifOrientation) {
-            // Fallback if EXIF orientation is missing: use screen orientation vs photo dimensions
-            if (isDevicePortrait && !isPhotoPortrait) {
-              actions = [{ rotate: 90 }];
-            } else if (!isDevicePortrait && isPhotoPortrait) {
-              actions = [{ rotate: 90 }];
-            }
-            
-            // Handle upside down device positions if EXIF is missing
-            if (currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
-              actions.push({ rotate: 180 });
-            } else if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT) {
-              actions.push({ rotate: 180 });
-            }
-          }
-
-          // Always run ImageManipulator to compress the image and normalize EXIF orientation to 1.
-          // This prevents double-rotation bugs where React Native <Image> or web dashboards read
-          // stale EXIF tags from the camera sensor even though the pixels were already rotated.
-          const manipResult = await ImageManipulator.manipulateAsync(
-            photo.uri,
-            actions,
-            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-          );
-          
-          setPhotoUri(manipResult.uri);
+          // Save the raw photo URI directly — no rotation, no manipulation.
+          // The camera embeds the correct EXIF orientation tag, and React Native's
+          // <Image> component respects it, so the preview will display correctly
+          // regardless of which orientation the photo was taken in.
+          setPhotoUri(photo.uri);
           router.push('/help/preview');
         }
       } catch (e) {
@@ -273,7 +214,7 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 45,
     borderWidth: 4,
-    borderColor: '#991B1B', // Dark red outer ring
+    borderColor: '#991B1B',
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
@@ -282,7 +223,7 @@ const styles = StyleSheet.create({
     width: 74,
     height: 74,
     borderRadius: 37,
-    backgroundColor: '#FFF', // White inner
+    backgroundColor: '#FFF',
   },
   capturingState: {
     backgroundColor: '#E5E7EB',
@@ -292,7 +233,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#991B1B', // Dark red background
+    backgroundColor: '#991B1B',
     justifyContent: 'center',
     alignItems: 'center',
   },

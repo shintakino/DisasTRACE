@@ -12,6 +12,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed
 
+- Fixed mobile camera capture speed and orientation: removed all EXIF rotation/ImageManipulator post-processing from `takePicture` for instant capture, added `skipProcessing: true`, and locked preview screen to portrait so landscape photos display as landscape rectangles within the portrait frame without any image rotation.
 - Resolved patient count discrepancy between Resident reports and Crew findings in the CDRRMO dashboard by using the count of physical Patient Care Reports as the source of truth.
 - Upgraded the Patient Care Report PDF export to use dynamic page overflow controls on Page 1, preventing long fields from overlapping the footer.
 - Fixed TypeScript compiler errors in the reports route.

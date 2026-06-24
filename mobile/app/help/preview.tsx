@@ -12,10 +12,9 @@ export default function PreviewScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      ScreenOrientation.unlockAsync();
-      return () => {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-      };
+      // Lock preview to portrait — landscape photos will display as a landscape
+      // rectangle inside the portrait frame via resizeMode="contain"
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     }, [])
   );
 

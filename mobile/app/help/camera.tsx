@@ -89,13 +89,21 @@ export default function CameraScreen() {
             else if (exifOrientation === 8) actions = [{ rotate: 270 }];
           }
 
-          const manipResult = await ImageManipulator.manipulateAsync(
-            photo.uri,
-            actions,
-            { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
-          );
+          let finalUri = photo.uri;
           
-          setPhotoUri(manipResult.uri);
+          // Only perform image manipulation if we actually have rotation actions to apply.
+          // This avoids the expensive CPU overhead of decoding, recompressing, and rewriting
+          // a high-resolution image file when no changes are needed.
+          if (actions.length > 0) {
+            const manipResult = await ImageManipulator.manipulateAsync(
+              photo.uri,
+              actions,
+              { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+            );
+            finalUri = manipResult.uri;
+          }
+          
+          setPhotoUri(finalUri);
           router.push('/help/preview');
         }
       } catch (e) {

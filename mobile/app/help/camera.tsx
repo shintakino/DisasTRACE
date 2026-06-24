@@ -49,43 +49,35 @@ export default function CameraScreen() {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.5,
           base64: false,
-          exif: true,
+          exif: false,
         });
         
         if (photo) {
           let actions: ImageManipulator.Action[] = [];
           
-          // Read EXIF orientation to determine required rotation
-          const exifOrientation = photo.exif?.Orientation ?? photo.exif?.orientation;
-          let rotation = 0;
-          
-          if (exifOrientation === 6 || exifOrientation === '6') {
-            rotation = 90;
-          } else if (exifOrientation === 3 || exifOrientation === '3') {
-            rotation = 180;
-          } else if (exifOrientation === 8 || exifOrientation === '8') {
-            rotation = 270;
+          const isPhotoPortrait = photo.width < photo.height;
+          const isDevicePortrait = 
+            currentOrientation === ScreenOrientation.Orientation.PORTRAIT_UP ||
+            currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN;
+            
+          // If the physical photo aspect ratio does not match the device's screen orientation,
+          // it means the sensor output was not auto-rotated natively, so we rotate it by 90 degrees.
+          if (isDevicePortrait && !isPhotoPortrait) {
+            actions = [{ rotate: 90 }];
+          } else if (!isDevicePortrait && isPhotoPortrait) {
+            actions = [{ rotate: 90 }];
           }
           
-          if (rotation !== 0) {
-            actions = [{ rotate: rotation }];
-          } else if (!exifOrientation) {
-            // Fallback if EXIF orientation is missing: use screen orientation vs photo dimensions
-            const isPhotoPortrait = photo.width < photo.height;
-            const isDevicePortrait = 
-              currentOrientation === ScreenOrientation.Orientation.PORTRAIT_UP ||
-              currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN;
-              
-            if (isDevicePortrait && !isPhotoPortrait) {
-              actions = [{ rotate: 90 }];
-            } else if (!isDevicePortrait && isPhotoPortrait) {
-              actions = [{ rotate: 90 }];
-            }
+          // Additional adjustment: if the device is held upside down landscape or portrait
+          if (currentOrientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
+            actions.push({ rotate: 180 });
+          } else if (currentOrientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT) {
+            actions.push({ rotate: 180 });
           }
 
-          // Always run ImageManipulator to compress the image and strip/normalize EXIF orientation to 1.
-          // This ensures the file size is small (~500KB-1MB) for fast uploads and resolves
-          // cross-platform rendering discrepancies in React Native <Image> and web dashboards.
+          // Always run ImageManipulator to compress the image and normalize EXIF orientation to 1.
+          // This prevents double-rotation bugs where React Native <Image> or web browsers read
+          // stale EXIF tags from the camera sensor even though the pixels were already rotated.
           const manipResult = await ImageManipulator.manipulateAsync(
             photo.uri,
             actions,

@@ -11,7 +11,8 @@ import {
   User, 
   Eye, 
   Check, 
-  Inbox
+  Inbox,
+  X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -405,8 +407,25 @@ export default function SupportMessagesPage() {
 
       {/* Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-md p-6 bg-white rounded-2xl shadow-xl border border-slate-100">
-          <DialogHeader className="pb-3 border-b border-slate-100">
+        <DialogContent className="max-w-md p-0 border-0 shadow-2xl rounded-[24px] overflow-hidden bg-white flex flex-col" showCloseButton={true}>
+          <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
+                  <MessageSquare className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-left">
+                  <DialogTitle className="text-xl font-bold text-white tracking-tight">Message Details</DialogTitle>
+                  <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
+                    Inquiry from <span className="font-bold text-white">{selectedMessage?.name}</span>
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 bg-slate-50/30 flex-1 overflow-y-auto space-y-4">
             <div className="flex items-center justify-between">
               <Badge 
                 variant="outline" 
@@ -428,72 +447,54 @@ export default function SupportMessagesPage() {
                 </span>
               )}
             </div>
-            <DialogTitle className="text-xl font-bold text-slate-800 mt-2 pr-6 leading-tight">
-              {selectedMessage?.subject}
-            </DialogTitle>
-          </DialogHeader>
 
-          {/* Details Body */}
-          <div className="py-4 space-y-4">
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2">
-              <div className="flex items-center text-xs font-bold text-slate-500 uppercase tracking-wide">
-                <User className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
-                Sender Information
-              </div>
-              <div className="grid grid-cols-3 gap-y-1 text-sm pl-5">
-                <span className="text-slate-500 font-medium">Name:</span>
-                <span className="col-span-2 text-slate-800 font-semibold">{selectedMessage?.name}</span>
-                
-                <span className="text-slate-500 font-medium">Email:</span>
-                <span className="col-span-2 text-slate-800 font-semibold truncate select-all">{selectedMessage?.email}</span>
-                
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+              <DialogTitle className="text-base font-black text-slate-800 leading-tight text-left">
+                {selectedMessage?.subject}
+              </DialogTitle>
+              <div className="h-px bg-slate-100" />
+              <div className="space-y-1.5 text-xs text-slate-600 pl-1 text-left">
+                <div className="flex"><span className="text-slate-400 font-bold w-16 uppercase">Name:</span> <span className="text-slate-800 font-bold">{selectedMessage?.name}</span></div>
+                <div className="flex"><span className="text-slate-400 font-bold w-16 uppercase">Email:</span> <span className="text-slate-800 font-bold truncate select-all">{selectedMessage?.email}</span></div>
                 {selectedMessage?.userId && (
-                  <>
-                    <span className="text-slate-500 font-medium">Resident ID:</span>
-                    <span className="col-span-2 text-[#1E3A8A] font-semibold text-xs truncate select-all">
-                      {selectedMessage.userId}
-                    </span>
-                  </>
+                  <div className="flex"><span className="text-slate-400 font-bold w-16 uppercase">User ID:</span> <span className="text-[#1E3A8A] font-bold select-all">{selectedMessage.userId}</span></div>
                 )}
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center pl-1">
-                <MessageSquare className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
+            <div className="space-y-1.5 text-left">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">
                 Inquiry Message
               </label>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-slate-700 text-sm leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto font-medium">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 text-slate-700 text-sm leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto font-medium shadow-sm">
                 {selectedMessage?.message}
               </div>
             </div>
           </div>
 
-          <DialogFooter className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:justify-end gap-2">
-            <div className="flex flex-1 gap-2">
-              {selectedMessage?.status !== "RESOLVED" && (
-                <Button
-                  variant="outline"
-                  onClick={() => selectedMessage && handleUpdateStatus(selectedMessage.id, "RESOLVED")}
-                  className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-800 hover:text-emerald-900 font-bold flex-1 cursor-pointer"
-                >
-                  <CheckCircle className="h-4 w-4 mr-1.5" />
-                  Resolve Message
-                </Button>
-              )}
-              {selectedMessage?.status === "RESOLVED" && (
-                <Button
-                  variant="outline"
-                  onClick={() => selectedMessage && handleUpdateStatus(selectedMessage.id, "READ")}
-                  className="bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800 font-bold flex-1 cursor-pointer"
-                >
-                  Reopen Message
-                </Button>
-              )}
-            </div>
+          <DialogFooter className="p-6 bg-white border-t border-slate-100 flex flex-row gap-3 shrink-0">
+            {selectedMessage?.status !== "RESOLVED" && (
+              <Button
+                variant="outline"
+                onClick={() => selectedMessage && handleUpdateStatus(selectedMessage.id, "RESOLVED")}
+                className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-800 hover:text-emerald-900 font-bold flex-1 cursor-pointer rounded-xl py-5 h-auto text-sm"
+              >
+                <CheckCircle className="h-4 w-4 mr-1.5" />
+                Resolve Message
+              </Button>
+            )}
+            {selectedMessage?.status === "RESOLVED" && (
+              <Button
+                variant="outline"
+                onClick={() => selectedMessage && handleUpdateStatus(selectedMessage.id, "READ")}
+                className="bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800 font-bold flex-1 cursor-pointer rounded-xl py-5 h-auto text-sm"
+              >
+                Reopen Message
+              </Button>
+            )}
             <Button
               onClick={() => setIsDetailsOpen(false)}
-              className="bg-[#1E3A8A] hover:bg-[#152a65] text-white font-bold cursor-pointer"
+              className="bg-[#1E3A8A] hover:bg-[#152a65] text-white font-bold cursor-pointer rounded-xl px-6 py-5 h-auto text-sm"
             >
               Close
             </Button>

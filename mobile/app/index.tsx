@@ -203,7 +203,7 @@ export default function EntryScreen() {
             onPress={() => router.push('/(auth)/sign-up')}
             activeOpacity={0.8}
           >
-            <Text style={styles.signUpButtonText}>Sign Up</Text>
+            <Text style={styles.signUpButtonText}>Create Account</Text>
           </TouchableOpacity>
         </Animated.View>
       )}

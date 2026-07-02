@@ -51,6 +51,17 @@ function MapPageContent() {
   const handleSelectIncident = (incident: MapIncident | string) => {
     const id = typeof incident === "string" ? incident : incident.id;
     setSelectedIncidentId(id);
+    
+    // Switch active category and ensure layer visibility when selecting from the map
+    const found = incidents.find((i) => i.id === id);
+    if (found) {
+      setCategory(found.category);
+      if (found.category === "user") {
+        setShowRequests(true);
+      } else if (found.category === "responder") {
+        setShowReports(true);
+      }
+    }
   };
 
   const handleOpenDetails = (id: string) => {
@@ -160,7 +171,7 @@ function MapPageContent() {
               responders={responders}
               hospitals={hospitals}
               selectedIncidentId={selectedIncidentId}
-              onSelectIncident={setSelectedIncidentId}
+              onSelectIncident={handleSelectIncident}
             />
           </div>
 

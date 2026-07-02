@@ -701,6 +701,18 @@ export function ResponderHome() {
           if (data.routes && data.routes[0]) {
             const coords = data.routes[0].geometry.coordinates;
             setRouteCoords(coords);
+
+            const distanceKm = Number((data.routes[0].distance / 1000).toFixed(1));
+            const etaMins = Math.ceil(data.routes[0].duration / 60);
+
+            const store = useResponderStore.getState();
+            if (store.activeDispatch) {
+              store.setActiveDispatch({
+                ...store.activeDispatch,
+                distance: `${distanceKm} km`,
+                eta: `~${etaMins} min`
+              });
+            }
             
             // Calculate map view bounds for OSRM route
             let minLng = coords[0][0], maxLng = coords[0][0], minLat = coords[0][1], maxLat = coords[0][1];
@@ -975,7 +987,7 @@ export function ResponderHome() {
 
         {/* Floating Camera Mode Toggle Button */}
         {(status === 'en_route' || status === 'to_hospital') && (
-          <View className="absolute right-6 top-[84px] pointer-events-auto" style={{ zIndex: 999 }}>
+          <View className="absolute right-6 top-[160px] pointer-events-auto" style={{ zIndex: 999 }}>
             <TouchableOpacity
               onPress={() => setCameraMode(prev => prev === 'follow' ? 'overview' : 'follow')}
               activeOpacity={0.85}
@@ -992,7 +1004,7 @@ export function ResponderHome() {
 
         {/* Floating Recenter Map Button */}
         {!isCameraCentered && (
-          <View className="absolute right-6 top-[196px] pointer-events-auto" style={{ zIndex: 999 }}>
+          <View className="absolute right-6 top-[272px] pointer-events-auto" style={{ zIndex: 999 }}>
             <TouchableOpacity
               onPress={() => setIsCameraCentered(true)}
               activeOpacity={0.85}
@@ -1006,7 +1018,7 @@ export function ResponderHome() {
 
         {/* Floating Simulation Button - Only visible in Developer Mode */}
         {process.env.EXPO_PUBLIC_DEV_MODE === 'true' && (status === 'en_route' || status === 'to_hospital') && (
-          <View className="absolute right-6 top-[140px] pointer-events-auto" style={{ zIndex: 999 }}>
+          <View className="absolute right-6 top-[216px] pointer-events-auto" style={{ zIndex: 999 }}>
             <TouchableOpacity
               onPress={toggleSimulation}
               activeOpacity={0.85}

@@ -20,17 +20,81 @@ export default function RejectedVerificationScreen() {
     await supabase.auth.signOut();
   };
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.6,
-      allowsMultipleSelection: false,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setSelectedImageUri(result.assets[0].uri);
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Denied',
+        'We need camera access to capture your ID photo. You can still upload an existing image from your gallery.',
+        [
+          { text: 'Use Gallery', onPress: pickFromGallery },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+      return;
     }
+
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.6,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setSelectedImageUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('Error taking photo:', err);
+      Alert.alert('Error', 'An error occurred while launching the camera.');
+    }
+  };
+
+  const pickFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Denied',
+        'We need gallery access to select your ID photo.'
+      );
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.6,
+        allowsMultipleSelection: false,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setSelectedImageUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('Error picking image from gallery:', err);
+      Alert.alert('Error', 'An error occurred while accessing the gallery.');
+    }
+  };
+
+  const handleSelectImageSource = () => {
+    Alert.alert(
+      "Upload ID Card",
+      "Choose a method to upload your government-issued ID",
+      [
+        {
+          text: "Take Photo (Camera)",
+          onPress: takePhoto,
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: pickFromGallery,
+        },
+        {
+          text: "Cancel",
+          style: "cancel"
+        }
+      ]
+    );
   };
 
   const handleResubmit = async () => {
@@ -82,7 +146,7 @@ export default function RejectedVerificationScreen() {
         <View className="mb-6">
           <Text className="text-gray-700 font-bold mb-2 ml-1">Upload ID Card *</Text>
           <TouchableOpacity 
-            onPress={pickImage}
+            onPress={handleSelectImageSource}
             className="h-40 bg-white rounded-xl border-2 border-dashed border-gray-300 items-center justify-center overflow-hidden"
           >
             {selectedImageUri ? (

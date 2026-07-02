@@ -40,15 +40,18 @@ export function IncidentPanel({
   // Auto-scroll list when an incident pin is selected on the map
   React.useEffect(() => {
     if (selectedIncidentId) {
-      const element = document.getElementById(`incident-card-${selectedIncidentId}`);
-      if (element) {
-        element.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-      }
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`incident-card-${selectedIncidentId}`);
+        if (element) {
+          element.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [selectedIncidentId]);
+  }, [selectedIncidentId, category]);
 
   // Handle category tab toggle
   const handleCategoryChange = (cat: "user" | "responder") => {

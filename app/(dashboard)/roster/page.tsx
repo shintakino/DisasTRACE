@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Plus, Trash2, UserX, User, MapPin, ShieldCheck, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -264,65 +264,79 @@ export default function RosterPage() {
       </div>
 
       <Dialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
-        <DialogContent className="max-w-md p-6 border-0 shadow-lg rounded-2xl" showCloseButton={false}>
-          <div className="flex flex-col items-center text-center">
-            <div className="mb-4">
-              <div className="text-[#1e1b4b]">
-                <Trash2 className="w-16 h-16 mb-2 mx-auto stroke-[1.5]" />
+        <DialogContent className="max-w-md p-0 border-0 shadow-2xl rounded-[24px] overflow-hidden bg-white flex flex-col" showCloseButton={true}>
+          <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
+                <Trash2 className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-left">
+                <DialogTitle className="text-xl font-bold text-white tracking-tight">Delete Responder</DialogTitle>
+                <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
+                  Are you sure you want to permanently delete this responder?
+                </DialogDescription>
               </div>
             </div>
-            <DialogTitle className="text-2xl font-bold text-[#1e1b4b] mb-2 tracking-tight">Delete User</DialogTitle>
-            <DialogDescription className="text-gray-500 mb-6 text-base font-medium">
-              Are you sure you want to delete this user?
-            </DialogDescription>
-            
-            <div className="w-full bg-[#EBF0FC] text-[#1e1b4b] p-4 rounded-xl flex items-center gap-3 mb-8 font-semibold">
+          </div>
+          
+          <div className="p-6 bg-slate-50/30 flex-1 space-y-6">
+            <div className="w-full bg-[#EBF0FC] text-[#1e1b4b] p-4 rounded-xl flex items-center gap-3 font-semibold text-sm">
               <div className="bg-[#8A9BBF] rounded-full text-white w-6 h-6 flex items-center justify-center font-bold text-sm shrink-0">!</div>
               <p>You are about to delete {userToDelete?.fullName}.</p>
             </div>
-            
-            <div className="flex gap-4 w-full">
-              <Button 
-                variant="secondary" 
-                className="flex-1 bg-[#E5E7EB] hover:bg-gray-300 text-[#4B5563] rounded-xl py-6 font-semibold text-base"
-                onClick={() => setUserToDelete(null)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                className="flex-1 bg-[#1e1b4b] hover:bg-[#1e1b4b]/90 text-white rounded-xl py-6 font-semibold text-base"
-                onClick={confirmDelete}
-              >
-                Delete
-              </Button>
-            </div>
+            <p className="text-xs font-bold text-red-500 text-center uppercase tracking-wider">Warning: This action will permanently remove all referencing logs and audit trails.</p>
           </div>
+          
+          <DialogFooter className="p-6 bg-white border-t border-slate-100 grid grid-cols-2 gap-4 shrink-0">
+            <Button 
+              variant="secondary" 
+              className="w-full bg-[#E5E7EB] hover:bg-gray-300 text-[#4B5563] rounded-xl py-5 h-auto font-bold text-sm"
+              onClick={() => setUserToDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="w-full bg-[#1e1b4b] hover:bg-[#1e1b4b]/90 text-white rounded-xl py-5 h-auto font-bold text-sm"
+              onClick={confirmDelete}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!userToBan} onOpenChange={(open) => !open && setUserToBan(null)}>
-        <DialogContent className="max-w-md p-6 border-0 shadow-lg rounded-2xl" showCloseButton={false}>
-          <div className="flex flex-col items-center text-center">
-            <div className="mb-4">
-              <div className="text-[#1e1b4b]">
-                <UserX className="w-16 h-16 mb-2 mx-auto stroke-[1.5]" />
+        <DialogContent className="max-w-md p-0 border-0 shadow-2xl rounded-[24px] overflow-hidden bg-white flex flex-col" showCloseButton={true}>
+          <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
+                <UserX className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-left">
+                <DialogTitle className="text-xl font-bold text-white tracking-tight">Manage Responder</DialogTitle>
+                <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
+                  Change status or suspend account for <span className="font-bold text-white">{userToBan?.fullName}</span>
+                </DialogDescription>
               </div>
             </div>
-            <DialogTitle className="text-2xl font-bold text-[#1e1b4b] mb-2 tracking-tight">Manage User</DialogTitle>
-            <DialogDescription className="text-gray-500 mb-6 text-base font-medium">
-              Are you sure you want to change this user's status?
-            </DialogDescription>
-            
-            <div className="w-full bg-[#EBF0FC] text-[#1e1b4b] p-4 rounded-xl flex items-center gap-3 mb-6 font-semibold">
+          </div>
+
+          <div className="p-6 bg-slate-50/30 flex-1 overflow-y-auto space-y-5">
+            <div className="w-full bg-[#EBF0FC] text-[#1e1b4b] p-4 rounded-xl flex items-center gap-3 font-semibold text-sm">
               <div className="bg-[#8A9BBF] rounded-full text-white w-6 h-6 flex items-center justify-center font-bold text-sm shrink-0">!</div>
               <p>You are about to modify {userToBan?.fullName}.</p>
             </div>
             
-            <div className="w-full text-left mb-6">
-              <p className="text-[#1e1b4b] font-semibold text-sm mb-2 tracking-tight">Action</p>
+            <div className="w-full text-left">
+              <p className="text-[#1E3A8A] font-bold text-xs mb-2 uppercase tracking-widest">Action</p>
               <Select value={banAction} onValueChange={(v: 'SUSPENDED' | 'DEACTIVATED' | null) => { if (v) setBanAction(v); }}>
-                <SelectTrigger className="w-full h-12 rounded-xl border-2 border-[#1e1b4b] focus:ring-[#1e1b4b]">
-                  <SelectValue placeholder="Select an action" />
+                <SelectTrigger className="w-full h-11 rounded-xl border-slate-200 bg-white focus:ring-[#2B4C9B] px-4 font-bold text-slate-700">
+                  <SelectValue placeholder="Select an action">
+                    {banAction === "SUSPENDED" && "Suspend User"}
+                    {banAction === "DEACTIVATED" && "Deactivate User"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SUSPENDED">Suspend User</SelectItem>
@@ -331,43 +345,43 @@ export default function RosterPage() {
               </Select>
             </div>
 
-            <div className="w-full text-left mb-8">
-              <p className="text-[#1e1b4b] font-semibold text-sm mb-4 tracking-tight">Why are you taking this action?</p>
+            <div className="w-full text-left">
+              <p className="text-[#1E3A8A] font-bold text-xs mb-4 uppercase tracking-widest">Why are you taking this action?</p>
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
-                  <Checkbox id="reason-spam" className="w-5 h-5 rounded" />
-                  <label htmlFor="reason-spam" className="text-sm font-semibold text-[#1e1b4b] cursor-pointer">Spamming</label>
+                  <Checkbox id="reason-spam" className="w-5 h-5 rounded border-slate-300" />
+                  <label htmlFor="reason-spam" className="text-sm font-semibold text-slate-700 cursor-pointer">Spamming</label>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Checkbox id="reason-abuse" className="w-5 h-5 rounded" />
-                  <label htmlFor="reason-abuse" className="text-sm font-semibold text-[#1e1b4b] cursor-pointer">Abusive Behavior</label>
+                  <Checkbox id="reason-abuse" className="w-5 h-5 rounded border-slate-300" />
+                  <label htmlFor="reason-abuse" className="text-sm font-semibold text-slate-700 cursor-pointer">Abusive Behavior</label>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Checkbox id="reason-other" className="w-5 h-5 rounded" />
-                  <label htmlFor="reason-other" className="text-sm font-semibold text-[#1e1b4b] cursor-pointer">Other</label>
+                  <Checkbox id="reason-other" className="w-5 h-5 rounded border-slate-300" />
+                  <label htmlFor="reason-other" className="text-sm font-semibold text-slate-700 cursor-pointer">Other</label>
                 </div>
               </div>
               <div className="mt-4">
-                <Textarea className="w-full border-2 border-[#1e1b4b] rounded-xl resize-none min-h-[100px] bg-transparent focus-visible:ring-1 focus-visible:ring-[#1e1b4b]" placeholder="" />
+                <Textarea className="w-full border-slate-200 bg-white rounded-xl resize-none min-h-[100px] focus-visible:ring-1 focus-visible:ring-[#2B4C9B] font-medium" placeholder="Additional details..." />
               </div>
             </div>
-            
-            <div className="flex gap-4 w-full">
-              <Button 
-                variant="secondary" 
-                className="flex-1 bg-[#E5E7EB] hover:bg-gray-300 text-[#4B5563] rounded-xl py-6 font-semibold text-base"
-                onClick={() => setUserToBan(null)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                className="flex-1 bg-[#1e1b4b] hover:bg-[#1e1b4b]/90 text-white rounded-xl py-6 font-semibold text-base"
-                onClick={confirmBan}
-              >
-                {banAction === 'SUSPENDED' ? 'Suspend' : 'Deactivate'}
-              </Button>
-            </div>
           </div>
+          
+          <DialogFooter className="p-6 bg-white border-t border-slate-100 grid grid-cols-2 gap-4 shrink-0">
+            <Button 
+              variant="secondary" 
+              className="w-full bg-[#E5E7EB] hover:bg-gray-300 text-[#4B5563] rounded-xl py-5 h-auto font-bold text-sm"
+              onClick={() => setUserToBan(null)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="w-full bg-[#1e1b4b] hover:bg-[#1e1b4b]/90 text-white rounded-xl py-5 h-auto font-bold text-sm"
+              onClick={confirmBan}
+            >
+              {banAction === 'SUSPENDED' ? 'Suspend' : 'Deactivate'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
@@ -439,7 +453,9 @@ export default function RosterPage() {
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Gender <span className="text-red-500">*</span></label>
                     <Select value={newResponder.gender} onValueChange={(v) => setNewResponder({ ...newResponder, gender: v || '' })}>
                       <SelectTrigger className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 focus:ring-[#2B4C9B] focus:bg-white transition-colors px-4">
-                        <SelectValue placeholder="Select Gender" />
+                        <SelectValue placeholder="Select Gender">
+                          {newResponder.gender}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-slate-200 shadow-xl">
                         <SelectItem value="Male" className="cursor-pointer rounded-lg mx-1 my-0.5">Male</SelectItem>
@@ -481,7 +497,10 @@ export default function RosterPage() {
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Responder Type <span className="text-red-500">*</span></label>
                     <Select value={newResponder.responderType} onValueChange={(v) => setNewResponder({ ...newResponder, responderType: v || 'cdrrmo_hq', barangay: v === 'cdrrmo_hq' ? '' : newResponder.barangay })}>
                       <SelectTrigger className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 focus:ring-[#2B4C9B] focus:bg-white transition-colors px-4">
-                        <SelectValue placeholder="Select Type" />
+                        <SelectValue placeholder="Select Type">
+                          {newResponder.responderType === 'cdrrmo_hq' && 'CDRRMO HQ'}
+                          {newResponder.responderType === 'barangay' && 'Barangay'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-slate-200 shadow-xl">
                         <SelectItem value="cdrrmo_hq" className="cursor-pointer rounded-lg mx-1 my-0.5">CDRRMO HQ</SelectItem>
@@ -494,7 +513,9 @@ export default function RosterPage() {
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Assigned Barangay <span className="text-red-500">*</span></label>
                       <Select value={newResponder.barangay} onValueChange={(v) => setNewResponder({ ...newResponder, barangay: v || '' })}>
                         <SelectTrigger className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 focus:ring-[#2B4C9B] focus:bg-white transition-colors px-4">
-                          <SelectValue placeholder="Select Barangay" />
+                          <SelectValue placeholder="Select Barangay">
+                            {newResponder.barangay}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-slate-200 shadow-xl max-h-60">
                           {barangays.map(b => (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Linking } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Linking, BackHandler } from 'react-native';
+import { useRouter, useNavigation } from 'expo-router';
 import { ShieldAlert, CheckCircle, Navigation, LogOut } from 'lucide-react-native';
 import { TransmissionLoader } from '../../components/help/TransmissionLoader';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 
 export default function PendingScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const report = useEmergencyReportStore((state) => state.report);
   
   const [isTransmitting, setIsTransmitting] = useState(true);
@@ -18,6 +19,25 @@ export default function PendingScreen() {
   const [isAccepted, setIsAccepted] = useState(false); // Simulate acceptance
   const [isSecuringResponder, setIsSecuringResponder] = useState(false);
   const incidentChannelRef = useRef<any>(null);
+
+  // Lock gestures and navigation
+  useEffect(() => {
+    navigation.setOptions({
+      gestureEnabled: false,
+      headerLeft: () => null,
+    });
+  }, [navigation]);
+
+  // Lock hardware back button on Android
+  useEffect(() => {
+    const onBackPress = () => {
+      // Return true to prevent default back behavior
+      return true;
+    };
+    
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backHandler.remove();
+  }, []);
 
   const setupIncidentSubscription = (requestId: string) => {
     if (incidentChannelRef.current) return; // Already subscribed

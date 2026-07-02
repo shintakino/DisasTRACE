@@ -78,28 +78,33 @@ export default function VerificationPage() {
       }
 
       if (type === 'emergency') {
-        // Dual-tone siren (High-low)
-        const playTone = (freq: number, startTime: number, duration: number) => {
+        // High-urgency warning siren using a sawtooth wave that sweeps frequency rapidly
+        const playSirenBlock = (startTime: number, duration: number) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.connect(gain);
           gain.connect(ctx.destination);
           
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(freq, startTime);
+          osc.type = "sawtooth";
           
-          gain.gain.setValueAtTime(0.15, startTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+          // Start at 880Hz, sweep up to 1320Hz, then back down
+          osc.frequency.setValueAtTime(880, startTime);
+          osc.frequency.linearRampToValueAtTime(1320, startTime + duration * 0.4);
+          osc.frequency.linearRampToValueAtTime(880, startTime + duration * 0.8);
+          
+          gain.gain.setValueAtTime(0.18, startTime);
+          gain.gain.linearRampToValueAtTime(0.18, startTime + duration * 0.75);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
           
           osc.start(startTime);
           osc.stop(startTime + duration);
         };
 
         const now = ctx.currentTime;
-        playTone(960, now, 0.3);
-        playTone(770, now + 0.35, 0.3);
-        playTone(960, now + 0.7, 0.3);
-        playTone(770, now + 1.05, 0.3);
+        // Three rapid, high-pitch wailing siren cycles (0.5s each)
+        playSirenBlock(now, 0.45);
+        playSirenBlock(now + 0.5, 0.45);
+        playSirenBlock(now + 1.0, 0.45);
       } else if (type === 'warning') {
         // Fast pulsing double beep
         const playTone = (freq: number, startTime: number, duration: number) => {

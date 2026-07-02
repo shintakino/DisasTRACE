@@ -24,8 +24,15 @@ export default function LogsPage() {
       const queryParams = new URLSearchParams()
       if (filters.search) queryParams.append("search", filters.search)
       if (filters.status) queryParams.append("status", filters.status)
+      queryParams.append("_t", Date.now().toString()) // Bypass browser cache
 
-      const response = await fetch(`/api/logs?${queryParams.toString()}`)
+      const response = await fetch(`/api/logs?${queryParams.toString()}`, {
+        cache: "no-store",
+        headers: {
+          "Pragma": "no-cache",
+          "Cache-Control": "no-cache"
+        }
+      })
       if (!response.ok) throw new Error("Failed to fetch logs")
       const data = await response.json()
       setLogs(data)
@@ -43,6 +50,12 @@ export default function LogsPage() {
     }
   }, [fetchLogs, role])
 
+  // Track the latest fetchLogs function using a ref to prevent recreating channel on every keystroke/filter change
+  const fetchLogsRef = React.useRef(fetchLogs)
+  React.useEffect(() => {
+    fetchLogsRef.current = fetchLogs
+  }, [fetchLogs])
+
   React.useEffect(() => {
     if (!role) return
 
@@ -59,8 +72,8 @@ export default function LogsPage() {
           table: "status_logs",
         },
         () => {
-          // Silent refresh (avoid skeleton flicker)
-          fetchLogs(false)
+          // Silent refresh (avoid skeleton flicker) using the latest ref function
+          fetchLogsRef.current(false)
         }
       )
       .subscribe()
@@ -68,7 +81,7 @@ export default function LogsPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [fetchLogs, role])
+  }, [role])
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-50/50 min-h-screen">

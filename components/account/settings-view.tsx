@@ -126,7 +126,7 @@ export function SettingsView() {
     <div className="w-full" key={user?.id || "loading"}>
       <Tabs defaultValue="signin" className="w-full">
         <div className="flex justify-center mb-10">
-          <TabsList className="bg-transparent border-b border-[#E2E8F0] w-full max-w-2xl justify-start rounded-none h-auto p-0 gap-6">
+          <TabsList className="bg-transparent border-b border-[#E2E8F0] w-full max-w-2xl justify-start rounded-none h-auto p-0 gap-6 overflow-x-auto no-scrollbar flex-nowrap whitespace-nowrap shrink-0">
             <TabsTrigger 
               value="signin"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A8A] data-[state=active]:bg-transparent px-2 py-3 text-base"

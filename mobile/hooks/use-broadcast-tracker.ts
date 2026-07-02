@@ -1,7 +1,48 @@
 import { useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
 import { supabase } from '../lib/supabase';
 import { useResponderStore, checkConnectivity } from '../stores/useResponderStore';
+
+const BACKGROUND_LOCATION_TASK = 'background-location-task';
+
+if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
+  TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+    if (error) {
+      console.error('[Background GPS Task] Task error:', error);
+      return;
+    }
+    if (data) {
+      const { locations } = data as any;
+      if (locations && locations.length > 0) {
+        const location = locations[0];
+        const lat = location.coords.latitude;
+        const lng = location.coords.longitude;
+        
+        console.log(`[Background GPS Task] Live background coordinate sync: ${lat}, ${lng}`);
+        
+        try {
+          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+          const { data: { session } } = await supabase.auth.getSession();
+          const reqHeaders: any = { 'Content-Type': 'application/json' };
+          if (session?.access_token) {
+            reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+          }
+          await fetch(`${apiUrl}/api/responder/location`, {
+            method: 'POST',
+            headers: reqHeaders,
+            body: JSON.stringify({
+              latitude: lat,
+              longitude: lng
+            })
+          });
+        } catch (err) {
+          console.error('[Background GPS Task] Location upload failed:', err);
+        }
+      }
+    }
+  });
+}
 
 // Helper to calculate distance in meters
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -41,6 +82,37 @@ export function useBroadcastTracker(
           console.log(`Subscribed to telemetry broadcast for incident ${incidentId}`);
         }
       });
+
+      // Start background location updates
+      const startBackgroundLocation = async () => {
+        try {
+          const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+          const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+          
+          if (fgStatus === 'granted' && bgStatus === 'granted') {
+            const isStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+            if (!isStarted) {
+              await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+                accuracy: Location.Accuracy.Balanced,
+                timeInterval: 5000,
+                distanceInterval: 10,
+                foregroundService: {
+                  notificationTitle: "DisasTRACE Active Tracking",
+                  notificationBody: "DisasTRACE is synchronized with live GPS location telemetry in the background.",
+                  notificationColor: "#1E3A8A"
+                }
+              });
+              console.log('[useBroadcastTracker] Started background location updates.');
+            }
+          } else {
+            console.warn('[useBroadcastTracker] Background location permissions not fully granted.');
+          }
+        } catch (err) {
+          console.error('[useBroadcastTracker] Error starting background location updates:', err);
+        }
+      };
+
+      startBackgroundLocation();
     }
 
     // Helper to query location with high-accuracy, cache fallback, and safe defaults
@@ -305,6 +377,17 @@ export function useBroadcastTracker(
       if (channel) {
         channel.unsubscribe();
       }
+
+      // Stop background location updates
+      Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
+        .then((isStarted) => {
+          if (isStarted) {
+            Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
+              .then(() => console.log('[useBroadcastTracker] Stopped background location updates.'))
+              .catch((e) => console.error('Error stopping background location:', e));
+          }
+        })
+        .catch((e) => console.log('Error checking background location status:', e));
     };
   }, [incidentId, active, responderStatus, targetHospital, activeDispatch]);
 }

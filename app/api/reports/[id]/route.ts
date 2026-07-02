@@ -42,6 +42,7 @@ export async function GET(
         peopleInvolved: verificationRequests.peopleInvolved,
         scenePhotos: reports.scenePhotos,
         participants: reports.participants,
+        residentId: verificationRequests.residentId,
       })
       .from(reports)
       .innerJoin(incidents, eq(reports.incidentId, incidents.id))
@@ -122,6 +123,9 @@ export async function GET(
           return 0;
         })(),
         scenePhotos: [],
+        residentName: userReq.resident?.fullName || "Anonymous",
+        residentPhone: userReq.resident?.phone || "N/A",
+        residentAddress: userReq.resident?.address || "N/A",
         logs: [
           { action: "Incident Reported by Resident", time: new Date(userReq.createdAt).toLocaleTimeString() },
           ...(userReq.status === "VERIFIED" ? [{ action: "Incident Verified by Dispatcher", time: new Date(userReq.updatedAt).toLocaleTimeString() }] : []),
@@ -135,6 +139,22 @@ export async function GET(
     }
 
     const r = results[0];
+
+    // Fetch resident user details separately
+    let residentName = "Anonymous";
+    let residentPhone = "N/A";
+    let residentAddress = "N/A";
+
+    if (r.residentId) {
+      const resUser = await db.query.users.findFirst({
+        where: eq(users.id, r.residentId),
+      });
+      if (resUser) {
+        residentName = resUser.fullName;
+        residentPhone = resUser.phone || "N/A";
+        residentAddress = resUser.address || "N/A";
+      }
+    }
 
     // Fetch associated Patient Care Reports and Driver Trip Ticket
     const patientCare = await db
@@ -189,6 +209,9 @@ export async function GET(
         return 0;
       })(),
       scenePhotos: Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
+      residentName: residentName,
+      residentPhone: residentPhone,
+      residentAddress: residentAddress,
       logs: [
         { action: "Incident Dispatched", time: new Date(r.createdAt).toLocaleTimeString() },
         { action: "Ambulance Arrived at Scene", time: new Date(r.createdAt).toLocaleTimeString() },

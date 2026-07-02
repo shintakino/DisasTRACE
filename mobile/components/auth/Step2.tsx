@@ -277,9 +277,11 @@ export default function Step2({ onNext, onBack }: Props) {
           <TextInput
             className={`bg-gray-50 p-4 rounded-xl border ${errors.email ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-800`}
             placeholder="your@email.com" onBlur={onBlur} 
-            onChangeText={(text) => onChange(text.toLowerCase())} 
+            onChangeText={onChange} 
             value={value}
             autoCapitalize="none" keyboardType="email-address"
+            autoCorrect={false}
+            autoComplete="off"
           />
         )} />
         {errors.email && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.email.message}</Text>}
@@ -295,6 +297,8 @@ export default function Step2({ onNext, onBack }: Props) {
             value={value}
             keyboardType="phone-pad"
             maxLength={11}
+            autoCorrect={false}
+            autoComplete="off"
           />
         )} />
         <Text className="text-gray-400 text-xs mt-1 ml-1">Format: 09XXXXXXXXX</Text>
@@ -309,7 +313,7 @@ export default function Step2({ onNext, onBack }: Props) {
             <TextInput
               className={`bg-gray-100 p-4 rounded-xl border ${errors.province ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-500`}
               placeholder="BULACAN" onBlur={onBlur} 
-              onChangeText={(text) => onChange(text.toUpperCase())} 
+              onChangeText={onChange} 
               value={value}
               editable={false} // Locked to Bulacan per requirement
             />
@@ -322,7 +326,7 @@ export default function Step2({ onNext, onBack }: Props) {
             <TextInput
               className={`bg-gray-100 p-4 rounded-xl border ${errors.city ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-500`}
               placeholder="BALIWAG CITY" onBlur={onBlur} 
-              onChangeText={(text) => onChange(text.toUpperCase())} 
+              onChangeText={onChange} 
               value={value}
               editable={false} // Locked to Baliwag City per requirement
             />
@@ -351,9 +355,11 @@ export default function Step2({ onNext, onBack }: Props) {
           <TextInput
             className={`bg-gray-50 p-4 rounded-xl border ${errors.street ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-800`}
             placeholder="UNIT 123, GEN. ALEJO SANTOS ST." onBlur={onBlur} 
-            onChangeText={(text) => onChange(text.toUpperCase())} 
+            onChangeText={onChange} 
             value={value}
             autoCapitalize="characters"
+            autoCorrect={false}
+            autoComplete="off"
           />
         )} />
         {errors.street && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.street.message}</Text>}

@@ -84,7 +84,7 @@ export async function autoDispatchIncident(
             eq(users.role, "ambulance_responder"),
             eq(users.status, "ACTIVE"),
             eq(users.dutyStatus, "ON_DUTY"),
-            sql`${users.lastLocationUpdatedAt} >= NOW() - INTERVAL '3 minutes'`,
+            sql`${users.lastLocationUpdatedAt} >= NOW() - INTERVAL '15 minutes'`,
             sql`ST_DWithin(
               ${users.locationGeom}::geography,
               ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography,
@@ -263,7 +263,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
             eq(users.role, "ambulance_responder"),
             eq(users.status, "ACTIVE"),
             eq(users.dutyStatus, "ON_DUTY"),
-            sql`${users.lastLocationUpdatedAt} >= NOW() - INTERVAL '3 minutes'`,
+            sql`${users.lastLocationUpdatedAt} >= NOW() - INTERVAL '15 minutes'`,
             sql`ST_DWithin(
               ${users.locationGeom}::geography,
               ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography,

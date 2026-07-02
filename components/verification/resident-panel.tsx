@@ -18,7 +18,7 @@ interface ResidentPanelProps {
 export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessing }: ResidentPanelProps) {
   if (!request) {
     return (
-      <div className="w-80 shrink-0 border-l bg-muted/30 p-4 flex flex-col items-center justify-center text-muted-foreground text-sm italic">
+      <div className="w-80 shrink-0 border-l bg-white p-4 flex flex-col items-center justify-center text-slate-400 text-sm italic">
         No resident selected
       </div>
     )
@@ -32,7 +32,7 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
     .join("")
 
   return (
-    <div className="w-80 shrink-0 border-l bg-muted/30 p-4 flex flex-col gap-6">
+    <div className="w-80 shrink-0 border-l bg-white p-4 flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-3">
           <Button
@@ -109,11 +109,15 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
             <div className="text-sm">
               <div className="text-muted-foreground text-[10px] uppercase font-bold">Account Standing</div>
               <div className="font-medium">
-                {resident.reliabilityScore !== undefined ? (
-                  resident.reliabilityScore >= 80 ? "Good Standing" :
-                  resident.reliabilityScore >= 50 ? "Fair Standing" : "Poor Standing"
+                {resident.priorReports === 0 ? (
+                  "New Account"
                 ) : (
-                  resident.priorReports >= 5 ? "Good Standing" : "New Account"
+                  resident.reliabilityScore !== undefined ? (
+                    resident.reliabilityScore >= 80 ? "Good Standing" :
+                    resident.reliabilityScore >= 50 ? "Fair Standing" : "Poor Standing"
+                  ) : (
+                    "New Account"
+                  )
                 )} ({resident.priorReports} reports)
               </div>
             </div>
@@ -128,14 +132,19 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
           <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
             <div
               className={`h-full ${
+                resident.priorReports === 0 ? "bg-slate-300" :
                 (resident.reliabilityScore ?? 100) >= 80 ? "bg-green-500" :
                 (resident.reliabilityScore ?? 100) >= 50 ? "bg-amber-500" : "bg-red-500"
               }`}
-              style={{ width: `${resident.reliabilityScore ?? 100}%` }}
+              style={{ width: `${resident.priorReports === 0 ? 0 : (resident.reliabilityScore ?? 100)}%` }}
             />
           </div>
           <div className="text-[10px] text-muted-foreground mt-2 text-center italic">
-            Based on historical accuracy of reports ({resident.reliabilityScore ?? 100}% reliable)
+            {resident.priorReports === 0 ? (
+              "No historical reports submitted yet"
+            ) : (
+              `Based on historical accuracy of reports (${resident.reliabilityScore ?? 100}% reliable)`
+            )}
           </div>
         </Card>
       </div>

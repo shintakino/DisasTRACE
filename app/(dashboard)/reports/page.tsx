@@ -154,10 +154,10 @@ export default function ReportsPage() {
       </div>
 
       <Card className="rounded-xl shadow-xl border-none overflow-hidden bg-white">
-        <ReportsHeader onFilterChange={handleFilterChange} onExport={handleExportPDF} isExporting={isExporting} />
+        <ReportsHeader onFilterChange={handleFilterChange} onExport={handleExportPDF} isExporting={isExporting} category={category} />
         
         <div className="px-6 py-4 border-b border-slate-100 bg-white">
-          <div className="flex bg-slate-100/80 rounded-xl p-1 gap-1">
+          <div className="flex overflow-x-auto no-scrollbar bg-slate-100/80 rounded-xl p-1 gap-1">
             {(category === "responder"
               ? (["all", "RESPONDING", "ONGOING", "COMPLETED"] as const)
               : (["all", "PENDING", "VERIFIED", "REJECTED", "DUPLICATE"] as const)
@@ -176,7 +176,7 @@ export default function ReportsPage() {
                   key={tab}
                   onClick={() => handleTabChange(tab)}
                   className={cn(
-                    "flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200",
+                    "flex-1 py-2.5 px-4 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200 whitespace-nowrap shrink-0",
                     isActive 
                       ? `${getBgColor(tab)} text-white shadow-sm` 
                       : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"

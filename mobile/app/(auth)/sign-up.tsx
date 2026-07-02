@@ -167,7 +167,7 @@ export default function SignUpScreen() {
             <ArrowLeft color="#FFFFFF" size={24} />
           </TouchableOpacity>
           
-          <View className="flex-1 items-center justify-center mr-8 flex-row space-x-2">
+          <View className="flex-1 items-center justify-center mr-8 flex-row space-x-4">
             <Text className="font-bold text-lg text-white">Create Account</Text>
             <View className="px-2.5 py-0.5 rounded-full border bg-blue-500/20 border-blue-500/30">
               <Text className="text-[10px] font-black tracking-widest uppercase text-blue-400">
@@ -210,7 +210,7 @@ export default function SignUpScreen() {
             </View>
           )}
 
-          <View className="bg-white rounded-t-3xl mt-4 px-6 pt-8 pb-10">
+          <View className="bg-white rounded-t-3xl mt-4 px-6 pt-8 pb-20">
             {currentStep === 1 && <Step1 onNext={() => setCurrentStep(2)} />}
             {currentStep === 2 && <Step2 onNext={() => setCurrentStep(3)} onBack={() => setCurrentStep(1)} />}
             {currentStep === 3 && <Step3 onNext={() => setCurrentStep(4)} onBack={() => setCurrentStep(2)} />}

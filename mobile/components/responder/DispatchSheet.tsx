@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, ActivityIndicator, Vibration } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -22,6 +22,18 @@ export function DispatchSheet() {
   
   // Start off-screen at the top.
   const translateY = useSharedValue(-800);
+
+  // Trigger continuous vibration when an emergency alert is offered
+  useEffect(() => {
+    if (status === 'dispatch_offered') {
+      Vibration.vibrate([1000, 1000], true);
+    } else {
+      Vibration.cancel();
+    }
+    return () => {
+      Vibration.cancel();
+    };
+  }, [status]);
 
   useEffect(() => {
     if (status === 'dispatch_offered') {
@@ -152,7 +164,7 @@ export function DispatchSheet() {
         {/* Actions Button Row */}
         <View className="flex-row">
           <TouchableOpacity 
-            className="bg-[#B91C1C] rounded-[20px] py-4 items-center shadow-lg shadow-[#B91C1C]/30 active:bg-red-800 flex-1 flex-row justify-center"
+            className="bg-[#1E3A8A] rounded-[20px] py-4 items-center shadow-lg shadow-[#1E3A8A]/30 active:bg-blue-900 flex-1 flex-row justify-center"
             disabled={accepting}
             onPress={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

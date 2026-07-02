@@ -62,6 +62,8 @@ interface ResponderState {
   currentSpeedKph: number;
   hospitalDistanceKm: number | null;
   hospitalEtaMins: number | null;
+  responseTimeSeconds: number;
+  initialDistanceKm: number;
   lastSubmittedSummary: {
     responseTimeMins: number;
     patientsCount: number;
@@ -145,6 +147,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
   currentSpeedKph: 0,
   hospitalDistanceKm: null,
   hospitalEtaMins: null,
+  responseTimeSeconds: 0,
+  initialDistanceKm: 0,
   lastSubmittedSummary: null,
   drafts: [],
   submittedIncidentIds: [],
@@ -159,10 +163,20 @@ export const useResponderStore = create<ResponderState>((set) => ({
   incrementElapsedTime: () => set((state) => ({ elapsedTimeSeconds: state.elapsedTimeSeconds + 1 })),
   resetTimer: () => set({ sceneTimeSeconds: 0, elapsedTimeSeconds: 0 }),
 
-  acceptDispatch: () => set({ 
-    status: 'en_route',
-    elapsedTimeSeconds: 0
-  }),
+  acceptDispatch: () => {
+    let parsedDist = 1.7;
+    const currentDispatch = useResponderStore.getState().activeDispatch;
+    if (currentDispatch?.distance) {
+      const match = currentDispatch.distance.match(/[\d.]+/);
+      if (match) parsedDist = parseFloat(match[0]);
+    }
+    set({ 
+      status: 'en_route',
+      elapsedTimeSeconds: 0,
+      responseTimeSeconds: 0,
+      initialDistanceKm: parsedDist
+    });
+  },
 
   confirmArrival: () => set({ 
     isArrivalConfirmVisible: true
@@ -207,10 +221,12 @@ export const useResponderStore = create<ResponderState>((set) => ({
         });
       }
     }
+    const enRouteDuration = useResponderStore.getState().elapsedTimeSeconds;
     set({
       status: 'on_scene',
       isArrivalConfirmVisible: false,
-      sceneTimeSeconds: 0
+      sceneTimeSeconds: 0,
+      responseTimeSeconds: enRouteDuration
     });
   },
 
@@ -269,20 +285,15 @@ export const useResponderStore = create<ResponderState>((set) => ({
       return;
     }
 
-    const activeDispatch = useResponderStore.getState().activeDispatch;
-    const elapsedTimeSeconds = useResponderStore.getState().elapsedTimeSeconds;
-    
-    // Parse distance from activeDispatch.distance (e.g. "1.7 km" or similar)
-    let parsedDistance = 1.7;
-    if (activeDispatch?.distance) {
-      const match = activeDispatch.distance.match(/[\d.]+/);
-      if (match) parsedDistance = parseFloat(match[0]);
-    }
+    const responseTimeMins = Math.ceil(useResponderStore.getState().responseTimeSeconds / 60) || 1;
+    const initialDist = useResponderStore.getState().initialDistanceKm || 1.7;
+    const hospDist = useResponderStore.getState().hospitalDistanceKm || 0;
+    const totalDistance = initialDist + hospDist;
 
     const summary = {
-      responseTimeMins: Math.ceil(elapsedTimeSeconds / 60) || 9,
+      responseTimeMins: responseTimeMins,
       patientsCount: formData?.patients?.length || 1,
-      distanceKm: parsedDistance,
+      distanceKm: totalDistance,
     };
 
     try {

@@ -14,11 +14,61 @@ import { useResponderStore } from '../../stores/useResponderStore';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
 
+import * as Notifications from 'expo-notifications';
+import { Platform, Vibration } from 'react-native';
+
 export default function HomeScreen() {
   const router = useRouter();
   const { profile, verificationStatus, role, user, isLoaded } = useAuthStatus();
   const [isCheckingIncident, setIsCheckingIncident] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Configure notifications channel
+  useEffect(() => {
+    async function configureNotifications() {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') return;
+
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldVibrate: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+          shouldSetBadge: false,
+        } as any),
+      });
+
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('announcements', {
+          name: 'Announcements',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#8B5CF6',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+        });
+
+        await Notifications.setNotificationChannelAsync('emergency-alerts', {
+          name: 'Emergency Alerts',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250, 250, 250],
+          lightColor: '#EF4444',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+        });
+      }
+    }
+    configureNotifications();
+  }, []);
 
   // Fetch and subscribe to unread notification count
   useEffect(() => {
@@ -53,8 +103,28 @@ export default function HomeScreen() {
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
+        (payload) => {
           fetchUnreadCount();
+          if (payload.eventType === 'INSERT') {
+            const notif = payload.new as any;
+            if (notif) {
+              Notifications.scheduleNotificationAsync({
+                content: {
+                  title: notif.type === 'system_announcement' ? `📢 ANNOUNCEMENT: ${notif.title}` : notif.title,
+                  body: notif.body,
+                  sound: true,
+                  priority: Notifications.AndroidNotificationPriority.HIGH,
+                  android: {
+                    channelId: notif.type === 'system_announcement' ? 'announcements' : 'emergency-alerts',
+                  },
+                } as any,
+                trigger: null,
+              });
+
+              // Play vibration pattern
+              Vibration.vibrate([0, 500, 250, 500]);
+            }
+          }
         }
       )
       .subscribe();

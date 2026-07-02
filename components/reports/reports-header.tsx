@@ -23,9 +23,10 @@ interface ReportsHeaderProps {
   onFilterChange: (filters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => void;
   onExport: () => void;
   isExporting?: boolean;
+  category?: "user" | "responder";
 }
 
-export function ReportsHeader({ onFilterChange, onExport, isExporting }: ReportsHeaderProps) {
+export function ReportsHeader({ onFilterChange, onExport, isExporting, category = "responder" }: ReportsHeaderProps) {
   const [search, setSearch] = React.useState("");
   const [type, setType] = React.useState<IncidentType | "all">("all");
 
@@ -50,9 +51,13 @@ export function ReportsHeader({ onFilterChange, onExport, isExporting }: Reports
 
   return (
     <div className="bg-[#1E3A8A] p-6 rounded-t-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-white tracking-tight">RESPONDER REPORTS</h2>
-        <p className="text-blue-200 text-xs font-medium uppercase tracking-wider">Historical Incident Data</p>
+      <div className="flex flex-col gap-1 text-left">
+        <h2 className="text-xl font-bold text-white tracking-tight">
+          {category === "user" ? "USER REPORTS" : "RESPONDER REPORTS"}
+        </h2>
+        <p className="text-blue-200 text-xs font-medium uppercase tracking-wider">
+          {category === "user" ? "Citizen Reported Incidents" : "Historical Incident Data"}
+        </p>
       </div>
 
       <div className="flex items-center gap-3">

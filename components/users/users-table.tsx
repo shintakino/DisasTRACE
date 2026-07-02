@@ -47,13 +47,13 @@ const StatusBadge = ({ status }: { status: UserStatus }) => {
 
 const RoleLabel = ({ role }: { role: UserRole }) => {
   const labels: Record<UserRole, string> = {
-    public_user: "PUBLIC USER",
-    ambulance_responder: "RESPONDER",
-    pacc_admin: "PACC ADMIN",
-    cdrrmo_super_admin: "SUPER ADMIN",
+    public_user: "Public User",
+    ambulance_responder: "Responder",
+    pacc_admin: "PACC Admin",
+    cdrrmo_super_admin: "Super Admin",
   };
 
-  return <span className="text-[10px] font-black text-slate-500 tracking-wider">{labels[role]}</span>;
+  return <span className="text-xs font-semibold text-slate-600">{labels[role]}</span>;
 };
 
 export function UsersTable({ data, onManageStatus, onBan, onDelete }: UsersTableProps) {

@@ -3,7 +3,6 @@
 import { Applicant } from "@/types/approval";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +38,7 @@ export function ApprovalQueue({
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin">
         <div className="p-4 space-y-3">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">
             Application Queue
@@ -80,7 +79,7 @@ export function ApprovalQueue({
             ))
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

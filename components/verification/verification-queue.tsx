@@ -9,25 +9,25 @@ import { formatDistanceToNow } from "date-fns"
 interface SummaryCardProps {
   label: string
   count: number
-  color: string
+  className: string
   isActive: boolean
   onClick: () => void
 }
 
-function SummaryCard({ label, count, color, isActive, onClick }: SummaryCardProps) {
+function SummaryCard({ label, count, className, isActive, onClick }: SummaryCardProps) {
   return (
     <Card
       className={cn(
-        "p-4 cursor-pointer transition-all border-2",
-        isActive ? "ring-2 ring-primary ring-offset-2" : "hover:bg-accent"
+        "p-4 cursor-pointer transition-all border border-slate-200/60 shadow-sm",
+        isActive ? "ring-2 ring-[#1E3A8A] ring-offset-1 border-[#1E3A8A]/50 bg-white" : "hover:bg-slate-50",
+        className
       )}
-      style={{ backgroundColor: color }}
       onClick={onClick}
     >
-      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
         {label}
       </div>
-      <div className="text-2xl font-bold mt-1">{count}</div>
+      <div className="text-2xl font-black mt-1 text-slate-800">{count}</div>
     </Card>
   )
 }
@@ -94,12 +94,12 @@ export function VerificationQueue({
   });
 
   return (
-    <div className="flex flex-col h-full gap-4 w-80 shrink-0 border-r bg-muted/30 p-4">
+    <div className="flex flex-col h-full gap-4 w-80 shrink-0 border-r bg-white p-4">
       <div className="grid grid-cols-1 gap-3">
         <SummaryCard
           label="Pending"
           count={counts.PENDING}
-          color="#FFEDD5"
+          className="bg-amber-50/40 border-amber-200/50"
           isActive={filter === "PENDING"}
           onClick={() => onFilterChange("PENDING")}
         />
@@ -107,14 +107,14 @@ export function VerificationQueue({
           <SummaryCard
             label="Verified"
             count={counts.VERIFIED}
-            color="#DCFCE7"
+            className="bg-emerald-50/40 border-emerald-200/50"
             isActive={filter === "VERIFIED"}
             onClick={() => onFilterChange("VERIFIED")}
           />
           <SummaryCard
             label="Rejected"
             count={counts.REJECTED}
-            color="#FEE2E2"
+            className="bg-rose-50/40 border-rose-200/50"
             isActive={filter === "REJECTED"}
             onClick={() => onFilterChange("REJECTED")}
           />

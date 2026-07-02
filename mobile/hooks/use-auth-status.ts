@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
+import * as SecureStore from 'expo-secure-store';
 
 const VerificationStatusSchema = z.enum(['pending', 'approved', 'rejected']);
 type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
@@ -42,11 +43,16 @@ export function useAuthStatus() {
 
       setRole(role);
       setVerificationStatus(VerificationStatusSchema.parse(status.toLowerCase()));
-      setProfile({
+      
+      const userProfile = {
         fullName: dbUser.full_name,
         address: dbUser.address || '',
         dutyStatus: dbUser.duty_status || 'OFF_DUTY',
-      });
+      };
+      setProfile(userProfile);
+      
+      // Save profile to local cache for offline use
+      SecureStore.setItemAsync(`profile_${currentUser.id}`, JSON.stringify(userProfile)).catch(() => {});
     } catch (error) {
       console.error('Error checking verification status via Supabase:', error);
       
@@ -76,6 +82,33 @@ export function useAuthStatus() {
           : undefined;
           
         return normalizedStatus || 'pending';
+      });
+
+      // Load cached profile during offline failure
+      SecureStore.getItemAsync(`profile_${currentUser.id}`).then((cached) => {
+        if (cached) {
+          try {
+            setProfile(JSON.parse(cached));
+          } catch (e) {
+            setProfile({
+              fullName: currentUser.user_metadata?.full_name || 'Resident',
+              address: currentUser.user_metadata?.address || '',
+              dutyStatus: 'OFF_DUTY',
+            });
+          }
+        } else {
+          setProfile({
+            fullName: currentUser.user_metadata?.full_name || 'Resident',
+            address: currentUser.user_metadata?.address || '',
+            dutyStatus: 'OFF_DUTY',
+          });
+        }
+      }).catch(() => {
+        setProfile({
+          fullName: currentUser.user_metadata?.full_name || 'Resident',
+          address: currentUser.user_metadata?.address || '',
+          dutyStatus: 'OFF_DUTY',
+        });
       });
     }
   };

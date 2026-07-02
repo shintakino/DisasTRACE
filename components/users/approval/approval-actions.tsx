@@ -49,33 +49,43 @@ export function ApprovalActions({
             Reject Application
           </Button>
         </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="w-5 h-5" />
-              Reject Application
-            </DialogTitle>
-            <DialogDescription>
-              Please provide a clear reason for rejecting this application. This will be sent to the applicant.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-2">
-            <Label htmlFor="reason" className="text-xs font-bold uppercase text-slate-500">
-              Reason for Rejection
-            </Label>
-            <Textarea
-              id="reason"
-              placeholder="e.g., Blurry ID image, Name mismatch, Expired document..."
-              className="min-h-[100px] resize-none"
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-            />
+        <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
+          <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
+                <AlertTriangle className="h-6 w-6 text-white" />
+              </div>
+              <div className="text-left">
+                <DialogTitle className="text-xl font-bold text-white tracking-tight">Reject Application</DialogTitle>
+                <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
+                  Please provide a clear reason for rejecting this application.
+                </DialogDescription>
+              </div>
+            </div>
           </div>
-          <DialogFooter>
+
+          <div className="p-6 bg-slate-50/30 flex-1 overflow-y-auto space-y-4">
+            <div className="space-y-2 text-left">
+              <Label htmlFor="reason" className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2">
+                Reason for Rejection
+              </Label>
+              <Textarea
+                id="reason"
+                placeholder="e.g., Blurry ID image, Name mismatch, Expired document..."
+                className="min-h-[100px] resize-none border-slate-200 bg-white font-medium focus-visible:ring-[#2B4C9B]"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="p-6 bg-white border-t border-slate-100 flex justify-end gap-2 shrink-0">
             <Button
               variant="ghost"
               onClick={() => setIsRejectDialogOpen(false)}
               disabled={isProcessing}
+              className="font-bold text-slate-500"
             >
               Cancel
             </Button>
@@ -83,7 +93,7 @@ export function ApprovalActions({
               variant="destructive"
               onClick={handleReject}
               disabled={!rejectionReason.trim() || isProcessing}
-              className="font-bold"
+              className="font-bold rounded-xl px-5 h-11"
             >
               {isProcessing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Confirm Rejection

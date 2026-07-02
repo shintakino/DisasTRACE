@@ -30,6 +30,7 @@ export default function TrackingScreen() {
 
   const [eta, setEta] = useState(8);
   const [distance, setDistance] = useState(1.7);
+  const [initialDistance, setInitialDistance] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0); // Natural elapsed time starting from 0
   const elapsedRef = useRef(0);
   const [isArrived, setIsArrived] = useState(false);
@@ -467,12 +468,13 @@ export default function TrackingScreen() {
         if (data.routes && data.routes[0]) {
           const route = data.routes[0];
           setRouteCoords(route.geometry.coordinates);
-          setDistance(route.distance / 1000);
+          const currentDist = route.distance / 1000;
+          setDistance(currentDist);
+          setInitialDistance((prev) => prev ?? currentDist);
           setEta(Math.ceil(route.duration / 60));
           
           // Calculate progress percentage dynamically relative to a baseline distance (e.g. 3.5 km initial gap)
           const initialDist = 3.5;
-          const currentDist = route.distance / 1000;
           const progress = Math.max(0, Math.min(100, Math.round(((initialDist - currentDist) / initialDist) * 100)));
           setProgressPercent(progress);
         }
@@ -1019,15 +1021,15 @@ export default function TrackingScreen() {
               <Text style={styles.tripSummaryLabel}>TRIP SUMMARY</Text>
               <View style={styles.tripStatsRow}>
                 <View style={styles.tripStat}>
-                  <Text style={styles.tripStatValue}>{Math.floor(elapsed / 60)}m</Text>
+                  <Text style={styles.tripStatValue}>{Math.max(1, Math.floor(elapsed / 60))}m</Text>
                   <Text style={styles.tripStatLabel}>RESPONSE</Text>
                 </View>
                 <View style={styles.tripStat}>
-                  <Text style={styles.tripStatValue}>3</Text>
+                  <Text style={styles.tripStatValue}>{report.peopleInvolved?.replace(" Persons", "") || "1-2"}</Text>
                   <Text style={styles.tripStatLabel}>PATIENTS</Text>
                 </View>
                 <View style={styles.tripStat}>
-                  <Text style={styles.tripStatValue}>1.7</Text>
+                  <Text style={styles.tripStatValue}>{initialDistance !== null ? initialDistance.toFixed(1) : "1.7"}</Text>
                   <Text style={styles.tripStatLabel}>KM</Text>
                 </View>
               </View>

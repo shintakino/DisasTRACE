@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -71,7 +72,7 @@ export function ReportDetailSheet({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent showCloseButton={false} className="sm:max-w-md p-0 overflow-hidden bg-white border-none shadow-2xl rounded-[32px] gap-0 h-[85vh] flex flex-col">
+      <DialogContent showCloseButton={false} className="max-w-md md:max-w-4xl p-0 overflow-hidden bg-white border-none shadow-2xl rounded-[32px] gap-0 h-[85vh] flex flex-col">
         {/* Hidden title for screen readers to avoid DialogTitle warning */}
         <DialogTitle className="sr-only">Report Details</DialogTitle>
         
@@ -81,38 +82,31 @@ export function ReportDetailSheet({
             <span className="font-bold uppercase tracking-widest text-[10px]">Loading...</span>
           </div>
         ) : report ? (
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="p-6 flex flex-col items-center">
-              {/* Header: Responders and Close Button */}
-              <div className="w-full flex justify-between items-start mb-6">
-                <div className="flex flex-col gap-3">
-                  {report.responderName && report.responderName !== "None Assigned" ? (
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-[#1A237E] text-white flex items-center justify-center font-bold text-sm">
-                        {report.responderName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-bold text-[#1A237E] text-sm leading-tight">{report.responderName}</p>
-                        <p className="text-[#1A237E]/70 text-[10px] font-bold uppercase tracking-wider">Responder</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center font-bold text-sm border border-dashed border-slate-200">
-                        --
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-400 text-sm leading-tight">No Responder Assigned</p>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Incident Log</p>
-                      </div>
-                    </div>
-                  )}
+          <>
+            {/* Standardized Header */}
+            <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+              
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
+                    <Truck className="h-6 w-6 text-white fill-white" />
+                  </div>
+                  <div className="text-left">
+                    <DialogTitle className="text-2xl font-bold text-white mb-0.5 tracking-tight flex items-center gap-2">
+                      Report Details
+                    </DialogTitle>
+                    <DialogDescription className="text-blue-100 text-xs font-medium">
+                      Incident: <span className="font-bold">{report.id}</span> · Assigned Unit: <span className="font-bold">{report.vehicleId || "None"}</span>
+                    </DialogDescription>
+                  </div>
                 </div>
+                
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleSingleReportExport}
                     disabled={exporting}
-                    className="h-8 px-3 rounded-full bg-[#E8EAF6] text-[#1A237E] hover:bg-[#C5CAE9] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0"
+                    className="h-9 px-4 rounded-full bg-white/20 hover:bg-white/30 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 border border-white/10 shadow-sm animate-in fade-in"
                     title="Export Report to PDF"
                   >
                     {exporting ? (
@@ -120,74 +114,90 @@ export function ReportDetailSheet({
                     ) : (
                       <FileDown className="h-3.5 w-3.5" />
                     )}
-                    <span>{exporting ? "Generating..." : "PDF"}</span>
+                    <span>{exporting ? "Generating..." : "Export PDF"}</span>
                   </button>
                   <button 
                     onClick={onClose}
-                    className="h-8 w-8 rounded-full bg-[#E8EAF6] flex items-center justify-center text-[#1A237E] hover:bg-[#C5CAE9] transition-colors shrink-0"
+                    className="h-9 w-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-all shrink-0 border border-white/10 shadow-sm"
                   >
                     <X className="h-4 w-4 stroke-[3]" />
                   </button>
                 </div>
               </div>
+            </div>
 
-              {/* Vehicle Icon */}
-              <div className="relative mb-3">
-                <div className="h-20 w-20 rounded-full bg-[#E8EAF6] flex items-center justify-center relative overflow-hidden">
-                   {/* Decorative circle shapes inside to mimic the design */}
-                   <div className="absolute top-[20%] -left-[10%] w-10 h-10 rounded-full bg-slate-300/40 mix-blend-multiply" />
-                   <div className="absolute bottom-[10%] -right-[10%] w-12 h-12 rounded-full bg-slate-300/40 mix-blend-multiply" />
-                   <Truck className="h-10 w-10 text-[#1A237E] relative z-10 fill-[#1A237E]" />
+            {/* Split Content Area */}
+            <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden bg-slate-50/20">
+              {/* Left Column (Desktop sidebar / Mobile top bar) */}
+              <div className="w-full md:w-[280px] shrink-0 bg-slate-50/50 border-b md:border-b-0 md:border-r border-slate-100 flex flex-row md:flex-col items-center p-4 md:p-6 text-center gap-4">
+                {/* Vehicle Info */}
+                <div className="flex flex-row md:flex-col items-center gap-3 md:gap-1.5 w-full md:justify-center">
+                  <div className="relative shrink-0">
+                    <div className="h-12 w-12 md:h-16 md:w-16 rounded-full bg-[#E8EAF6] flex items-center justify-center relative overflow-hidden">
+                      <div className="absolute top-[20%] -left-[10%] w-8 h-8 rounded-full bg-slate-300/40 mix-blend-multiply" />
+                      <div className="absolute bottom-[10%] -right-[10%] w-10 h-10 rounded-full bg-slate-300/40 mix-blend-multiply" />
+                      <Truck className="h-6 w-6 md:h-8 md:w-8 text-[#1A237E] relative z-10 fill-[#1A237E]" />
+                    </div>
+                  </div>
+                  <div className="text-left md:text-center mt-1">
+                    <h2 className="text-[#1A237E] text-base md:text-lg font-black tracking-tight leading-tight">{report.id}</h2>
+                    <p className="text-[#1A237E]/80 font-bold text-[9px] tracking-wider uppercase">{report.vehicleId || "No Vehicle"}</p>
+                  </div>
+                </div>
+
+                {/* Tab buttons */}
+                <div className="flex flex-row md:flex-col gap-1.5 text-[10px] font-black uppercase tracking-wide w-full overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
+                  <button
+                    onClick={() => setActiveTab("resident")}
+                    className={cn(
+                      "flex-1 md:flex-none md:w-full py-2 px-3 text-center md:text-left rounded-full md:rounded-xl transition-colors flex items-center justify-center md:justify-start gap-2 whitespace-nowrap",
+                      activeTab === "resident" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100/50"
+                    )}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                    From Resident
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("incident")}
+                    className={cn(
+                      "flex-1 md:flex-none md:w-full py-2 px-3 text-center md:text-left rounded-full md:rounded-xl transition-colors flex items-center justify-center md:justify-start gap-2 whitespace-nowrap",
+                      activeTab === "incident" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100/50"
+                    )}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    Crew Findings
+                  </button>
+                  {report.patientCareReports && report.patientCareReports.length > 0 && (
+                    <button
+                      onClick={() => { setActiveTab("patient_care"); setSelectedPcrIdx(0); }}
+                      className={cn(
+                        "flex-1 md:flex-none md:w-full py-2 px-3 text-center md:text-left rounded-full md:rounded-xl transition-colors flex items-center justify-center md:justify-start gap-2 whitespace-nowrap",
+                        activeTab === "patient_care" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100/50"
+                      )}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                      Patient Care ({report.patientCareReports.length})
+                    </button>
+                  )}
+                  {report.driverTripTicket && (
+                    <button
+                      onClick={() => setActiveTab("trip_ticket")}
+                      className={cn(
+                        "flex-1 md:flex-none md:w-full py-2 px-3 text-center md:text-left rounded-full md:rounded-xl transition-colors flex items-center justify-center md:justify-start gap-2 whitespace-nowrap",
+                        activeTab === "trip_ticket" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100/50"
+                      )}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      Trip Ticket
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* ID and Vehicle Name */}
-              <h2 className="text-[#1A237E] text-[22px] font-black tracking-tight mb-1">{report.id}</h2>
-              <p className="text-[#1A237E]/80 font-bold text-[10px] mb-8 tracking-wider">{report.vehicleId}</p>
-
-              {/* Tabs */}
-              <div className="flex flex-wrap items-center justify-center gap-1.5 mb-8 text-[10px] font-black w-full max-w-[420px] mx-auto uppercase tracking-wide">
-                <button
-                  onClick={() => setActiveTab("resident")}
-                  className={cn(
-                    "flex-1 min-w-[80px] py-2 px-1 text-center rounded-full transition-colors",
-                    activeTab === "resident" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
-                  )}
-                >
-                  From Resident
-                </button>
-                <button
-                  onClick={() => setActiveTab("incident")}
-                  className={cn(
-                    "flex-1 min-w-[80px] py-2 px-1 text-center rounded-full transition-colors",
-                    activeTab === "incident" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
-                  )}
-                >
-                  Crew Findings
-                </button>
-                {report.patientCareReports && report.patientCareReports.length > 0 && (
-                  <button
-                    onClick={() => { setActiveTab("patient_care"); setSelectedPcrIdx(0); }}
-                    className={cn(
-                      "flex-1 min-w-[80px] py-2 px-1 text-center rounded-full transition-colors",
-                      activeTab === "patient_care" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
-                    )}
-                  >
-                    Patient Care
-                  </button>
-                )}
-                {report.driverTripTicket && (
-                  <button
-                    onClick={() => setActiveTab("trip_ticket")}
-                    className={cn(
-                      "flex-1 min-w-[80px] py-2 px-1 text-center rounded-full transition-colors",
-                      activeTab === "trip_ticket" ? "bg-[#E8EAF6] text-[#1A237E]" : "text-slate-400 hover:text-slate-600"
-                    )}
-                  >
-                    Trip Ticket
-                  </button>
-                )}
-              </div>
+              {/* Right Column: Scrollable Content */}
+              <div className="flex-1 min-w-0 h-full overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="p-6 md:p-8 flex flex-col items-center">
 
 
               {/* Tab Content */}
@@ -240,6 +250,27 @@ export function ReportDetailSheet({
                           </div>
                         </button>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Resident Information */}
+                  <div>
+                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Reporter Information</h3>
+                    <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center text-[13px]">
+                          <span className="text-slate-500 font-medium">Reporter Name</span>
+                          <span className="font-bold text-[#1A237E]">{report.residentName || "Anonymous"}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[13px]">
+                          <span className="text-slate-500 font-medium">Contact Number</span>
+                          <span className="font-bold text-[#1A237E]">{report.residentPhone || "N/A"}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[13px] pt-1">
+                          <span className="text-slate-500 font-medium self-start">Home Address</span>
+                          <span className="font-bold text-[#1A237E] text-right max-w-[65%] leading-tight">{report.residentAddress || "N/A"}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -646,8 +677,11 @@ export function ReportDetailSheet({
                 </div>
               )}
 
+                  </div>
+                </ScrollArea>
+              </div>
             </div>
-          </ScrollArea>
+          </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-400">
             No report selected.

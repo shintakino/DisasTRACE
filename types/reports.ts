@@ -239,6 +239,9 @@ export const DetailedIncidentReportSchema = z.object({
       triageStatus: z.string(),
     })
   ).optional(),
+  residentName: z.string().optional(),
+  residentPhone: z.string().optional(),
+  residentAddress: z.string().optional(),
   patientCareReports: z.array(PatientCareReportPayloadSchema).optional(),
   driverTripTicket: DriverTripTicketPayloadSchema.optional().nullable(),
 });

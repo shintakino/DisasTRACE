@@ -43,9 +43,11 @@ export default function Step1({ onNext }: Props) {
           <TextInput
             className={`bg-gray-50 p-4 rounded-xl border ${errors.firstName ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-800`}
             placeholder="JUAN" onBlur={onBlur} 
-            onChangeText={(text) => onChange(text.toUpperCase())} 
+            onChangeText={onChange} 
             value={value}
             autoCapitalize="characters"
+            autoCorrect={false}
+            autoComplete="off"
           />
         )} />
         {errors.firstName && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.firstName.message}</Text>}
@@ -57,9 +59,11 @@ export default function Step1({ onNext }: Props) {
           <TextInput
             className="bg-gray-50 p-4 rounded-xl border border-gray-200 h-14 text-gray-800"
             placeholder="SANTOS" onBlur={onBlur} 
-            onChangeText={(text) => onChange(text.toUpperCase())} 
+            onChangeText={onChange} 
             value={value}
             autoCapitalize="characters"
+            autoCorrect={false}
+            autoComplete="off"
           />
         )} />
       </View>
@@ -70,9 +74,11 @@ export default function Step1({ onNext }: Props) {
           <TextInput
             className={`bg-gray-50 p-4 rounded-xl border ${errors.lastName ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-800`}
             placeholder="DELA CRUZ" onBlur={onBlur} 
-            onChangeText={(text) => onChange(text.toUpperCase())} 
+            onChangeText={onChange} 
             value={value}
             autoCapitalize="characters"
+            autoCorrect={false}
+            autoComplete="off"
           />
         )} />
         {errors.lastName && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.lastName.message}</Text>}
@@ -84,9 +90,11 @@ export default function Step1({ onNext }: Props) {
           <TextInput
             className="bg-gray-50 p-4 rounded-xl border border-gray-200 h-14 text-gray-800"
             placeholder="JR., SR., III" onBlur={onBlur} 
-            onChangeText={(text) => onChange(text.toUpperCase())} 
+            onChangeText={onChange} 
             value={value}
             autoCapitalize="characters"
+            autoCorrect={false}
+            autoComplete="off"
           />
         )} />
       </View>

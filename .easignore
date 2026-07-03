@@ -1,0 +1,24 @@
+# Exclude Next.js web application files from the EAS build upload
+.next/
+app/
+components/
+db/
+drizzle/
+node_modules/
+public/
+scripts/
+types/
+lib/
+hooks/
+package.json
+package-lock.json
+next-env.d.ts
+next.config.ts
+postcss.config.mjs
+tailwind.config.ts
+drizzle.config.ts
+eslint.config.mjs
+tsconfig.json
+tsconfig.tsbuildinfo
+components.json
+scratch_inspect_reqs.ts

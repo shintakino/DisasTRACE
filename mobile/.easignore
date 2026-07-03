@@ -1,0 +1,13 @@
+# Ignore local dependencies and build folders in the mobile app during EAS builds
+node_modules/
+.expo/
+dist/
+web-build/
+package-lock.json
+*.tsbuildinfo
+.kotlin/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision

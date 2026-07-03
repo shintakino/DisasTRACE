@@ -14,8 +14,6 @@ scripts/
 types/
 lib/
 hooks/
-package.json
-package-lock.json
 next-env.d.ts
 next.config.ts
 postcss.config.mjs

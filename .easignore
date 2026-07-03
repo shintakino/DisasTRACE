@@ -1,3 +1,7 @@
+# Exclude Antigravity CLI config containing symlinks
+.antigravitycli/
+.antigravitycli
+
 # Exclude Next.js web application files from the EAS build upload
 .next/
 app/

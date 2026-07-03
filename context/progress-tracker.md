@@ -276,8 +276,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Fixed Android Foreground Service Restart Error: Resolved an Android foreground service startup restriction error where changing dispatcher status (e.g. clicking "Arrive on Scene") triggered a React useEffect teardown-restart cycle of `Location.startLocationUpdatesAsync` from an asynchronous background database callback thread. Replaced state dependencies with React Refs (`statusRef`, `targetHospitalRef`, `activeDispatchRef`) and restricted the `useBroadcastTracker` hook's `useEffect` dependency array to `[incidentId, active]`. This keeps background location tracking running continuously from initial foreground accept until resolution, avoiding any mid-trip start/stop cycles.
 - Adjusted Responder Home Top Header Spacing: Expanded the layout spacing of the top-right header action buttons (Notifications, Support/FAQs, and Dev Logout) from `space-x-2` to `space-x-6` in [ResponderHome.tsx](file:///D:/dev/freelance/disas_trace/mobile/components/responder/ResponderHome.tsx) to align them better and utilize the screen estate.
 - Adjusted Resident Home Top Header Spacing: Expanded the layout spacing of the top-right header action buttons (Notifications and Support/FAQs) from `space-x-2` to `space-x-4` in [index.tsx](file:///D:/dev/freelance/disas_trace/mobile/app/(tabs)/index.tsx) to align them better.
-
-
+- Aligned Mobile App JSON Config (Plugins and Permissions): Added missing Expo configuration plugins (`expo-camera`, `expo-image-picker`, `expo-notifications`) and declared corresponding Android permissions (`CAMERA`, `VIBRATE`, `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `RECORD_AUDIO`, `SYSTEM_ALERT_WINDOW`, `POST_NOTIFICATIONS`) in `mobile/app.json`. This ensures native modules and Android permission declarations are not stripped or missing after running `expo prebuild` or triggering EAS native builds.
 
 ## In Progress
 

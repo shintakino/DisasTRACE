@@ -70,6 +70,17 @@ export function useBroadcastTracker(
   const lastDbUpdateRef = useRef<number>(0);
   const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
+  const statusRef = useRef(responderStatus);
+  const targetHospitalRef = useRef(targetHospital);
+  const activeDispatchRef = useRef(activeDispatch);
+
+  // Keep refs in sync with the latest prop values on every render
+  useEffect(() => {
+    statusRef.current = responderStatus;
+    targetHospitalRef.current = targetHospital;
+    activeDispatchRef.current = activeDispatch;
+  });
+
   useEffect(() => {
     let channel: any = null;
 
@@ -175,17 +186,17 @@ export function useBroadcastTracker(
 
           // Geofence coordinate locking for developer testing convenience
           if (isDevMode && (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00)) {
-            if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
-              lat = activeDispatch.coordinates.latitude;
-              lng = activeDispatch.coordinates.longitude;
+            if (statusRef.current === 'on_scene' && activeDispatchRef.current?.coordinates) {
+              lat = activeDispatchRef.current.coordinates.latitude;
+              lng = activeDispatchRef.current.coordinates.longitude;
             } else {
               lat = 14.954;
               lng = 120.902;
             }
-          } else if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
+          } else if (statusRef.current === 'on_scene' && activeDispatchRef.current?.coordinates) {
             // Maintain on-scene snap alignment in both dev and production to ensure map markers overlap perfectly
-            lat = activeDispatch.coordinates.latitude;
-            lng = activeDispatch.coordinates.longitude;
+            lat = activeDispatchRef.current.coordinates.latitude;
+            lng = activeDispatchRef.current.coordinates.longitude;
           }
 
           const payload = {
@@ -194,8 +205,8 @@ export function useBroadcastTracker(
             heading: pos.heading,
             speedKph: Math.max(0, Math.round(pos.speed * 3.6)),
             timestamp: new Date().toISOString(),
-            responderStatus,
-            targetHospital
+            responderStatus: statusRef.current,
+            targetHospital: targetHospitalRef.current
           };
 
           // 1. Emit L2 broadcast event for sub-second smooth map updates
@@ -378,16 +389,22 @@ export function useBroadcastTracker(
         channel.unsubscribe();
       }
 
-      // Stop background location updates
-      Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
-        .then((isStarted) => {
-          if (isStarted) {
+      // Stop background location updates safely
+      TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK)
+        .then((isRegistered) => {
+          if (isRegistered) {
             Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
               .then(() => console.log('[useBroadcastTracker] Stopped background location updates.'))
-              .catch((e) => console.error('Error stopping background location:', e));
+              .catch((e) => {
+                if (e.message?.includes('TaskNotFoundException') || e.message?.includes('not found')) {
+                  console.log('[useBroadcastTracker] Background location task already stopped/not found.');
+                } else {
+                  console.log('[useBroadcastTracker] Error stopping background location:', e.message);
+                }
+              });
           }
         })
-        .catch((e) => console.log('Error checking background location status:', e));
+        .catch((e) => console.log('[useBroadcastTracker] Error checking background location registration status:', e.message));
     };
-  }, [incidentId, active, responderStatus, targetHospital, activeDispatch]);
+  }, [incidentId, active]);
 }

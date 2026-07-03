@@ -464,7 +464,7 @@ export default function HomeScreen() {
             <Text className="text-white text-md font-bold mt-0.5">Baliwag City</Text>
           </View>
           
-          <View className="flex-row space-x-2">
+          <View className="flex-row space-x-4">
             <TouchableOpacity 
               className="p-2" 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}

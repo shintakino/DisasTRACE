@@ -1141,12 +1141,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: '#0F172A', // Slate 900 for light map readability
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: '#CBD5E1',
+    color: '#475569', // Slate 600 for light map readability
     marginBottom: 24,
   },
   statsRow: {
@@ -1158,13 +1158,13 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: '#FFF',
+    color: '#475569', // Slate 600
     fontWeight: 'bold',
     marginBottom: 4,
   },
   statValue: {
     fontSize: 24,
-    color: '#FFF',
+    color: '#0F172A', // Slate 900
     fontWeight: 'bold',
   },
   drawer: {

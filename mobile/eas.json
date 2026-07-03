@@ -18,7 +18,8 @@
         "EXPO_PUBLIC_API_URL": "https://disas-trace.vercel.app",
         "EXPO_PUBLIC_SUPABASE_URL": "https://nqfekhcajfoqflckwjhm.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xZmVraGNhamZvcWZsY2t3amhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDg1NTksImV4cCI6MjA5NDA4NDU1OX0.ZYAF-ESa-W93vHBb-IB0Yf9ezLWonVdxSfbOHrgePXc",
-        "EXPO_PUBLIC_DEV_MODE": "false"
+        "EXPO_PUBLIC_DEV_MODE": "false",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },
     "production": {
@@ -31,7 +32,8 @@
         "EXPO_PUBLIC_API_URL": "https://disas-trace.vercel.app",
         "EXPO_PUBLIC_SUPABASE_URL": "https://nqfekhcajfoqflckwjhm.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xZmVraGNhamZvcWZsY2t3amhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDg1NTksImV4cCI6MjA5NDA4NDU1OX0.ZYAF-ESa-W93vHBb-IB0Yf9ezLWonVdxSfbOHrgePXc",
-        "EXPO_PUBLIC_DEV_MODE": "false"
+        "EXPO_PUBLIC_DEV_MODE": "false",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     }
   },

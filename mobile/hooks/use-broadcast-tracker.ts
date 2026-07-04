@@ -312,7 +312,9 @@ export function useBroadcastTracker(
           let lat = pos.latitude;
           let lng = pos.longitude;
 
-          if (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00) {
+          const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+
+          if (isDevMode && (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00)) {
             if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
               lat = activeDispatch.coordinates.latitude;
               lng = activeDispatch.coordinates.longitude;
@@ -320,6 +322,10 @@ export function useBroadcastTracker(
               lat = 14.954;
               lng = 120.902;
             }
+          } else if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
+            // Maintain on-scene snap alignment in both dev and production to ensure map markers overlap perfectly
+            lat = activeDispatch.coordinates.latitude;
+            lng = activeDispatch.coordinates.longitude;
           }
 
           lastDbUpdateRef.current = Date.now();

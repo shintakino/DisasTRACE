@@ -49,6 +49,11 @@ export async function PATCH(
       .where(eq(verificationRequests.id, id))
       .returning();
 
+    // If rejected, remove any associated pending incidents to clean up the DB
+    if (validatedStatus === "REJECTED") {
+      await db.delete(incidents).where(eq(incidents.requestId, id));
+    }
+
     let incident = null;
     let autoDispatched = false;
 

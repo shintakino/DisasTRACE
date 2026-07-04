@@ -112,6 +112,10 @@ export async function POST(req: NextRequest) {
         })
         .where(eq(verificationRequests.id, requestId))
         .returning();
+
+      // Remove any associated pending incidents to clean up the DB
+      await db.delete(incidents).where(eq(incidents.requestId, requestId));
+
       finalReq = updated;
     }
 

@@ -31,6 +31,13 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
     .map((n) => n[0])
     .join("")
 
+  const needsManualDispatch =
+    request.status === "VERIFIED" &&
+    request.incident &&
+    request.incident.dispatchMethod === "PACC_MANUAL" &&
+    !request.incident.responderId &&
+    !request.incident.currentOfferResponderId;
+
   return (
     <div className="w-80 shrink-0 border-l bg-white p-4 flex flex-col gap-6">
       <div className="flex flex-col gap-3">
@@ -39,7 +46,10 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
             variant="secondary"
             className="w-full flex items-center justify-center gap-2"
             onClick={() => onReject(request.id)}
-            disabled={isProcessing || request.status !== "PENDING"}
+            disabled={
+              isProcessing || 
+              !(request.status === "PENDING" || needsManualDispatch)
+            }
           >
             <XCircle className="w-4 h-4" />
             Reject

@@ -338,6 +338,23 @@ export default function VerificationPage() {
     }
   }
 
+  const handleDispatchSuccess = async () => {
+    const dispatchedId = dispatchReqId;
+    await fetchRequests()
+    if (dispatchedId) {
+      const currentIdx = requests.findIndex((r) => r.id === dispatchedId)
+      const nextPending =
+        requests.slice(currentIdx + 1).find((r) => r.status === "PENDING" || needsManualDispatch(r)) ||
+        requests.slice(0, currentIdx).find((r) => r.status === "PENDING" || needsManualDispatch(r))
+
+      if (nextPending) {
+        setSelectedId(nextPending.id)
+      } else {
+        setSelectedId(null)
+      }
+    }
+  }
+
   const handleMerge = async (duplicateId: string, parentId: string) => {
     setIsProcessing(true)
     try {
@@ -496,7 +513,7 @@ export default function VerificationPage() {
         }}
         requestId={dispatchReqId}
         requestNum={dispatchReqNum}
-        onSuccess={fetchRequests}
+        onSuccess={handleDispatchSuccess}
       />
 
       <MergeDuplicateModal

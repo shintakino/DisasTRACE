@@ -278,6 +278,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Fixed Mobile App Launch Crash: Aligned `react-native-worklets` to version `0.5.1` (expected by Expo SDK 54) to resolve incompatible native ABI startup crashes, and updated other minor Expo dependencies (`expo`, `expo-file-system`, `expo-font`, `expo-router`) to their recommended SDK 54 alignments.
 - Fixed Hermes Bundle Compilation Failure: Pinned `@supabase/supabase-js` to version `2.105.4` to avoid compile-time Hermes parser errors caused by OpenTelemetry dynamic `import()` statements introduced in `v2.106.0+`.
 - Fixed PACC Manual Dispatch Duplicate Incidents and UI Refresh: Updated the manual dispatch API endpoint (`/api/verification/[id]/dispatch`) to update existing placeholder incident records instead of inserting duplicate rows. Additionally, updated the PACC verification dashboard to auto-advance the selected request and details panel to the next pending incident upon successful manual dispatch.
+- Fixed Vercel Next.js Production Build Failure: Added the `react-is` dependency directly to the root `package.json` to resolve a Turbopack build failure in `recharts` triggered during deployment.
 
 ## In Progress
 

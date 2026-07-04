@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 
@@ -37,13 +37,14 @@ export async function POST(req: NextRequest) {
 
     const { latitude, longitude } = result.data;
 
-    // Cache telemetry in the users table
+    // Cache telemetry in the users table (including PostGIS geometry for spatial queries)
     await db.update(users)
       .set({
         lastLatitude: latitude,
         lastLongitude: longitude,
         lastLocationUpdatedAt: new Date(),
         updatedAt: new Date(),
+        locationGeom: sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)`,
       })
       .where(eq(users.id, user.id));
 

@@ -126,11 +126,11 @@ export async function autoDispatchIncident(
         );
         return { responder, distanceKm };
       })
-      .filter((item) => item.distanceKm <= 1.2) // Only within 1.2km radius
+      .filter((item) => item.distanceKm <= 2.0) // Only within 2km radius
       .sort((a, b) => a.distanceKm - b.distanceKm); // Sort nearest first
 
     if (respondersWithDistance.length === 0) {
-      console.log(`No eligible responders within 1.2km found for request ${requestId}`);
+      console.log(`No eligible responders within 2km found for request ${requestId}`);
       return null;
     }
 
@@ -225,7 +225,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
     let reqLng = request.longitude;
 
     // Mock request coordinates in Baliwag if outside (for developer off-site testing convenience)
-    if (reqLat < 14.90 || reqLat > 15.05 || reqLng < 120.80 || reqLng > 121.00) {
+    if (isDevMode && (reqLat < 14.90 || reqLat > 15.05 || reqLng < 120.80 || reqLng > 121.00)) {
       reqLat = 14.945;
       reqLng = 120.895;
     }
@@ -307,7 +307,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         );
         return { responder, distanceKm };
       })
-      .filter((item) => item.distanceKm <= 1.2)
+      .filter((item) => item.distanceKm <= 2.0)
       .sort((a, b) => a.distanceKm - b.distanceKm);
 
     if (sortedResponders.length > 0) {
@@ -335,7 +335,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
       console.log(`Cascade successfully completed. Transmitted offer to responder ${nextResponder.fullName}.`);
     } else {
       // No more responders left in range: Revert immediately back to PENDING triage!
-      console.log(`Cascade exhausted: No remaining available responders within 1.2km for incident ${incident.id}. Reverting verification request to PENDING immediately.`);
+      console.log(`Cascade exhausted: No remaining available responders within 2km for incident ${incident.id}. Reverting verification request to PENDING immediately.`);
       
       // 1. Delete the incident
       await db.delete(incidents).where(eq(incidents.id, incident.id));

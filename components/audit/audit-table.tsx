@@ -76,34 +76,61 @@ export function AuditTable({ data }: AuditTableProps) {
 
   return (
     <div className="bg-white rounded-b-xl border-x border-b shadow-sm overflow-hidden">
-      <Table>
+      <Table className="table-fixed w-full">
         <TableHeader className="bg-slate-50/50">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
+              {headerGroup.headers.map((header) => {
+                const columnId = header.column.id;
+                const widthClass = 
+                  columnId === "userName" ? "w-[25%]" :
+                  columnId === "action" ? "w-[55%]" :
+                  columnId === "dateTime" ? "w-[20%]" : "";
+                return (
+                  <TableHead 
+                    key={header.id} 
+                    className={cn("h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest", widthClass)}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           ))}
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className="hover:bg-slate-50/50 border-b last:border-0 h-16 transition-colors"
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="py-2">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
+            <>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="hover:bg-slate-50/50 border-b last:border-0 h-16 transition-colors"
+                >
+                  {row.getVisibleCells().map((cell) => {
+                    const columnId = cell.column.id;
+                    const widthClass = 
+                      columnId === "userName" ? "w-[25%]" :
+                      columnId === "action" ? "w-[55%]" :
+                      columnId === "dateTime" ? "w-[20%]" : "";
+                    return (
+                      <TableCell key={cell.id} className={cn("py-2", widthClass)}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))}
+              {/* Spacer rows to keep the height fixed at 7 items */}
+              {table.getRowModel().rows.length < 7 && 
+                Array.from({ length: 7 - table.getRowModel().rows.length }).map((_, idx) => (
+                  <TableRow key={`spacer-${idx}`} className="h-16 border-b last:border-0 hover:bg-transparent pointer-events-none opacity-0">
+                    <TableCell colSpan={columns.length} className="py-2">&nbsp;</TableCell>
+                  </TableRow>
+                ))
+              }
+            </>
           ) : (
             <TableRow>
               <TableCell colSpan={columns.length} className="h-32 text-center text-slate-400 font-medium">

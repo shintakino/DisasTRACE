@@ -95,6 +95,7 @@ export default function ReportsPage() {
           search: filters.search,
           type: filters.type,
           status: filters.status,
+          category: category,
         });
       })(),
       {

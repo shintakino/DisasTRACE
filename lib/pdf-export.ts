@@ -47,7 +47,7 @@ const getBase64ImageFromUrl = async (url: string): Promise<string | null> => {
  */
 export async function exportReportsSummaryPDF(
   reports: ReportEntry[],
-  filters: { search?: string; type?: string; status?: string } = {}
+  filters: { search?: string; type?: string; status?: string; category?: "user" | "responder" } = {}
 ) {
   if (typeof window === "undefined") return;
 
@@ -88,7 +88,7 @@ export async function exportReportsSummaryPDF(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(255, 255, 255);
-    doc.text("EMERGENCY INCIDENT REPORTS SUMMARY", 14, 32);
+    doc.text(filters.category === "user" ? "USER INCIDENT REPORTS SUMMARY" : "EMERGENCY INCIDENT REPORTS SUMMARY", 14, 32);
 
     // --- Document Meta Information ---
     doc.setTextColor(75, 85, 99); // Gray-600
@@ -130,7 +130,7 @@ export async function exportReportsSummaryPDF(
     // --- Reports Table ---
     const tableColumns = [
       { header: "REPORT ID", dataKey: "id" },
-      { header: "RESPONDER NAME", dataKey: "responderName" },
+      { header: filters.category === "user" ? "SUBMITTER NAME" : "RESPONDER NAME", dataKey: "responderName" },
       { header: "INCIDENT TYPE", dataKey: "type" },
       { header: "STATUS", dataKey: "status" },
       { header: "DATE & TIME", dataKey: "dateTime" },

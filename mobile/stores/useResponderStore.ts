@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import * as SecureStore from 'expo-secure-store';
-import * as FileSystem from 'expo-file-system/build/legacy/FileSystem';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const DRAFTS_FILE_PATH = `${FileSystem.documentDirectory}disas_trace_drafts.json`;
 

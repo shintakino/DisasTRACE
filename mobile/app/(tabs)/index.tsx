@@ -13,9 +13,22 @@ import { ResponderHome } from '../../components/responder/ResponderHome';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
+import * as Location from 'expo-location';
 
 import * as Notifications from 'expo-notifications';
 import { Platform, Vibration } from 'react-native';
+
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -282,13 +295,30 @@ export default function HomeScreen() {
               storeStatus = 'on_scene';
             }
 
+            let initialDistanceStr = '1.7 km';
+            let parsedDistanceKm = 1.7;
+            try {
+              const { status: locPermission } = await Location.requestForegroundPermissionsAsync();
+              if (locPermission === 'granted') {
+                const loc = await Location.getLastKnownPositionAsync();
+                if (loc) {
+                  const dist = getDistanceKm(loc.coords.latitude, loc.coords.longitude, incidentLat, incidentLng);
+                  initialDistanceStr = `${dist.toFixed(1)} km`;
+                  parsedDistanceKm = Number(dist.toFixed(1));
+                }
+              }
+            } catch (e) {
+              console.log('Error getting initial distance on startup:', e);
+            }
+
             useResponderStore.setState({
               status: storeStatus,
+              initialDistanceKm: parsedDistanceKm,
               activeDispatch: {
                 id: activeInc.id,
                 type: typeOfEmergency,
                 locationName,
-                distance: '1.5 km',
+                distance: initialDistanceStr,
                 natureOfCall: 'Emergency',
                 peopleInvolved,
                 eta: activeInc.eta_minutes ? `~${activeInc.eta_minutes} min` : '~8 min',
@@ -357,13 +387,30 @@ export default function HomeScreen() {
                 }
               }
 
+              let initialDistanceStr = '1.7 km';
+              let parsedDistanceKm = 1.7;
+              try {
+                const { status: locPermission } = await Location.requestForegroundPermissionsAsync();
+                if (locPermission === 'granted') {
+                  const loc = await Location.getLastKnownPositionAsync();
+                  if (loc) {
+                    const dist = getDistanceKm(loc.coords.latitude, loc.coords.longitude, incidentLat, incidentLng);
+                    initialDistanceStr = `${dist.toFixed(1)} km`;
+                    parsedDistanceKm = Number(dist.toFixed(1));
+                  }
+                }
+              } catch (e) {
+                console.log('Error getting initial distance on startup:', e);
+              }
+
               useResponderStore.setState({
                 status: 'dispatch_offered',
+                initialDistanceKm: parsedDistanceKm,
                 activeDispatch: {
                   id: offerInc.id,
                   type: typeOfEmergency,
                   locationName,
-                  distance: '1.5 km',
+                  distance: initialDistanceStr,
                   natureOfCall: 'Emergency',
                   peopleInvolved,
                   eta: offerInc.eta_minutes ? `~${offerInc.eta_minutes} min` : '~8 min',
@@ -519,7 +566,7 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View className="bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/30 flex-row items-center space-x-1">
+          <View className="bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/30 flex-row items-center space-x-2">
             <View className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <Text className="text-emerald-400 text-[10px] font-black tracking-widest uppercase">Online</Text>
           </View>

@@ -265,15 +265,15 @@ export default function RosterPage() {
 
       <Dialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
         <DialogContent className="max-w-md p-0 border-0 shadow-2xl rounded-[24px] overflow-hidden bg-white flex flex-col" showCloseButton={true}>
-          <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+          <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
             <div className="relative z-10 flex items-center gap-3">
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
                 <Trash2 className="w-6 h-6 text-white" />
               </div>
-              <div className="text-left">
-                <DialogTitle className="text-xl font-bold text-white tracking-tight">Delete Responder</DialogTitle>
-                <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
+              <div>
+                <DialogTitle className="text-2xl font-bold text-white mb-1 tracking-tight">Delete Responder</DialogTitle>
+                <DialogDescription className="text-blue-100 text-sm font-medium">
                   Are you sure you want to permanently delete this responder?
                 </DialogDescription>
               </div>
@@ -308,15 +308,15 @@ export default function RosterPage() {
 
       <Dialog open={!!userToBan} onOpenChange={(open) => !open && setUserToBan(null)}>
         <DialogContent className="max-w-md p-0 border-0 shadow-2xl rounded-[24px] overflow-hidden bg-white flex flex-col" showCloseButton={true}>
-          <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+          <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
             <div className="relative z-10 flex items-center gap-3">
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
                 <UserX className="w-6 h-6 text-white" />
               </div>
-              <div className="text-left">
-                <DialogTitle className="text-xl font-bold text-white tracking-tight">Manage Responder</DialogTitle>
-                <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
+              <div>
+                <DialogTitle className="text-2xl font-bold text-white mb-1 tracking-tight">Manage Responder</DialogTitle>
+                <DialogDescription className="text-blue-100 text-sm font-medium">
                   Change status or suspend account for <span className="font-bold text-white">{userToBan?.fullName}</span>
                 </DialogDescription>
               </div>

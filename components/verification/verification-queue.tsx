@@ -9,25 +9,30 @@ import { formatDistanceToNow } from "date-fns"
 interface SummaryCardProps {
   label: string
   count: number
-  className: string
+  gradient: string
   isActive: boolean
   onClick: () => void
 }
 
-function SummaryCard({ label, count, className, isActive, onClick }: SummaryCardProps) {
+function SummaryCard({ label, count, gradient, isActive, onClick }: SummaryCardProps) {
   return (
     <Card
       className={cn(
-        "p-4 cursor-pointer transition-all border border-slate-200/60 shadow-sm",
-        isActive ? "ring-2 ring-[#1E3A8A] ring-offset-1 border-[#1E3A8A]/50 bg-white" : "hover:bg-slate-50",
-        className
+        "p-4 cursor-pointer transition-all border-none relative overflow-hidden flex flex-col bg-gradient-to-br shadow-sm rounded-2xl",
+        gradient,
+        isActive 
+          ? "opacity-100 scale-100 shadow-md ring-2 ring-offset-1 ring-[#1E3A8A]/30" 
+          : "opacity-45 hover:opacity-75 scale-95 hover:scale-[0.97]"
       )}
       onClick={onClick}
     >
-      <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+      <div className="absolute inset-0 bg-black/[0.03]" />
+      <div className="text-[10px] font-extrabold uppercase tracking-widest text-white/80 relative z-10">
         {label}
       </div>
-      <div className="text-2xl font-black mt-1 text-slate-800">{count}</div>
+      <div className="text-2xl font-black mt-1 text-white relative z-10 leading-none">
+        {count}
+      </div>
     </Card>
   )
 }
@@ -99,7 +104,7 @@ export function VerificationQueue({
         <SummaryCard
           label="Pending"
           count={counts.PENDING}
-          className="bg-amber-50/40 border-amber-200/50"
+          gradient="from-[#4776E6] to-[#3843D0]"
           isActive={filter === "PENDING"}
           onClick={() => onFilterChange("PENDING")}
         />
@@ -107,14 +112,14 @@ export function VerificationQueue({
           <SummaryCard
             label="Verified"
             count={counts.VERIFIED}
-            className="bg-emerald-50/40 border-emerald-200/50"
+            gradient="from-[#11998e] to-[#38ef7d]"
             isActive={filter === "VERIFIED"}
             onClick={() => onFilterChange("VERIFIED")}
           />
           <SummaryCard
             label="Rejected"
             count={counts.REJECTED}
-            className="bg-rose-50/40 border-rose-200/50"
+            gradient="from-[#FF416C] to-[#FF4B2B]"
             isActive={filter === "REJECTED"}
             onClick={() => onFilterChange("REJECTED")}
           />

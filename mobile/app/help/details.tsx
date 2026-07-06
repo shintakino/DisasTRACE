@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, CheckCircle, X } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
@@ -83,22 +83,14 @@ export default function DetailsScreen() {
   const [how, setHow] = useState<string>('');
   const [howOther, setHowOther] = useState<string>('');
   
-  const [showAnalyzing, setShowAnalyzing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSubmitted, setShowSubmitted] = useState(false);
-  const [analyzingStep, setAnalyzingStep] = useState(0);
   const [isAutoDispatched, setIsAutoDispatched] = useState(false);
 
   const handleSubmit = async () => {
     if (!what || !where || !when || !how) return;
 
-    // Show analyzing modal
-    setShowAnalyzing(true);
-    
-    // Simulate analyzing steps
-    setTimeout(() => setAnalyzingStep(1), 800);
-    setTimeout(() => setAnalyzingStep(2), 1600);
-    setTimeout(() => setAnalyzingStep(3), 2400);
-    setTimeout(() => setAnalyzingStep(4), 3200);
+    setIsSubmitting(true);
 
     try {
       let uploadedUrl = null;
@@ -148,28 +140,23 @@ export default function DetailsScreen() {
         }));
       }
       
-      // Wait for animations
-      setTimeout(() => {
-        setShowAnalyzing(false);
-        setIsAutoDispatched(data.autoDispatched);
-        setShowSubmitted(true);
-      }, 4500);
+      setIsSubmitting(false);
+      setIsAutoDispatched(data.autoDispatched);
+      setShowSubmitted(true);
 
     } catch (error) {
       console.error("Submission error:", error);
-      setTimeout(() => {
-        setShowAnalyzing(false);
-        setShowSubmitted(true);
-      }, 4500);
+      setIsSubmitting(false);
+      Alert.alert("Submission Failed", "There was an error submitting your report. Please check your connection and try again.");
     }
   };
 
   const handleFinish = () => {
     setShowSubmitted(false);
     if (isAutoDispatched) {
-      router.push('/help/tracking');
+      router.replace('/help/tracking');
     } else {
-      router.push('/help/pending');
+      router.replace('/help/pending');
     }
   };
 
@@ -240,60 +227,22 @@ export default function DetailsScreen() {
         </View>
         
         <TouchableOpacity 
-          style={[styles.submitBtn, (!what || !where || !when || !how || showAnalyzing || showSubmitted) && styles.submitBtnDisabled]} 
+          style={[styles.submitBtn, (!what || !where || !when || !how || isSubmitting || showSubmitted) && styles.submitBtnDisabled]} 
           onPress={handleSubmit} 
           activeOpacity={0.8}
-          disabled={!what || !where || !when || !how || showAnalyzing || showSubmitted}
+          disabled={!what || !where || !when || !how || isSubmitting || showSubmitted}
         >
-          <Text style={styles.submitBtnText}>Submit Report</Text>
+          {isSubmitting ? (
+            <ActivityIndicator color="#FFF" size="small" />
+          ) : (
+            <Text style={styles.submitBtnText}>Submit Report</Text>
+          )}
         </TouchableOpacity>
         
         <View style={{height: 40}} />
       </ScrollView>
 
-      {/* Analyzing Modal */}
-      <Modal visible={showAnalyzing} transparent animationType="fade" onRequestClose={() => {}}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.analyzingIconBox}>
-              <View style={styles.analyzingIconInner} />
-            </View>
-            <Text style={styles.modalTitle}>Analyzing Report</Text>
-            <Text style={styles.modalSubtitle}>Routing your emergency to the right responders in Baliwag City.</Text>
-            
-            <View style={styles.analyzingList}>
-              <View style={styles.analyzingListItem}>
-                {analyzingStep >= 1 ? <CheckCircle color="#1E3A8A" size={18} /> : <View style={styles.emptyCircle} />}
-                <Text style={[styles.analyzingListText, analyzingStep >= 1 && styles.analyzingListTextActive]}>Photo verified (live capture)</Text>
-              </View>
-              <View style={styles.analyzingDivider} />
-              
-              <View style={styles.analyzingListItem}>
-                {analyzingStep >= 2 ? <CheckCircle color="#1E3A8A" size={18} /> : <View style={styles.emptyCircle} />}
-                <Text style={[styles.analyzingListText, analyzingStep >= 2 && styles.analyzingListTextActive]}>Details received</Text>
-              </View>
-              <View style={styles.analyzingDivider} />
-              
-              <View style={styles.analyzingListItem}>
-                {analyzingStep >= 3 ? <CheckCircle color="#1E3A8A" size={18} /> : <View style={styles.emptyCircle} />}
-                <Text style={[styles.analyzingListText, analyzingStep >= 3 && styles.analyzingListTextActive]}>Classified as Emergency — direct dispatch</Text>
-              </View>
-              <View style={styles.analyzingDivider} />
-              
-              <View style={styles.analyzingListItem}>
-                {analyzingStep >= 4 ? <CheckCircle color="#1E3A8A" size={18} /> : <View style={styles.emptyCircle} />}
-                <Text style={[styles.analyzingListText, analyzingStep >= 4 && styles.analyzingListTextActive]}>CDRRMO notified — dispatch approved</Text>
-              </View>
-              <View style={styles.analyzingDivider} />
-              
-              <View style={styles.analyzingListItem}>
-                <ActivityIndicator size="small" color="#B91C1C" style={{marginRight: 10}} />
-                <Text style={styles.analyzingListTextUrgent}>Finding nearest ambulance...</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Analyzing Modal removed */}
 
       {/* Submitted Modal */}
       <Modal visible={showSubmitted} transparent animationType="fade" onRequestClose={() => {}}>

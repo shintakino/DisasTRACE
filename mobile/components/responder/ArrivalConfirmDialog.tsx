@@ -14,8 +14,8 @@ export function ArrivalConfirmDialog() {
       animationType="fade"
       onRequestClose={hideArrivalConfirm}
     >
-      <View className="flex-1 bg-black/60 justify-center items-center px-6">
-        <View className="bg-white rounded-3xl w-full p-6 shadow-xl">
+      <View className="flex-1 bg-black/60 justify-center items-center px-6" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View className="bg-white rounded-3xl p-6 shadow-xl w-full" style={{ maxWidth: 360 }}>
           
           <View className="w-16 h-16 bg-blue-50 rounded-full items-center justify-center mb-6 mx-auto">
             <MapPin color="#1E3A8A" size={32} />

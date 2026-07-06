@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Modal, Alert, BackHandler } from 'react-native';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPin, CheckCircle2, Truck, Navigation, LogOut } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
@@ -14,7 +14,26 @@ const EXPANDED_HEIGHT = height * 0.85;
 
 export default function TrackingScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const report = useEmergencyReportStore((state) => state.report);
+
+  // Lock gestures and navigation
+  useEffect(() => {
+    navigation.setOptions({
+      gestureEnabled: false,
+      headerLeft: () => null,
+    });
+  }, [navigation]);
+
+  // Lock hardware back button on Android
+  useEffect(() => {
+    const onBackPress = () => {
+      // Return true to prevent default back behavior
+      return true;
+    };
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backHandler.remove();
+  }, []);
   const [isCameraCentered, setIsCameraCentered] = useState(true);
   
   const targetLocation = {
@@ -31,6 +50,7 @@ export default function TrackingScreen() {
   const [eta, setEta] = useState(8);
   const [distance, setDistance] = useState(1.7);
   const [initialDistance, setInitialDistance] = useState<number | null>(null);
+  const [hospitalDistance, setHospitalDistance] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0); // Natural elapsed time starting from 0
   const elapsedRef = useRef(0);
   const [isArrived, setIsArrived] = useState(false);
@@ -468,9 +488,13 @@ export default function TrackingScreen() {
         if (data.routes && data.routes[0]) {
           const route = data.routes[0];
           setRouteCoords(route.geometry.coordinates);
-          const currentDist = route.distance / 1000;
+           const currentDist = route.distance / 1000;
           setDistance(currentDist);
-          setInitialDistance((prev) => prev ?? currentDist);
+          if (isTransporting) {
+            setHospitalDistance((prev) => prev ?? currentDist);
+          } else {
+            setInitialDistance((prev) => prev ?? currentDist);
+          }
           setEta(Math.ceil(route.duration / 60));
           
           // Calculate progress percentage dynamically relative to a baseline distance (e.g. 3.5 km initial gap)
@@ -1029,7 +1053,11 @@ export default function TrackingScreen() {
                   <Text style={styles.tripStatLabel}>PATIENTS</Text>
                 </View>
                 <View style={styles.tripStat}>
-                  <Text style={styles.tripStatValue}>{initialDistance !== null ? initialDistance.toFixed(1) : "1.7"}</Text>
+                  <Text style={styles.tripStatValue}>
+                    {initialDistance !== null 
+                      ? (initialDistance + (hospitalDistance ?? 0)).toFixed(1) 
+                      : "1.7"}
+                  </Text>
                   <Text style={styles.tripStatLabel}>KM</Text>
                 </View>
               </View>

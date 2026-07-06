@@ -10,8 +10,8 @@ export function ReportSubmittedModal() {
 
   return (
     <Modal visible={showReportSuccess} animationType="fade" transparent>
-      <View className="flex-1 bg-black/60 items-center justify-center p-6">
-        <View className="bg-white rounded-3xl w-full p-6 items-center shadow-xl">
+      <View className="flex-1 bg-black/60 items-center justify-center p-6" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View className="bg-white rounded-3xl p-6 items-center shadow-xl w-full" style={{ maxWidth: 360 }}>
           
           <View className="w-16 h-16 bg-[#1E3A8A] rounded-2xl items-center justify-center mb-6 mt-4">
             <FolderCheck color="white" size={32} />
@@ -32,8 +32,8 @@ export function ReportSubmittedModal() {
             
             <View className="flex-row justify-between">
               <View className="items-center flex-1">
-                <Text className="text-[#1E3A8A] font-bold text-2xl mb-1">
-                  {lastSubmittedSummary?.responseTimeMins || 9}m
+                <Text className="text-[#1E3A8A] font-bold text-xl mb-1.5" numberOfLines={1}>
+                  {lastSubmittedSummary?.responseTimeStr || '9m'}
                 </Text>
                 <Text className="text-slate-400 font-bold text-[8px] tracking-widest uppercase">RESPONSE</Text>
               </View>
@@ -47,7 +47,9 @@ export function ReportSubmittedModal() {
               
               <View className="items-center flex-1">
                 <Text className="text-[#1E3A8A] font-bold text-2xl mb-1">
-                  {lastSubmittedSummary?.distanceKm?.toFixed(1) || 1.7}
+                  {lastSubmittedSummary !== null && lastSubmittedSummary !== undefined
+                    ? lastSubmittedSummary.distanceKm.toFixed(1)
+                    : '1.7'}
                 </Text>
                 <Text className="text-slate-400 font-bold text-[8px] tracking-widest uppercase">KM</Text>
               </View>

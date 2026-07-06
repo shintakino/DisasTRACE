@@ -15,6 +15,39 @@ export default function CameraScreen() {
   const [zoom, setZoom] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+  const initialTouchDistance = useRef<number | null>(null);
+  const initialZoom = useRef<number>(0);
+
+  const getTouchDistance = (touches: any[]) => {
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleTouchStart = (event: any) => {
+    const touches = event.nativeEvent.touches;
+    if (touches && touches.length === 2) {
+      initialTouchDistance.current = getTouchDistance(touches);
+      initialZoom.current = zoom;
+    }
+  };
+
+  const handleTouchMove = (event: any) => {
+    const touches = event.nativeEvent.touches;
+    if (touches && touches.length === 2 && initialTouchDistance.current !== null) {
+      const currentDistance = getTouchDistance(touches);
+      const diff = currentDistance - initialTouchDistance.current;
+      
+      // Sensitivity: 300 pixels of distance for full zoom range
+      const zoomChange = diff / 300;
+      const nextZoom = Math.max(0, Math.min(1, initialZoom.current + zoomChange));
+      setZoom(nextZoom);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    initialTouchDistance.current = null;
+  };
   
   useFocusEffect(
     React.useCallback(() => {
@@ -48,7 +81,7 @@ export default function CameraScreen() {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.5,
           base64: false,
-          skipProcessing: true,
+          skipProcessing: false, // Apply digital zoom/rotation crop processing
         });
         
         if (photo) {
@@ -95,7 +128,18 @@ export default function CameraScreen() {
       </Modal>
 
       {permission.granted && (
-        <CameraView style={styles.camera} facing={facing} flash={flash} zoom={zoom} ref={cameraRef}>
+        <CameraView 
+          style={styles.camera} 
+          facing={facing} 
+          flash={flash} 
+          zoom={zoom} 
+          ref={cameraRef}
+          onMoveShouldSetResponder={(evt) => evt.nativeEvent.touches?.length === 2}
+          onResponderGrant={handleTouchStart}
+          onResponderMove={handleTouchMove}
+          onResponderRelease={handleTouchEnd}
+          onResponderTerminate={handleTouchEnd}
+        >
           
           {/* Top Back Button */}
           <View style={styles.topBar}>

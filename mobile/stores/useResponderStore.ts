@@ -1,6 +1,33 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import * as SecureStore from 'expo-secure-store';
+import * as FileSystem from 'expo-file-system/build/legacy/FileSystem';
+
+const DRAFTS_FILE_PATH = `${FileSystem.documentDirectory}disas_trace_drafts.json`;
+
+const persistDrafts = async (drafts: any[]) => {
+  try {
+    await FileSystem.writeAsStringAsync(DRAFTS_FILE_PATH, JSON.stringify(drafts));
+    console.log('[useResponderStore] Successfully persisted drafts to FileSystem');
+  } catch (err) {
+    console.error('[useResponderStore] Failed to persist drafts to file:', err);
+  }
+};
+
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // metres
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // in metres
+}
 
 export type DispatchState = 'idle' | 'dispatch_offered' | 'en_route' | 'on_scene' | 'to_hospital' | 'report_filling';
 
@@ -65,10 +92,11 @@ interface ResponderState {
   responseTimeSeconds: number;
   initialDistanceKm: number;
   lastSubmittedSummary: {
-    responseTimeMins: number;
+    responseTimeStr: string;
     patientsCount: number;
     distanceKm: number;
   } | null;
+  currentLocation: [number, number] | null;
   
   drafts: DraftForm[];
   submittedIncidentIds: string[];
@@ -150,6 +178,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
   responseTimeSeconds: 0,
   initialDistanceKm: 0,
   lastSubmittedSummary: null,
+  currentLocation: null,
   drafts: [],
   submittedIncidentIds: [],
   offlineQueue: [],
@@ -165,8 +194,19 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
   acceptDispatch: () => {
     let parsedDist = 1.7;
-    const currentDispatch = useResponderStore.getState().activeDispatch;
-    if (currentDispatch?.distance) {
+    const storeState = useResponderStore.getState();
+    const currentDispatch = storeState.activeDispatch;
+    const currentLoc = storeState.currentLocation;
+
+    if (currentLoc && currentDispatch?.coordinates) {
+      const meters = calculateDistanceMeters(
+        currentLoc[1],
+        currentLoc[0],
+        currentDispatch.coordinates.latitude,
+        currentDispatch.coordinates.longitude
+      );
+      parsedDist = Number((meters / 1000).toFixed(1));
+    } else if (currentDispatch?.distance) {
       const match = currentDispatch.distance.match(/[\d.]+/);
       if (match) parsedDist = parseFloat(match[0]);
     }
@@ -285,13 +325,37 @@ export const useResponderStore = create<ResponderState>((set) => ({
       return;
     }
 
-    const responseTimeMins = Math.ceil(useResponderStore.getState().responseTimeSeconds / 60) || 1;
-    const initialDist = useResponderStore.getState().initialDistanceKm || 1.7;
+    const responseTimeSecs = useResponderStore.getState().responseTimeSeconds;
+    let responseTimeStr = '0s';
+    if (responseTimeSecs > 0) {
+      const mins = Math.floor(responseTimeSecs / 60);
+      const secs = responseTimeSecs % 60;
+      if (mins > 0) {
+        responseTimeStr = secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+      } else {
+        responseTimeStr = `${secs}s`;
+      }
+    }
+
+    let initialDist = useResponderStore.getState().initialDistanceKm;
+    if (initialDist === 0) {
+      const currentDispatch = useResponderStore.getState().activeDispatch;
+      const currentLoc = useResponderStore.getState().currentLocation;
+      if (currentLoc && currentDispatch?.coordinates) {
+        const meters = calculateDistanceMeters(
+          currentLoc[1],
+          currentLoc[0],
+          currentDispatch.coordinates.latitude,
+          currentDispatch.coordinates.longitude
+        );
+        initialDist = Number((meters / 1000).toFixed(1));
+      }
+    }
     const hospDist = useResponderStore.getState().hospitalDistanceKm || 0;
     const totalDistance = initialDist + hospDist;
 
     const summary = {
-      responseTimeMins: responseTimeMins,
+      responseTimeStr: responseTimeStr,
       patientsCount: formData?.patients?.length || 1,
       distanceKm: totalDistance,
     };
@@ -320,7 +384,6 @@ export const useResponderStore = create<ResponderState>((set) => ({
       const res = await response.json();
       if (res.success) {
         const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
-        SecureStore.setItemAsync('disas_trace_drafts', JSON.stringify(nextDrafts)).catch(() => {});
         set((state) => ({
           isSubmittingReport: false,
           showReportSuccess: true,
@@ -352,7 +415,6 @@ export const useResponderStore = create<ResponderState>((set) => ({
       });
 
       const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
-      SecureStore.setItemAsync('disas_trace_drafts', JSON.stringify(nextDrafts)).catch(() => {});
       set((state) => ({
         isSubmittingReport: false,
         showReportSuccess: true,
@@ -412,10 +474,6 @@ export const useResponderStore = create<ResponderState>((set) => ({
       newDrafts = [...state.drafts, newDraft];
     }
     
-    SecureStore.setItemAsync('disas_trace_drafts', JSON.stringify(newDrafts)).catch(err => {
-      console.error('[useResponderStore] Failed to save drafts:', err);
-    });
-
     return { drafts: newDrafts };
   }),
 
@@ -465,16 +523,36 @@ export const useResponderStore = create<ResponderState>((set) => ({
         set({ offlineQueue: [] });
       }
 
-      const storedDrafts = await SecureStore.getItemAsync('disas_trace_drafts');
-      if (storedDrafts) {
-        set({ drafts: JSON.parse(storedDrafts) });
+      const fileInfo = await FileSystem.getInfoAsync(DRAFTS_FILE_PATH);
+      if (fileInfo.exists) {
+        const fileContent = await FileSystem.readAsStringAsync(DRAFTS_FILE_PATH);
+        set({ drafts: JSON.parse(fileContent) });
       } else {
-        set({ drafts: [] });
+        // Fallback to legacy SecureStore if file doesn't exist yet
+        const storedDrafts = await SecureStore.getItemAsync('disas_trace_drafts');
+        if (storedDrafts) {
+          const parsed = JSON.parse(storedDrafts);
+          set({ drafts: parsed });
+          // Migrate to FileSystem immediately
+          await FileSystem.writeAsStringAsync(DRAFTS_FILE_PATH, storedDrafts);
+          await SecureStore.deleteItemAsync('disas_trace_drafts').catch(() => {});
+        } else {
+          set({ drafts: [] });
+        }
       }
     } catch (e) {
-      console.error('[useResponderStore] Failed to load offline data from SecureStore:', e);
+      console.error('[useResponderStore] Failed to load offline data:', e);
     }
   },
 
   setSyncingQueue: (isSyncingQueue) => set({ isSyncingQueue })
 }));
+
+// Auto-persist drafts on change
+let lastDrafts = useResponderStore.getState().drafts;
+useResponderStore.subscribe((state) => {
+  if (state.drafts !== lastDrafts) {
+    lastDrafts = state.drafts;
+    persistDrafts(lastDrafts);
+  }
+});

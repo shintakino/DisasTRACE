@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { VerificationRequest } from "@/types/verification"
-import { CheckCircle2, Phone, MapPin, History, ShieldCheck, XCircle, Check, GitMerge } from "lucide-react"
+import { CheckCircle2, Phone, MapPin, History, ShieldCheck, XCircle, Check, GitMerge, HelpCircle } from "lucide-react"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 interface ResidentPanelProps {
   request: VerificationRequest | null
@@ -117,7 +118,25 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
           <div className="flex items-start gap-3">
             <History className="w-4 h-4 text-muted-foreground mt-0.5" />
             <div className="text-sm">
-              <div className="text-muted-foreground text-[10px] uppercase font-bold">Account Standing</div>
+              <div className="text-muted-foreground text-[10px] uppercase font-bold flex items-center gap-1">
+                Account Standing
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-muted-foreground cursor-help transition-colors" />
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-slate-950 border border-slate-800 text-white p-3 rounded-lg text-xs max-w-[280px] shadow-lg leading-relaxed z-50">
+                    <div className="space-y-2 text-left">
+                      <p className="font-bold border-b border-white/10 pb-1 text-[11px] uppercase tracking-wide text-blue-400">Account Standing Levels</p>
+                      <div className="space-y-1 text-[10px] text-slate-200">
+                        <p><strong className="text-green-400">Good Standing (≥80%):</strong> User has zero rejected reports. Fully reliable.</p>
+                        <p><strong className="text-amber-400">Fair Standing (50-79%):</strong> User has 1 rejected false report. Validated with caution.</p>
+                        <p><strong className="text-red-400">Poor Standing (&lt;50%):</strong> User has 2+ rejected false reports. Highly likely spam/fake.</p>
+                        <p className="text-slate-400 mt-1.5 italic pt-1 border-t border-white/5">Note: Rejection reduces reliability by 33% per report.</p>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <div className="font-medium">
                 {resident.priorReports === 0 ? (
                   "New Account"
@@ -155,6 +174,21 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
             ) : (
               `Based on historical accuracy of reports (${resident.reliabilityScore ?? 100}% reliable)`
             )}
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-slate-150 grid grid-cols-3 gap-1 text-[9px] font-bold text-slate-500">
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+              <span>Good (≥80%)</span>
+            </div>
+            <div className="flex items-center gap-1 justify-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+              <span>Fair (50-79%)</span>
+            </div>
+            <div className="flex items-center gap-1 justify-end">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+              <span>Poor (&lt;50%)</span>
+            </div>
           </div>
         </Card>
       </div>

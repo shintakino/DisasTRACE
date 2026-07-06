@@ -55,7 +55,7 @@ export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-300" />
           <Input
-            placeholder="Search reports..."
+            placeholder="Search logs..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9 h-10 w-[240px] bg-white/10 border-blue-400/30 text-white placeholder:text-blue-300 focus:bg-white/20 transition-all"

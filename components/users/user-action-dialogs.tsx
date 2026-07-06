@@ -54,15 +54,15 @@ export function ManageUserDialog({ user, isOpen, onClose, onUpdate }: ManageUser
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
-        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
           <div className="relative z-10 flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
               <ShieldCheck className="h-6 w-6 text-white" />
             </div>
-            <div className="text-left">
-              <DialogTitle className="text-xl font-bold text-white tracking-tight">Manage User</DialogTitle>
-              <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
+            <div>
+              <DialogTitle className="text-2xl font-bold text-white mb-1 tracking-tight">Manage User</DialogTitle>
+              <DialogDescription className="text-blue-100 text-sm font-medium">
                 Updating permissions and status for <span className="font-bold text-white">{user.fullName}</span>
               </DialogDescription>
             </div>
@@ -181,15 +181,15 @@ export function BanUserDialog({ user, isOpen, onClose, onConfirm }: BanUserDialo
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
-        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
           <div className="relative z-10 flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
               <Ban className="w-6 h-6 text-white" />
             </div>
-            <div className="text-left">
-              <DialogTitle className="text-xl font-bold text-white tracking-tight">Ban User</DialogTitle>
-              <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
+            <div>
+              <DialogTitle className="text-2xl font-bold text-white mb-1 tracking-tight">Ban User</DialogTitle>
+              <DialogDescription className="text-blue-100 text-sm font-medium">
                 Are you sure you want to ban this user?
               </DialogDescription>
             </div>
@@ -250,60 +250,6 @@ export function BanUserDialog({ user, isOpen, onClose, onConfirm }: BanUserDialo
   );
 }
 
-interface DeleteUserDialogProps {
-  user: UserManagementEntry | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: (id: string) => void;
-}
-
-export function DeleteUserDialog({ user, isOpen, onClose, onConfirm }: DeleteUserDialogProps) {
-  if (!user) return null;
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
-        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
-          <div className="relative z-10 flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
-              <Trash2 className="w-6 h-6 text-white" />
-            </div>
-            <div className="text-left">
-              <DialogTitle className="text-xl font-bold text-white tracking-tight">Delete User</DialogTitle>
-              <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
-                Are you sure you want to delete this user?
-              </DialogDescription>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 bg-slate-50/30 flex-1 space-y-5">
-          <div className="bg-[#EBF0FC] text-[#1e1b4b] p-4 rounded-xl flex items-center gap-3 font-semibold text-sm">
-            <div className="bg-[#8A9BBF] rounded-full text-white w-6 h-6 flex items-center justify-center font-bold text-sm shrink-0">!</div>
-            <p>You are about to delete <span className="font-bold">{user.fullName}</span>.</p>
-          </div>
-          <p className="text-xs font-bold text-red-500 text-center uppercase tracking-wider">Warning: This action will permanently remove all referencing logs and audit trails.</p>
-        </div>
-
-        <DialogFooter className="p-6 bg-white border-t border-slate-100 grid grid-cols-2 gap-4 shrink-0">
-          <Button variant="secondary" onClick={onClose} className="w-full font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl py-5 h-auto text-sm">
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              onConfirm(user.id);
-              onClose();
-            }}
-            className="w-full font-bold bg-[#1E3A8A] hover:bg-blue-900 text-white rounded-xl py-5 h-auto text-sm"
-          >
-            Delete
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 interface CreateUserDialogProps {
   isOpen: boolean;
@@ -345,15 +291,15 @@ export function CreateUserDialog({ isOpen, onClose, defaultRole, onCreate }: Cre
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
-        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
           <div className="relative z-10 flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
               <UserPlus className="w-6 h-6 text-white" />
             </div>
-            <div className="text-left">
-              <DialogTitle className="text-xl font-bold text-white tracking-tight">Create Account</DialogTitle>
-              <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
+            <div>
+              <DialogTitle className="text-2xl font-bold text-white mb-1 tracking-tight">Create Account</DialogTitle>
+              <DialogDescription className="text-blue-100 text-sm font-medium">
                 Create a new administrative account for CDRRMO or PACC.
               </DialogDescription>
             </div>

@@ -84,15 +84,17 @@ export function useBroadcastTracker(
   useEffect(() => {
     let channel: any = null;
 
-    if (incidentId && active) {
-      // Connect to Supabase Realtime Broadcast Channel
-      channel = supabase.channel(`telemetry:${incidentId}`);
-      
-      channel.subscribe((status: string) => {
-        if (status === 'SUBSCRIBED') {
-          console.log(`Subscribed to telemetry broadcast for incident ${incidentId}`);
-        }
-      });
+    if (active) {
+      if (incidentId) {
+        // Connect to Supabase Realtime Broadcast Channel
+        channel = supabase.channel(`telemetry:${incidentId}`);
+        
+        channel.subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            console.log(`Subscribed to telemetry broadcast for incident ${incidentId}`);
+          }
+        });
+      }
 
       // Start background location updates
       const startBackgroundLocation = async () => {
@@ -161,13 +163,17 @@ export function useBroadcastTracker(
           console.warn('[Broadcast GPS] Cached position failed, using default Baliwag position:', cacheErr);
         }
       }
-      // Fail-safe estimated default coordinates with a tiny offset
-      return {
-        latitude: 14.954 + (Math.random() - 0.5) * 0.002,
-        longitude: 120.902 + (Math.random() - 0.5) * 0.002,
-        heading: 0,
-        speed: 0
-      };
+      // Fail-safe estimated default coordinates with a tiny offset (only in dev mode)
+      const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+      if (isDevMode) {
+        return {
+          latitude: 14.954 + (Math.random() - 0.5) * 0.002,
+          longitude: 120.902 + (Math.random() - 0.5) * 0.002,
+          heading: 0,
+          speed: 0
+        };
+      }
+      return null;
     };
 
     // Start location updates on a 3-second fixed interval

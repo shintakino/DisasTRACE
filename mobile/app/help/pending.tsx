@@ -447,19 +447,13 @@ export default function PendingScreen() {
 
           <View style={{ flex: 1 }} />
 
-          {elapsedSeconds < 60 ? (
-            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} activeOpacity={0.7}>
-              <Text style={styles.cancelButtonText}>CANCEL REPORT</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={[styles.cancelButton, { backgroundColor: '#1E3A8A' }]} 
-              onPress={() => Linking.openURL('tel:09436018271')} 
-              activeOpacity={0.7}
-            >
-              <Text style={styles.cancelButtonText}>CALL PACC COMMAND CENTER</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity 
+            style={[styles.cancelButton, { backgroundColor: '#1E3A8A' }]} 
+            onPress={() => Linking.openURL('tel:09436018271')} 
+            activeOpacity={0.7}
+          >
+            <Text style={styles.cancelButtonText}>CALL PACC COMMAND CENTER</Text>
+          </TouchableOpacity>
         </View>
       )}
 

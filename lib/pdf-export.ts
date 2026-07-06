@@ -300,7 +300,7 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     // Draw grid border box
     doc.setFillColor(249, 250, 251); // Gray-50
     doc.setDrawColor(229, 231, 235); // Gray-200
-    doc.rect(14, 56, pageWidth - 28, 48, "FD");
+    doc.rect(14, 56, pageWidth - 28, 64, "FD");
 
     doc.setTextColor(75, 85, 99); // Text Gray-600
     doc.setFont("helvetica", "normal");
@@ -322,6 +322,12 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     doc.setFont("helvetica", "bold").text("People Involved:", 18, 95);
     doc.setFont("helvetica", "normal").text(`${report.peopleInvolved || 0} Person(s) (Resident reported: ${report.residentPeopleInvolved || report.peopleInvolved || 0})`, 55, 95);
 
+    doc.setFont("helvetica", "bold").text("Reporter Name:", 18, 103);
+    doc.setFont("helvetica", "normal").text(report.residentName || "Anonymous", 55, 103);
+
+    doc.setFont("helvetica", "bold").text("Contact Number:", 18, 111);
+    doc.setFont("helvetica", "normal").text(report.residentPhone || "N/A", 55, 111);
+
     // Right Column Info
     doc.setFont("helvetica", "bold").text("Dispatch Nature:", 110, 63);
     doc.setFont("helvetica", "normal").text(report.natureOfCall || "Emergency", 145, 63);
@@ -336,14 +342,18 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     const locationLines = doc.splitTextToSize(report.location, pageWidth - 145 - 8);
     doc.setFont("helvetica", "normal").text(locationLines, 145, 87);
 
+    doc.setFont("helvetica", "bold").text("Home Address:", 110, 103);
+    const addressLines = doc.splitTextToSize(report.residentAddress || "N/A", pageWidth - 145 - 8);
+    doc.setFont("helvetica", "normal").text(addressLines, 145, 103);
+
     // --- Section 2: Resident & Dispatch Triage Findings ---
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("2. INITIAL EMERGENCY DISPATCH CALL DETAILS", 14, 114);
+    doc.text("2. INITIAL EMERGENCY DISPATCH CALL DETAILS", 14, 130);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(14, 118, pageWidth - 28, 20, "D");
+    doc.rect(14, 134, pageWidth - 28, 20, "D");
     doc.setTextColor(55, 65, 81); // Gray-700
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
@@ -351,16 +361,16 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
       report.residentReportDescription || "Emergency report filed by verified resident. Dispatch logs initiated automatically.",
       pageWidth - 36
     );
-    doc.text(residentDescLines, 18, 124);
+    doc.text(residentDescLines, 18, 140);
 
     // --- Section 3: Responder Clinical Findings & Notes ---
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("3. AMBULANCE CREW ACTUAL CLINICAL FINDINGS", 14, 148);
+    doc.text("3. AMBULANCE CREW ACTUAL CLINICAL FINDINGS", 14, 164);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(14, 152, pageWidth - 28, 28, "D");
+    doc.rect(14, 168, pageWidth - 28, 28, "D");
     doc.setTextColor(55, 65, 81);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
@@ -368,15 +378,15 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
       report.crewFindings || "No clinical logs or responder findings recorded. Logged successfully in records.",
       pageWidth - 36
     );
-    doc.text(crewFindingsLines, 18, 158);
+    doc.text(crewFindingsLines, 18, 174);
 
     // --- Section 4: Patient Roster ---
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("4. PATIENT & PARTICIPANT ROSTER", 14, 190);
+    doc.text("4. PATIENT & PARTICIPANT ROSTER", 14, 206);
 
-    const checkY = 194;
+    const checkY = 210;
     // Patient columns headers
     doc.setFillColor(243, 244, 246); // Gray-100
     doc.rect(14, checkY, pageWidth - 28, 6, "F");

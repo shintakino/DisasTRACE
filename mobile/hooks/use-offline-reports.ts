@@ -163,7 +163,7 @@ export function useOfflineReports() {
                     if (match) parsedDistance = parseFloat(match[0]);
                   }
                   const summary = {
-                    responseTimeMins: 9,
+                    responseTimeStr: '9m',
                     patientsCount: draft.participants?.length || 1,
                     distanceKm: parsedDistance,
                   };

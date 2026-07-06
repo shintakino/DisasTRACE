@@ -4,7 +4,7 @@ import * as React from "react";
 import { UserSummaryCards } from "@/components/users/user-summary-cards";
 import { UsersHeader } from "@/components/users/users-header";
 import { UsersTable } from "@/components/users/users-table";
-import { BanUserDialog, DeleteUserDialog, CreateUserDialog, ManageUserDialog } from "@/components/users/user-action-dialogs";
+import { BanUserDialog, CreateUserDialog, ManageUserDialog } from "@/components/users/user-action-dialogs";
 import { UserManagementEntry, UserFilter, UserStatus, UserRole } from "@/types/users";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,7 +22,6 @@ export default function UsersPage() {
   });
 
   const [banUser, setBanUser] = React.useState<UserManagementEntry | null>(null);
-  const [deleteUser, setDeleteUser] = React.useState<UserManagementEntry | null>(null);
   const [selectedUser, setSelectedUser] = React.useState<UserManagementEntry | null>(null);
   const [isManageOpen, setIsManageOpen] = React.useState(false);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
@@ -124,24 +123,7 @@ export default function UsersPage() {
     }
   };
 
-  const handleDeleteUser = async (id: string) => {
-    try {
-      const response = await fetch(`/api/users?id=${id}`, {
-        method: "DELETE",
-      });
 
-      if (response.ok) {
-        toast.success("User deleted successfully");
-        fetchData();
-      } else {
-        const err = await response.json();
-        toast.error(err.error || "Failed to delete user");
-      }
-    } catch (err) {
-      console.error("Failed to delete user:", err);
-      toast.error("Failed to delete user");
-    }
-  };
 
   const handleExport = async () => {
     if (filteredUsers.length === 0) {
@@ -196,7 +178,7 @@ export default function UsersPage() {
 
 
   return (
-    <div className="h-full w-full overflow-y-auto p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="h-full w-full overflow-y-auto p-8 space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-black text-[#1E3A8A] tracking-tight">USER MANAGEMENT</h1>
         <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.2em]">Administrative Control Center</p>
@@ -236,7 +218,6 @@ export default function UsersPage() {
             onBan={(user) => {
               setBanUser(user);
             }}
-            onDelete={(user) => setDeleteUser(user)}
           />
         )}
       </div>
@@ -260,13 +241,6 @@ export default function UsersPage() {
         isOpen={!!banUser}
         onClose={() => setBanUser(null)}
         onConfirm={handleBanUser}
-      />
-
-      <DeleteUserDialog
-        user={deleteUser}
-        isOpen={!!deleteUser}
-        onClose={() => setDeleteUser(null)}
-        onConfirm={handleDeleteUser}
       />
     </div>
   );

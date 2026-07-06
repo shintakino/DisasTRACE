@@ -27,7 +27,6 @@ interface UsersTableProps {
   data: UserManagementEntry[];
   onManageStatus: (user: UserManagementEntry) => void;
   onBan: (user: UserManagementEntry) => void;
-  onDelete: (user: UserManagementEntry) => void;
 }
 
 const StatusBadge = ({ status }: { status: UserStatus }) => {
@@ -56,7 +55,7 @@ const RoleLabel = ({ role }: { role: UserRole }) => {
   return <span className="text-xs font-semibold text-slate-600">{labels[role]}</span>;
 };
 
-export function UsersTable({ data, onManageStatus, onBan, onDelete }: UsersTableProps) {
+export function UsersTable({ data, onManageStatus, onBan }: UsersTableProps) {
   const [rowSelection, setRowSelection] = React.useState({});
 
   const columns: ColumnDef<UserManagementEntry>[] = [
@@ -133,15 +132,6 @@ export function UsersTable({ data, onManageStatus, onBan, onDelete }: UsersTable
             title="Ban User"
           >
             <Ban className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(row.original)}
-            className="h-8 w-8 text-[#1E3A8A] hover:text-blue-900 hover:bg-blue-50"
-            title="Delete User"
-          >
-            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       ),

@@ -126,7 +126,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
   return (
     <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-white">
       <div className="bg-[#2B4C9B] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold text-white tracking-wide">Users</h2>
+        <h2 className="text-xl font-semibold text-white tracking-wide">Responders</h2>
         <div className="flex items-center gap-3">
           {searchComponent}
           {filterComponent}

@@ -436,13 +436,24 @@ export function ResponderHome() {
               console.error('Error fetching verification request details for dispatch offer:', err);
             }
 
+            let offerDist = '1.7 km';
+            if (currentLocation && incidentLat && incidentLng) {
+              const meters = calculateDistanceMeters(
+                currentLocation[1],
+                currentLocation[0],
+                incidentLat,
+                incidentLng
+              );
+              offerDist = `${(meters / 1000).toFixed(1)} km`;
+            }
+
             useResponderStore.setState({
               status: 'dispatch_offered',
               activeDispatch: {
                 id: inc.id,
                 type: typeOfEmergency,
                 locationName,
-                distance: '1.5 km',
+                distance: offerDist,
                 natureOfCall: 'Emergency',
                 peopleInvolved,
                 eta: '~8 min',
@@ -522,13 +533,27 @@ export function ResponderHome() {
               console.error('Error fetching verification request details for manual dispatch:', err);
             }
 
+            let manualDist = '1.7 km';
+            let initialDistanceKm = 1.7;
+            if (currentLocation && incidentLat && incidentLng) {
+              const meters = calculateDistanceMeters(
+                currentLocation[1],
+                currentLocation[0],
+                incidentLat,
+                incidentLng
+              );
+              initialDistanceKm = Number((meters / 1000).toFixed(1));
+              manualDist = `${initialDistanceKm} km`;
+            }
+
             useResponderStore.setState({
               status: 'en_route',
+              initialDistanceKm,
               activeDispatch: {
                 id: inc.id,
                 type: typeOfEmergency,
                 locationName,
-                distance: '1.5 km',
+                distance: manualDist,
                 natureOfCall: 'Emergency',
                 peopleInvolved,
                 eta: inc.eta_minutes ? `~${inc.eta_minutes} min` : '~8 min',
@@ -611,7 +636,13 @@ export function ResponderHome() {
   // 1. Activate live GPS telemetry tracking
   useBroadcastTracker(
     activeDispatch?.id || null,
-    (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') && !isSimulating,
+    !isSimulating && (
+      status === 'en_route' || 
+      status === 'on_scene' || 
+      status === 'to_hospital' || 
+      profile?.dutyStatus === 'ON_DUTY' ||
+      profile?.dutyStatus === 'ACTIVE_DISPATCH'
+    ),
     status,
     targetHospital,
     activeDispatch
@@ -658,6 +689,7 @@ export function ResponderHome() {
             }
             
             setCurrentLocation([lng, lat]);
+            useResponderStore.setState({ currentLocation: [lng, lat] });
             if (loc.coords.heading !== null && loc.coords.heading !== undefined) {
               setHeading(loc.coords.heading);
             }
@@ -675,13 +707,8 @@ export function ResponderHome() {
       }
     };
     
-    if (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') {
-      startTracking();
-    } else {
-      // Idle or offered: stay at default Baliwag base
-      setCurrentLocation([120.895, 14.945]);
-      setHeading(0);
-    }
+    // Always start tracking if component is mounted to get live location of responder
+    startTracking();
     
     return () => {
       if (subscription) {
@@ -689,6 +716,34 @@ export function ResponderHome() {
       }
     };
   }, [status]);
+
+  // Fetch initial location immediately on mount for snappy rendering
+  useEffect(() => {
+    const getInitialLocation = async () => {
+      try {
+        const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+        if (fgStatus === 'granted') {
+          const lastLoc = await Location.getLastKnownPositionAsync();
+          if (lastLoc && lastLoc.coords) {
+            let lat = lastLoc.coords.latitude;
+            let lng = lastLoc.coords.longitude;
+            
+            const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+            if (isDevMode && (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00)) {
+              lat = 14.954;
+              lng = 120.902;
+            }
+            
+            setCurrentLocation([lng, lat]);
+            useResponderStore.setState({ currentLocation: [lng, lat] });
+          }
+        }
+      } catch (err) {
+        console.log('[ResponderHome] Error getting initial location on mount:', err);
+      }
+    };
+    getInitialLocation();
+  }, []);
 
   // 3. Dynamic Real-Time OSRM route calculation
   useEffect(() => {
@@ -712,6 +767,11 @@ export function ResponderHome() {
                 distance: `${distanceKm} km`,
                 eta: `~${etaMins} min`
               });
+
+              // Lock the initial distance to the first real OSRM driving route distance calculated en route
+              if (store.elapsedTimeSeconds < 15 || store.initialDistanceKm === 0) {
+                useResponderStore.setState({ initialDistanceKm: distanceKm });
+              }
             }
             
             // Calculate map view bounds for OSRM route

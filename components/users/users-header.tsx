@@ -95,10 +95,10 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Role</label>
                 <Select value={role} onValueChange={handleRoleChange}>
                   <SelectTrigger className="uppercase">
-                    <SelectValue placeholder="ALL ROLES" />
+                    <SelectValue placeholder="ALL" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">ALL ROLES</SelectItem>
+                    <SelectItem value="all">ALL</SelectItem>
                     <SelectItem value="public_user">PUBLIC USER</SelectItem>
                     <SelectItem value="ambulance_responder">RESPONDER</SelectItem>
                     <SelectItem value="pacc_admin">PACC ADMIN</SelectItem>
@@ -111,10 +111,10 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</label>
                 <Select value={status} onValueChange={handleStatusChange}>
                   <SelectTrigger className="uppercase">
-                    <SelectValue placeholder="ALL STATUSES" />
+                    <SelectValue placeholder="ALL" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">ALL STATUSES</SelectItem>
+                    <SelectItem value="all">ALL</SelectItem>
                     <SelectItem value="ACTIVE">ACTIVE</SelectItem>
                     <SelectItem value="SUSPENDED">SUSPENDED</SelectItem>
                     <SelectItem value="DEACTIVATED">DEACTIVATED</SelectItem>

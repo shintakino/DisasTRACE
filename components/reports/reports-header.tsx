@@ -82,10 +82,10 @@ export function ReportsHeader({ onFilterChange, onExport, isExporting, category 
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Incident Type</label>
                 <Select value={type} onValueChange={handleTypeChange}>
                   <SelectTrigger className="uppercase">
-                    <SelectValue placeholder="ALL TYPES" />
+                    <SelectValue placeholder="ALL" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">ALL TYPES</SelectItem>
+                    <SelectItem value="all">ALL</SelectItem>
                     <SelectItem value="Fire Emergency">FIRE EMERGENCY</SelectItem>
                     <SelectItem value="Vehicular Collision">VEHICULAR COLLISION</SelectItem>
                     <SelectItem value="Medical Emergency">MEDICAL EMERGENCY</SelectItem>

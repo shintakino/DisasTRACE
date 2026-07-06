@@ -49,10 +49,10 @@ export function RosterFilter({ onFilterChange }: RosterFilterProps) {
               <label className="text-xs font-semibold text-gray-700">Status</label>
               <Select value={status} onValueChange={(val) => setStatus(val || "all")}>
                 <SelectTrigger className="h-10 bg-gray-50 border-none rounded-md text-sm font-medium uppercase">
-                  <SelectValue placeholder="ALL STATUSES" />
+                  <SelectValue placeholder="ALL" />
                 </SelectTrigger>
                 <SelectContent className="rounded-md border-none shadow-md">
-                  <SelectItem value="all">ALL STATUSES</SelectItem>
+                  <SelectItem value="all">ALL</SelectItem>
                   <SelectItem value="ACTIVE">ACTIVE</SelectItem>
                   <SelectItem value="DEACTIVATED">DEACTIVATED</SelectItem>
                   <SelectItem value="SUSPENDED">SUSPENDED</SelectItem>

@@ -217,7 +217,7 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
           <TouchableOpacity onPress={onClose} className="w-10 h-10 items-center justify-center">
             <ChevronLeft color="white" size={24} />
           </TouchableOpacity>
-          <Text className="text-white text-base font-bold">Driver's Trip Ticket</Text>
+          <Text className="text-white text-base font-bold">{"Driver's Trip Ticket"}</Text>
           <TouchableOpacity onPress={handleSave} className="bg-emerald-600 px-4 py-2 rounded-xl">
             <Text className="text-white font-bold text-xs">Save</Text>
           </TouchableOpacity>

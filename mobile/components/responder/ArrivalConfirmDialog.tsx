@@ -38,7 +38,7 @@ export function ArrivalConfirmDialog() {
                 arriveAtScene();
               }}
             >
-              <Text className="text-white font-bold text-lg">Yes, I'm here</Text>
+              <Text className="text-white font-bold text-lg">{"Yes, I'm here"}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 

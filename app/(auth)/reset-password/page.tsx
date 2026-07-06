@@ -1,9 +1,9 @@
 "use client";
 
 import { createClientBrowser } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Eye, EyeOff, Loader2, ShieldCheck, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -23,9 +23,11 @@ const ResetPasswordSchema = z.object({
   path: ["confirmPassword"],
 });
 
-export default function ResetPasswordPage() {
+function ResetPasswordPage() {
   const supabase = createClientBrowser();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const code = searchParams.get("code");
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -33,11 +35,33 @@ export default function ResetPasswordPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string }>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   
   const [isSuccess, setIsSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
+
+  // Exchange PKCE code for session on load if present
+  useEffect(() => {
+    async function handleCodeExchange() {
+      if (code) {
+        setIsVerifyingCode(true);
+        console.log("[ResetPassword] Found PKCE code in URL, exchanging for session...");
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error("[ResetPassword] Code exchange failed:", error);
+          setGeneralError("The password reset link is invalid or has expired. Please request a new one.");
+          toast.error("Invalid or expired reset link.");
+        } else {
+          console.log("[ResetPassword] Code exchange successful. Session established.");
+          toast.success("Reset link verified successfully.");
+        }
+        setIsVerifyingCode(false);
+      }
+    }
+    handleCodeExchange();
+  }, [code, supabase]);
 
   // Auto-redirect countdown once success is triggered
   useEffect(() => {
@@ -230,13 +254,13 @@ export default function ResetPasswordPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="h-[56px] w-full rounded-xl border border-white/10 bg-white/5 px-6 pr-14 text-base text-white shadow-inner outline-none placeholder:text-slate-500 focus:border-blue-500/50 focus:bg-white/10 focus:ring-4 focus:ring-blue-500/10 transition-all duration-200"
-                    disabled={isLoading || isSuccess}
+                    disabled={isLoading || isSuccess || isVerifyingCode}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
-                    disabled={isLoading || isSuccess}
+                    disabled={isLoading || isSuccess || isVerifyingCode}
                   >
                     {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
                   </button>
@@ -261,13 +285,13 @@ export default function ResetPasswordPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="h-[56px] w-full rounded-xl border border-white/10 bg-white/5 px-6 pr-14 text-base text-white shadow-inner outline-none placeholder:text-slate-500 focus:border-blue-500/50 focus:bg-white/10 focus:ring-4 focus:ring-blue-500/10 transition-all duration-200"
-                    disabled={isLoading || isSuccess}
+                    disabled={isLoading || isSuccess || isVerifyingCode}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
-                    disabled={isLoading || isSuccess}
+                    disabled={isLoading || isSuccess || isVerifyingCode}
                   >
                     {showConfirmPassword ? <EyeOff size={22} /> : <Eye size={22} />}
                   </button>
@@ -283,10 +307,15 @@ export default function ResetPasswordPage() {
               <div className="pt-4">
                 <Button
                   type="submit"
-                  disabled={isLoading || isSuccess}
+                  disabled={isLoading || isSuccess || isVerifyingCode}
                   className="h-[60px] w-full rounded-xl bg-blue-600 text-lg font-bold text-white shadow-2xl hover:bg-blue-500 active:scale-[0.99] transition-all disabled:opacity-70"
                 >
-                  {isLoading ? (
+                  {isVerifyingCode ? (
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <span>Verifying Reset Link...</span>
+                    </div>
+                  ) : isLoading ? (
                     <div className="flex items-center gap-3">
                       <Loader2 className="h-6 w-6 animate-spin" />
                       <span>Updating Credentials...</span>
@@ -337,5 +366,17 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen w-full items-center justify-center bg-[#0a2e7a]">
+        <Loader2 className="animate-spin text-white" size={32} />
+      </div>
+    }>
+      <ResetPasswordPage />
+    </Suspense>
   );
 }

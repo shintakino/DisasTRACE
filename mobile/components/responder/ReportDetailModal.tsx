@@ -89,7 +89,7 @@ export function ReportDetailModal({
             <View className="px-6">
               {activeTab === 'FROM RESIDENT' ? (
                 <>
-                  <Text className="text-xs font-bold text-[#1E3A8A] uppercase tracking-widest mb-4">RESIDENT'S REPORT</Text>
+                  <Text className="text-xs font-bold text-[#1E3A8A] uppercase tracking-widest mb-4">{"RESIDENT'S REPORT"}</Text>
               
               <View className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 mb-6">
                 <View className="flex-row justify-between mb-4">
@@ -143,7 +143,7 @@ export function ReportDetailModal({
 
               {report.status !== 'RESPONDING' && (
                 <>
-                  <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">CREW'S ACTUAL FINDINGS {report.status === 'ONGOING' ? '(DRAFT)' : ''}</Text>
+                  <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">{"CREW'S ACTUAL FINDINGS"} {report.status === 'ONGOING' ? '(DRAFT)' : ''}</Text>
                   
                   <View className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 mb-6">
                     <View className="flex-row justify-between mb-4">

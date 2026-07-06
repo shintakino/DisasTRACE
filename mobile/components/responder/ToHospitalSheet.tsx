@@ -74,7 +74,7 @@ export function ToHospitalSheet() {
             <Info size={14} color="#1E3A8A" />
           </View>
           <Text className="text-[#1E3A8A] text-xs font-medium flex-1">
-            The form will be pre-filled from the resident's report. You can edit any field.
+            {"The form will be pre-filled from the resident's report. You can edit any field."}
           </Text>
         </View>
 

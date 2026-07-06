@@ -314,9 +314,11 @@ export function IncidentReportForm() {
                 <Info size={14} color="#1E3A8A" />
               </View>
               <View className="flex-1">
-                <Text className="text-[#1E3A8A] font-bold text-sm mb-1">Pre-filled from resident's report</Text>
+                <Text className="text-[#1E3A8A] font-bold text-sm mb-1">{"Pre-filled from resident's report"}</Text>
                 <Text className="text-[#1E3A8A] text-xs">
-                  All fields below were auto-filled from what the resident submitted. <Text className="font-bold">Review each one</Text> — correct anything that doesn't match what you found on scene.
+                  {"All fields below were auto-filled from what the resident submitted. "}
+                  <Text className="font-bold">Review each one</Text>
+                  {" — correct anything that doesn't match what you found on scene."}
                 </Text>
               </View>
             </View>
@@ -330,7 +332,7 @@ export function IncidentReportForm() {
             </View>
 
             {/* RESIDENT'S REPORT */}
-            <Text className="text-[#1E3A8A] font-black text-xs uppercase tracking-widest mb-4">RESIDENT'S REPORT</Text>
+            <Text className="text-[#1E3A8A] font-black text-xs uppercase tracking-widest mb-4">{"RESIDENT'S REPORT"}</Text>
             
             <View className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm shadow-slate-200 mb-8">
               <View className="flex-row justify-between mb-4">
@@ -362,7 +364,7 @@ export function IncidentReportForm() {
             </View>
 
             {/* CREW'S ACTUAL FINDINGS */}
-            <Text className="text-slate-400 font-bold text-xs uppercase tracking-widest mb-6">CREW'S ACTUAL FINDINGS</Text>
+            <Text className="text-slate-400 font-bold text-xs uppercase tracking-widest mb-6">{"CREW'S ACTUAL FINDINGS"}</Text>
 
             {/* Form Fields */}
             <View className="space-y-6">
@@ -508,7 +510,7 @@ export function IncidentReportForm() {
                   onPress={() => setIsTripTicketOpen(true)}
                   className="bg-amber-50 border border-amber-200 rounded-2xl py-4 flex-row justify-center items-center mt-4 mb-8"
                 >
-                  <Text className="text-amber-800 font-bold text-base">Fill Driver's Trip Ticket</Text>
+                  <Text className="text-amber-800 font-bold text-base">{"Fill Driver's Trip Ticket"}</Text>
                 </TouchableOpacity>
               </View>
 

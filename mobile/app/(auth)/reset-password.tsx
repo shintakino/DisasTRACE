@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { Eye, EyeSlash, ArrowLeft, ShieldTick } from 'iconsax-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import * as Linking from 'expo-linking';
 
 // Strict Zod Validation Schema
 const ResetPasswordSchema = z.object({
@@ -41,10 +42,12 @@ export default function ResetPasswordScreen() {
   const router = useRouter();
   const { phone, token } = useLocalSearchParams<{ phone?: string; token?: string }>();
   const isOtpFlow = !!(phone && token);
+  const url = Linking.useURL();
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [isVerifyingLink, setIsVerifyingLink] = useState(false);
 
   // Success Modal & Redirect
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -54,6 +57,48 @@ export default function ResetPasswordScreen() {
     resolver: zodResolver(ResetPasswordSchema),
     defaultValues: { password: '', confirmPassword: '' }
   });
+
+  // Capture and process deep linking session tokens (Email Reset Flow)
+  useEffect(() => {
+    async function handleDeepLink() {
+      if (url && !isOtpFlow) {
+        console.log('[ResetPassword] Deep link received:', url);
+        const { queryParams } = Linking.parse(url);
+        
+        let accessToken = queryParams?.access_token as string;
+        let refreshToken = queryParams?.refresh_token as string;
+        
+        // Manually parse tokens from hash fragment if they are not in the queryParams
+        if (!accessToken && url.includes('#')) {
+          const hash = url.split('#')[1];
+          const parts = hash.split('&');
+          for (const part of parts) {
+            const [key, val] = part.split('=');
+            if (key === 'access_token') accessToken = val;
+            if (key === 'refresh_token') refreshToken = val;
+          }
+        }
+
+        if (accessToken && refreshToken) {
+          setIsVerifyingLink(true);
+          console.log('[ResetPassword] Parsed session tokens from deep link. Authenticating...');
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) {
+            console.error('[ResetPassword] Failed to set session from deep link:', error);
+            setGlobalError('The reset link is invalid or has expired.');
+          } else {
+            console.log('[ResetPassword] Session set successfully. Ready to reset password.');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          }
+          setIsVerifyingLink(false);
+        }
+      }
+    }
+    handleDeepLink();
+  }, [url, isOtpFlow]);
 
   // Success Redirect Countdown Timer
   useEffect(() => {
@@ -171,7 +216,7 @@ export default function ResetPasswordScreen() {
                           value={value}
                           secureTextEntry={!showPassword}
                           autoCapitalize="none"
-                          editable={!isSubmitting}
+                          editable={!isSubmitting && !isVerifyingLink}
                         />
                         <TouchableOpacity
                           onPress={() => setShowPassword(!showPassword)}
@@ -206,7 +251,7 @@ export default function ResetPasswordScreen() {
                           value={value}
                           secureTextEntry={!showConfirmPassword}
                           autoCapitalize="none"
-                          editable={!isSubmitting}
+                          editable={!isSubmitting && !isVerifyingLink}
                         />
                         <TouchableOpacity
                           onPress={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -234,10 +279,15 @@ export default function ResetPasswordScreen() {
 
               <TouchableOpacity
                 onPress={handleSubmit(onSubmit)}
-                disabled={isSubmitting}
-                className={`mt-8 bg-[#15286A] p-4 rounded-xl items-center justify-center min-h-[56px] ${isSubmitting ? 'opacity-70' : ''}`}
+                disabled={isSubmitting || isVerifyingLink}
+                className={`mt-8 bg-[#15286A] p-4 rounded-xl items-center justify-center min-h-[56px] ${(isSubmitting || isVerifyingLink) ? 'opacity-70' : ''}`}
               >
-                {isSubmitting ? (
+                {isVerifyingLink ? (
+                  <View className="flex-row items-center justify-center">
+                    <ActivityIndicator color="white" size="small" />
+                    <Text className="text-white font-bold ml-2 text-lg">Verifying link...</Text>
+                  </View>
+                ) : isSubmitting ? (
                   <ActivityIndicator color="white" />
                 ) : (
                   <Text className="text-white font-bold text-lg">Save Password</Text>

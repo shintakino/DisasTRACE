@@ -81,17 +81,17 @@ export function ReportsHeader({ onFilterChange, onExport, isExporting, category 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Incident Type</label>
                 <Select value={type} onValueChange={handleTypeChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Types" />
+                  <SelectTrigger className="uppercase">
+                    <SelectValue placeholder="ALL TYPES" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="Fire Emergency">Fire Emergency</SelectItem>
-                    <SelectItem value="Vehicular Collision">Vehicular Collision</SelectItem>
-                    <SelectItem value="Medical Emergency">Medical Emergency</SelectItem>
-                    <SelectItem value="Structural Failure">Structural Failure</SelectItem>
-                    <SelectItem value="Flood/Water">Flood/Water</SelectItem>
-                    <SelectItem value="Unknown Cause">Unknown Cause</SelectItem>
+                    <SelectItem value="all">ALL TYPES</SelectItem>
+                    <SelectItem value="Fire Emergency">FIRE EMERGENCY</SelectItem>
+                    <SelectItem value="Vehicular Collision">VEHICULAR COLLISION</SelectItem>
+                    <SelectItem value="Medical Emergency">MEDICAL EMERGENCY</SelectItem>
+                    <SelectItem value="Structural Failure">STRUCTURAL FAILURE</SelectItem>
+                    <SelectItem value="Flood/Water">FLOOD/WATER</SelectItem>
+                    <SelectItem value="Unknown Cause">UNKNOWN CAUSE</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

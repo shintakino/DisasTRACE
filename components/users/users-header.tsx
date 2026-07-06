@@ -94,15 +94,15 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Role</label>
                 <Select value={role} onValueChange={handleRoleChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Roles" />
+                  <SelectTrigger className="uppercase">
+                    <SelectValue placeholder="ALL ROLES" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="public_user">Public User</SelectItem>
-                    <SelectItem value="ambulance_responder">Responder</SelectItem>
-                    <SelectItem value="pacc_admin">PACC Admin</SelectItem>
-                    <SelectItem value="cdrrmo_super_admin">Super Admin</SelectItem>
+                    <SelectItem value="all">ALL ROLES</SelectItem>
+                    <SelectItem value="public_user">PUBLIC USER</SelectItem>
+                    <SelectItem value="ambulance_responder">RESPONDER</SelectItem>
+                    <SelectItem value="pacc_admin">PACC ADMIN</SelectItem>
+                    <SelectItem value="cdrrmo_super_admin">SUPER ADMIN</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -110,15 +110,15 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</label>
                 <Select value={status} onValueChange={handleStatusChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Statuses" />
+                  <SelectTrigger className="uppercase">
+                    <SelectValue placeholder="ALL STATUSES" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="ACTIVE">Active</SelectItem>
-                    <SelectItem value="SUSPENDED">Suspended</SelectItem>
-                    <SelectItem value="DEACTIVATED">Deactivated</SelectItem>
-                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="all">ALL STATUSES</SelectItem>
+                    <SelectItem value="ACTIVE">ACTIVE</SelectItem>
+                    <SelectItem value="SUSPENDED">SUSPENDED</SelectItem>
+                    <SelectItem value="DEACTIVATED">DEACTIVATED</SelectItem>
+                    <SelectItem value="PENDING">PENDING</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

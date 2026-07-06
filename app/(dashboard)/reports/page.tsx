@@ -154,7 +154,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <Card className="rounded-xl shadow-xl border-none overflow-hidden bg-white">
+      <div className="flex flex-col rounded-xl shadow-xl border border-slate-200/80 overflow-hidden bg-white">
         <ReportsHeader onFilterChange={handleFilterChange} onExport={handleExportPDF} isExporting={isExporting} category={category} />
         
         <div className="px-6 py-4 border-b border-slate-100 bg-white">
@@ -207,7 +207,7 @@ export default function ReportsPage() {
             onRowSelectionChange={setRowSelection}
           />
         )}
-      </Card>
+      </div>
 
       <ReportDetailSheet
         reportId={selectedReportId}

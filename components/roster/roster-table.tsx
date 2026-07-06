@@ -124,7 +124,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
   })
 
   return (
-    <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-white">
+    <div className="flex flex-col border border-slate-200/80 shadow-sm rounded-xl overflow-hidden bg-white">
       <div className="bg-[#2B4C9B] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-xl font-semibold text-white tracking-wide">Responders</h2>
         <div className="flex items-center gap-3">
@@ -132,7 +132,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
           {filterComponent}
         </div>
       </div>
-      <CardContent className="p-0">
+      <div className="p-0">
         <Table>
           <TableHeader className="bg-white border-b border-gray-100">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -223,7 +223,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

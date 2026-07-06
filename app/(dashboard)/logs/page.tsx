@@ -94,7 +94,7 @@ export default function LogsPage() {
         </div>
       </div>
 
-      <Card className="rounded-xl shadow-xl border-none overflow-hidden">
+      <div className="flex flex-col rounded-xl shadow-xl border border-slate-200/80 overflow-hidden bg-white">
         <LogsHeader onFilterChange={setFilters} />
         
         {isLoading ? (
@@ -108,7 +108,7 @@ export default function LogsPage() {
         ) : (
           <LogsTable data={logs} showActionColumn={role === "cdrrmo_super_admin"} />
         )}
-      </Card>
+      </div>
     </div>
   )
 }

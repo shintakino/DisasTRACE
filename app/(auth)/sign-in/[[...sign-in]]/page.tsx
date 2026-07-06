@@ -26,7 +26,7 @@ export default function SignInPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
+    if (!email || !employeeId || !password) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -45,6 +45,25 @@ export default function SignInPage() {
       }
 
       if (data.user) {
+        // Retrieve the user profile to check the employee ID
+        const { data: profile, error: profileError } = await supabase
+          .from("users")
+          .select("employee_id")
+          .eq("email", email)
+          .single();
+
+        if (profileError || !profile || !profile.employee_id) {
+          await supabase.auth.signOut();
+          toast.error("Incorrect Employee ID");
+          return;
+        }
+
+        if (profile.employee_id.trim().toUpperCase() !== employeeId.trim().toUpperCase()) {
+          await supabase.auth.signOut();
+          toast.error("Incorrect Employee ID");
+          return;
+        }
+
         toast.success("Welcome back!");
         router.push("/dashboard");
         router.refresh();

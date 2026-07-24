@@ -159,6 +159,40 @@ export default function DashboardLayout({
           }
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        (payload) => {
+          const notif = payload.new;
+          if (notif && (notif.user_id === user.id || notif.userId === user.id)) {
+            const notifType = notif.type || '';
+            if (notifType.includes('manual_dispatch') || notifType.includes('dispatch_')) {
+              const isRejectionOrExpiry = notifType.includes('rejected') || notifType.includes('expired');
+              playAlert(isRejectionOrExpiry ? 'emergency' : 'warning');
+              
+              if (isRejectionOrExpiry) {
+                toast.error(`🚨 ${notif.title}`, {
+                  duration: 12000,
+                  description: notif.body,
+                  action: {
+                    label: "Re-assign",
+                    onClick: () => router.push('/verification')
+                  }
+                });
+              } else {
+                toast.success(`✅ ${notif.title}`, {
+                  duration: 10000,
+                  description: notif.body,
+                  action: {
+                    label: "View",
+                    onClick: () => router.push('/verification')
+                  }
+                });
+              }
+            }
+          }
+        }
+      )
       .subscribe();
 
     return () => {

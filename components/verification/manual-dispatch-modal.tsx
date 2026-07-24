@@ -75,7 +75,7 @@ export function ManualDispatchModal({
       
       const data = await response.json()
       if (data.success) {
-        toast.success(`Successfully dispatched ${responderName}!`)
+        toast.success(`Manual dispatch offer sent to ${responderName}! Awaiting acceptance.`)
         onSuccess()
         onClose()
       } else {

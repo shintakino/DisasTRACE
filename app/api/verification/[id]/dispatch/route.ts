@@ -6,6 +6,7 @@ import { users } from "@/db/schema/users";
 import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { systemSettings } from "@/db/schema/system_settings";
+import { notifyPaccAndCdrrmo } from "@/lib/dispatch-engine";
 
 export async function POST(
   req: NextRequest,
@@ -60,22 +61,29 @@ export async function POST(
     const suffix = responder.id.slice(-3).toUpperCase();
     const vehicleId = `AMB-${initials || "001"}-${suffix}`;
 
-    // 3. Check if an incident already exists for this request
+    // 3. Fetch system settings to resolve dynamic offer timeout duration
+    const settings = await db.query.systemSettings.findFirst({
+      where: eq(systemSettings.id, 'current'),
+    });
+    const offerDuration = settings?.dispatchOfferTimeoutSeconds ?? 30;
+    const offerExpiresAt = new Date(Date.now() + offerDuration * 1000);
+
+    // 4. Check if an incident already exists for this request
     const existingIncident = await db.query.incidents.findFirst({
       where: eq(incidents.requestId, id),
     });
 
     let incidentResult;
     if (existingIncident) {
-      // Update the existing incident (assign responder and set EN_ROUTE status)
+      // Update the existing incident (transmit offer to responder with PACC_MANUAL method)
       const [updatedIncident] = await db.update(incidents)
         .set({
-          responderId: responderId,
-          status: "EN_ROUTE",
+          responderId: null,
+          status: "DISPATCHED",
           assignedAmbulance: vehicleId,
           etaMinutes: 8,
-          currentOfferResponderId: null,
-          offerExpiresAt: null,
+          currentOfferResponderId: responderId,
+          offerExpiresAt: offerExpiresAt,
           dispatchMethod: "PACC_MANUAL",
         })
         .where(eq(incidents.id, existingIncident.id))
@@ -86,19 +94,19 @@ export async function POST(
       const [newIncident] = await db.insert(incidents).values({
         id: crypto.randomUUID(),
         requestId: id,
-        responderId: responderId,
-        status: "EN_ROUTE",
+        responderId: null,
+        status: "DISPATCHED",
         assignedAmbulance: vehicleId,
         etaMinutes: 8,
-        currentOfferResponderId: null,
+        currentOfferResponderId: responderId,
         skippedResponderIds: [],
-        offerExpiresAt: null,
+        offerExpiresAt: offerExpiresAt,
         dispatchMethod: "PACC_MANUAL",
       }).returning();
       incidentResult = newIncident;
     }
 
-    // 4. Mark the verification request as VERIFIED second
+    // 5. Mark the verification request as VERIFIED
     await db.update(verificationRequests)
       .set({
         status: "VERIFIED",
@@ -106,14 +114,27 @@ export async function POST(
       })
       .where(eq(verificationRequests.id, id));
 
-    // 5. Reserve responder as ACTIVE_DISPATCH
+    // 6. Reserve responder as ACTIVE_DISPATCH
     await db.update(users)
       .set({ dutyStatus: "ACTIVE_DISPATCH" })
       .where(eq(users.id, responderId));
 
+    // 7. Notify PACC and CDRRMO of transmitted manual offer
+    await notifyPaccAndCdrrmo({
+      title: "Manual Dispatch Offer Transmitted",
+      body: `Manual dispatch offer sent to ${responder.fullName} for Request #${existingReq.requestId || id}. Awaiting responder acceptance.`,
+      type: "manual_dispatch_offered",
+      metadata: {
+        incidentId: incidentResult.id,
+        requestId: id,
+        responderId: responder.id,
+        responderName: responder.fullName,
+      },
+    });
+
     return NextResponse.json({
       success: true,
-      message: `Successfully verified and manually dispatched incident to ${responder.fullName}`,
+      message: `Manual dispatch offer sent to ${responder.fullName}. Awaiting responder acceptance.`,
       incident: incidentResult
     });
   } catch (error) {

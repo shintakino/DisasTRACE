@@ -2,8 +2,9 @@ import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
+import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
-import { eq, ne, and, notInArray, sql } from "drizzle-orm";
+import { eq, ne, and, or, notInArray, sql } from "drizzle-orm";
 
 // Haversine formula to compute distance in kilometers
 // Haversine formula to compute distance in kilometers
@@ -19,6 +20,47 @@ export function calculateHaversineDistance(lat1: number, lon1: number, lat2: num
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in km
+}
+
+export async function notifyPaccAndCdrrmo({
+  title,
+  body,
+  type,
+  metadata,
+}: {
+  title: string;
+  body: string;
+  type: string;
+  metadata?: any;
+}) {
+  try {
+    const admins = await db.query.users.findMany({
+      where: and(
+        eq(users.status, "ACTIVE"),
+        or(
+          eq(users.role, "pacc_admin"),
+          eq(users.role, "cdrrmo_super_admin")
+        )
+      ),
+    });
+
+    if (!admins || admins.length === 0) return;
+
+    const notifValues = admins.map((admin) => ({
+      id: crypto.randomUUID(),
+      userId: admin.id,
+      title,
+      body,
+      type,
+      metadata,
+      unread: true,
+      createdAt: new Date(),
+    }));
+
+    await db.insert(notifications).values(notifValues);
+  } catch (err) {
+    console.error("[Notifications] Failed to notify PACC & CDRRMO:", err);
+  }
 }
 
 export async function autoDispatchIncident(
@@ -217,6 +259,42 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
       await db.update(users)
         .set({ dutyStatus: "ON_DUTY" })
         .where(eq(users.id, timedOutResponderId));
+    }
+
+    // Handle PACC_MANUAL incidents separately:
+    if (incident.dispatchMethod === "PACC_MANUAL") {
+      console.log(`Manual Dispatch Offer Rejected/Timed out for incident ${incident.id}. Reverting to manual dispatch queue.`);
+
+      let timedOutResponderName = "Assigned Responder";
+      if (timedOutResponderId) {
+        const rUser = await db.query.users.findFirst({
+          where: eq(users.id, timedOutResponderId),
+        });
+        if (rUser) timedOutResponderName = rUser.fullName;
+      }
+
+      await db.update(incidents)
+        .set({
+          currentOfferResponderId: null,
+          offerExpiresAt: null,
+          responderId: null,
+          skippedResponderIds: updatedSkipped,
+        })
+        .where(eq(incidents.id, incident.id));
+
+      await notifyPaccAndCdrrmo({
+        title: "Manual Dispatch Re-assignment Required",
+        body: `Responder ${timedOutResponderName} did not accept the manual dispatch offer for Request #${request.requestId || request.id}. Manual re-assignment required.`,
+        type: "manual_dispatch_rejected",
+        metadata: {
+          incidentId: incident.id,
+          requestId: incident.requestId,
+          responderId: timedOutResponderId,
+          responderName: timedOutResponderName,
+        },
+      });
+
+      return;
     }
 
     const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";

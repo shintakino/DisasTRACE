@@ -6,7 +6,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { eq, and } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
-import { cascadeIncident, calculateHaversineDistance } from "@/lib/dispatch-engine";
+import { cascadeIncident, calculateHaversineDistance, notifyPaccAndCdrrmo } from "@/lib/dispatch-engine";
 
 const RespondSchema = z.object({
   incidentId: z.string().uuid(),
@@ -107,12 +107,26 @@ export async function POST(req: NextRequest) {
           etaMinutes: recalculatedEta,
         })
         .where(eq(incidents.id, incidentId))
-        .returning();
-
       // 2. Set responder state to ACTIVE_DISPATCH
       await db.update(users)
         .set({ dutyStatus: 'ACTIVE_DISPATCH' })
         .where(eq(users.id, user.id));
+
+      // 3. Notify PACC and CDRRMO of acceptance
+      const reqNum = request?.requestId || request?.id || incident.requestId;
+      const isManual = incident.dispatchMethod === "PACC_MANUAL";
+      await notifyPaccAndCdrrmo({
+        title: isManual ? "Manual Dispatch Accepted" : "Dispatch Accepted",
+        body: `Responder ${dbUser.fullName} ACCEPTED the dispatch offer for Request #${reqNum}.`,
+        type: isManual ? "manual_dispatch_accepted" : "dispatch_accepted",
+        metadata: {
+          incidentId,
+          requestId: incident.requestId,
+          responderId: dbUser.id,
+          responderName: dbUser.fullName,
+          dispatchMethod: incident.dispatchMethod,
+        },
+      });
 
       return NextResponse.json({
         success: true,

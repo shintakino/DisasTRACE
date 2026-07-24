@@ -558,19 +558,55 @@ export function ReportDetailSheet({
                           </div>
                         </div>
 
-                        {/* Handoff & Team */}
+                        {/* Handoff & Signatures */}
                         {(() => {
                           const isRefused = pcr.liabilityRelease?.refused === true;
                           const isResolvedOnScene = !pcr.dispatchInfo?.hospitalArrTime || pcr.dispatchInfo?.hospitalArrTime === '';
                           const defaultNa = isRefused ? "N/A (Refused Transport)" : (isResolvedOnScene ? "N/A (Resolved on Scene)" : "N/A");
+                          const lr = pcr.liabilityRelease || {};
+                          const hs = pcr.handoffSignatures || {};
+
                           return (
-                            <div>
-                              <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Handoff Details</h4>
-                              <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
-                                <div className="flex justify-between"><span className="text-slate-500 font-medium">PCR Accomplished By</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.accomplishedBy || "N/A"} (License: {pcr.handoffSignatures?.accomplishedByLicense || "N/A"})</span></div>
-                                <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Hospital</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingHospital || defaultNa} (Arrival: {pcr.handoffSignatures?.arrivalTime || defaultNa})</span></div>
-                                <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Physician</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.receivingPhysician || defaultNa} (License: {pcr.handoffSignatures?.receivingPhysicianLicense || defaultNa})</span></div>
-                                <div className="flex justify-between"><span className="text-slate-500 font-medium">Referred To</span><span className="font-bold text-[#1A237E]">{pcr.handoffSignatures?.referredTo || defaultNa} (License: {pcr.handoffSignatures?.referredToLicense || defaultNa})</span></div>
+                            <div className="space-y-4">
+                              <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Handoff & Signatures</h4>
+                              <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-3 text-xs">
+                                <div className="flex justify-between"><span className="text-slate-500 font-medium">PCR Accomplished By</span><span className="font-bold text-[#1A237E]">{hs.accomplishedBy || "N/A"} (License: {hs.accomplishedByLicense || "N/A"})</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Hospital</span><span className="font-bold text-[#1A237E]">{hs.receivingHospital || defaultNa} (Arrival: {hs.arrivalTime || defaultNa})</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Physician</span><span className="font-bold text-[#1A237E]">{hs.receivingPhysician || defaultNa} (License: {hs.receivingPhysicianLicense || defaultNa})</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500 font-medium">Referred To</span><span className="font-bold text-[#1A237E]">{hs.referredTo || defaultNa} (License: {hs.referredToLicense || defaultNa})</span></div>
+                                
+                                {/* E-Signatures Display */}
+                                {(lr.patientSignature || lr.witnessSignature || hs.accomplishedBySignature) && (
+                                  <div className="border-t border-slate-100 pt-3 space-y-3 mt-2">
+                                    <p className="text-[#1A237E] font-black text-[10px] uppercase tracking-wider">Captured Digital E-Signatures</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                      {lr.patientSignature && (
+                                        <div className="border border-slate-200 rounded-2xl p-2 bg-slate-50 flex flex-col items-center">
+                                          <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Patient / Guardian</p>
+                                          <svg className="w-full h-16 bg-white rounded-xl border border-slate-200 p-1" viewBox="0 0 400 150">
+                                            <path d={lr.patientSignature} stroke="#1E3A8A" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                      {lr.witnessSignature && (
+                                        <div className="border border-slate-200 rounded-2xl p-2 bg-slate-50 flex flex-col items-center">
+                                          <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Witness ({lr.witnessedBy || "Signed"})</p>
+                                          <svg className="w-full h-16 bg-white rounded-xl border border-slate-200 p-1" viewBox="0 0 400 150">
+                                            <path d={lr.witnessSignature} stroke="#1E3A8A" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                      {hs.accomplishedBySignature && (
+                                        <div className="border border-slate-200 rounded-2xl p-2 bg-slate-50 flex flex-col items-center">
+                                          <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Responder Signature</p>
+                                          <svg className="w-full h-16 bg-white rounded-xl border border-slate-200 p-1" viewBox="0 0 400 150">
+                                            <path d={hs.accomplishedBySignature} stroke="#1E3A8A" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
@@ -619,31 +655,52 @@ export function ReportDetailSheet({
                         setExportingDtt(false);
                       }}
                       disabled={exportingDtt}
-                      className="h-8 px-3 rounded-full bg-amber-700 text-white hover:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
                     >
-                      {exportingDtt ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <FileDown className="h-3.5 w-3.5" />
-                      )}
-                      <span>{exportingDtt ? "Generating..." : "PDF"}</span>
+                      {exportingDtt ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                      <span>{exportingDtt ? "Exporting..." : "Export DTT"}</span>
                     </button>
                   </div>
 
                   {/* Trip Details */}
                   <div>
-                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Vehicle & Driver Info</h4>
+                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Trip & Vehicle Details</h4>
                     <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Driver Name</span><span className="font-bold text-slate-800">{report.driverTripTicket.driverName || "N/A"} {report.driverTripTicket.signatures?.driverPhone ? `(Phone: ${report.driverTripTicket.signatures.driverPhone})` : ""}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Date of Travel</span><span className="font-bold text-slate-800">{report.driverTripTicket.tripLog?.date || "N/A"}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Vehicle Plate</span><span className="font-bold text-slate-800">{report.driverTripTicket.vehiclePlate || "N/A"}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Passengers</span><span className="font-bold text-slate-800">{report.driverTripTicket.passengerName || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Driver Name</span><span className="font-bold text-slate-800">{report.driverTripTicket.driverName || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Date of Travel</span><span className="font-bold text-slate-800">{report.driverTripTicket.date || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Plate Number</span><span className="font-bold text-slate-800">{report.driverTripTicket.vehiclePlate || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Authorized Passenger(s)</span><span className="font-bold text-slate-800">{report.driverTripTicket.passengerName || "N/A"}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Places Visited</span><span className="font-bold text-slate-800">{report.driverTripTicket.placesVisited || "N/A"}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Purpose</span><span className="font-bold text-slate-800">{report.driverTripTicket.purpose || "N/A"}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500 font-medium">Purpose of Travel</span><span className="font-bold text-slate-800">{report.driverTripTicket.purpose || "N/A"}</span></div>
                     </div>
                   </div>
 
-                  {/* Trip Logs */}
+                  {/* Driver Signatures */}
+                  {report.driverTripTicket.signatures && (report.driverTripTicket.signatures.driverSignature || report.driverTripTicket.signatures.passengerSignature) && (
+                    <div>
+                      <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Captured Signatures</h4>
+                      <div className="border border-amber-100 rounded-3xl p-4 bg-white grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {report.driverTripTicket.signatures.driverSignature && (
+                          <div className="border border-slate-200 rounded-2xl p-2 bg-slate-50 flex flex-col items-center">
+                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Driver Signature</p>
+                            <svg className="w-full h-16 bg-white rounded-xl border border-slate-200 p-1" viewBox="0 0 400 150">
+                              <path d={report.driverTripTicket.signatures.driverSignature} stroke="#1E3A8A" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        )}
+                        {report.driverTripTicket.signatures.passengerSignature && (
+                          <div className="border border-slate-200 rounded-2xl p-2 bg-slate-50 flex flex-col items-center">
+                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Authorized Official / Passenger</p>
+                            <svg className="w-full h-16 bg-white rounded-xl border border-slate-200 p-1" viewBox="0 0 400 150">
+                              <path d={report.driverTripTicket.signatures.passengerSignature} stroke="#1E3A8A" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Logistics Logs */}
                   <div>
                     <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Logistics Logs</h4>
                     <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
@@ -670,18 +727,17 @@ export function ReportDetailSheet({
                   {/* Remarks */}
                   <div>
                     <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Trip Remarks</h4>
-                    <div className="border border-amber-100 rounded-3xl p-4 bg-white text-xs leading-relaxed text-slate-600 font-medium font-medium">
+                    <div className="border border-amber-100 rounded-3xl p-4 bg-white text-xs leading-relaxed text-slate-600 font-medium">
                       {report.driverTripTicket.remarks || "No trip remarks logged."}
                     </div>
                   </div>
                 </div>
               )}
-
-                  </div>
-                </ScrollArea>
-              </div>
             </div>
-          </>
+          </ScrollArea>
+        </div>
+      </div>
+    </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-400">
             No report selected.

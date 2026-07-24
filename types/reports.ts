@@ -113,6 +113,7 @@ export const SampleHistorySchema = z.object({
 export const HandoffSignaturesSchema = z.object({
   accomplishedBy: z.string().optional().nullable(),
   accomplishedByLicense: z.string().optional().nullable(),
+  accomplishedBySignature: z.string().optional().nullable(),
   receivingHospital: z.string().optional().nullable(),
   referredTo: z.string().optional().nullable(),
   referredToLicense: z.string().optional().nullable(),
@@ -126,6 +127,8 @@ export const LiabilityReleaseSchema = z.object({
   refused: z.boolean().optional().nullable(),
   refusalType: z.string().optional().nullable(),
   signature: z.string().optional().nullable(),
+  patientSignature: z.string().optional().nullable(),
+  witnessSignature: z.string().optional().nullable(),
   witnessedBy: z.string().optional().nullable(),
   witnessAddress: z.string().optional().nullable(),
 });
@@ -190,11 +193,13 @@ export const SpeedometerSchema = z.object({
 export const SignaturesSchema = z.object({
   driverPhone: z.string().optional().nullable(),
   driverSignature: z.string().optional().nullable(),
+  passengerSignature: z.string().optional().nullable(),
   authorizedRepSignature: z.string().optional().nullable(),
 });
 
 export const DriverTripTicketPayloadSchema = z.object({
   id: z.string().optional().nullable(),
+  date: z.string().optional().nullable(),
   driverName: z.string(),
   vehiclePlate: z.string(),
   passengerName: z.string().optional().nullable(),

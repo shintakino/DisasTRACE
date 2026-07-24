@@ -318,6 +318,21 @@ Update this file whenever the current phase, active feature, or implementation s
 - Fixed Cascade Coordinate Override Missing Dev Mode Guard: The `cascadeIncident` function in `dispatch-engine.ts` was unconditionally overriding request coordinates outside the Baliwag geofence (even in production), causing dispatch distance calculations to use mock Tiaong coordinates instead of the resident's actual location. Added the `isDevMode &&` conditional guard.
 - Fixed Responder Location Display Stuck at Tiaong: Root cause was the missing `locationGeom` PostGIS write (see above). Combined with the earlier mobile-side initialSync geofence fix, responder positions now update correctly in real-time on the PACC dashboard map.
 
+- **E-Signature Support in Patient Care Report & Driver's Trip Ticket**:
+  * **Interactive Drawing Canvas & Modal**: Built a lightweight, touch-responsive `SignaturePadModal` component ([SignaturePadModal.tsx](file:///D:/dev/freelance/disas_trace/mobile/components/responder/SignaturePadModal.tsx)) using `react-native-svg` (`Svg`, `Path`) and `PanResponder` touch gesture tracking. Supports real-time vector path rendering, clear, redraw, and saving SVG path strings.
+  * **Patient Care Report (Patient / Refusal Form)**: Integrated signature cards & drawing triggers in [PatientCareModal.tsx](file:///D:/dev/freelance/disas_trace/mobile/components/responder/PatientCareModal.tsx):
+    1. Patient / Parent / Legal Guardian E-Signature under Release of Liability (`liabilityRelease.patientSignature`).
+    2. Witness Signature over Printed Name (`liabilityRelease.witnessSignature`), with printed name (`witnessedBy`) and address (`witnessAddress`) text inputs matching the physical CDRRMO paper form.
+    3. PCR Accomplished By / Responder Signature under Signatures & Handoff (`handoffSignatures.accomplishedBySignature`).
+  * **Driver's Trip Ticket**: Integrated signature cards & drawing triggers in [TripTicketModal.tsx](file:///D:/dev/freelance/disas_trace/mobile/components/responder/TripTicketModal.tsx):
+    1. Driver's E-Signature over Printed Name under Driver Signatures & Contact (`signatures.driverSignature`).
+    2. Authorized Passenger / Official E-Signature (`signatures.passengerSignature`).
+  * **Saved State, Web Inspection & PDF Export**: Serialized captured signature vector paths cleanly inside the responder store draft state and backend payloads (`/api/reports`). Updated [report-detail-sheet.tsx](file:///D:/dev/freelance/disas_trace/components/reports/report-detail-sheet.tsx) on the web CDRRMO Reports tab to render interactive SVG vector signature cards, and updated [lib/pdf-export.ts](file:///D:/dev/freelance/disas_trace/lib/pdf-export.ts) with `convertSvgPathToDataUrl` to automatically convert SVG signature paths to PNG images and embed them directly into PCR and Driver Trip Ticket PDF exports.
+- **Offline Draft Creation & 5-Minute Recurring Reminder Loop**:
+  * **Offline Draft Persistence**: Creating an incident report while offline (or tapping "Save as Draft") saves full form details (vitals, PCR, signatures, trip tickets) into device storage (`disas_trace_drafts.json`).
+  * **5-Minute Recurring System Reminder**: Integrated a background reminder loop in [use-offline-reports.ts](file:///D:/dev/freelance/disas_trace/mobile/hooks/use-offline-reports.ts). When internet connection is active (`isOnline === true`) AND unsent drafts exist (`drafts.length > 0`), the app triggers high-priority local notifications (`Notifications.scheduleNotificationAsync`) and tactile haptics every 5 minutes (`5 * 60 * 1000 ms`), reminding responders to submit pending reports.
+  * **Visual In-App Warning Banner**: Rendered an amber warning banner in [ResponderHome.tsx](file:///D:/dev/freelance/disas_trace/mobile/components/responder/ResponderHome.tsx) displaying `"⚠️ [X] Unsent Incident Drafts · Internet active · 5-min reminder active to submit to HQ"`, allowing responders to tap directly to review and submit their drafts.
+
 ## In Progress
 
 - None

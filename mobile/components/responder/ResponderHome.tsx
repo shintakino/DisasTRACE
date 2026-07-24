@@ -6,6 +6,7 @@ import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Pla
 import { Hospital } from 'iconsax-react-native';
 import { useResponderStore, checkConnectivity } from '../../stores/useResponderStore';
 import { useAuthStatus } from '../../hooks/use-auth-status';
+import { useOfflineReports } from '../../hooks/use-offline-reports';
 import { DispatchSheet } from './DispatchSheet';
 import { EnRouteSheet } from './EnRouteSheet';
 import { OnSceneSheet } from './OnSceneSheet';
@@ -40,8 +41,9 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
 export function ResponderHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { status, activeDispatch, targetHospital, setTargetHospital } = useResponderStore();
+  const { status, activeDispatch, targetHospital, setTargetHospital, drafts } = useResponderStore();
   const { profile, user, role } = useAuthStatus();
+  const { isOnline } = useOfflineReports();
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Configure notifications permissions and foreground notification behavior
@@ -1044,6 +1046,32 @@ export function ResponderHome() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Pending Draft Warning Banner Prompt */}
+        {isOnline && drafts.length > 0 && (
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/forms')}
+            activeOpacity={0.9}
+            className="mx-4 mt-3 bg-[#1E3A8A] border-2 border-amber-400 rounded-2xl p-3 flex-row items-center justify-between shadow-xl pointer-events-auto"
+          >
+            <View className="flex-row items-center space-x-3 flex-1 pr-2">
+              <View className="w-9 h-9 rounded-xl bg-amber-500/20 items-center justify-center border border-amber-400/40">
+                <FolderDown size={20} color="#F59E0B" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-white font-extrabold text-xs">
+                  ⚠️ {drafts.length} Unsent Incident Draft{drafts.length > 1 ? 's' : ''}
+                </Text>
+                <Text className="text-blue-100 text-[10px] font-medium mt-0.5" numberOfLines={1}>
+                  Internet active · 5-min reminder active to submit to HQ.
+                </Text>
+              </View>
+            </View>
+            <View className="bg-amber-500 px-3 py-1.5 rounded-xl border border-amber-300">
+              <Text className="text-white text-[10px] font-bold">Review</Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Floating Camera Mode Toggle Button */}
         {(status === 'en_route' || status === 'to_hospital') && (

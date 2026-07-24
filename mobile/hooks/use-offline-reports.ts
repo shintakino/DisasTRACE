@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useResponderStore } from '../stores/useResponderStore';
 import { supabase } from '../lib/supabase';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 
 const OFFLINE_REPORTS_KEY = 'disas_trace_offline_reports';
 
@@ -30,6 +31,41 @@ export function useOfflineReports() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // 5-Minute Recurring Draft Reminder Loop (Triggers when device is online & pending drafts exist)
+  useEffect(() => {
+    if (!isOnline || drafts.length === 0) return;
+
+    const sendDraftReminderNotification = async () => {
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '⚠️ Pending Incident Draft Reminder',
+            body: `You have ${drafts.length} unsent incident report draft(s). Please review and submit your report to CDRRMO HQ.`,
+            data: { type: 'DRAFT_REMINDER' },
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: null, // Send immediately
+        });
+        console.log(`[DraftReminder] Sent 5-minute reminder for ${drafts.length} pending draft(s).`);
+      } catch (err) {
+        console.error('[DraftReminder] Failed to present notification reminder:', err);
+      }
+    };
+
+    // Initial reminder upon connection return if drafts exist
+    sendDraftReminderNotification();
+
+    // 5-minute recurring timer (300,000 milliseconds)
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+    const intervalId = setInterval(() => {
+      sendDraftReminderNotification();
+    }, FIVE_MINUTES_MS);
+
+    return () => clearInterval(intervalId);
+  }, [isOnline, drafts.length]);
 
   // Trigger background sync when device transitions to online
   useEffect(() => {

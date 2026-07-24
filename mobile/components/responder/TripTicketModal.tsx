@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Calendar, PenTool } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
+import { SignaturePadModal } from './SignaturePadModal';
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -173,6 +175,23 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [driverPhone, setDriverPhone] = useState(data?.signatures?.driverPhone || '');
 
+  const [signatures, setSignatures] = useState(data?.signatures || {
+    driverPhone: '', driverSignature: '', passengerSignature: ''
+  });
+
+  const [activeSigTarget, setActiveSigTarget] = useState<{
+    visible: boolean;
+    title: string;
+    subtitle?: string;
+    target: 'driver' | 'passenger';
+    currentPath: string;
+  }>({
+    visible: false,
+    title: '',
+    target: 'driver',
+    currentPath: '',
+  });
+
   const [tripLog, setTripLog] = useState(data?.tripLog || {
     departureOffice: '', arrivalScene: '', departureScene: '', arrivalOffice: '', distance: ''
   });
@@ -202,7 +221,7 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
       lubricants,
       speedometer,
       signatures: {
-        ...data?.signatures,
+        ...signatures,
         driverPhone
       }
     });
@@ -497,13 +516,94 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
             </View>
           </View>
 
-          {/* Driver Contact */}
-          <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Driver Contact</Text>
-          <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-3">
+          {/* Driver Contact & E-Signatures */}
+          <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Driver Signatures & Contact</Text>
+          <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-4">
             <View>
               <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Driver Cellphone Number</Text>
               <TextInput value={driverPhone} onChangeText={setDriverPhone} keyboardType="phone-pad" placeholder="0917-123-4567" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
             </View>
+
+            {/* Driver E-Signature */}
+            <View className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+              <Text className="text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                Driver's Signature over Printed Name
+              </Text>
+              {signatures.driverSignature ? (
+                <View className="bg-white border border-slate-200 rounded-xl p-2 h-24 justify-center items-center relative">
+                  <Svg className="w-full h-full">
+                    <Path d={signatures.driverSignature} stroke="#1E3A8A" strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <TouchableOpacity 
+                    onPress={() => setActiveSigTarget({
+                      visible: true,
+                      title: "Driver E-Signature",
+                      subtitle: "Signature over printed name of driver",
+                      target: 'driver',
+                      currentPath: signatures.driverSignature || ''
+                    })}
+                    className="absolute top-2 right-2 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200"
+                  >
+                    <Text className="text-slate-600 text-[10px] font-bold">Redraw</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  onPress={() => setActiveSigTarget({
+                    visible: true,
+                    title: "Driver E-Signature",
+                    subtitle: "Signature over printed name of driver",
+                    target: 'driver',
+                    currentPath: ''
+                  })}
+                  className="bg-white border-2 border-dashed border-slate-300 rounded-xl py-4 justify-center items-center flex-row gap-2"
+                >
+                  <PenTool size={16} color="#1E3A8A" />
+                  <Text className="text-[#1E3A8A] font-bold text-xs">Tap to Sign Driver's Signature</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Passenger / Official E-Signature */}
+            <View className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+              <Text className="text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                Authorized Passenger / Official Signature
+              </Text>
+              {signatures.passengerSignature ? (
+                <View className="bg-white border border-slate-200 rounded-xl p-2 h-24 justify-center items-center relative">
+                  <Svg className="w-full h-full">
+                    <Path d={signatures.passengerSignature} stroke="#1E3A8A" strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <TouchableOpacity 
+                    onPress={() => setActiveSigTarget({
+                      visible: true,
+                      title: "Authorized Passenger / Official Signature",
+                      subtitle: "Signature over printed name of passenger/official",
+                      target: 'passenger',
+                      currentPath: signatures.passengerSignature || ''
+                    })}
+                    className="absolute top-2 right-2 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200"
+                  >
+                    <Text className="text-slate-600 text-[10px] font-bold">Redraw</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  onPress={() => setActiveSigTarget({
+                    visible: true,
+                    title: "Authorized Passenger / Official Signature",
+                    subtitle: "Signature over printed name of passenger/official",
+                    target: 'passenger',
+                    currentPath: ''
+                  })}
+                  className="bg-white border-2 border-dashed border-slate-300 rounded-xl py-4 justify-center items-center flex-row gap-2"
+                >
+                  <PenTool size={16} color="#1E3A8A" />
+                  <Text className="text-[#1E3A8A] font-bold text-xs">Tap to Sign Passenger Signature</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
           </View>
         </ScrollView>
         <CalendarModal 
@@ -511,6 +611,20 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
           currentVal={date}
           onSelect={(dateStr) => setDate(dateStr)}
           onClose={() => setShowDatePicker(false)}
+        />
+        <SignaturePadModal 
+          visible={activeSigTarget.visible}
+          title={activeSigTarget.title}
+          subtitle={activeSigTarget.subtitle}
+          initialPath={activeSigTarget.currentPath}
+          onSave={(pathData) => {
+            if (activeSigTarget.target === 'driver') {
+              setSignatures({ ...signatures, driverSignature: pathData });
+            } else if (activeSigTarget.target === 'passenger') {
+              setSignatures({ ...signatures, passengerSignature: pathData });
+            }
+          }}
+          onClose={() => setActiveSigTarget({ ...activeSigTarget, visible: false })}
         />
       </SafeAreaView>
     </Modal>

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Check, Calendar } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Check, Calendar, PenTool } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
+import { SignaturePadModal } from './SignaturePadModal';
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -172,6 +174,19 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
   const [patientGender, setPatientGender] = useState(data?.patientGender || 'Male');
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const [activeSigTarget, setActiveSigTarget] = useState<{
+    visible: boolean;
+    title: string;
+    subtitle?: string;
+    target: 'patient' | 'witness' | 'responder';
+    currentPath: string;
+  }>({
+    visible: false,
+    title: '',
+    target: 'patient',
+    currentPath: '',
+  });
+
   const [dispatchInfo, setDispatchInfo] = useState(() => {
     const today = getTodayDateString();
     if (data?.dispatchInfo) {
@@ -219,11 +234,11 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
   const [narrativeReport, setNarrativeReport] = useState(data?.narrativeReport || '');
 
   const [handoffSignatures, setHandoffSignatures] = useState(data?.handoffSignatures || {
-    accomplishedBy: '', accomplishedByLicense: '', receivingHospital: '', referredTo: '', referredToLicense: '', receivingPhysician: '', receivingPhysicianLicense: '', licenseNo: '', arrivalTime: ''
+    accomplishedBy: '', accomplishedByLicense: '', accomplishedBySignature: '', receivingHospital: '', referredTo: '', referredToLicense: '', receivingPhysician: '', receivingPhysicianLicense: '', licenseNo: '', arrivalTime: ''
   });
 
   const [liabilityRelease, setLiabilityRelease] = useState(data?.liabilityRelease || {
-    refused: false, refusalType: 'Refusal to consent to treatment', signature: '', witnessedBy: '', witnessAddress: ''
+    refused: false, refusalType: 'Refusal to consent to treatment', patientSignature: '', witnessSignature: '', witnessedBy: '', witnessAddress: ''
   });
 
   const [respondingTeam, setRespondingTeam] = useState(data?.respondingTeam || {
@@ -701,19 +716,142 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
               <Text className="text-slate-700 text-xs font-bold">Refusal of Treatment/Transport?</Text>
               <Switch value={liabilityRelease.refused} onValueChange={(val) => setLiabilityRelease({...liabilityRelease, refused: val})} />
             </View>
-            {liabilityRelease.refused && (
-              <View className="space-y-3">
-                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase">Witness Name</Text>
-                <TextInput value={liabilityRelease.witnessedBy} onChangeText={(val) => setLiabilityRelease({...liabilityRelease, witnessedBy: val})} placeholder="Witness Name" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
-                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase">Witness Address</Text>
-                <TextInput value={liabilityRelease.witnessAddress} onChangeText={(val) => setLiabilityRelease({...liabilityRelease, witnessAddress: val})} placeholder="Witness Address" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
+            
+            {/* Patient / Parent / Guardian Signature */}
+            <View className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+              <Text className="text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                Patient's Signature or if Minor, Parent / Legal Guardian
+              </Text>
+              {liabilityRelease.patientSignature ? (
+                <View className="bg-white border border-slate-200 rounded-xl p-2 h-24 justify-center items-center relative">
+                  <Svg className="w-full h-full">
+                    <Path d={liabilityRelease.patientSignature} stroke="#1E3A8A" strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <TouchableOpacity 
+                    onPress={() => setActiveSigTarget({
+                      visible: true,
+                      title: "Patient / Parent / Guardian E-Signature",
+                      subtitle: "Sign on screen for refusal / consent documentation",
+                      target: 'patient',
+                      currentPath: liabilityRelease.patientSignature || ''
+                    })}
+                    className="absolute top-2 right-2 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200"
+                  >
+                    <Text className="text-slate-600 text-[10px] font-bold">Redraw</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  onPress={() => setActiveSigTarget({
+                    visible: true,
+                    title: "Patient / Parent / Guardian E-Signature",
+                    subtitle: "Sign on screen for refusal / consent documentation",
+                    target: 'patient',
+                    currentPath: ''
+                  })}
+                  className="bg-white border-2 border-dashed border-slate-300 rounded-xl py-4 justify-center items-center flex-row gap-2"
+                >
+                  <PenTool size={16} color="#1E3A8A" />
+                  <Text className="text-[#1E3A8A] font-bold text-xs">Tap to Sign Patient/Guardian Signature</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Witness Signature over Printed Name */}
+            <View className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-3">
+              <Text className="text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                WITNESSED BY: Signature over printed name
+              </Text>
+              
+              {liabilityRelease.witnessSignature ? (
+                <View className="bg-white border border-slate-200 rounded-xl p-2 h-24 justify-center items-center relative">
+                  <Svg className="w-full h-full">
+                    <Path d={liabilityRelease.witnessSignature} stroke="#1E3A8A" strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <TouchableOpacity 
+                    onPress={() => setActiveSigTarget({
+                      visible: true,
+                      title: "Witness E-Signature",
+                      subtitle: "Signature over printed name of witness",
+                      target: 'witness',
+                      currentPath: liabilityRelease.witnessSignature || ''
+                    })}
+                    className="absolute top-2 right-2 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200"
+                  >
+                    <Text className="text-slate-600 text-[10px] font-bold">Redraw</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  onPress={() => setActiveSigTarget({
+                    visible: true,
+                    title: "Witness E-Signature",
+                    subtitle: "Signature over printed name of witness",
+                    target: 'witness',
+                    currentPath: ''
+                  })}
+                  className="bg-white border-2 border-dashed border-slate-300 rounded-xl py-4 justify-center items-center flex-row gap-2"
+                >
+                  <PenTool size={16} color="#1E3A8A" />
+                  <Text className="text-[#1E3A8A] font-bold text-xs">Tap to Sign Witness Signature</Text>
+                </TouchableOpacity>
+              )}
+
+              <View>
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Witness Printed Name</Text>
+                <TextInput value={liabilityRelease.witnessedBy} onChangeText={(val) => setLiabilityRelease({...liabilityRelease, witnessedBy: val})} placeholder="Witness Full Name" className="border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-800 font-medium" />
               </View>
-            )}
+              <View>
+                <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Witness Address</Text>
+                <TextInput value={liabilityRelease.witnessAddress} onChangeText={(val) => setLiabilityRelease({...liabilityRelease, witnessAddress: val})} placeholder="Witness Complete Address" className="border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-800 font-medium" />
+              </View>
+            </View>
           </View>
 
           {/* Signatures & Handoff */}
           <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Signatures & Handoff</Text>
           <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-3">
+            
+            {/* Responder Signature */}
+            <View className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2 mb-2">
+              <Text className="text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                PCR Accomplished By / Responder Signature
+              </Text>
+              {handoffSignatures.accomplishedBySignature ? (
+                <View className="bg-white border border-slate-200 rounded-xl p-2 h-24 justify-center items-center relative">
+                  <Svg className="w-full h-full">
+                    <Path d={handoffSignatures.accomplishedBySignature} stroke="#1E3A8A" strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <TouchableOpacity 
+                    onPress={() => setActiveSigTarget({
+                      visible: true,
+                      title: "Responder E-Signature",
+                      subtitle: "Signature of PCR Accomplished By",
+                      target: 'responder',
+                      currentPath: handoffSignatures.accomplishedBySignature || ''
+                    })}
+                    className="absolute top-2 right-2 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200"
+                  >
+                    <Text className="text-slate-600 text-[10px] font-bold">Redraw</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  onPress={() => setActiveSigTarget({
+                    visible: true,
+                    title: "Responder E-Signature",
+                    subtitle: "Signature of PCR Accomplished By",
+                    target: 'responder',
+                    currentPath: ''
+                  })}
+                  className="bg-white border-2 border-dashed border-slate-300 rounded-xl py-4 justify-center items-center flex-row gap-2"
+                >
+                  <PenTool size={16} color="#1E3A8A" />
+                  <Text className="text-[#1E3A8A] font-bold text-xs">Tap to Sign Responder Signature</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             <View className="flex-row space-x-3">
               <View className="flex-1">
                 <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">PCR Accomplished By</Text>
@@ -778,6 +916,22 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
           currentVal={dispatchInfo.date}
           onSelect={(dateStr) => setDispatchInfo({...dispatchInfo, date: dateStr})}
           onClose={() => setShowDatePicker(false)}
+        />
+        <SignaturePadModal 
+          visible={activeSigTarget.visible}
+          title={activeSigTarget.title}
+          subtitle={activeSigTarget.subtitle}
+          initialPath={activeSigTarget.currentPath}
+          onSave={(pathData) => {
+            if (activeSigTarget.target === 'patient') {
+              setLiabilityRelease({ ...liabilityRelease, patientSignature: pathData });
+            } else if (activeSigTarget.target === 'witness') {
+              setLiabilityRelease({ ...liabilityRelease, witnessSignature: pathData });
+            } else if (activeSigTarget.target === 'responder') {
+              setHandoffSignatures({ ...handoffSignatures, accomplishedBySignature: pathData });
+            }
+          }}
+          onClose={() => setActiveSigTarget({ ...activeSigTarget, visible: false })}
         />
       </SafeAreaView>
     </Modal>

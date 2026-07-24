@@ -43,6 +43,33 @@ const getBase64ImageFromUrl = async (url: string): Promise<string | null> => {
 };
 
 /**
+ * Convert SVG Path string to high-res PNG Data URL for jsPDF embedding
+ */
+const convertSvgPathToDataUrl = async (d: string, width = 400, height = 150): Promise<string | null> => {
+  if (!d || typeof window === "undefined") return null;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.strokeStyle = "#1E3A8A";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    const path = new Path2D(d);
+    ctx.stroke(path);
+
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    console.error("Failed to convert SVG path to PNG for PDF:", err);
+    return null;
+  }
+};
+
+/**
  * Exports a summary list of incident reports as a beautifully formatted PDF
  */
 export async function exportReportsSummaryPDF(
@@ -1139,8 +1166,8 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     const refLines = doc.splitTextToSize(refText, pageWidth - 36);
 
     let boxHeight7 = 10 + refLines.length * 4.2;
-    if (lr.refused) {
-      boxHeight7 += 20; // Extra height for signatures
+    if (lr.refused || lr.patientSignature || lr.witnessSignature) {
+      boxHeight7 += 24; // Extra height for signature rendering
     }
 
     y2 = checkPCRPageOverflow(doc, y2, 6 + boxHeight7 + 10, "PRE-HOSPITAL CARE REPORT - CLINICAL EVALUATION & LIABILITY RELEASE");
@@ -1158,16 +1185,33 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.setFontSize(8.5);
     doc.text(refLines, 18, y2 + 9);
 
-    if (lr.refused) {
-      doc.setFont("helvetica", "bold").text("Patient Signature: [SIGNED]", 18, y2 + 9 + refLines.length * 4.2 + 8);
-      doc.setFont("helvetica", "bold").text(`Witnessed By: ${lr.witnessedBy || "N/A"}`, 100, y2 + 9 + refLines.length * 4.2 + 8);
-      doc.setFont("helvetica", "bold").text(`Witness Address: ${lr.witnessAddress || "N/A"}`, 100, y2 + 9 + refLines.length * 4.2 + 14);
+    const sigY = y2 + 9 + refLines.length * 4.2 + 4;
+    if (lr.patientSignature) {
+      const patientSigPng = await convertSvgPathToDataUrl(lr.patientSignature);
+      if (patientSigPng) {
+        doc.addImage(patientSigPng, "PNG", 18, sigY, 40, 15);
+      }
+      doc.setFont("helvetica", "bold").text("Patient / Guardian Signature", 18, sigY + 18);
+    } else if (lr.refused) {
+      doc.setFont("helvetica", "bold").text("Patient Signature: [SIGNED]", 18, sigY + 14);
+    }
+
+    if (lr.witnessSignature) {
+      const witnessSigPng = await convertSvgPathToDataUrl(lr.witnessSignature);
+      if (witnessSigPng) {
+        doc.addImage(witnessSigPng, "PNG", 100, sigY, 40, 15);
+      }
+      doc.setFont("helvetica", "bold").text(`Witness: ${lr.witnessedBy || "Signed"}`, 100, sigY + 18);
+      doc.setFont("helvetica", "normal").text(`Address: ${lr.witnessAddress || "N/A"}`, 100, sigY + 22);
+    } else if (lr.witnessedBy) {
+      doc.setFont("helvetica", "bold").text(`Witnessed By: ${lr.witnessedBy}`, 100, sigY + 14);
+      doc.setFont("helvetica", "normal").text(`Witness Address: ${lr.witnessAddress || "N/A"}`, 100, sigY + 18);
     }
 
     y2 = y2 + 3 + boxHeight7 + 6;
 
     // --- Section 8: Signatures & Handoff ---
-    y2 = checkPCRPageOverflow(doc, y2, 6 + 44 + 10, "PRE-HOSPITAL CARE REPORT - CLINICAL EVALUATION & LIABILITY RELEASE");
+    y2 = checkPCRPageOverflow(doc, y2, 6 + 54 + 10, "PRE-HOSPITAL CARE REPORT - CLINICAL EVALUATION & LIABILITY RELEASE");
 
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
@@ -1175,7 +1219,7 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.text("HANDOFF & SIGNATURES", 14, y2);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(14, y2 + 3, pageWidth - 28, 44, "D");
+    doc.rect(14, y2 + 3, pageWidth - 28, 54, "D");
 
     const hs = pcr.handoffSignatures || {};
     const rt = pcr.respondingTeam || {};
@@ -1215,33 +1259,40 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.setFont("helvetica", "bold").text("Receiving Physician:", 110, y2 + 9);
     doc.setFont("helvetica", "normal").text(receivingPhysicianText, 145, y2 + 9);
 
+    if (hs.accomplishedBySignature) {
+      const respSigPng = await convertSvgPathToDataUrl(hs.accomplishedBySignature);
+      if (respSigPng) {
+        doc.addImage(respSigPng, "PNG", 55, y2 + 10, 35, 12);
+      }
+    }
+
     // Row 2
-    doc.setFont("helvetica", "bold").text("Acc. License No:", 18, y2 + 15);
-    doc.setFont("helvetica", "normal").text(hs.accomplishedByLicense || hs.licenseNo || "N/A", 55, y2 + 15);
-    doc.setFont("helvetica", "bold").text("Phys. License No:", 110, y2 + 15);
-    doc.setFont("helvetica", "normal").text(hs.receivingPhysicianLicense || "N/A", 145, y2 + 15);
+    doc.setFont("helvetica", "bold").text("Acc. License No:", 18, y2 + 25);
+    doc.setFont("helvetica", "normal").text(hs.accomplishedByLicense || hs.licenseNo || "N/A", 55, y2 + 25);
+    doc.setFont("helvetica", "bold").text("Phys. License No:", 110, y2 + 25);
+    doc.setFont("helvetica", "normal").text(hs.receivingPhysicianLicense || "N/A", 145, y2 + 25);
 
     // Row 3
-    doc.setFont("helvetica", "bold").text("Receiving Hospital:", 18, y2 + 21);
-    doc.setFont("helvetica", "normal").text(receivingHospitalText, 55, y2 + 21);
-    doc.setFont("helvetica", "bold").text("Arrival Time:", 110, y2 + 21);
-    doc.setFont("helvetica", "normal").text(arrivalTimeText, 145, y2 + 21);
+    doc.setFont("helvetica", "bold").text("Receiving Hospital:", 18, y2 + 31);
+    doc.setFont("helvetica", "normal").text(receivingHospitalText, 55, y2 + 31);
+    doc.setFont("helvetica", "bold").text("Arrival Time:", 110, y2 + 31);
+    doc.setFont("helvetica", "normal").text(arrivalTimeText, 145, y2 + 31);
 
     // Row 4
-    doc.setFont("helvetica", "bold").text("Referred To:", 18, y2 + 27);
-    doc.setFont("helvetica", "normal").text(hs.referredTo || "N/A", 55, y2 + 27);
-    doc.setFont("helvetica", "bold").text("Ref. License No:", 110, y2 + 27);
-    doc.setFont("helvetica", "normal").text(hs.referredToLicense || "N/A", 145, y2 + 27);
+    doc.setFont("helvetica", "bold").text("Referred To:", 18, y2 + 37);
+    doc.setFont("helvetica", "normal").text(hs.referredTo || "N/A", 55, y2 + 37);
+    doc.setFont("helvetica", "bold").text("Ref. License No:", 110, y2 + 37);
+    doc.setFont("helvetica", "normal").text(hs.referredToLicense || "N/A", 145, y2 + 37);
 
     // Row 5
-    doc.setFont("helvetica", "bold").text("Team Leader:", 18, y2 + 33);
-    doc.setFont("helvetica", "normal").text(rt.teamLeader || "N/A", 55, y2 + 33);
-    doc.setFont("helvetica", "bold").text("Team Members:", 110, y2 + 33);
-    doc.setFont("helvetica", "normal").text(rt.teamMembers || "N/A", 145, y2 + 33);
+    doc.setFont("helvetica", "bold").text("Team Leader:", 18, y2 + 43);
+    doc.setFont("helvetica", "normal").text(rt.teamLeader || "N/A", 55, y2 + 43);
+    doc.setFont("helvetica", "bold").text("Team Members:", 110, y2 + 43);
+    doc.setFont("helvetica", "normal").text(rt.teamMembers || "N/A", 145, y2 + 43);
 
     // Row 6
-    doc.setFont("helvetica", "bold").text("Ambulance Driver:", 18, y2 + 39);
-    doc.setFont("helvetica", "normal").text(rt.driver || "N/A", 55, y2 + 39);
+    doc.setFont("helvetica", "bold").text("Ambulance Driver:", 18, y2 + 49);
+    doc.setFont("helvetica", "normal").text(rt.driver || "N/A", 55, y2 + 49);
 
     // --- Footer Page Numbers and Lines ---
     const addPCRFooters = (d: any, patientName: string) => {
@@ -1269,11 +1320,16 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
   }
 }
 
-export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
-  if (typeof window === "undefined") return;
-
+/**
+ * Exports a Driver's Trip Ticket report as a PDF
+ */
+export async function exportDriverTripTicketPDF(
+  ticket: any,
+  reportId: string
+): Promise<boolean> {
   try {
-    const { jsPDF } = await import("jspdf");
+    const jsPDFModule = await import("jspdf");
+    const jsPDF = jsPDFModule.default;
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -1281,71 +1337,39 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
       format: "a4",
     });
 
-    const pageHeight = doc.internal.pageSize.height;
     const pageWidth = doc.internal.pageSize.width;
+    const headerHeight = 28;
 
-    const drawDTTPageHeader = (d: any, title: string) => {
-      d.setFillColor(30, 58, 138); // Navy
-      d.rect(0, 0, pageWidth, 20, "F");
-      d.setFillColor(239, 68, 68); // Red
-      d.rect(0, 20, pageWidth, 1.5, "F");
-
-      d.setTextColor(255, 255, 255);
-      d.setFont("helvetica", "bold");
-      d.setFontSize(11);
-      d.text(title, 14, 12);
-    };
-
-    const checkDTTPageOverflow = (d: any, currentY: number, heightNeeded: number, title: string) => {
-      if (currentY + heightNeeded > pageHeight - 20) {
-        d.addPage();
-        drawDTTPageHeader(d, title);
-        return 28;
-      }
-      return currentY;
-    };
-
-    // First Page Banner
-    doc.setFillColor(30, 58, 138); // Navy
-    doc.rect(0, 0, pageWidth, 25, "F");
-    doc.setFillColor(239, 68, 68); // Red
-    doc.rect(0, 25, pageWidth, 1.5, "F");
+    // --- Header ---
+    doc.setFillColor(22, 32, 58);
+    doc.rect(0, 0, pageWidth, headerHeight, "F");
 
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("Republic of the Philippines | Province of Bulacan | CITY OF BALIWAG", 14, 8);
-    doc.setFontSize(11);
-    doc.text("RESCUE 5 FVE - BALIWAG DRRMO OFFICE", 14, 13);
-    doc.setFontSize(13);
-    doc.text("DRIVER'S TRIP TICKET", 14, 20);
+    doc.setFontSize(14);
+    doc.text("BALIWAG CDRRMO RESCUE 5 FVE", 14, 12);
 
-    doc.setFontSize(10);
-    doc.text(`TICKET ID: DTT-${reportId}`, pageWidth - 60, 16);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("DRIVER'S TRIP TICKET & VEHICLE LOG SHEET", 14, 18);
+    doc.text(`TICKET ID: DTT-${reportId.slice(0, 8).toUpperCase()}`, pageWidth - 14, 18, { align: "right" });
 
     // --- Section 1: Trip & Vehicle Details ---
+    const passLines = doc.splitTextToSize(ticket.passengerName || "N/A", pageWidth - 55 - 14);
+    const placesLines = doc.splitTextToSize(ticket.placesVisited || "N/A", pageWidth - 55 - 14);
+    const purposeLines = doc.splitTextToSize(ticket.purpose || "Emergency Response & Scene Transport", pageWidth - 55 - 14);
+
+    const placesOffset = passLines.length * 4;
+    const purposeOffset = placesOffset + placesLines.length * 4;
+    const boxHeight1 = 30 + passLines.length * 4 + placesLines.length * 4 + purposeLines.length * 4;
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
-    doc.text("1. TRIP & VEHICLE DETAILS", 14, 33);
-
-    const passLines = doc.splitTextToSize(ticket.passengerName || "Responder Crew", 130);
-    const placesLines = doc.splitTextToSize(ticket.placesVisited || "Baliwag City", 130);
-    const purposeLines = doc.splitTextToSize(ticket.purpose || "Emergency Medical Response", 130);
-
-    let offset = 22;
-    const passOffset = offset;
-    offset += passLines.length * 4.5 + 1.5;
-    const placesOffset = offset;
-    offset += placesLines.length * 4.5 + 1.5;
-    const purposeOffset = offset;
-    offset += purposeLines.length * 4.5 + 1.5;
-
-    const boxHeight1 = Math.max(offset, 48);
+    doc.setFontSize(9);
+    doc.text("1. TRIP & VEHICLE DETAILS", 14, 34);
 
     doc.setFillColor(249, 250, 251);
-    doc.setDrawColor(203, 213, 225);
-    doc.rect(14, 36, pageWidth - 28, boxHeight1, "FD");
+    doc.rect(14, 37, pageWidth - 28, boxHeight1, "FD");
 
     doc.setTextColor(75, 85, 99);
     doc.setFont("helvetica", "normal");
@@ -1354,29 +1378,27 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
     doc.setFont("helvetica", "bold").text("Name of Driver:", 18, 42);
     doc.setFont("helvetica", "normal").text(ticket.driverName || "Ambulance Driver", 55, 42);
     doc.setFont("helvetica", "bold").text("Date of Travel:", 110, 42);
-    doc.setFont("helvetica", "normal").text(ticket.date || (ticket.tripLog && ticket.tripLog.date) || "N/A", 145, 42);
+    doc.setFont("helvetica", "normal").text(ticket.date || "N/A", 145, 42);
 
-    doc.setFont("helvetica", "bold").text("Gov Car / Plate No:", 18, 50);
-    doc.setFont("helvetica", "normal").text(ticket.vehiclePlate || "AMB-001", 55, 50);
+    doc.setFont("helvetica", "bold").text("Gov Car / Plate No:", 18, 48);
+    doc.setFont("helvetica", "normal").text(ticket.vehiclePlate || "AMB-001", 55, 48);
 
-    doc.setFont("helvetica", "bold").text("Authorized Passengers:", 18, 58);
-    doc.setFont("helvetica", "normal").text(passLines, 55, 58);
+    doc.setFont("helvetica", "bold").text("Authorized Passengers:", 18, 54);
+    doc.setFont("helvetica", "normal").text(passLines, 55, 54);
 
-    doc.setFont("helvetica", "bold").text("Places Visited:", 18, 36 + placesOffset);
-    doc.setFont("helvetica", "normal").text(placesLines, 55, 36 + placesOffset);
+    doc.setFont("helvetica", "bold").text("Places Visited:", 18, 54 + placesOffset);
+    doc.setFont("helvetica", "normal").text(placesLines, 55, 54 + placesOffset);
 
-    doc.setFont("helvetica", "bold").text("Purpose of Travel:", 18, 36 + purposeOffset);
-    doc.setFont("helvetica", "normal").text(purposeLines, 55, 36 + purposeOffset);
+    doc.setFont("helvetica", "bold").text("Purpose of Travel:", 18, 54 + purposeOffset);
+    doc.setFont("helvetica", "normal").text(purposeLines, 55, 54 + purposeOffset);
 
-    let y = 36 + boxHeight1 + 6;
+    let y = 37 + boxHeight1 + 6;
 
     // --- Section 2: Logistics Log (Times & Speedometer) ---
     const sm = ticket.speedometer || {};
     const tl = ticket.tripLog || {};
     const remarkLines = doc.splitTextToSize(sm.remarks || "No defects reported.", pageWidth - 150 - 6);
     const boxHeight2 = Math.max(38, 18 + remarkLines.length * 4.5);
-
-    y = checkDTTPageOverflow(doc, y, 6 + boxHeight2 + 10, "RESCUE 5 FVE - BALIWAG DRRMO OFFICE - DRIVER'S TRIP TICKET");
 
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
@@ -1405,8 +1427,6 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
     y = y + 3 + boxHeight2 + 6;
 
     // --- Section 3: Fuel Consumption & Lubricants ---
-    y = checkDTTPageOverflow(doc, y, 6 + 38 + 10, "RESCUE 5 FVE - BALIWAG DRRMO OFFICE - DRIVER'S TRIP TICKET");
-
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.text("3. FUEL CONSUMPTION & LUBRICANTS", 14, y);
@@ -1445,8 +1465,6 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
     const generalRemarks = doc.splitTextToSize(ticket.remarks || "No trip remarks logged. Vehicle operations completed normal scene transport parameters.", pageWidth - 36);
     const boxHeight4 = Math.max(20, 6 + generalRemarks.length * 4.5);
 
-    y = checkDTTPageOverflow(doc, y, 6 + boxHeight4 + 10, "RESCUE 5 FVE - BALIWAG DRRMO OFFICE - DRIVER'S TRIP TICKET");
-
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.text("4. GENERAL TRIP REMARKS & NOTES", 14, y);
@@ -1459,22 +1477,34 @@ export async function exportDriverTripTicketPDF(ticket: any, reportId: string) {
     y = y + 3 + boxHeight4 + 6;
 
     // --- Signatures ---
-    y = checkDTTPageOverflow(doc, y, 32, "RESCUE 5 FVE - BALIWAG DRRMO OFFICE - DRIVER'S TRIP TICKET");
-
     doc.setTextColor(75, 85, 99);
     doc.line(14, y, pageWidth - 14, y);
 
+    const sigs = ticket.signatures || {};
+    if (sigs.driverSignature) {
+      const driverSigPng = await convertSvgPathToDataUrl(sigs.driverSignature);
+      if (driverSigPng) {
+        doc.addImage(driverSigPng, "PNG", 18, y + 2, 45, 14);
+      }
+    }
     doc.text("Driver Signature:", 18, y + 6);
-    doc.line(18, y + 16, 75, y + 16);
+    doc.line(18, y + 18, 75, y + 18);
     doc.setFont("helvetica", "bold");
-    doc.text(ticket.driverName || "Ambulance Driver", 18, y + 20);
+    doc.text(ticket.driverName || "Ambulance Driver", 18, y + 22);
     doc.setFont("helvetica", "normal");
-    doc.text(`Cellphone: ${ticket.signatures?.driverPhone || "N/A"}`, 18, y + 25);
+    doc.text(`Cellphone: ${sigs.driverPhone || "N/A"}`, 18, y + 27);
 
+    const passengerSigPath = sigs.passengerSignature || sigs.authorizedRepSignature;
+    if (passengerSigPath) {
+      const passSigPng = await convertSvgPathToDataUrl(passengerSigPath);
+      if (passSigPng) {
+        doc.addImage(passSigPng, "PNG", 110, y + 2, 45, 14);
+      }
+    }
     doc.text("Authorized Chief/Representative:", 110, y + 6);
-    doc.line(110, y + 16, 185, y + 16);
+    doc.line(110, y + 18, 185, y + 18);
     doc.setFont("helvetica", "bold");
-    doc.text("CDRRMO OFFICE REPRESENTATIVE", 110, y + 20);
+    doc.text("CDRRMO OFFICE REPRESENTATIVE", 110, y + 22);
 
     const addDTTFooters = (d: any) => {
       const totalPages = d.internal.getNumberOfPages();

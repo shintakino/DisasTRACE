@@ -136,7 +136,7 @@ export async function autoDispatchIncident(
         );
     }
 
-    // 3. Compute distance vectors and filter responders within 1.2km radius
+    // 3. Compute distance vectors and filter responders within 2km radius
     const respondersWithDistance = eligibleResponders
       .map((item) => {
         if ('distanceMeters' in item) {
@@ -176,52 +176,84 @@ export async function autoDispatchIncident(
       return null;
     }
 
-    const assignedItem = respondersWithDistance[0];
-    const assignedResponder = assignedItem.responder;
-
     // Fetch system settings to resolve dynamic dispatch offer timeout duration
     const settings = await db.query.systemSettings.findFirst({
       where: eq(systemSettings.id, 'current'),
     });
     const offerDuration = settings?.dispatchOfferTimeoutSeconds ?? 30;
-    const offerExpiresAt = new Date(Date.now() + offerDuration * 1000);
 
-    // Generate deterministic vehicle ID based on initials and unique UUID suffix (Option 1)
-    const initials = assignedResponder.fullName
-      .split(" ")
-      .map((n: string) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 3);
-    const suffix = assignedResponder.id.slice(-3).toUpperCase();
-    const vehicleId = `AMB-${initials || "001"}-${suffix}`;
+    // 4. Atomically reserve a responder inside a database transaction to prevent
+    //    concurrent dispatch race conditions (two simultaneous SOS requests selecting
+    //    the same responder). Iterate through sorted candidates and attempt an atomic
+    //    UPDATE ... WHERE dutyStatus = 'ON_DUTY' — only one concurrent transaction
+    //    can succeed per responder row.
+    const result = await db.transaction(async (tx) => {
+      for (const candidateItem of respondersWithDistance) {
+        const candidate = candidateItem.responder;
 
-    // 4. Create the incident record with the initial dispatch offer first
-    const [newIncident] = await db.insert(incidents).values({
-      id: crypto.randomUUID(),
-      requestId,
-      responderId: null, // Null during negotiation offer
-      currentOfferResponderId: assignedResponder.id,
-      status: "DISPATCHED",
-      dispatchMethod: "AUTO_1KM",
-      assignedAmbulance: vehicleId,
-      etaMinutes: Math.max(2, Math.round(assignedItem.distanceKm * 5)), // Approximate ETA based on distance
-      offerExpiresAt,
-      dispatchOfferDurationSeconds: offerDuration,
-      skippedResponderIds: [],
-    }).returning();
+        // Atomic reservation: only succeeds if the responder is still ON_DUTY
+        // at this exact moment. If another concurrent transaction already reserved
+        // this responder (set them to ACTIVE_DISPATCH), zero rows are returned
+        // and we move to the next candidate.
+        const reserved = await tx.update(users)
+          .set({ dutyStatus: "ACTIVE_DISPATCH" })
+          .where(
+            and(
+              eq(users.id, candidate.id),
+              eq(users.dutyStatus, "ON_DUTY")
+            )
+          )
+          .returning({ id: users.id });
 
-    // 5. Update the verification request to VERIFIED second
-    await db.update(verificationRequests)
-      .set({ status: "VERIFIED", updatedAt: new Date() })
-      .where(eq(verificationRequests.id, requestId));
+        if (reserved.length === 0) {
+          // Another concurrent dispatch already reserved this responder — skip to next
+          console.log(`[AutoDispatch] Responder ${candidate.fullName} already reserved by concurrent dispatch. Trying next candidate...`);
+          continue;
+        }
 
-    // 6. Set responder's dutyStatus to ACTIVE_DISPATCH (reserved for countdown)
-    await db.update(users)
-      .set({ dutyStatus: "ACTIVE_DISPATCH" })
-      .where(eq(users.id, assignedResponder.id));
+        // Successfully reserved this responder atomically — proceed with dispatch
+        const offerExpiresAt = new Date(Date.now() + offerDuration * 1000);
 
-    return newIncident;
+        // Generate deterministic vehicle ID
+        const initials = candidate.fullName
+          .split(" ")
+          .map((n: string) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 3);
+        const suffix = candidate.id.slice(-3).toUpperCase();
+        const vehicleId = `AMB-${initials || "001"}-${suffix}`;
+
+        // Create the incident record with the dispatch offer
+        const [newIncident] = await tx.insert(incidents).values({
+          id: crypto.randomUUID(),
+          requestId,
+          responderId: null, // Null during negotiation offer
+          currentOfferResponderId: candidate.id,
+          status: "DISPATCHED",
+          dispatchMethod: "AUTO_1KM",
+          assignedAmbulance: vehicleId,
+          etaMinutes: Math.max(2, Math.round(candidateItem.distanceKm * 5)),
+          offerExpiresAt,
+          dispatchOfferDurationSeconds: offerDuration,
+          skippedResponderIds: [],
+        }).returning();
+
+        // Update the verification request to VERIFIED
+        await tx.update(verificationRequests)
+          .set({ status: "VERIFIED", updatedAt: new Date() })
+          .where(eq(verificationRequests.id, requestId));
+
+        console.log(`[AutoDispatch] Successfully dispatched to ${candidate.fullName} for request ${requestId}`);
+        return newIncident;
+      }
+
+      // All candidates were already reserved by concurrent dispatches
+      console.log(`[AutoDispatch] All ${respondersWithDistance.length} candidate(s) within 2km were already reserved for request ${requestId}`);
+      return null;
+    });
+
+    return result;
   } catch (error) {
     console.error("Error in autoDispatchIncident:", error);
     return null;
@@ -389,28 +421,59 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
       .sort((a, b) => a.distanceKm - b.distanceKm);
 
     if (sortedResponders.length > 0) {
-      // Option A: Cascade offer to the next nearest unit
-      const nextItem = sortedResponders[0];
-      const nextResponder = nextItem.responder;
-
+      // Iterate through candidates and atomically reserve the first available one
       const nextOfferDuration = incident.dispatchOfferDurationSeconds || 30;
-      const nextOfferExpiresAt = new Date(Date.now() + nextOfferDuration * 1000);
+      let cascaded = false;
 
-      await db.update(incidents)
-        .set({
-          currentOfferResponderId: nextResponder.id,
-          offerExpiresAt: nextOfferExpiresAt,
-          skippedResponderIds: updatedSkipped,
-          etaMinutes: Math.max(2, Math.round(nextItem.distanceKm * 5)),
-        })
-        .where(eq(incidents.id, incident.id));
+      for (const nextItem of sortedResponders) {
+        const nextResponder = nextItem.responder;
 
-      // Reserve new responder
-      await db.update(users)
-        .set({ dutyStatus: "ACTIVE_DISPATCH" })
-        .where(eq(users.id, nextResponder.id));
+        // Atomic reservation: only succeeds if the responder is still ON_DUTY
+        const reserved = await db.update(users)
+          .set({ dutyStatus: "ACTIVE_DISPATCH" })
+          .where(
+            and(
+              eq(users.id, nextResponder.id),
+              eq(users.dutyStatus, "ON_DUTY")
+            )
+          )
+          .returning({ id: users.id });
 
-      console.log(`Cascade successfully completed. Transmitted offer to responder ${nextResponder.fullName}.`);
+        if (reserved.length === 0) {
+          // Responder already reserved by a concurrent dispatch — try next candidate
+          console.log(`[Cascade] Responder ${nextResponder.fullName} already reserved. Trying next candidate...`);
+          // Add to skipped so we don't retry them on the next cascade cycle
+          if (!updatedSkipped.includes(nextResponder.id)) {
+            updatedSkipped.push(nextResponder.id);
+          }
+          continue;
+        }
+
+        // Successfully reserved — update incident with new offer
+        const nextOfferExpiresAt = new Date(Date.now() + nextOfferDuration * 1000);
+
+        await db.update(incidents)
+          .set({
+            currentOfferResponderId: nextResponder.id,
+            offerExpiresAt: nextOfferExpiresAt,
+            skippedResponderIds: updatedSkipped,
+            etaMinutes: Math.max(2, Math.round(nextItem.distanceKm * 5)),
+          })
+          .where(eq(incidents.id, incident.id));
+
+        console.log(`[Cascade] Successfully transmitted offer to responder ${nextResponder.fullName}.`);
+        cascaded = true;
+        break;
+      }
+
+      if (!cascaded) {
+        // All candidates in range were already reserved by concurrent dispatches
+        console.log(`[Cascade] All candidates within 2km already reserved for incident ${incident.id}. Reverting to PENDING.`);
+        await db.delete(incidents).where(eq(incidents.id, incident.id));
+        await db.update(verificationRequests)
+          .set({ status: "PENDING", updatedAt: new Date() })
+          .where(eq(verificationRequests.id, incident.requestId));
+      }
     } else {
       // No more responders left in range: Revert immediately back to PENDING triage!
       console.log(`Cascade exhausted: No remaining available responders within 2km for incident ${incident.id}. Reverting verification request to PENDING immediately.`);

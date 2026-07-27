@@ -1,0 +1,1036 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 8001
+>>
+stream
+0.5670000000000001 w
+0 G
+0.12 0.23 0.54 rg
+0. 841.8899999999999864 595.2799999999999727 -62.3622047244094517 re
+f
+0.94 0.27 0.27 rg
+0. 779.5277952755905062 595.2799999999999727 -4.2519685039370083 re
+f
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+1. g
+39.6850393700787407 810.7088976377953031 Td
+(CDRRMO BALIWAG CITY | DISASTRACE COMPREHENSIVE DOCUMENTATION) Tj
+ET
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+1. g
+39.6850393700787407 793.7010236220472734 Td
+(SYSTEM ARCHITECTURE, OPERATIONAL FLOWS, API ENDPOINTS & TECHNICAL SPECIFICATIONS) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+1. g
+399.6894488188975743 793.7010236220472734 Td
+(RELEASE 1.0 \(PROD SPEC\)) Tj
+ET
+0.95 0.96 0.96 rg
+39.6850393700787407 756.8506299212598378 515.9099212598424629 -73.7007874015748143 re
+f
+0.82 0.84 0.86 RG
+39.6850393700787407 756.8506299212598378 515.9099212598424629 -73.7007874015748143 re
+S
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.118 0.227 0.541 rg
+51.0236220472441033 734.1734645669291695 Td
+(DisasTRACE: Emergency Incident Reporting & Dispatch Platform) Tj
+ET
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+0.294 0.333 0.388 rg
+51.0236220472441033 717.1655905511811397 Td
+(Built for CDRRMO Baliwag City & Public Assistance and Command Center \(PACC\)) Tj
+ET
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+0.294 0.333 0.388 rg
+51.0236220472441033 702.9923622047243725 Td
+(Full System Architecture, End-to-End Operational Flows, Data Models, API Registry, and Security.) Tj
+ET
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+0.294 0.333 0.388 rg
+51.0236220472441033 691.6537795275589815 Td
+(Includes 1km PostGIS Spatial Dispatching, Realtime WebSockets, Touch E-Signatures, & Offline Sync.) Tj
+ET
+0.12 0.23 0.54 rg
+39.6850393700787407 666.1419685039369369 515.9099212598424629 -19.8425196850393704 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+48.1889763779527627 651.9687401574802834 Td
+(1. EXECUTIVE SUMMARY & SYSTEM BACKGROUND) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 634.9608661417322537 Td
+(A. PROBLEM STATEMENT & BACKGROUND) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 619.3703149606299121 Td
+(• Traditional Emergency Response Challenges: CDRRMO Baliwag City previously relied on manual phone hotlines and) Tj
+T* (paper-based logs. This led to verbal address miscommunications, delayed responder dispatching, lack of real-time) Tj
+T* (responder location visibility, and vulnerable paper record keeping.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 579.4018110236220309 Td
+(• Solution Overview: DisasTRACE is a centralized, multi-platform emergency management platform. It connects Public) Tj
+T* (Residents, Ambulance Responders, PACC Dispatchers, and CDRRMO Executive Admins through a high-performance) Tj
+T* (Android mobile app and a Next.js real-time web dashboard.) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 533.7640157480315111 Td
+(B. CORE MISSIONS & GOALS) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 518.1734645669291695 Td
+(• Eliminate Call Bottlenecks: Allow residents to submit digital SOS requests tagged with exact GPS coordinates and camera) Tj
+T* (photo evidence.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 490.110472440944875 Td
+(• Automated 1km Proximity Selection: Use PostGIS geospatial indexing \(ST_DWithin\) to automatically find and dispatch the) Tj
+T* (nearest available ON_DUTY ambulance within a 1.0km radius.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 462.0474803149605805 Td
+(• Real-Time GPS Telemetry: Broadcast responder GPS positions, speed, and heading to PACC Web Command Center via) Tj
+T* (Supabase Realtime WebSockets.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 433.984488188976286 Td
+(• Paperless Electronic Forms: Digitally capture Pre-Hospital Care Reports \(PCR\) and Driver's Trip Tickets \(DTT\) with touch) Tj
+T* (finger E-Signatures and instant PDF exports.) Tj
+ET
+0.12 0.23 0.54 rg
+39.6850393700787407 391.748267716535338 515.9099212598424629 -19.8425196850393704 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+48.1889763779527627 377.5750393700786276 Td
+(2. STAKEHOLDER PERSONAS & SYSTEM ROLES) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 360.5671653543305979 Td
+(1. Resident / Public User \(Android App\): Registers with phone OTP verification and government ID. Submits emergency SOS requests, attaches photo evidence, and tracks assigned ambulance on a live map with dynamic ETA.) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 344.9766141732282563 Td
+(2. Ambulance Responder \(Android App\): Receives timed 30-second dispatch offer drawers with resident photo evidence preview, navigates to scene/hospital, logs vitals, captures digital e-signatures, and completes PCR/Trip Tickets.) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 329.3860629921258578 Td
+(3. PACC Dispatcher / Admin \(Next.js Web\): Monitors incoming emergency requests, triages incidents \(VERIFICATION_PENDING -> VERIFIED\), initiates manual or auto dispatches, and coordinates emergency response.) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 313.7955118110235162 Td
+(4. CDRRMO Super Admin \(Next.js Web\): Reviews user/responder registrations, manages system accounts, views executive KPI analytics, inspects report archives, and exports official PDF reports.) Tj
+ET
+0.12 0.23 0.54 rg
+39.6850393700787407 284.0317322834644642 515.9099212598424629 -19.8425196850393704 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+48.1889763779527627 269.8585039370077538 Td
+(3. END-TO-END OPERATIONAL WORKFLOWS) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 252.8506299212597241 Td
+(A. ACCOUNT REGISTRATION & VERIFICATION GATE) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 237.2600787401573825 Td
+(• OTP SMS Verification: Users register with phone verification powered by textbee.dev SMS gateway.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 221.1025984251967884 Td
+(• Government ID Upload: Mobile registrants upload a photo of a government-issued ID stored in Supabase Storage) Tj
+T* (\(ids/{userId}/\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 193.0396062992125508 Td
+(• Super Admin Verification Gate: Accounts enter PENDING status. All mobile app screens are locked until a CDRRMO Super) Tj
+T* (Admin verifies the account. If rejected, an SMS alert is sent with rejection reasons.) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 159.3073228346455608 Td
+(B. RESIDENT EMERGENCY SOS FLOW) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 143.7167716535432191 Td
+(• GPS Tagging & Photo Capture: Residents tap SOS, automatically locking GPS coordinates \(latitude/longitude\) and taking) Tj
+T* (mandatory incident scene photos.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 115.6537795275589815 Td
+(• Structured Classification: Captures call nature, emergency type, estimated victims, and chief complaint details.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 99.4962992125983874 Td
+(• Live Responder Tracking: Post-dispatch, residents view assigned ambulance movement on an interactive MapLibre map) Tj
+T* (with dynamic ETA updates.) Tj
+ET
+39.6850393700787407 34.0157480314960665 m
+555.5949606299211609 34.0157480314960665 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.612 0.639 0.686 rg
+39.6850393700787407 19.8425196850394059 Td
+(CDRRMO Baliwag City - DisasTRACE Detailed System Specifications & Architecture) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.612 0.639 0.686 rg
+493.2327559055117376 19.8425196850394059 Td
+(Page 1 of 3) Tj
+ET
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/Length 7886
+>>
+stream
+0.5670000000000001 w
+0.82 0.84 0.86 RG
+0.12 0.23 0.54 rg
+0. 841.8899999999999864 595.2799999999999727 -62.3622047244094517 re
+f
+0.94 0.27 0.27 rg
+0. 779.5277952755905062 595.2799999999999727 -4.2519685039370083 re
+f
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+1. g
+39.6850393700787407 810.7088976377953031 Td
+(CDRRMO BALIWAG CITY | DISASTRACE COMPREHENSIVE DOCUMENTATION) Tj
+ET
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+1. g
+39.6850393700787407 793.7010236220472734 Td
+(SYSTEM ARCHITECTURE, OPERATIONAL FLOWS, API ENDPOINTS & TECHNICAL SPECIFICATIONS) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+1. g
+399.6894488188975743 793.7010236220472734 Td
+(RELEASE 1.0 \(PROD SPEC\)) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 756.8506299212598378 Td
+(C. PACC TRIAGE & VERIFICATION QUEUE) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 741.2600787401574962 Td
+(• Verification Queue Landing: Emergency requests enter the PACC Queue as VERIFICATION_PENDING.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 725.1025984251967884 Td
+(• Verification Action: Dispatchers inspect incident details, verify authenticity \(VERIFIED\), and choose either automated) Tj
+T* (spatial dispatch or manual responder selection.) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 691.3703149606299121 Td
+(D. AUTO-DISPATCH ENGINE & 1KM PROXIMITY CASCADE) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 675.7797637795274568 Td
+(• PostGIS 1km Spatial Search: Executes a spatial query using ST_DWithin\(location_geom, ST_SetSRID\(ST_MakePoint\(lng,) Tj
+T* (lat\), 4326\), 1000\) to find nearest ON_DUTY responders within 1.0km.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 647.7167716535432191 Td
+(• 30-Second Timed Offer: Transmits a 30-second offer \(currentOfferResponderId\) to the candidate. Candidate's duty status) Tj
+T* (becomes ACTIVE_DISPATCH.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 619.6537795275589815 Td
+(• Automated Cascading: If the responder declines or the 30-second timer expires, the engine automatically cascades to the) Tj
+T* (next nearest candidate within 1km.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 591.5907874015747439 Td
+(• Fallback Escalation: If no candidate accepts within 1km, the incident transitions to PACC_MANUAL status and escalates) Tj
+T* (back to the PACC Dispatch Queue for manual assignment.) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 557.8585039370077538 Td
+(E. RESPONDER MOBILE OPERATIONS & DIGITAL SIGNATURES) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 542.2679527559054122 Td
+(• Offer Accept/Decline Drawer: Responders view timed offer cards with resident scene photos, incident location, and) Tj
+T* (distance.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 514.2049606299211746 Td
+(• Telemetry Broadcast: Live GPS location, heading orientation, and speed \(kph\) are broadcast to the command center via) Tj
+T* (WebSockets \(useBroadcastTracker\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 486.1419685039368801 Td
+(• Turn-by-Turn Navigation & Hospital Search: Interactive route navigation to scene and receiving hospital.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 469.984488188976286 Td
+(• Touch E-Signatures \(SignaturePadModal\): Touch finger canvas allowing on-screen signature drawing for) Tj
+T* (Patient/Guardian, Witness, Responder, Driver, and Authorized Representative.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 441.9214960629919915 Td
+(• Pre-Hospital Care Report \(PCR\) & Driver's Trip Ticket \(DTT\): Electronic forms capturing vitals, GCS points, SAMPLE) Tj
+T* (history, narrative reports, and vehicle fuel controls.) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 408.1892125984250583 Td
+(F. CDRRMO EXECUTIVE DASHBOARD & PDF EXPORTS) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 392.5986614173227167 Td
+(• Command Center Interactive Map: Displays live active incidents, hospital locations, and real-time ambulance fleet) Tj
+T* (positions.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 364.5356692913384222 Td
+(• KPI Analytics: Dynamic charts \(Recharts\) visualizing daily incidents, average response times, severity breakdown, and) Tj
+T* (responder activity logs.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 336.4726771653541277 Td
+(• Report Inspection & Vector PDF Export: Report inspection modal rendering SVG vector signature cards, with one-click) Tj
+T* (export \(exportPatientCareReportPDF & exportDriverTripTicketPDF\) converting vector paths to high-res PNG images via) Tj
+T* (HTML5 Canvas \(convertSvgPathToDataUrl\).) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 290.8348818897636647 Td
+(G. OFFLINE DRAFT PERSISTENCE & 5-MINUTE RECURRING REMINDER LOOP) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 275.2443307086612094 Td
+(• Local File Caching: PCR and Trip Ticket drafts created offline are saved in device storage \(disas_trace_drafts.json\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 259.0868503937006153 Td
+(• 5-Minute System Reminder: When connection recovers \(isOnline === true\), the app triggers high-priority notifications and) Tj
+T* (haptics every 5 minutes reminding responders to submit pending drafts.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 231.0238582677163777 Td
+(• Background Queue Replay: Sequentially flushes local offline queue actions to backend API endpoints upon connection) Tj
+T* (return.) Tj
+ET
+0.12 0.23 0.54 rg
+39.6850393700787407 188.7876377952754012 515.9099212598424629 -19.8425196850393704 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+48.1889763779527627 174.6144094488187193 Td
+(4. DETAILED TECHNOLOGY STACK SPECIFICATIONS) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 157.6065354330706896 Td
+(• Web Front-End: Next.js 16 \(React 19, App Router\), TypeScript, Tailwind CSS v4, Lucide Icons, Shadcn UI, Recharts.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 141.4490551181100955 Td
+(• Mobile Front-End: React Native with Expo \(SDK 52, Expo Router\), NativeWind / Tailwind CSS,) Tj
+T* (@maplibre/maplibre-react-native \(Android APK\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 113.3860629921258578 Td
+(• Backend & Serverless API: Next.js API Routes \(Node.js Serverless runtime\), Supabase Cloud Platform.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 97.2285826771652637 Td
+(• Database & Spatial Extension: Supabase PostgreSQL DBMS with PostGIS spatial extension \(locationGeom spatial index,) Tj
+T* (ST_DWithin 1km radius query, ST_SetSRID\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 69.1655905511811397 Td
+(• ORM Layer: Drizzle ORM \(type-safe SQL schema & parameterized query builder\).) Tj
+ET
+39.6850393700787407 34.0157480314960665 m
+555.5949606299211609 34.0157480314960665 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.612 0.639 0.686 rg
+39.6850393700787407 19.8425196850394059 Td
+(CDRRMO Baliwag City - DisasTRACE Detailed System Specifications & Architecture) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.612 0.639 0.686 rg
+493.2327559055117376 19.8425196850394059 Td
+(Page 2 of 3) Tj
+ET
+endstream
+endobj
+7 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 8 0 R
+>>
+endobj
+8 0 obj
+<<
+/Length 6993
+>>
+stream
+0.5670000000000001 w
+0.82 0.84 0.86 RG
+0.12 0.23 0.54 rg
+0. 841.8899999999999864 595.2799999999999727 -62.3622047244094517 re
+f
+0.94 0.27 0.27 rg
+0. 779.5277952755905062 595.2799999999999727 -4.2519685039370083 re
+f
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+1. g
+39.6850393700787407 810.7088976377953031 Td
+(CDRRMO BALIWAG CITY | DISASTRACE COMPREHENSIVE DOCUMENTATION) Tj
+ET
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+1. g
+39.6850393700787407 793.7010236220472734 Td
+(SYSTEM ARCHITECTURE, OPERATIONAL FLOWS, API ENDPOINTS & TECHNICAL SPECIFICATIONS) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+1. g
+399.6894488188975743 793.7010236220472734 Td
+(RELEASE 1.0 \(PROD SPEC\)) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+1. g
+51.0236220472441033 756.8506299212598378 Td
+(• Real-time & WebSockets: Supabase Realtime \(Postgres Change Data Capture channels\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 740.69314960629913 Td
+(• Authentication & Security: Supabase Auth with Argon2id / bcrypt password hashing, JWT claims, 4-tier RBAC) Tj
+T* (\(pacc_admin, cdrrmo_admin, ambulance_responder, resident\), and PostgreSQL Row Level Security \(RLS\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 712.6301574803148924 Td
+(• File & Asset Storage: Supabase Storage Buckets \(ids/, scenes/, exports/\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 696.4726771653542983 Td
+(• Mapping & Tile Engine: OpenFreeMap / MapLibre GL, OpenStreetMap \(OSM\) vector tiles \(Zero-cost, no API key\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 680.3151968503937042 Td
+(• PDF Generation: jsPDF & jsPDF-AutoTable with HTML5 Canvas vector-to-PNG renderer \(convertSvgPathToDataUrl\).) Tj
+ET
+0.12 0.23 0.54 rg
+39.6850393700787407 649.9844881889762291 515.9099212598424629 -19.8425196850393704 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+48.1889763779527627 635.8112598425195756 Td
+(5. DATABASE SCHEMA & API ENDPOINT REGISTRY) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 618.8033858267715459 Td
+(A. DATABASE TABLES \(POSTGRESQL / DRIZZLE ORM\)) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 603.2128346456692043 Td
+(• public.users: Id, fullName, phone, role, dutyStatus, verificationStatus, lastLatitude, lastLongitude, locationGeom \(PostGIS) Tj
+T* (point\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 575.149842519684853 Td
+(• public.verification_requests: Id, residentId, locationDescription, type, latitude, longitude, imageUrl, status, createdAt.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 558.9923622047242588 Td
+(• public.incidents: Id, requestId, responderId, status, assignedAmbulance, currentOfferResponderId, offerExpiresAt,) Tj
+T* (dispatchMethod, createdAt.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 530.9293700787400212 Td
+(• public.patient_care_reports: Id, incidentId, patientName, patientAge, dispatchInfo, emergencyType, initialAssessment,) Tj
+T* (vitalsLogs, sampleHistory, narrativeReport, handoffSignatures, liabilityRelease, respondingTeam.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 502.8663779527557267 Td
+(• public.driver_trip_tickets: Id, incidentId, driverName, vehiclePlate, passengerName, placesVisited, tripLog,) Tj
+T* (gasolineConsumed, lubricants, speedometer, remarks, signatures.) Tj
+ET
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.118 0.227 0.541 rg
+45.354330708661422 469.1340944881888504 Td
+(B. REST API ENDPOINTS REGISTRY) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 453.5435433070864519 Td
+(• POST /api/auth/register — Mobile account registration with OTP verification.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 437.3860629921258578 Td
+(• POST /api/verification-requests — Submit resident SOS help request with photo and GPS.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 421.2285826771652637 Td
+(• POST /api/verification/[id]/dispatch — Manual responder dispatch by PACC dispatcher.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 405.0711023622046696 Td
+(• POST /api/incidents/respond — Responder accept/decline dispatch offer.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 388.9136220472440755 Td
+(• POST /api/incidents/status — Incident status updates \(EN_ROUTE, ON_SCENE, TO_HOSPITAL, RESOLVED\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 372.7561417322834814 Td
+(• POST /api/responder/location — Live GPS telemetry update writing PostGIS locationGeom.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 356.5986614173228872 Td
+(• POST /api/reports — Submit electronic PCR and Driver's Trip Ticket payloads.) Tj
+ET
+0.12 0.23 0.54 rg
+39.6850393700787407 326.2679527559055828 515.9099212598424629 -19.8425196850393704 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+1. g
+48.1889763779527627 312.0947244094488724 Td
+(6. SECURITY, COMPLIANCE & DISASTER RECOVERY) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 295.0868503937008427 Td
+(• 100% SQL Injection Protection: All database interactions utilize Drizzle ORM parameterized queries.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 278.9293700787402486 Td
+(• Strict Role-Based Access Control \(RBAC\): Enforced at client navigation guards and server-side API authorization headers.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 262.7718897637796545 Td
+(• Row Level Security \(RLS\): Supabase PostgreSQL tables are protected by strict RLS policies.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 246.6144094488190603 Td
+(• Data Encryption: HTTPS / TLS 1.3 encryption for data in transit; AES-256 for storage assets.) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 230.4569291338584662 Td
+(• Automated Cloud Backups: Daily automated database backups with WAL Point-in-Time Recovery \(PITR\).) Tj
+ET
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.216 0.255 0.318 rg
+51.0236220472441033 214.2994488188978721 Td
+(• Immutable Audit Trail: Every incident status transition, dispatch offer, acceptance, decline, and telemetry log is stored in) Tj
+T* (audit logs.) Tj
+ET
+39.6850393700787407 34.0157480314960665 m
+555.5949606299211609 34.0157480314960665 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.612 0.639 0.686 rg
+39.6850393700787407 19.8425196850394059 Td
+(CDRRMO Baliwag City - DisasTRACE Detailed System Specifications & Architecture) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.612 0.639 0.686 rg
+493.2327559055117376 19.8425196850394059 Td
+(Page 3 of 3) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R 7 0 R ]
+/Count 3
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+19 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+20 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+21 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+22 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 9 0 R
+/F2 10 0 R
+/F3 11 0 R
+/F4 12 0 R
+/F5 13 0 R
+/F6 14 0 R
+/F7 15 0 R
+/F8 16 0 R
+/F9 17 0 R
+/F10 18 0 R
+/F11 19 0 R
+/F12 20 0 R
+/F13 21 0 R
+/F14 22 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+23 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20260726234451+08'00')
+>>
+endobj
+24 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 25
+0000000000 65535 f 
+0000023462 00000 n 
+0000025295 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000008205 00000 n 
+0000008342 00000 n 
+0000016280 00000 n 
+0000016417 00000 n 
+0000023531 00000 n 
+0000023656 00000 n 
+0000023787 00000 n 
+0000023921 00000 n 
+0000024059 00000 n 
+0000024183 00000 n 
+0000024312 00000 n 
+0000024444 00000 n 
+0000024580 00000 n 
+0000024708 00000 n 
+0000024835 00000 n 
+0000024964 00000 n 
+0000025097 00000 n 
+0000025199 00000 n 
+0000025547 00000 n 
+0000025633 00000 n 
+trailer
+<<
+/Size 25
+/Root 24 0 R
+/Info 23 0 R
+/ID [ <50A41E2C89C437D343C7485FBA049CEC> <50A41E2C89C437D343C7485FBA049CEC> ]
+>>
+startxref
+25737
+%%EOF

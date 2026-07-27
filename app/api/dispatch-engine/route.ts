@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides } from "@/lib/dispatch-engine";
+import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides, healOrphanedActiveDispatches } from "@/lib/dispatch-engine";
 
 export async function GET() {
   try {
@@ -8,6 +8,9 @@ export async function GET() {
     
     // 2. Run recycling check on expired PACC manual overrides (Option B backup)
     await checkAndRecycleManualOverrides();
+
+    // 3. Self-heal orphaned ACTIVE_DISPATCH responders with no active incident
+    await healOrphanedActiveDispatches();
 
     return NextResponse.json({ 
       success: true, 

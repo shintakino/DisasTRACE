@@ -557,3 +557,55 @@ export async function checkAndRecycleManualOverrides() {
     console.error("Error in checkAndRecycleManualOverrides:", error);
   }
 }
+
+// Self-healing: detect and fix responders stuck in ACTIVE_DISPATCH with no active incident.
+// This can happen when a race condition, crash, or cascade error leaves a responder reserved
+// but with no corresponding DISPATCHED incident pointing to them.
+export async function healOrphanedActiveDispatches() {
+  try {
+    // 1. Find all responders currently in ACTIVE_DISPATCH
+    const activeDispatchResponders = await db.query.users.findMany({
+      where: and(
+        eq(users.role, "ambulance_responder"),
+        eq(users.dutyStatus, "ACTIVE_DISPATCH")
+      ),
+    });
+
+    if (activeDispatchResponders.length === 0) return;
+
+    // 2. Find all DISPATCHED incidents that have an active offer or assigned responder
+    const activeIncidents = await db.query.incidents.findMany({
+      where: eq(incidents.status, "DISPATCHED"),
+    });
+
+    // Also check EN_ROUTE and ARRIVED — these are actively assigned
+    const enRouteIncidents = await db.query.incidents.findMany({
+      where: or(
+        eq(incidents.status, "EN_ROUTE"),
+        eq(incidents.status, "ARRIVED")
+      ),
+    });
+
+    // Build a set of responder IDs that are legitimately busy
+    const busyResponderIds = new Set<string>();
+    for (const inc of activeIncidents) {
+      if (inc.currentOfferResponderId) busyResponderIds.add(inc.currentOfferResponderId);
+      if (inc.responderId) busyResponderIds.add(inc.responderId);
+    }
+    for (const inc of enRouteIncidents) {
+      if (inc.responderId) busyResponderIds.add(inc.responderId);
+    }
+
+    // 3. Reset orphaned responders (ACTIVE_DISPATCH but no incident pointing to them)
+    for (const responder of activeDispatchResponders) {
+      if (!busyResponderIds.has(responder.id)) {
+        console.log(`[SelfHeal] Responder ${responder.fullName} (${responder.id}) is stuck in ACTIVE_DISPATCH with no active incident. Resetting to ON_DUTY.`);
+        await db.update(users)
+          .set({ dutyStatus: "ON_DUTY" })
+          .where(eq(users.id, responder.id));
+      }
+    }
+  } catch (error) {
+    console.error("Error in healOrphanedActiveDispatches:", error);
+  }
+}

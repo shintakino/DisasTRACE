@@ -6,7 +6,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
-import { eq, and, or, like, desc, sql } from "drizzle-orm";
+import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import crypto from "crypto";
@@ -158,6 +158,7 @@ export async function GET(req: NextRequest) {
         scenePhotos: reports.scenePhotos,
         participants: reports.participants,
         patientCareCount: sql<number>`(select count(*)::int from patient_care_reports where patient_care_reports.incident_id = ${reports.incidentId})`,
+        verificationRequestId: verificationRequests.id,
       })
       .from(reports)
       .innerJoin(incidents, eq(reports.incidentId, incidents.id))
@@ -166,44 +167,99 @@ export async function GET(req: NextRequest) {
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(reports.createdAt));
 
-    let filtered = [...dbReports].map((r) => ({
-      id: r.id,
-      responderName: r.responderName,
-      type: r.type,
-      status: r.status === 'SUBMITTED' ? 'COMPLETED' : 'ONGOING',
-      date: new Date(r.createdAt).toLocaleDateString("en-US", {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      }),
-      time: new Date(r.createdAt).toLocaleTimeString("en-US", {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      location: r.location || "Baliwag City",
-      residentPhotoUrl: r.residentPhotoUrl,
-      natureOfCall: r.natureOfCall,
-      severityLevel: r.severityLevel,
-      peopleInvolved: (() => {
-        if (r.patientCareCount && r.patientCareCount > 0) {
-          return r.patientCareCount;
-        }
-        if (Array.isArray(r.participants) && r.participants.length > 0) {
-          return r.participants.length;
-        }
-        if (!r.peopleInvolved || r.peopleInvolved === 'None') return 0;
-        const match = r.peopleInvolved.match(/\d+/);
-        return match ? parseInt(match[0], 10) : 1;
-      })(),
-      residentPeopleInvolved: (() => {
-        if (r.peopleInvolved === '1-2 Persons') return 2;
-        if (r.peopleInvolved === '3-5 Persons') return 4;
-        if (r.peopleInvolved === '6+ Persons') return 6;
-        return 0;
-      })(),
-      crewFindings: r.crewFindings || "No additional logs provided.",
-      scenePhotos: Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
-    }));
+    // Fetch duplicate requests for all fetched reports
+    const primaryRequestIds = dbReports.map(r => r.verificationRequestId).filter(Boolean);
+    let allDuplicates: any[] = [];
+    if (primaryRequestIds.length > 0) {
+      allDuplicates = await db
+        .select({
+          id: verificationRequests.id,
+          requestId: verificationRequests.requestId,
+          parentRequestId: verificationRequests.parentRequestId,
+          residentName: users.fullName,
+          type: verificationRequests.type,
+          status: verificationRequests.status,
+          createdAt: verificationRequests.createdAt,
+          location: verificationRequests.locationDescription,
+          imageUrl: verificationRequests.imageUrl,
+          nature: verificationRequests.nature,
+          severity: verificationRequests.severity,
+          peopleInvolved: verificationRequests.peopleInvolved,
+        })
+        .from(verificationRequests)
+        .innerJoin(users, eq(verificationRequests.residentId, users.id))
+        .where(inArray(verificationRequests.parentRequestId, primaryRequestIds));
+    }
+
+    let filtered = [...dbReports].map((r) => {
+      const duplicatesForReport = allDuplicates
+        .filter(d => d.parentRequestId === r.verificationRequestId)
+        .map(d => ({
+          id: d.id,
+          requestId: d.requestId,
+          residentName: d.residentName,
+          type: d.type,
+          status: d.status,
+          date: new Date(d.createdAt).toLocaleDateString("en-US", {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }),
+          time: new Date(d.createdAt).toLocaleTimeString("en-US", {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          location: d.location || "Baliwag City",
+          residentPhotoUrl: d.imageUrl,
+          natureOfCall: d.nature,
+          severityLevel: d.severity,
+          peopleInvolved: (() => {
+            if (!d.peopleInvolved || d.peopleInvolved === 'None') return 0;
+            const match = d.peopleInvolved.match(/\d+/);
+            return match ? parseInt(match[0], 10) : 1;
+          })(),
+        }));
+
+      return {
+        id: r.id,
+        responderName: r.responderName,
+        type: r.type,
+        status: r.status === 'SUBMITTED' ? 'COMPLETED' : 'ONGOING',
+        date: new Date(r.createdAt).toLocaleDateString("en-US", {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        time: new Date(r.createdAt).toLocaleTimeString("en-US", {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        location: r.location || "Baliwag City",
+        residentPhotoUrl: r.residentPhotoUrl,
+        natureOfCall: r.natureOfCall,
+        severityLevel: r.severityLevel,
+        peopleInvolved: (() => {
+          if (r.patientCareCount && r.patientCareCount > 0) {
+            return r.patientCareCount;
+          }
+          if (Array.isArray(r.participants) && r.participants.length > 0) {
+            return r.participants.length;
+          }
+          if (!r.peopleInvolved || r.peopleInvolved === 'None') return 0;
+          const match = r.peopleInvolved.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 1;
+        })(),
+        residentPeopleInvolved: (() => {
+          if (r.peopleInvolved === '1-2 Persons') return 2;
+          if (r.peopleInvolved === '3-5 Persons') return 4;
+          if (r.peopleInvolved === '6+ Persons') return 6;
+          return 0;
+        })(),
+        crewFindings: r.crewFindings || "No additional logs provided.",
+        scenePhotos: Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
+        duplicates: duplicatesForReport,
+      };
+    });
 
     if (search) {
       filtered = filtered.filter(

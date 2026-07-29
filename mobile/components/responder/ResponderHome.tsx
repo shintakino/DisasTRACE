@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { View, Text, Platform, StatusBar, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
@@ -152,6 +152,41 @@ export function ResponderHome() {
   const lastDbUpdateRef = useRef<number>(0);
   const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const [hospitals, setHospitals] = useState<any[]>([]);
+
+  const hospitalsWithDistance = useMemo(() => {
+    if (!currentLocation || hospitals.length === 0) return [];
+    return hospitals.map(h => {
+      const distMeters = calculateDistanceMeters(
+        currentLocation[1],
+        currentLocation[0],
+        h.coordinates.latitude,
+        h.coordinates.longitude
+      );
+      return {
+        ...h,
+        distanceMeters: distMeters,
+        distanceKm: Number((distMeters / 1000).toFixed(1))
+      };
+    });
+  }, [hospitals, currentLocation]);
+
+  const nearestHospitalId = useMemo(() => {
+    if (hospitalsWithDistance.length === 0) return null;
+    let minMeters = Infinity;
+    let nearestId = null;
+    hospitalsWithDistance.forEach(h => {
+      if (h.distanceMeters < minMeters) {
+        minMeters = h.distanceMeters;
+        nearestId = h.id;
+      }
+    });
+    return nearestId;
+  }, [hospitalsWithDistance]);
+
+  const enrichedSelectedHospital = useMemo(() => {
+    if (!selectedHospital) return null;
+    return hospitalsWithDistance.find(h => h.id === selectedHospital.id) || selectedHospital;
+  }, [selectedHospital, hospitalsWithDistance]);
 
 
   // Simulated Drive Telemetry properties
@@ -939,9 +974,10 @@ export function ResponderHome() {
           </Marker>
         )}
 
-        {hospitals.map((hospital) => {
+        {hospitalsWithDistance.map((hospital) => {
           const isTarget = status === 'to_hospital' && targetHospital?.id === hospital.id;
           const isSelected = selectedHospital?.id === hospital.id;
+          const isNearest = hospital.id === nearestHospitalId;
           return (
             <Marker 
               key={hospital.id} 
@@ -963,22 +999,23 @@ export function ResponderHome() {
                       <View className="w-10 h-10 bg-blue-50 rounded-xl items-center justify-center mr-3">
                         <Hospital size={20} color="#1E3A8A" variant="Bold" />
                       </View>
-                      <Text className="text-sm font-bold text-[#1E3A8A] flex-1">{hospital.name}</Text>
+                      <View className="flex-1">
+                        <View className="flex-row items-center">
+                          <Text className="text-sm font-bold text-[#1E3A8A] flex-1" numberOfLines={1}>{hospital.name}</Text>
+                          {isNearest && (
+                            <View className="bg-emerald-100 px-1.5 py-0.5 rounded ml-1 shrink-0">
+                              <Text className="text-[8px] font-black text-emerald-800 uppercase tracking-wider">NEAREST</Text>
+                            </View>
+                          )}
+                        </View>
+                        {hospital.distanceKm !== undefined && (
+                          <Text className="text-[10px] font-extrabold text-slate-500 mt-0.5">{hospital.distanceKm} km away</Text>
+                        )}
+                      </View>
                     </View>
-                    <Text className="text-xs font-medium text-slate-500 mb-1">{hospital.address}</Text>
+                    <Text className="text-xs font-medium text-slate-500 mb-1" numberOfLines={2}>{hospital.address}</Text>
                     <Text className="text-xs font-medium text-slate-500">{hospital.phone}</Text>
                     
-                    {status === 'to_hospital' && !targetHospital && (
-                      <TouchableOpacity
-                        onPress={() => {
-                          setTargetHospital(hospital);
-                          setSelectedHospital(null);
-                        }}
-                        className="mt-3 bg-blue-600 rounded-lg p-2 items-center"
-                      >
-                        <Text className="text-white text-xs font-bold">Select Hospital</Text>
-                      </TouchableOpacity>
-                    )}
 
                     {/* Tooltip Triangle Pointer */}
                     <View className="absolute -bottom-2 left-1/2 -ml-2 w-4 h-4 bg-white border-b border-r border-slate-200" style={{ transform: [{ rotate: '45deg' }] }} />
@@ -1121,10 +1158,49 @@ export function ResponderHome() {
           </View>
         )}
 
-        {status === 'to_hospital' && !targetHospital && (
+        {status === 'to_hospital' && !targetHospital && !selectedHospital && (
           <View className="px-6 mt-4 pointer-events-auto">
             <View className="bg-orange-500/90 p-3.5 rounded-xl backdrop-blur-md border border-orange-400 shadow-lg shadow-black/10">
               <Text className="text-white font-bold text-xs text-center">Tap a hospital marker on the map to select destination</Text>
+            </View>
+          </View>
+        )}
+
+        {status === 'to_hospital' && !targetHospital && enrichedSelectedHospital && (
+          <View className="px-6 mt-4 pointer-events-auto">
+            <View className="bg-white rounded-2xl p-4 shadow-xl border border-slate-200">
+              <View className="flex-row items-center mb-3">
+                <View className="w-10 h-10 bg-blue-50 rounded-xl items-center justify-center mr-3">
+                  <Hospital size={20} color="#1E3A8A" variant="Bold" />
+                </View>
+                <View className="flex-1">
+                  <View className="flex-row items-center">
+                    <Text className="text-sm font-bold text-[#1E3A8A] flex-1">{enrichedSelectedHospital.name}</Text>
+                    {enrichedSelectedHospital.id === nearestHospitalId && (
+                      <View className="bg-emerald-100 px-2 py-0.5 rounded-full ml-2">
+                        <Text className="text-[9px] font-black text-emerald-800 uppercase tracking-widest">NEAREST</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View className="flex-row items-center justify-between mt-1">
+                    {enrichedSelectedHospital.address && (
+                      <Text className="text-xs text-slate-500 flex-1 mr-2" numberOfLines={1}>{enrichedSelectedHospital.address}</Text>
+                    )}
+                    {enrichedSelectedHospital.distanceKm !== undefined && (
+                      <Text className="text-xs font-extrabold text-[#1E3A8A] shrink-0">{enrichedSelectedHospital.distanceKm} km away</Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setTargetHospital(enrichedSelectedHospital);
+                  setSelectedHospital(null);
+                }}
+                className="bg-[#1E3A8A] rounded-xl py-3 items-center"
+              >
+                <Text className="text-white font-bold text-sm">Navigate to This Hospital</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}

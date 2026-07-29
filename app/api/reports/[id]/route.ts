@@ -43,6 +43,7 @@ export async function GET(
         scenePhotos: reports.scenePhotos,
         participants: reports.participants,
         residentId: verificationRequests.residentId,
+        verificationRequestId: verificationRequests.id,
       })
       .from(reports)
       .innerJoin(incidents, eq(reports.incidentId, incidents.id))
@@ -135,7 +136,52 @@ export async function GET(
         participants: [],
       };
 
-      return NextResponse.json(formatted);
+      // Fetch duplicates for the resident request
+      const dbDuplicates = await db
+        .select({
+          id: verificationRequests.id,
+          requestId: verificationRequests.requestId,
+          residentName: users.fullName,
+          type: verificationRequests.type,
+          status: verificationRequests.status,
+          createdAt: verificationRequests.createdAt,
+          location: verificationRequests.locationDescription,
+          imageUrl: verificationRequests.imageUrl,
+          nature: verificationRequests.nature,
+          severity: verificationRequests.severity,
+          peopleInvolved: verificationRequests.peopleInvolved,
+        })
+        .from(verificationRequests)
+        .innerJoin(users, eq(verificationRequests.residentId, users.id))
+        .where(eq(verificationRequests.parentRequestId, userReq.id));
+
+      const duplicates = dbDuplicates.map(d => ({
+        id: d.id,
+        requestId: d.requestId,
+        residentName: d.residentName,
+        type: d.type,
+        status: d.status,
+        date: new Date(d.createdAt).toLocaleDateString("en-US", {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        time: new Date(d.createdAt).toLocaleTimeString("en-US", {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        location: d.location || "Baliwag City",
+        residentPhotoUrl: d.imageUrl,
+        natureOfCall: d.nature,
+        severityLevel: d.severity,
+        peopleInvolved: (() => {
+          if (!d.peopleInvolved || d.peopleInvolved === 'None') return 0;
+          const match = d.peopleInvolved.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 1;
+        })(),
+      }));
+
+      return NextResponse.json({ ...formatted, duplicates });
     }
 
     const r = results[0];
@@ -222,7 +268,52 @@ export async function GET(
       driverTripTicket: tripTicket[0] || null,
     };
 
-    return NextResponse.json(formatted);
+    // Fetch duplicates for the responder report's associated verification request
+    const dbDuplicates = await db
+      .select({
+        id: verificationRequests.id,
+        requestId: verificationRequests.requestId,
+        residentName: users.fullName,
+        type: verificationRequests.type,
+        status: verificationRequests.status,
+        createdAt: verificationRequests.createdAt,
+        location: verificationRequests.locationDescription,
+        imageUrl: verificationRequests.imageUrl,
+        nature: verificationRequests.nature,
+        severity: verificationRequests.severity,
+        peopleInvolved: verificationRequests.peopleInvolved,
+      })
+      .from(verificationRequests)
+      .innerJoin(users, eq(verificationRequests.residentId, users.id))
+      .where(eq(verificationRequests.parentRequestId, r.verificationRequestId));
+
+    const duplicates = dbDuplicates.map(d => ({
+      id: d.id,
+      requestId: d.requestId,
+      residentName: d.residentName,
+      type: d.type,
+      status: d.status,
+      date: new Date(d.createdAt).toLocaleDateString("en-US", {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }),
+      time: new Date(d.createdAt).toLocaleTimeString("en-US", {
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      location: d.location || "Baliwag City",
+      residentPhotoUrl: d.imageUrl,
+      natureOfCall: d.nature,
+      severityLevel: d.severity,
+      peopleInvolved: (() => {
+        if (!d.peopleInvolved || d.peopleInvolved === 'None') return 0;
+        const match = d.peopleInvolved.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 1;
+      })(),
+    }));
+
+    return NextResponse.json({ ...formatted, duplicates });
 
   } catch (error) {
     console.error("Error in GET /api/reports/[id]:", error);

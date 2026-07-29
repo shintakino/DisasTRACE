@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
 import { X, Truck, Image as ImageIcon } from 'lucide-react-native';
 
@@ -13,8 +13,35 @@ export function ReportDetailModal({
 }) {
   const [activeTab, setActiveTab] = useState('FROM RESIDENT');
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const [selectedReportIndex, setSelectedReportIndex] = useState(0);
+
+  useEffect(() => {
+    setSelectedReportIndex(0);
+  }, [report?.id]);
 
   if (!report) return null;
+
+  // Assemble the list of reports (primary first, then duplicates)
+  const allReports = [
+    {
+      id: report.id,
+      requestId: report.requestId || report.id,
+      residentName: report.residentName || 'Primary Submitter',
+      natureOfCall: report.natureOfCall || 'Emergency',
+      type: report.type,
+      severityLevel: report.severityLevel || 'Medium',
+      peopleInvolved: report.peopleInvolved,
+      location: report.location,
+      residentPhotoUrl: report.residentPhotoUrl,
+      isPrimary: true,
+    },
+    ...(report.duplicates || []).map((d: any) => ({
+      ...d,
+      isPrimary: false,
+    }))
+  ];
+
+  const currentReport = allReports[selectedReportIndex] || allReports[0];
 
   return (
     <>
@@ -89,46 +116,88 @@ export function ReportDetailModal({
             <View className="px-6">
               {activeTab === 'FROM RESIDENT' ? (
                 <>
-                  <Text className="text-xs font-bold text-[#1E3A8A] uppercase tracking-widest mb-4">{"RESIDENT'S REPORT"}</Text>
+                  <Text className="text-xs font-bold text-[#1E3A8A] uppercase tracking-widest mb-3">{"RESIDENT'S REPORT"}</Text>
+                  
+                  {allReports.length > 1 && (
+                    <View className="mb-4">
+                      <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false} 
+                        contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+                      >
+                        {allReports.map((r, idx) => {
+                          const isSel = idx === selectedReportIndex;
+                          return (
+                            <TouchableOpacity
+                              key={r.id || idx}
+                              onPress={() => setSelectedReportIndex(idx)}
+                              className={`px-3 py-1.5 rounded-full border ${
+                                isSel 
+                                  ? 'bg-[#1E3A8A] border-[#1E3A8A]' 
+                                  : 'bg-slate-50 border-slate-200'
+                              }`}
+                            >
+                              <Text className={`text-xs font-bold ${isSel ? 'text-white' : 'text-slate-600'}`}>
+                                {r.isPrimary ? 'Primary' : `Duplicate #${idx}`}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  )}
               
               <View className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 mb-6">
+                <View className="flex-row justify-between mb-4 pb-4 border-b border-slate-100">
+                  <Text className="text-sm font-medium text-slate-500">Reported By</Text>
+                  <View className="flex-row items-center gap-1.5">
+                    <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.residentName}</Text>
+                    <Text className={`text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase ${
+                      currentReport.isPrimary 
+                        ? 'bg-blue-50 text-blue-700 border border-blue-100' 
+                        : 'bg-amber-50 text-amber-700 border border-amber-100'
+                    }`}>
+                      {currentReport.isPrimary ? 'Primary' : 'Duplicate'}
+                    </Text>
+                  </View>
+                </View>
                 <View className="flex-row justify-between mb-4">
                   <Text className="text-sm font-medium text-slate-500">Nature of Call</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.natureOfCall || 'Emergency'}</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.natureOfCall || 'Emergency'}</Text>
                 </View>
                 <View className="flex-row justify-between mb-4 items-center">
                   <Text className="text-sm font-medium text-slate-500">Type of Emergency</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.type}</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.type}</Text>
                 </View>
                 <View className="flex-row justify-between mb-4 items-center">
                   <Text className="text-sm font-medium text-slate-500">Severity Level</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.severityLevel || 'Critical'}</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.severityLevel || 'Critical'}</Text>
                 </View>
                 <View className="flex-row justify-between mb-4">
                   <Text className="text-sm font-medium text-slate-500">People Involved</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.peopleInvolved !== undefined ? String(report.peopleInvolved) : '3'}</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.peopleInvolved !== undefined ? String(currentReport.peopleInvolved) : '3'}</Text>
                 </View>
                 <View className="flex-row justify-between mb-6">
                   <Text className="text-sm font-medium text-slate-500">Location</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{report.location}</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.location}</Text>
                 </View>
                 
                 {/* Attached Image */}
                 <View className="w-full">
-                  {report.residentPhotoUrl ? (
+                  {currentReport.residentPhotoUrl ? (
                     <TouchableOpacity 
                       activeOpacity={0.9} 
-                      onPress={() => setExpandedImage(report.residentPhotoUrl)}
+                      onPress={() => setExpandedImage(currentReport.residentPhotoUrl)}
                       className="w-full h-32 bg-slate-100 rounded-xl overflow-hidden relative justify-end"
                     >
                       <Image 
-                        source={{ uri: report.residentPhotoUrl }} 
+                        source={{ uri: currentReport.residentPhotoUrl }} 
                         className="absolute inset-0 w-full h-full" 
                         resizeMode="cover" 
                       />
                       <View className="absolute inset-0 bg-black/10" />
                       <View className="absolute bottom-0 left-0 right-0 bg-black/60 p-2 flex-row justify-between items-center">
-                        <Text className="text-white text-xs font-semibold">IMG_7904.jpg</Text>
+                        <Text className="text-white text-xs font-semibold">Attached Incident Photo</Text>
                         <Text className="text-white/80 text-[10px] font-medium">Click to expand</Text>
                       </View>
                     </TouchableOpacity>

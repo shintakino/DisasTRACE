@@ -7,6 +7,7 @@ import { LocationPermissionDrawer } from '../../components/dashboard/LocationPer
 import { HelpButton } from '../../components/dashboard/HelpButton';
 import { OfflineBanner } from '../../components/dashboard/OfflineBanner';
 import { MapPin, HelpCircle, Bell, Shield, Check } from 'lucide-react-native';
+import { useOfflineReports } from '../../hooks/use-offline-reports';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, Tabs } from 'expo-router';
 import { ResponderHome } from '../../components/responder/ResponderHome';
@@ -33,6 +34,7 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): 
 export default function HomeScreen() {
   const router = useRouter();
   const { profile, verificationStatus, role, user, isLoaded } = useAuthStatus();
+  const { isOnline } = useOfflineReports();
   const [isCheckingIncident, setIsCheckingIncident] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -538,7 +540,7 @@ export default function HomeScreen() {
 
         {/* User Profile Card */}
         <View className="px-6 pb-8 flex-row items-center justify-between">
-          <View className="flex-row items-center">
+          <View className="flex-row items-center flex-1 mr-3">
             <View className="relative">
               <View className="w-14 h-14 rounded-full border border-white/40 items-center justify-center bg-[#1E3A8A] overflow-hidden">
                 {user?.user_metadata?.avatar_url ? (
@@ -556,19 +558,25 @@ export default function HomeScreen() {
             </View>
 
             
-            <View className="ml-4">
-              <Text className="text-white text-lg font-bold leading-tight tracking-tight">
+            <View className="ml-4 flex-1">
+              <Text className="text-white text-lg font-bold leading-tight tracking-tight" numberOfLines={1}>
                 {profile?.fullName || 'Eloisa Guibani'}
               </Text>
-              <Text className="text-white/60 text-sm">
+              <Text className="text-white/60 text-sm" numberOfLines={1} ellipsizeMode="tail">
                 {profile?.address || 'Barangay Paitan'}
               </Text>
             </View>
           </View>
 
-          <View className="bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/30 flex-row items-center space-x-2">
-            <View className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <Text className="text-emerald-400 text-[10px] font-black tracking-widest uppercase">Online</Text>
+          <View className={`px-3 py-1 rounded-full border flex-row items-center space-x-2 shrink-0 ${
+            isOnline 
+              ? "bg-emerald-500/20 border-emerald-500/30" 
+              : "bg-orange-500/20 border-orange-500/30"
+          }`}>
+            <View className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-orange-500"}`} />
+            <Text className={`text-[10px] font-black tracking-widest uppercase ${isOnline ? "text-emerald-400" : "text-orange-400"}`}>
+              {isOnline ? 'Online' : 'Offline'}
+            </Text>
           </View>
         </View>
       </View>

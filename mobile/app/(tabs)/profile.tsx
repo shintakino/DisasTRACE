@@ -186,6 +186,20 @@ export default function ProfileScreen() {
       .slice(0, 2);
   };
 
+  const formatDate = (isoString?: string) => {
+    if (!isoString) return 'March 27, 2025';
+    try {
+      const date = new Date(isoString);
+      const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+    } catch (e) {
+      return 'March 27, 2025';
+    }
+  };
+
   const initials = profile?.fullName ? getInitials(profile.fullName) : (isResponder ? 'RB' : 'EG');
   const displayName = profile?.fullName || (isResponder ? 'Renzy Bastes' : 'Eloisa Guibani');
   const vehicleInitials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
@@ -324,7 +338,7 @@ export default function ProfileScreen() {
                 <Text className="text-sm text-blue-200">Barangay</Text>
                 <Text className="text-base font-bold text-white mb-2">{barangayName}</Text>
                 <Text className="text-sm text-blue-200">Date Joined</Text>
-                <Text className="text-base font-bold text-white">March 27, 2025</Text>
+                <Text className="text-base font-bold text-white">{formatDate(user?.created_at)}</Text>
               </>
             )}
           </View>

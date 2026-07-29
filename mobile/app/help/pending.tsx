@@ -276,7 +276,7 @@ export default function PendingScreen() {
                     text: "Track Ambulance", 
                     onPress: () => {
                       supabase.removeChannel(channel);
-                      router.push('/help/tracking');
+                      router.replace('/help/tracking');
                     }
                   }
                 ],
@@ -305,7 +305,7 @@ export default function PendingScreen() {
 
       // 2. Auto-navigation after 2.5 seconds
       const timer = setTimeout(() => {
-        router.push('/help/tracking');
+        router.replace('/help/tracking');
       }, 2500);
 
       return () => clearTimeout(timer);
@@ -470,7 +470,7 @@ export default function PendingScreen() {
           
           <TouchableOpacity 
             style={styles.trackButton} 
-            onPress={() => router.push('/help/tracking')}
+            onPress={() => router.replace('/help/tracking')}
             activeOpacity={0.8}
           >
             <Navigation color="#FFF" size={20} style={{ marginRight: 8 }} />

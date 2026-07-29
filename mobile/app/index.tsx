@@ -102,7 +102,7 @@ export default function EntryScreen() {
           } else {
             router.replace('/(verification)/unauthorized');
           }
-        }, 3600);
+        }, 1600);
       } else {
         // If not signed in, show the role selection card
         cardTranslate.value = withDelay(

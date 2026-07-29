@@ -10,7 +10,9 @@ export default function PersonalInfoScreen() {
   const { user, role, profile, refreshStatus } = useAuthStatus();
   
   const [firstName, setFirstName] = useState('');
+  const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [suffix, setSuffix] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +21,9 @@ export default function PersonalInfoScreen() {
   useEffect(() => {
     if (user) {
       setFirstName(user.user_metadata?.first_name || profile?.fullName?.split(' ')[0] || '');
+      setMiddleName(user.user_metadata?.middle_name || '');
       setLastName(user.user_metadata?.last_name || profile?.fullName?.split(' ').slice(1).join(' ') || '');
+      setSuffix(user.user_metadata?.suffix || '');
       setPhone(user.user_metadata?.phone || '');
       setEmail(user.email || '');
     }
@@ -53,8 +57,10 @@ export default function PersonalInfoScreen() {
         method: 'PATCH',
         headers: reqHeaders,
         body: JSON.stringify({
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
+          firstName: firstName.trim().toUpperCase(),
+          middleName: middleName.trim().toUpperCase(),
+          lastName: lastName.trim().toUpperCase(),
+          suffix: suffix.trim().toUpperCase(),
           phone: phone.trim(),
           email: role === 'ambulance_responder' ? email.trim() : undefined,
         }),
@@ -108,10 +114,23 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">First Name</Text>
               <TextInput 
                 value={firstName}
-                onChangeText={setFirstName}
+                onChangeText={(val) => setFirstName(val.toUpperCase())}
                 editable={!loading}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
-                placeholder="Enter your first name"
+                placeholder="JUAN"
+                autoCapitalize="characters"
+              />
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-slate-700 mb-2">Middle Name (Optional)</Text>
+              <TextInput 
+                value={middleName}
+                onChangeText={(val) => setMiddleName(val.toUpperCase())}
+                editable={!loading}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
+                placeholder="SANTOS"
+                autoCapitalize="characters"
               />
             </View>
             
@@ -119,10 +138,23 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">Last Name</Text>
               <TextInput 
                 value={lastName}
-                onChangeText={setLastName}
+                onChangeText={(val) => setLastName(val.toUpperCase())}
                 editable={!loading}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
-                placeholder="Enter your last name"
+                placeholder="DELA CRUZ"
+                autoCapitalize="characters"
+              />
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-slate-700 mb-2">Suffix Name (Optional)</Text>
+              <TextInput 
+                value={suffix}
+                onChangeText={(val) => setSuffix(val.toUpperCase())}
+                editable={!loading}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
+                placeholder="JR., SR., III"
+                autoCapitalize="characters"
               />
             </View>
 
@@ -135,6 +167,16 @@ export default function PersonalInfoScreen() {
                 editable={!loading}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
                 placeholder="Enter your phone number"
+              />
+            </View>
+
+            <View className="mb-2">
+              <Text className="text-sm font-semibold text-slate-700 mb-2">Registered Home Address</Text>
+              <TextInput 
+                value={profile?.address || 'No address provided'}
+                editable={false}
+                multiline={true}
+                className="bg-slate-100/80 border border-slate-200 rounded-xl px-4 py-3 text-slate-500 font-medium"
               />
             </View>
           </View>

@@ -7,7 +7,9 @@ import { z } from "zod";
 
 const ProfileUpdateSchema = z.object({
   firstName: z.string().optional(),
+  middleName: z.string().optional(),
   lastName: z.string().optional(),
+  suffix: z.string().optional(),
   phone: z.string().optional(),
   position: z.string().optional(),
   address: z.string().optional(),
@@ -30,7 +32,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Invalid payload", details: result.error.format() }, { status: 400 });
     }
 
-    const { firstName, lastName, phone, position, address, email } = result.data;
+    const { firstName, middleName, lastName, suffix, phone, position, address, email } = result.data;
 
     // 1. Fetch current db user details to compute values if missing
     const dbUser = await db.query.users.findFirst({
@@ -53,14 +55,19 @@ export async function PATCH(req: Request) {
 
     // 2. Build full name and address updates
     let updatedFullName = dbUser.fullName;
-    if (firstName !== undefined || lastName !== undefined) {
+    if (firstName !== undefined || lastName !== undefined || middleName !== undefined || suffix !== undefined) {
       const currentMeta = user.user_metadata || {};
       const currentFirst = currentMeta.first_name || dbUser.fullName.split(" ")[0] || "";
+      const currentMiddle = currentMeta.middle_name || "";
       const currentLast = currentMeta.last_name || dbUser.fullName.split(" ").slice(1).join(" ") || "";
+      const currentSuffix = currentMeta.suffix || "";
       
       const newFirst = firstName !== undefined ? firstName : currentFirst;
+      const newMiddle = middleName !== undefined ? middleName : currentMiddle;
       const newLast = lastName !== undefined ? lastName : currentLast;
-      updatedFullName = `${newFirst} ${newLast}`.trim();
+      const newSuffix = suffix !== undefined ? suffix : currentSuffix;
+      
+      updatedFullName = `${newFirst} ${newMiddle ? newMiddle + ' ' : ''}${newLast}${newSuffix ? ' ' + newSuffix : ''}`.trim();
     }
 
     const updatePayload: any = {
@@ -88,7 +95,9 @@ export async function PATCH(req: Request) {
       full_name: updatedFullName,
     };
     if (firstName !== undefined) metaUpdates.first_name = firstName;
+    if (middleName !== undefined) metaUpdates.middle_name = middleName;
     if (lastName !== undefined) metaUpdates.last_name = lastName;
+    if (suffix !== undefined) metaUpdates.suffix = suffix;
     if (phone !== undefined) metaUpdates.phone = phone;
     if (position !== undefined) metaUpdates.position = position;
     if (address !== undefined) metaUpdates.address = address;

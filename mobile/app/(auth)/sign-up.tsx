@@ -64,8 +64,10 @@ export default function SignUpScreen() {
         options: {
           data: {
             first_name: currentData.firstName,
+            middle_name: currentData.middleName || '',
             last_name: currentData.lastName,
-            full_name: `${currentData.firstName} ${currentData.lastName}`,
+            suffix: currentData.suffix || '',
+            full_name: `${currentData.firstName} ${currentData.middleName ? currentData.middleName + ' ' : ''}${currentData.lastName}${currentData.suffix ? ' ' + currentData.suffix : ''}`.trim(),
             role: currentData.role,
             phone: currentData.mobileNumber,
             address: `${currentData.street}, ${currentData.barangay}, ${currentData.city}, ${currentData.province}`,

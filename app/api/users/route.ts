@@ -10,6 +10,7 @@ import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { eq, inArray } from "drizzle-orm";
 import { createClient, createAdminClient } from "@/lib/supabase-server";
+import { getUserRole } from "@/lib/auth";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -73,7 +74,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Role gate: Only Super Admins can create administrative/responder accounts
-    if (user.app_metadata?.role !== 'cdrrmo_super_admin') {
+    const currentUserRole = await getUserRole();
+    if (currentUserRole !== 'cdrrmo_super_admin') {
       return NextResponse.json({ error: "Forbidden: Super Admin access required" }, { status: 403 });
     }
 
@@ -175,7 +177,8 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Role gate: Only Super Admins can update roles and statuses globally
-    if (user.app_metadata?.role !== 'cdrrmo_super_admin') {
+    const currentUserRole = await getUserRole();
+    if (currentUserRole !== 'cdrrmo_super_admin') {
       return NextResponse.json({ error: "Forbidden: Super Admin access required" }, { status: 403 });
     }
 
@@ -243,7 +246,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (user.app_metadata?.role !== 'cdrrmo_super_admin') {
+    const currentUserRole = await getUserRole();
+    if (currentUserRole !== 'cdrrmo_super_admin') {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

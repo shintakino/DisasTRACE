@@ -85,6 +85,8 @@ export default function HomeScreen() {
     configureNotifications();
   }, []);
 
+  const processedNotifIds = React.useRef(new Set<string>());
+
   // Fetch and subscribe to unread notification count
   useEffect(() => {
     if (!user) return;
@@ -107,9 +109,8 @@ export default function HomeScreen() {
 
     fetchUnreadCount();
 
-    const instanceId = Math.random().toString(36).substring(7);
     const channel = supabase
-      .channel(`mobile_home_notifs_${user.id}_${instanceId}`)
+      .channel(`mobile_home_notifs_${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -122,7 +123,15 @@ export default function HomeScreen() {
           fetchUnreadCount();
           if (payload.eventType === 'INSERT') {
             const notif = payload.new as any;
-            if (notif) {
+            if (notif && notif.id) {
+              if (processedNotifIds.current.has(notif.id)) return;
+              processedNotifIds.current.add(notif.id);
+
+              if (processedNotifIds.current.size > 100) {
+                const firstKey = processedNotifIds.current.values().next().value;
+                if (firstKey) processedNotifIds.current.delete(firstKey);
+              }
+
               Notifications.scheduleNotificationAsync({
                 content: {
                   title: notif.type === 'system_announcement' ? `📢 ANNOUNCEMENT: ${notif.title}` : notif.title,

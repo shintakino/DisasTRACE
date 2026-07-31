@@ -7,6 +7,8 @@ import { Truck, Phone, MapPin, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
+import { createClientBrowser } from "@/lib/supabase"
+
 interface Responder {
   id: string
   fullName: string
@@ -39,8 +41,8 @@ export function ManualDispatchModal({
   useEffect(() => {
     if (!isOpen) return
 
-    const fetchResponders = async () => {
-      setIsLoading(true)
+    const fetchResponders = async (isSilent = false) => {
+      if (!isSilent) setIsLoading(true)
       try {
         const response = await fetch("/api/verification/available-responders")
         if (!response.ok) throw new Error("Failed to fetch available responders")
@@ -51,13 +53,36 @@ export function ManualDispatchModal({
         }
       } catch (error) {
         console.error(error)
-        toast.error("Failed to load available responders")
+        if (!isSilent) toast.error("Failed to load available responders")
       } finally {
-        setIsLoading(false)
+        if (!isSilent) setIsLoading(false)
       }
     }
 
     fetchResponders()
+
+    // Real-Time subscription for responder updates while modal is open
+    const supabase = createClientBrowser()
+    const channel = supabase
+      .channel("manual-dispatch-responders-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        async () => {
+          await fetchResponders(true)
+        }
+      )
+      .subscribe()
+
+    // 15-second heartbeat freshness ticker
+    const interval = setInterval(() => {
+      fetchResponders(true)
+    }, 15000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
   }, [isOpen])
 
   const handleSelectResponder = async (responderId: string, responderName: string) => {

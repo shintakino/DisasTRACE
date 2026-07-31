@@ -231,7 +231,7 @@ export default function DashboardLayout({
             <UserMenu role={role as UserRole} getRoleLabel={getRoleLabel} />
           </div>
         </header>
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#F3F4F6] p-6">
+        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-[#F3F4F6] p-6">
           {children}
         </main>
       </SidebarInset>

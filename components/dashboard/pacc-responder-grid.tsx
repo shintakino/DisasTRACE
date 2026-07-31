@@ -32,6 +32,7 @@ export function PACCResponderGrid({ responders = [] }: { responders?: Responder[
       case 'STANDBY':
         return "bg-[#FAF1BC] text-[#8C7700] border-[#EBD982]";
       case 'OFF DUTY':
+      case 'OFFLINE':
         return "bg-[#E1A6A8] text-[#A80107] border-[#D28C8E]";
       default:
         return "bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0]";

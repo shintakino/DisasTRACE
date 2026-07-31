@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+import { WebPreloader } from "@/components/ui/web-preloader";
+
 export default function ReportsPage() {
   const [category, setCategory] = React.useState<"user" | "responder">("responder");
   const [data, setData] = React.useState<ReportEntry[]>([]);
@@ -54,7 +56,7 @@ export default function ReportsPage() {
 
       const res = await fetch(`/api/reports?${params.toString()}`);
       const json = await res.json();
-      setData(json.data);
+      setData(json.data || []);
     } catch (error) {
       console.error("Failed to fetch reports:", error);
       toast.error("Failed to load reports. Please try again.");
@@ -67,6 +69,51 @@ export default function ReportsPage() {
     fetchReports();
   }, [fetchReports]);
 
+  // Filter reports by datePreset locally
+  const filteredData = React.useMemo(() => {
+    if (!data) return [];
+    let result = [...data];
+
+    if (filters.datePreset && filters.datePreset !== "all") {
+      const now = new Date();
+      result = result.filter((item) => {
+        const itemDate = new Date(item.date);
+        if (isNaN(itemDate.getTime())) {
+          return true;
+        }
+
+        if (filters.datePreset === "today") {
+          return (
+            itemDate.getDate() === now.getDate() &&
+            itemDate.getMonth() === now.getMonth() &&
+            itemDate.getFullYear() === now.getFullYear()
+          );
+        }
+
+        if (filters.datePreset === "this_week") {
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(now.getDate() - 7);
+          return itemDate >= oneWeekAgo && itemDate <= now;
+        }
+
+        if (filters.datePreset === "this_month") {
+          return (
+            itemDate.getMonth() === now.getMonth() &&
+            itemDate.getFullYear() === now.getFullYear()
+          );
+        }
+
+        if (filters.datePreset === "this_year") {
+          return itemDate.getFullYear() === now.getFullYear();
+        }
+
+        return true;
+      });
+    }
+
+    return result;
+  }, [data, filters.datePreset]);
+
   const handleViewDetails = (id: string) => {
     setSelectedReportId(id);
     setIsDetailOpen(true);
@@ -75,8 +122,8 @@ export default function ReportsPage() {
   const handleExportPDF = async () => {
     const selectedIndices = Object.keys(rowSelection).filter(key => rowSelection[key]);
     const reportsToExport = selectedIndices.length > 0
-      ? selectedIndices.map(idx => data[parseInt(idx)]).filter(Boolean)
-      : data;
+      ? selectedIndices.map(idx => filteredData[parseInt(idx)]).filter(Boolean)
+      : filteredData;
 
     if (reportsToExport.length === 0) {
       toast.error("No reports available to export.");
@@ -155,7 +202,14 @@ export default function ReportsPage() {
       </div>
 
       <div className="flex flex-col rounded-xl shadow-xl border border-slate-200/80 overflow-hidden bg-white">
-        <ReportsHeader onFilterChange={handleFilterChange} onExport={handleExportPDF} isExporting={isExporting} category={category} />
+        <ReportsHeader
+          onFilterChange={handleFilterChange}
+          onExport={handleExportPDF}
+          isExporting={isExporting}
+          category={category}
+          filteredCount={filteredData.length}
+          totalCount={data.length}
+        />
         
         <div className="px-6 py-4 border-b border-slate-100 bg-white">
           <div className="flex overflow-x-auto no-scrollbar bg-slate-100/80 rounded-xl p-1 gap-1">
@@ -191,16 +245,12 @@ export default function ReportsPage() {
         </div>
 
         {loading ? (
-          <div className="p-8 space-y-4 bg-white">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
+          <div className="p-8">
+            <WebPreloader title="Loading Reports Management..." subtitle="Retrieving historical post-incident reports and citizen submissions" />
           </div>
         ) : (
           <ReportsTable
-            data={data}
+            data={filteredData}
             category={category}
             onViewDetails={handleViewDetails}
             rowSelection={rowSelection}

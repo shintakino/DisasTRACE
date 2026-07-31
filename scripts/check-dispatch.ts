@@ -12,20 +12,23 @@ async function checkDispatches() {
     
     // Fetch active incidents
     const activeIncidents = await db.query.incidents.findMany({
-      where: inArray(incidents.status, ["DISPATCHED", "EN_ROUTE", "ARRIVED", "ON_SCENE", "TO_HOSPITAL"])
+      where: inArray(incidents.status, ["DISPATCHED", "EN_ROUTE", "ARRIVED"]),
+      with: {
+        responder: true,
+      }
     });
 
     if (activeIncidents.length === 0) {
       console.log("\n✅ No active dispatches found.");
     } else {
       console.log(`\n🚨 Found ${activeIncidents.length} active incident(s):`);
-      activeIncidents.forEach((inc, i) => {
+      activeIncidents.forEach((inc: any, i: number) => {
         console.log(`\n--- Incident ${i + 1} ---`);
         console.log(`ID: ${inc.id}`);
         console.log(`Status: ${inc.status}`);
         console.log(`Dispatch Method: ${inc.dispatchMethod}`);
         console.log(`Current Offer Responder ID: ${inc.currentOfferResponderId || 'None'}`);
-        console.log(`Assigned Responder: ${inc.responder ? inc.responder.fullName : 'None'}`);
+        console.log(`Assigned Responder: ${inc.responder ? inc.responder.fullName : (inc.responderId || 'None')}`);
         console.log(`Assigned Ambulance: ${inc.assignedAmbulance || 'None'}`);
         console.log(`Offer Expires At: ${inc.offerExpiresAt ? new Date(inc.offerExpiresAt).toLocaleString() : 'N/A'}`);
       });

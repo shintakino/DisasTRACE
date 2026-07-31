@@ -218,12 +218,12 @@ export function DispatchSheet() {
                     acceptDispatch();
                   } else {
                     alert(res.error || "Failed to accept dispatch.");
-                    setAccepting(false);
                   }
                 } catch (err) {
                   console.error("Failed to accept dispatch offer:", err);
                   // Fallback to local state so UX remains intact during dev
                   acceptDispatch();
+                } finally {
                   setAccepting(false);
                 }
               }}

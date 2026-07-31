@@ -324,10 +324,22 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     doc.setFontSize(11);
     doc.text("1. BASIC INCIDENT INFORMATION", 14, 52);
     
+    // Compute dynamic offsets for Section 1
+    const colRightWidth = pageWidth - 145 - 8;
+    const locationLines = doc.splitTextToSize(report.location || "Baliwag City", colRightWidth);
+    const locationHeight = locationLines.length * 4.5;
+    
+    const homeAddressY = 87 + Math.max(8, locationHeight + 2);
+    const addressLines = doc.splitTextToSize(report.residentAddress || "N/A", colRightWidth);
+    const addressHeight = addressLines.length * 4.5;
+    
+    const section1MinY = Math.max(118, homeAddressY + addressHeight + 4);
+    const section1BoxHeight = section1MinY - 56;
+
     // Draw grid border box
     doc.setFillColor(249, 250, 251); // Gray-50
     doc.setDrawColor(229, 231, 235); // Gray-200
-    doc.rect(14, 56, pageWidth - 28, 64, "FD");
+    doc.rect(14, 56, pageWidth - 28, section1BoxHeight, "FD");
 
     doc.setTextColor(75, 85, 99); // Text Gray-600
     doc.setFont("helvetica", "normal");
@@ -366,54 +378,76 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     doc.setFont("helvetica", "normal").text(report.time, 145, 79);
 
     doc.setFont("helvetica", "bold").text("Location:", 110, 87);
-    const locationLines = doc.splitTextToSize(report.location, pageWidth - 145 - 8);
     doc.setFont("helvetica", "normal").text(locationLines, 145, 87);
 
-    doc.setFont("helvetica", "bold").text("Home Address:", 110, 103);
-    const addressLines = doc.splitTextToSize(report.residentAddress || "N/A", pageWidth - 145 - 8);
-    doc.setFont("helvetica", "normal").text(addressLines, 145, 103);
+    doc.setFont("helvetica", "bold").text("Home Address:", 110, homeAddressY);
+    doc.setFont("helvetica", "normal").text(addressLines, 145, homeAddressY);
 
     // --- Section 2: Resident & Dispatch Triage Findings ---
+    let sec2TitleY = 56 + section1BoxHeight + 8;
+    if (sec2TitleY + 30 > pageHeight) {
+      doc.addPage();
+      sec2TitleY = 25;
+    }
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("2. INITIAL EMERGENCY DISPATCH CALL DETAILS", 14, 130);
+    doc.text("2. INITIAL EMERGENCY DISPATCH CALL DETAILS", 14, sec2TitleY);
 
-    doc.setFillColor(255, 255, 255);
-    doc.rect(14, 134, pageWidth - 28, 20, "D");
-    doc.setTextColor(55, 65, 81); // Gray-700
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
     const residentDescLines = doc.splitTextToSize(
       report.residentReportDescription || "Emergency report filed by verified resident. Dispatch logs initiated automatically.",
       pageWidth - 36
     );
-    doc.text(residentDescLines, 18, 140);
+    const sec2BoxHeight = Math.max(16, residentDescLines.length * 4.5 + 8);
+
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(229, 231, 235);
+    doc.rect(14, sec2TitleY + 4, pageWidth - 28, sec2BoxHeight, "D");
+    doc.setTextColor(55, 65, 81); // Gray-700
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(residentDescLines, 18, sec2TitleY + 10);
 
     // --- Section 3: Responder Clinical Findings & Notes ---
+    let sec3TitleY = sec2TitleY + 4 + sec2BoxHeight + 8;
+    if (sec3TitleY + 35 > pageHeight) {
+      doc.addPage();
+      sec3TitleY = 25;
+    }
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("3. AMBULANCE CREW ACTUAL CLINICAL FINDINGS", 14, 164);
+    doc.text("3. AMBULANCE CREW ACTUAL CLINICAL FINDINGS", 14, sec3TitleY);
 
-    doc.setFillColor(255, 255, 255);
-    doc.rect(14, 168, pageWidth - 28, 28, "D");
-    doc.setTextColor(55, 65, 81);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
     const crewFindingsLines = doc.splitTextToSize(
       report.crewFindings || "No clinical logs or responder findings recorded. Logged successfully in records.",
       pageWidth - 36
     );
-    doc.text(crewFindingsLines, 18, 174);
+    const sec3BoxHeight = Math.max(18, crewFindingsLines.length * 4.5 + 8);
+
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(229, 231, 235);
+    doc.rect(14, sec3TitleY + 4, pageWidth - 28, sec3BoxHeight, "D");
+    doc.setTextColor(55, 65, 81);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(crewFindingsLines, 18, sec3TitleY + 10);
 
     // --- Section 4: Patient Roster ---
+    let sec4TitleY = sec3TitleY + 4 + sec3BoxHeight + 8;
+    if (sec4TitleY + 30 > pageHeight) {
+      doc.addPage();
+      sec4TitleY = 25;
+    }
+
     doc.setTextColor(30, 58, 138);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("4. PATIENT & PARTICIPANT ROSTER", 14, 206);
+    doc.text("4. PATIENT & PARTICIPANT ROSTER", 14, sec4TitleY);
 
-    const checkY = 210;
+    const checkY = sec4TitleY + 4;
     // Patient columns headers
     doc.setFillColor(243, 244, 246); // Gray-100
     doc.rect(14, checkY, pageWidth - 28, 6, "F");

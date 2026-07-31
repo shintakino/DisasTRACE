@@ -24,10 +24,14 @@ export const ReportEntrySchema = z.object({
 });
 export type ReportEntry = z.infer<typeof ReportEntrySchema>;
 
+export const DatePresetSchema = z.enum(["all", "today", "this_week", "this_month", "this_year"]);
+export type DatePreset = z.infer<typeof DatePresetSchema>;
+
 export const ReportFilterSchema = z.object({
   search: z.string().optional(),
   type: IncidentTypeSchema.optional(),
   status: ReportStatusSchema.optional(),
+  datePreset: DatePresetSchema.optional(),
   dateRange: z.object({
     from: z.date().optional(),
     to: z.date().optional(),

@@ -37,9 +37,9 @@ export async function GET() {
 
     const mappedResponders = activeResponders.map((r) => {
       const isDevResponder = isDevMode && r.email === "responder@disastrace.com";
-      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-      const isRecent = r.lastLocationUpdatedAt && new Date(r.lastLocationUpdatedAt) >= fifteenMinutesAgo;
-      const status = "STANDBY";
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const isRecent = r.lastLocationUpdatedAt && new Date(r.lastLocationUpdatedAt) >= fiveMinutesAgo;
+      const status = (isDevResponder || isRecent) ? "STANDBY" : "OFFLINE";
 
       return {
         id: r.id,

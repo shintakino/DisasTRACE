@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
 
+import { WebPreloader } from "@/components/ui/web-preloader";
+
 function MapPageContent() {
   const { incidents, responders, hospitals, summary, isLoading, error } = useMapData();
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
@@ -93,24 +95,9 @@ function MapPageContent() {
   return (
     <div className="flex-1 min-h-0 flex overflow-hidden relative">
       {isLoading ? (
-        <>
-          <div className="w-[400px] h-full border-r p-4 space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-20 w-full" />
-              ))}
-            </div>
-            <Skeleton className="h-10 w-full" />
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-32 w-full" />
-              ))}
-            </div>
-          </div>
-          <div className="flex-1 h-full bg-muted/20">
-            <Skeleton className="w-full h-full" />
-          </div>
-        </>
+        <div className="w-full h-full p-4 flex items-center justify-center bg-[#0B132B]">
+          <WebPreloader title="Loading Interactive Emergency Map..." subtitle="Fetching real-time GPS responder telemetry, active emergency pins, and hospital routes" />
+        </div>
       ) : (
         <>
           <div className={cn(
@@ -190,23 +177,8 @@ function MapPageContent() {
 export default function MapPage() {
   return (
     <Suspense fallback={
-      <div className="flex-1 min-h-0 flex overflow-hidden relative">
-        <div className="w-[400px] h-full border-r p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-20 w-full" />
-            ))}
-          </div>
-          <Skeleton className="h-10 w-full" />
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-32 w-full" />
-            ))}
-          </div>
-        </div>
-        <div className="flex-1 h-full bg-muted/20">
-          <Skeleton className="w-full h-full" />
-        </div>
+      <div className="w-full h-full p-4 flex items-center justify-center bg-[#0B132B]">
+        <WebPreloader title="Loading Interactive Emergency Map..." subtitle="Fetching real-time GPS responder telemetry, active emergency pins, and hospital routes" />
       </div>
     }>
       <MapPageContent />

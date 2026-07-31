@@ -13,9 +13,11 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { DashboardData, DashboardDataSchema } from "@/types/dashboard";
 import { useRouter } from "next/navigation";
+import { WebPreloader } from "@/components/ui/web-preloader";
+import { createClientBrowser } from "@/lib/supabase";
 
 export default function DashboardPage() {
-  const { role, loading: authLoading } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,49 @@ export default function DashboardPage() {
   const handleReportClick = (reportId: string) => {
     router.push(`/map?select=${reportId}`);
   };
+
+  const fetchRespondersSilent = async () => {
+    try {
+      const responderRes = await fetch('/api/dashboard/responders');
+      if (responderRes.ok) {
+        const json = await responderRes.json();
+        setData((prev) => prev ? { ...prev, responders: json.data } : null);
+      }
+    } catch (err) {
+      console.error("Silent responder update failed:", err);
+    }
+  };
+
+  // Real-Time Subscriptions for Responder Status & Telemetry updates
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClientBrowser();
+
+    const channel = supabase
+      .channel("dashboard-responders-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        async (payload) => {
+          console.log("[DashboardRealtime] User table updated, re-evaluating responder status...", payload);
+          await fetchRespondersSilent();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  // Periodic heartbeat freshness check (15s interval for live offline detection)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchRespondersSilent();
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -90,20 +135,8 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="h-full flex flex-col space-y-4 animate-in fade-in duration-500 min-h-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full rounded-3xl" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
-          <Skeleton className="h-full w-full rounded-2xl" />
-          <Skeleton className="h-full w-full rounded-2xl" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
-          <Skeleton className="h-full w-full rounded-2xl" />
-          <Skeleton className="h-full w-full rounded-2xl" />
-        </div>
+      <div className="h-full flex items-center justify-center min-h-0">
+        <WebPreloader title="Loading Dashboard Statistics..." subtitle="Fetching real-time incident trends, active responders, and recent reports" />
       </div>
     );
   }

@@ -9,7 +9,7 @@ import { z } from "zod";
 import { cascadeIncident, calculateHaversineDistance, notifyPaccAndCdrrmo } from "@/lib/dispatch-engine";
 
 const RespondSchema = z.object({
-  incidentId: z.string().uuid(),
+  incidentId: z.string().min(1, "Incident ID is required"),
   action: z.enum(['ACCEPT', 'REJECT']),
 });
 

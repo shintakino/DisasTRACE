@@ -110,9 +110,8 @@ export function ResponderHome() {
 
     fetchUnreadCount();
 
-    const instanceId = Math.random().toString(36).substring(7);
     const channel = supabase
-      .channel(`responder_home_notifs_${user.id}_${instanceId}`)
+      .channel(`responder_home_notifs_${user.id}`)
       .on(
         'postgres_changes',
         {

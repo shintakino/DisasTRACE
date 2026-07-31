@@ -129,7 +129,13 @@ export default function DetailsScreen() {
       
       const data = await response.json();
       
-      if (data.success && data.request) {
+      if (!response.ok || !data.success) {
+        setIsSubmitting(false);
+        Alert.alert("Submission Blocked", data.message || data.error || "Your account is not permitted to submit emergency reports.");
+        return;
+      }
+
+      if (data.request) {
         useEmergencyReportStore.setState((state) => ({
           report: {
             ...state.report,

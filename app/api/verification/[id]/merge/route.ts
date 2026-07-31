@@ -28,7 +28,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify user role in the users table is pacc_admin
+    // Verify user role in the users table is pacc_admin or cdrrmo_super_admin
     const dbUser = await db.query.users.findFirst({
       where: eq(users.id, user.id),
     });
@@ -37,8 +37,8 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (dbUser.role !== "pacc_admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (dbUser.role !== "pacc_admin" && dbUser.role !== "cdrrmo_super_admin") {
+      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
     }
 
     // Validate that target request exists
@@ -53,13 +53,6 @@ export async function POST(
       );
     }
 
-    if (targetRequest.nature !== "EMERGENCY") {
-      return NextResponse.json(
-        { error: "Only emergency reports can be merged as duplicates." },
-        { status: 400 }
-      );
-    }
-
     // Validate that parent request exists
     const parentRequest = await db.query.verificationRequests.findFirst({
       where: eq(verificationRequests.id, parentRequestId),
@@ -69,13 +62,6 @@ export async function POST(
       return NextResponse.json(
         { error: "Parent verification request not found" },
         { status: 404 }
-      );
-    }
-
-    if (parentRequest.nature !== "EMERGENCY") {
-      return NextResponse.json(
-        { error: "Reports can only be merged into active verified emergencies." },
-        { status: 400 }
       );
     }
 

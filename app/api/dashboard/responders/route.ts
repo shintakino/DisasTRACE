@@ -49,10 +49,19 @@ export async function GET() {
       ),
     });
 
+    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+
     const mapped = dbResponders.map((r) => {
+      const isDevResponder = isDevMode && r.email === "responder@disastrace.com";
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const isRecent = r.lastLocationUpdatedAt && new Date(r.lastLocationUpdatedAt) >= fiveMinutesAgo;
+
       let statusMapped: 'DISPATCHED' | 'STANDBY' | 'OFF DUTY' = 'OFF DUTY';
-      if (r.dutyStatus === 'ACTIVE_DISPATCH') statusMapped = 'DISPATCHED';
-      else if (r.dutyStatus === 'ON_DUTY') statusMapped = 'STANDBY';
+      if (r.dutyStatus === 'ACTIVE_DISPATCH') {
+        statusMapped = 'DISPATCHED';
+      } else if (r.dutyStatus === 'ON_DUTY') {
+        statusMapped = (isDevResponder || isRecent) ? 'STANDBY' : 'OFF DUTY';
+      }
 
       return {
         id: r.id,

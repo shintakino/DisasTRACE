@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { IncidentType, ReportFilter } from "@/types/reports";
+import { IncidentType, ReportFilter, DatePreset } from "@/types/reports";
 import { cn } from "@/lib/utils";
 
 interface ReportsHeaderProps {
@@ -24,11 +24,21 @@ interface ReportsHeaderProps {
   onExport: () => void;
   isExporting?: boolean;
   category?: "user" | "responder";
+  filteredCount?: number;
+  totalCount?: number;
 }
 
-export function ReportsHeader({ onFilterChange, onExport, isExporting, category = "responder" }: ReportsHeaderProps) {
+export function ReportsHeader({
+  onFilterChange,
+  onExport,
+  isExporting,
+  category = "responder",
+  filteredCount = 0,
+  totalCount = 0,
+}: ReportsHeaderProps) {
   const [search, setSearch] = React.useState("");
   const [type, setType] = React.useState<IncidentType | "all">("all");
+  const [datePreset, setDatePreset] = React.useState<DatePreset>("all");
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
@@ -36,6 +46,7 @@ export function ReportsHeader({ onFilterChange, onExport, isExporting, category 
       ...prev,
       search: val || undefined,
       type: type === "all" ? undefined : type,
+      datePreset: datePreset === "all" ? undefined : datePreset,
     }));
   };
 
@@ -46,6 +57,18 @@ export function ReportsHeader({ onFilterChange, onExport, isExporting, category 
       ...prev,
       search: search || undefined,
       type: newType === "all" ? undefined : newType,
+      datePreset: datePreset === "all" ? undefined : datePreset,
+    }));
+  };
+
+  const handleDatePresetChange = (val: string | null) => {
+    const newPreset = (val || "all") as DatePreset;
+    setDatePreset(newPreset);
+    onFilterChange((prev: ReportFilter) => ({
+      ...prev,
+      search: search || undefined,
+      type: type === "all" ? undefined : type,
+      datePreset: newPreset === "all" ? undefined : newPreset,
     }));
   };
 
@@ -55,9 +78,15 @@ export function ReportsHeader({ onFilterChange, onExport, isExporting, category 
         <h2 className="text-xl font-bold text-white tracking-tight">
           {category === "user" ? "USER REPORTS" : "RESPONDER REPORTS"}
         </h2>
-        <p className="text-blue-200 text-xs font-medium uppercase tracking-wider">
-          {category === "user" ? "Citizen Reported Incidents" : "Historical Incident Data"}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-blue-200 text-xs font-medium uppercase tracking-wider">
+            {category === "user" ? "Citizen Reported Incidents" : "Historical Incident Data"}
+          </p>
+          <span className="text-blue-300/40 text-xs">•</span>
+          <span className="bg-white/10 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-white/10">
+            Showing {filteredCount} of {totalCount} reports
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
@@ -77,7 +106,7 @@ export function ReportsHeader({ onFilterChange, onExport, isExporting, category 
             Filter
           </PopoverTrigger>
           <PopoverContent className="w-80 p-4" align="end">
-            <div className="space-y-4">
+            <div className="space-y-4 text-left">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Incident Type</label>
                 <Select value={type} onValueChange={handleTypeChange}>
@@ -92,6 +121,22 @@ export function ReportsHeader({ onFilterChange, onExport, isExporting, category 
                     <SelectItem value="Structural Failure">STRUCTURAL FAILURE</SelectItem>
                     <SelectItem value="Flood/Water">FLOOD/WATER</SelectItem>
                     <SelectItem value="Unknown Cause">UNKNOWN CAUSE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Date</label>
+                <Select value={datePreset} onValueChange={handleDatePresetChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="this_week">This week</SelectItem>
+                    <SelectItem value="this_month">This month</SelectItem>
+                    <SelectItem value="this_year">This year</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

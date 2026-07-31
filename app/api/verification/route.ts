@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { incidents } from "@/db/schema/incidents";
+import { users } from "@/db/schema/users";
 import { createClient } from "@/lib/supabase-server";
 import { eq, desc, sql } from "drizzle-orm";
 import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides, healOrphanedActiveDispatches } from "@/lib/dispatch-engine";
@@ -118,6 +119,18 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Verify resident account status in database
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+
+    if (!dbUser || dbUser.status === 'SUSPENDED' || dbUser.status === 'DEACTIVATED' || dbUser.verificationStatus !== 'APPROVED') {
+      return NextResponse.json({ 
+        error: 'Forbidden', 
+        message: 'Your account is suspended, deactivated, or unverified. Emergency report submission is disabled.' 
+      }, { status: 403 });
     }
 
     const body = await req.json();

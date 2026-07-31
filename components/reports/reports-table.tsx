@@ -146,7 +146,8 @@ export function ReportsTable({
 
   return (
     <div className="bg-white rounded-b-xl border-x border-b shadow-sm overflow-hidden">
-      <Table>
+      <div className="overflow-x-auto">
+        <Table>
         <TableHeader className="bg-slate-50/50">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
@@ -184,6 +185,7 @@ export function ReportsTable({
           )}
         </TableBody>
       </Table>
+      </div>
 
       <div className="flex items-center justify-between px-6 py-4 bg-slate-50/30 border-t">
         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">

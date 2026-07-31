@@ -13,14 +13,25 @@ export async function getUserRole(): Promise<UserRole> {
     return 'public_user';
   }
 
-  const role = user.app_metadata?.role as UserRole | undefined;
+  let role = user.app_metadata?.role as UserRole | undefined;
 
   if (!role) {
-    console.warn(`[Auth Warning] Role missing in Supabase user app_metadata for user ${user.id}`);
-    return 'public_user';
+    try {
+      const { db } = await import("@/db");
+      const { users } = await import("@/db/schema/users");
+      const { eq } = await import("drizzle-orm");
+      const dbUser = await db.query.users.findFirst({
+        where: eq(users.id, user.id),
+      });
+      if (dbUser?.role) {
+        role = dbUser.role as UserRole;
+      }
+    } catch (dbErr) {
+      console.error("[Auth Error] Failed to query user role fallback:", dbErr);
+    }
   }
 
-  return role;
+  return role || 'public_user';
 }
 
 /**

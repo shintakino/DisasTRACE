@@ -38,9 +38,9 @@ export function MergeDuplicateModal({
     onClose()
   }
 
-  // Filter out the current request itself and ensure only verified EMERGENCIES are listed
+  // Filter out the current request itself and list active verified reports
   const selectableRequests = activeVerifiedRequests.filter(
-    (req) => req.id !== requestId && req.nature === "EMERGENCY"
+    (req) => req.id !== requestId && req.status === "VERIFIED"
   )
 
   return (

@@ -26,7 +26,7 @@ export function useAuthStatus() {
       // Direct Supabase query is more robust than a separate API call for mobile
       const { data: dbUser, error: dbError } = await supabase
         .from('users')
-        .select('role, verification_status, full_name, address, duty_status')
+        .select('role, verification_status, status, full_name, address, duty_status')
         .eq('id', currentUser.id)
         .single();
 
@@ -34,6 +34,7 @@ export function useAuthStatus() {
       
       const role = dbUser.role;
       const status = dbUser.verification_status;
+      const accountStanding = dbUser.status;
 
       // Platform Restriction: Deny Web Admins on Mobile
       if (role === 'cdrrmo_super_admin' || role === 'pacc_admin') {
@@ -42,6 +43,12 @@ export function useAuthStatus() {
       }
 
       setRole(role);
+      
+      if (accountStanding === 'SUSPENDED' || accountStanding === 'DEACTIVATED') {
+        setVerificationStatus('rejected');
+        return;
+      }
+
       setVerificationStatus(VerificationStatusSchema.parse(status.toLowerCase()));
       
       const userProfile = {

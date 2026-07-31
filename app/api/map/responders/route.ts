@@ -25,12 +25,19 @@ export async function GET() {
       .from(users)
       .where(eq(users.role, "ambulance_responder"));
 
+    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
     const mapped = dbResponders.map((r, i) => {
+      const isRecent = isDevMode || (r.lastLocationUpdatedAt && new Date(r.lastLocationUpdatedAt) >= fiveMinutesAgo);
+
       let mappedStatus: "AVAILABLE" | "DISPATCHED" | "OFF_DUTY" = "OFF_DUTY";
-      if (r.dutyStatus === "ON_DUTY") {
-        mappedStatus = "AVAILABLE";
-      } else if (r.dutyStatus === "ACTIVE_DISPATCH") {
+      if (r.dutyStatus === "ACTIVE_DISPATCH") {
         mappedStatus = "DISPATCHED";
+      } else if (r.dutyStatus === "ON_DUTY" && isRecent) {
+        mappedStatus = "AVAILABLE";
+      } else {
+        mappedStatus = "OFF_DUTY";
       }
 
       // Generate a dynamic, deterministic vehicle ID

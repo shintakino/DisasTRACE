@@ -13,6 +13,7 @@ import { createClientBrowser } from "@/lib/supabase"
 import { Volume2, VolumeX, ShieldAlert, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
+import { WebPreloader } from "@/components/ui/web-preloader"
 
 export default function VerificationPage() {
   const { user } = useAuth()
@@ -424,8 +425,8 @@ export default function VerificationPage() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#F3F4F6]">
-        <Spinner className="size-12 text-[#1E3A8A]" />
+      <div className="flex-1 flex items-center justify-center bg-[#0B132B]">
+        <WebPreloader title="Loading Verification & Dispatch..." subtitle="Synchronizing incident queues and establishing real-time communication" />
       </div>
     )
   }

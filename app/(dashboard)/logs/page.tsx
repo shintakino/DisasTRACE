@@ -6,7 +6,7 @@ import { LogsHeader } from "@/components/logs/logs-header"
 import { LogsTable } from "@/components/logs/logs-table"
 import { StatusLogEntry, LogFilter } from "@/types/logs"
 import { Card } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import { WebPreloader } from "@/components/ui/web-preloader"
 import { toast } from "sonner"
 import { createClientBrowser } from "@/lib/supabase"
 
@@ -83,6 +83,14 @@ export default function LogsPage() {
     }
   }, [role])
 
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center p-8 bg-[#0B132B]">
+        <WebPreloader title="Loading Activity Logs..." subtitle="Streaming status logs, dispatcher activity, and audit records in real-time" />
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-50/50 min-h-screen">
       <div className="flex items-center justify-between">
@@ -97,17 +105,7 @@ export default function LogsPage() {
       <div className="flex flex-col rounded-xl shadow-xl border border-slate-200/80 overflow-hidden bg-white">
         <LogsHeader onFilterChange={setFilters} />
         
-        {isLoading ? (
-          <div className="p-8 space-y-4 bg-white">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
-        ) : (
-          <LogsTable data={logs} showActionColumn={role === "cdrrmo_super_admin"} />
-        )}
+        <LogsTable data={logs} showActionColumn={role === "cdrrmo_super_admin"} />
       </div>
     </div>
   )

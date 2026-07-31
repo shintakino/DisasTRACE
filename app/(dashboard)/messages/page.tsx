@@ -34,7 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+import { WebPreloader } from "@/components/ui/web-preloader";
 
 interface SupportMessage {
   id: string;
@@ -143,6 +143,14 @@ export default function SupportMessagesPage() {
   const resolvedCount = messages.filter(m => m.status === "RESOLVED").length;
   const totalCount = messages.length;
 
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center p-8 bg-[#0B132B]">
+        <WebPreloader title="Loading Support Messages..." subtitle="Retrieving feedback submissions and community requests" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 space-y-6 p-8 pt-6 bg-[#F3F4F6]">
       <div className="flex items-center justify-between">
@@ -164,11 +172,7 @@ export default function SupportMessagesPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-3xl font-black text-slate-800">{totalCount}</div>
-            )}
+            <div className="text-3xl font-black text-slate-800">{totalCount}</div>
             <p className="text-xs text-muted-foreground mt-1">General submissions received</p>
           </CardContent>
         </Card>
@@ -181,11 +185,7 @@ export default function SupportMessagesPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-3xl font-black text-amber-600">{unreadCount}</div>
-            )}
+            <div className="text-3xl font-black text-amber-600">{unreadCount}</div>
             <p className="text-xs text-amber-600 font-medium mt-1 font-semibold">Require immediate review</p>
           </CardContent>
         </Card>
@@ -198,11 +198,7 @@ export default function SupportMessagesPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-3xl font-black text-emerald-600">{resolvedCount}</div>
-            )}
+            <div className="text-3xl font-black text-emerald-600">{resolvedCount}</div>
             <p className="text-xs text-emerald-600 font-medium mt-1 font-semibold">Successfully addressed</p>
           </CardContent>
         </Card>
@@ -241,15 +237,7 @@ export default function SupportMessagesPage() {
           </div>
 
           {/* Messages Table */}
-          {loading ? (
-            <div className="space-y-3 py-6">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : paginatedMessages.length === 0 ? (
+          {paginatedMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                 <MessageSquare className="h-8 w-8 text-slate-400" />

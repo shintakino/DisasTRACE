@@ -4,7 +4,7 @@ import * as React from "react";
 import { AuditHeader } from "@/components/audit/audit-header";
 import { AuditTable } from "@/components/audit/audit-table";
 import { AuditLogEntry, AuditFilter } from "@/types/audit";
-import { Skeleton } from "@/components/ui/skeleton";
+import { WebPreloader } from "@/components/ui/web-preloader";
 
 export default function AuditPage() {
   const [logs, setLogs] = React.useState<AuditLogEntry[]>([]);
@@ -32,6 +32,14 @@ export default function AuditPage() {
     fetchLogs();
   }, [fetchLogs]);
 
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center p-8 bg-[#0B132B]">
+        <WebPreloader title="Loading Audit Trails..." subtitle="Synchronizing security logs, access tokens, and accountability records" />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full overflow-y-auto p-8 space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
@@ -42,17 +50,7 @@ export default function AuditPage() {
       <div className="flex flex-col shadow-2xl shadow-blue-900/10 rounded-xl overflow-hidden border border-slate-200">
         <AuditHeader onFilterChange={setFilters} />
         
-        {loading ? (
-          <div className="bg-white p-8 space-y-4">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        ) : (
-          <AuditTable data={logs} />
-        )}
+        <AuditTable data={logs} />
       </div>
     </div>
   );

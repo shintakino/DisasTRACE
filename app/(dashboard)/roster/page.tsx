@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input"
 
 import { toast } from "sonner"
 
+import { WebPreloader } from "@/components/ui/web-preloader"
+
 export default function RosterPage() {
   const [data, setData] = React.useState<RosterEntry[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -50,7 +52,7 @@ export default function RosterPage() {
   const barangays = [
     "Bagong Nayon", "Barangca", "Bonga Mayor", "Bonga Menor", "Catulinan", 
     "Concepcion", "Hinukay", "Makinabang", "Matangtubig", "Pagala", "Paitan", 
-    "Piel", "Pinagbarilan", "Poblacion", "Sabang", "San Jose", "San Roque", 
+    "Piel", "Pinagbarilan", "Poblacion", "Sabang", "San Roque", "San Roque", 
     "Santa Barbara", "Santo Cristo", "Santo Niño", "Subic", "Sulivan", 
     "Tangos", "Tarcan", "Tiaong", "Tibag", "Virgen delas Flores"
   ]
@@ -162,7 +164,7 @@ export default function RosterPage() {
       setBanAction('SUSPENDED')
     }
   }
-  const handleAddResponder = async (e: React.FormEvent) => {
+  const handleAddResponder = async (e: React.FormEvent) => {
     e.preventDefault()
     setAddError('')
     
@@ -220,11 +222,8 @@ export default function RosterPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-500 p-6">
-        <div className="flex justify-end">
-          <Skeleton className="h-10 w-44 rounded-md" />
-        </div>
-        <Skeleton className="h-[600px] w-full rounded-xl" />
+      <div className="h-full flex items-center justify-center p-6 bg-[#0B132B]">
+        <WebPreloader title="Loading Responder Roster..." subtitle="Retrieving personnel databases and certification rosters" />
       </div>
     )
   }

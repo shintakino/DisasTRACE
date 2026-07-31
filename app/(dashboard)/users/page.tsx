@@ -7,7 +7,7 @@ import { UsersTable } from "@/components/users/users-table";
 import { BanUserDialog, CreateUserDialog, ManageUserDialog } from "@/components/users/user-action-dialogs";
 import { UserManagementEntry, UserFilter, UserStatus, UserRole } from "@/types/users";
 import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
+import { WebPreloader } from "@/components/ui/web-preloader";
 
 export default function UsersPage() {
   const [loading, setLoading] = React.useState(true);
@@ -176,6 +176,13 @@ export default function UsersPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center p-8 bg-[#0B132B]">
+        <WebPreloader title="Loading User Registries..." subtitle="Synchronizing resident profiles and administrator access controls" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full overflow-y-auto p-8 space-y-8 animate-in fade-in duration-500">
@@ -184,15 +191,7 @@ export default function UsersPage() {
         <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.2em]">Administrative Control Center</p>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-32 rounded-3xl" />
-          ))}
-        </div>
-      ) : (
-        <UserSummaryCards data={summary} />
-      )}
+      <UserSummaryCards data={summary} />
 
       <div className="space-y-0">
         <UsersHeader 
@@ -204,22 +203,16 @@ export default function UsersPage() {
           }}
           isExporting={isExporting}
         />
-        {loading ? (
-          <div className="bg-white border-x border-b p-8 rounded-b-xl">
-            <Skeleton className="h-[400px] w-full" />
-          </div>
-        ) : (
-          <UsersTable
-            data={filteredUsers}
-            onManageStatus={(user) => {
-              setSelectedUser(user);
-              setIsManageOpen(true);
-            }}
-            onBan={(user) => {
-              setBanUser(user);
-            }}
-          />
-        )}
+        <UsersTable
+          data={filteredUsers}
+          onManageStatus={(user) => {
+            setSelectedUser(user);
+            setIsManageOpen(true);
+          }}
+          onBan={(user) => {
+            setBanUser(user);
+          }}
+        />
       </div>
 
       <CreateUserDialog

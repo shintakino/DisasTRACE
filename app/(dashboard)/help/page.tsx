@@ -23,7 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
+import { WebPreloader } from "@/components/ui/web-preloader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -231,17 +231,8 @@ export default function HelpPage() {
 
   if (loading) {
     return (
-      <div className="flex h-[calc(100vh-140px)] w-full bg-slate-50/20 border border-slate-100 rounded-2xl overflow-hidden p-8 gap-8">
-        <div className="w-[260px] space-y-3 shrink-0">
-          <Skeleton className="h-10 w-full rounded-full" />
-          <Skeleton className="h-10 w-full rounded-full" />
-          <Skeleton className="h-10 w-full rounded-full" />
-        </div>
-        <div className="flex-1 space-y-6">
-          <Skeleton className="h-12 w-1/3 rounded-xl" />
-          <Skeleton className="h-40 w-full rounded-2xl" />
-          <Skeleton className="h-40 w-full rounded-2xl" />
-        </div>
+      <div className="h-full flex items-center justify-center p-8 bg-[#0B132B]">
+        <WebPreloader title="Loading Help & Support Desk..." subtitle="Retrieving system guides, privacy settings, and FAQs" />
       </div>
     );
   }

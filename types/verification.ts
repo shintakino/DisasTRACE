@@ -7,6 +7,9 @@ export type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
 export const IncidentNatureSchema = z.enum(["EMERGENCY", "NON-EMERGENCY"]);
 export type IncidentNature = z.infer<typeof IncidentNatureSchema>;
 
+export const IncidentSeveritySchema = z.enum(["Low", "Medium", "High", "Critical"]);
+export type IncidentSeverity = z.infer<typeof IncidentSeveritySchema>;
+
 export const ResidentInfoSchema = z.object({
   id: z.string(),
   fullName: z.string(),
@@ -31,6 +34,7 @@ export const VerificationRequestSchema = z.object({
   requestId: z.string(), // e.g., REQ-2026-0047
   status: VerificationStatusSchema,
   nature: IncidentNatureSchema,
+  severity: IncidentSeveritySchema,
   type: IncidentTypeSchema,
   location: z.string(),
   peopleInvolved: z.number(),

@@ -22,41 +22,38 @@ interface TrendRow {
 
 function getTrendQuery(period: AnalyticsPeriod) {
   if (period === "day") {
-    const bucket = sql`date_trunc('day', timezone('Asia/Manila', ${verificationRequests.createdAt}))`;
     return db
       .select({
-        label: sql<string>`to_char(${bucket}, 'Mon DD')`,
+        label: sql<string>`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon DD')`,
         count: sql<number>`count(*)`,
       })
       .from(verificationRequests)
       .where(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= timezone('Asia/Manila', CURRENT_DATE) - interval '13 days'`)
-      .groupBy(bucket)
-      .orderBy(bucket);
+      .groupBy(sql`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon DD')`)
+      .orderBy(sql`date_trunc('day', timezone('Asia/Manila', ${verificationRequests.createdAt}))`);
   }
 
   if (period === "week") {
-    const bucket = sql`date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt}))`;
     return db
       .select({
-        label: sql<string>`concat('Week of ', to_char(${bucket}, 'Mon DD'))`,
+        label: sql<string>`concat('Week of ', to_char(date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt})), 'Mon DD'))`,
         count: sql<number>`count(*)`,
       })
       .from(verificationRequests)
       .where(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('week', timezone('Asia/Manila', now())) - interval '11 weeks'`)
-      .groupBy(bucket)
-      .orderBy(bucket);
+      .groupBy(sql`concat('Week of ', to_char(date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt})), 'Mon DD'))`)
+      .orderBy(sql`date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt}))`);
   }
 
-  const bucket = sql`date_trunc('month', timezone('Asia/Manila', ${verificationRequests.createdAt}))`;
   return db
     .select({
-      label: sql<string>`to_char(${bucket}, 'Mon YYYY')`,
+      label: sql<string>`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon YYYY')`,
       count: sql<number>`count(*)`,
     })
     .from(verificationRequests)
     .where(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('month', timezone('Asia/Manila', now())) - interval '11 months'`)
-    .groupBy(bucket)
-    .orderBy(bucket);
+    .groupBy(sql`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon YYYY')`)
+    .orderBy(sql`date_trunc('month', timezone('Asia/Manila', ${verificationRequests.createdAt}))`);
 }
 
 export async function GET(request: Request) {
@@ -87,22 +84,20 @@ export async function GET(request: Request) {
     }
 
     const period = parsedPeriod.data;
-    const [frequencyRows, trendRows, summaryRows] = await Promise.all([
+    const [frequencyRows, trendRows, totalRows, verifiedRows, pendingRows, resolvedRows, responseTimeRows] = await Promise.all([
       db
         .select({ type: verificationRequests.type, count: sql<number>`count(*)` })
         .from(verificationRequests)
         .groupBy(verificationRequests.type),
       getTrendQuery(period),
+      db.select({ count: sql<number>`count(*)` }).from(verificationRequests),
+      db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "VERIFIED")),
+      db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "PENDING")),
+      db.select({ count: sql<number>`count(*)` }).from(incidents).where(eq(incidents.status, "RESOLVED")),
       db
-        .select({
-          totalReported: sql<number>`count(distinct ${verificationRequests.id})`,
-          verified: sql<number>`count(distinct ${verificationRequests.id}) filter (where ${verificationRequests.status} = 'VERIFIED')`,
-          pending: sql<number>`count(distinct ${verificationRequests.id}) filter (where ${verificationRequests.status} = 'PENDING')`,
-          resolved: sql<number>`count(distinct ${incidents.id}) filter (where ${incidents.status} = 'RESOLVED')`,
-          avgResponseMinutes: sql<number>`coalesce(round(avg(extract(epoch from (${incidents.resolvedAt} - ${incidents.createdAt})) filter (where ${incidents.status} = 'RESOLVED') / 60), 0)`,
-        })
-        .from(verificationRequests)
-        .leftJoin(incidents, eq(incidents.requestId, verificationRequests.id)),
+        .select({ avgResponseMinutes: sql<number>`coalesce(round(avg(extract(epoch from (${incidents.resolvedAt} - ${incidents.createdAt})) / 60), 0)` })
+        .from(incidents)
+        .where(eq(incidents.status, "RESOLVED")),
     ]);
 
     const frequencies = INCIDENT_TYPES.map((incidentType) => ({
@@ -114,12 +109,11 @@ export async function GET(request: Request) {
       label: row.label,
       count: Number(row.count),
     }));
-    const summary = summaryRows[0];
-    const totalReported = Number(summary?.totalReported ?? 0);
-    const verified = Number(summary?.verified ?? 0);
-    const pending = Number(summary?.pending ?? 0);
-    const resolved = Number(summary?.resolved ?? 0);
-    const avgResponseMinutes = Number(summary?.avgResponseMinutes ?? 0);
+    const totalReported = Number(totalRows[0]?.count ?? 0);
+    const verified = Number(verifiedRows[0]?.count ?? 0);
+    const pending = Number(pendingRows[0]?.count ?? 0);
+    const resolved = Number(resolvedRows[0]?.count ?? 0);
+    const avgResponseMinutes = Number(responseTimeRows[0]?.avgResponseMinutes ?? 0);
     const topFrequency = frequencies[0];
     const peakTrend = trends.reduce<TrendRow | undefined>(
       (peak, current) => (!peak || current.count > peak.count ? current : peak),

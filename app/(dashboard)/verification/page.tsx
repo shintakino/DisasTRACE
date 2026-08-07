@@ -14,6 +14,7 @@ import { Volume2, VolumeX, ShieldAlert, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { WebPreloader } from "@/components/ui/web-preloader"
+import { getIncidentAlertPriority, INCIDENT_ALERT_PRIORITY_RANK, type IncidentAlertPriority } from "@/lib/incident-severity"
 
 export default function VerificationPage() {
   const { user } = useAuth()
@@ -66,7 +67,7 @@ export default function VerificationPage() {
     }
   }
 
-  const playAlertSound = (type: 'info' | 'warning' | 'emergency', customCtx?: AudioContext | null) => {
+  const playAlertSound = (type: IncidentAlertPriority | 'info', customCtx?: AudioContext | null) => {
     if (isMutedRef.current) return;
     
     try {
@@ -78,7 +79,7 @@ export default function VerificationPage() {
         ctx.resume();
       }
 
-      if (type === 'emergency') {
+      if (type === 'critical') {
         // High-urgency warning siren using a sawtooth wave that sweeps frequency rapidly
         const playSirenBlock = (startTime: number, duration: number) => {
           const osc = ctx.createOscillator();
@@ -106,7 +107,7 @@ export default function VerificationPage() {
         playSirenBlock(now, 0.45);
         playSirenBlock(now + 0.5, 0.45);
         playSirenBlock(now + 1.0, 0.45);
-      } else if (type === 'warning') {
+      } else if (type === 'severe' || type === 'standard') {
         // Fast pulsing double beep
         const playTone = (freq: number, startTime: number, duration: number) => {
           const osc = ctx.createOscillator();
@@ -217,8 +218,8 @@ export default function VerificationPage() {
         async (payload) => {
           console.log("Realtime verification_request change:", payload);
           
-          // Trigger a silent fetch to keep the UI perfectly in sync
-          await fetchRequestsSilent();
+          // Keep the queue synchronized without delaying the immediate priority prompt.
+          void fetchRequestsSilent();
           
           if (payload.eventType === "INSERT") {
             const newRequest = payload.new;
@@ -228,13 +229,26 @@ export default function VerificationPage() {
             const reqLoc = newRequest.location_description || newRequest.locationDescription || "Baliwag City";
             
             if (isEmergency) {
-              playAlertSound("emergency");
-              toast.error(`NEW EMERGENCY INCIDENT: ${reqType} reported! (${reqNum})`, {
-                duration: 10000,
-                description: `Location: ${reqLoc}. Immediate triage and dispatch required.`,
-              });
+              const priority = getIncidentAlertPriority(newRequest.severity);
+              if (priority === "critical" || priority === "severe") {
+                setSelectedId(newRequest.id);
+                playAlertSound(priority);
+                toast[priority === "critical" ? "error" : "warning"](
+                  `${priority === "critical" ? "CRITICAL" : "HIGH-SEVERITY"} INCIDENT: ${reqType} (${reqNum})`,
+                  {
+                    duration: priority === "critical" ? 20000 : 15000,
+                    description: `${priority === "critical" ? "Immediate dispatch coordination is required" : "Prioritize triage and unit readiness"}. Location: ${reqLoc}.`,
+                  }
+                );
+              } else {
+                playAlertSound("standard");
+                toast.error(`NEW EMERGENCY INCIDENT: ${reqType} reported! (${reqNum})`, {
+                  duration: 10000,
+                  description: `Location: ${reqLoc}. Immediate triage and dispatch required.`,
+                });
+              }
             } else {
-              playAlertSound("warning");
+              playAlertSound("standard");
               toast.warning(`New Incident Report: ${reqType} submitted. (${reqNum})`, {
                 duration: 6000,
                 description: `Location: ${reqLoc}. Review for triage.`,
@@ -249,7 +263,7 @@ export default function VerificationPage() {
             
             // Reverted to PENDING status
             if (newReq.status === "PENDING" && oldReq.status !== "PENDING") {
-              playAlertSound("emergency");
+              playAlertSound("critical");
               toast.error(`CRITICAL: Request ${reqNum} has reverted to PENDING status!`, {
                 duration: 10000,
                 description: "Dispatcher attention required immediately.",
@@ -278,7 +292,7 @@ export default function VerificationPage() {
             
             // If it needs manual dispatch and either just transitioned or was rejected/expired
             if (isPaccManual && noResponder && (!wasAlreadyManual || hadResponder)) {
-              playAlertSound("emergency");
+              playAlertSound("critical");
               toast.error(`MANUAL DISPATCH REQUIRED: A responder rejected the offer or the timer expired!`, {
                 duration: 10000,
                 description: "Open the request to dispatch a backup unit manually.",
@@ -402,7 +416,15 @@ export default function VerificationPage() {
 
   const selectedRequest = requests.find((r) => r.id === selectedId) || null
   const activeAlerts = requests.filter((r) => r.status === "PENDING" || needsManualDispatch(r))
-  const hasEmergency = activeAlerts.some(r => r.nature === "EMERGENCY" || needsManualDispatch(r))
+  const mostUrgentAlert = activeAlerts.reduce<VerificationRequest | null>((currentMostUrgent, request) => {
+    if (!currentMostUrgent) return request;
+
+    return INCIDENT_ALERT_PRIORITY_RANK[getIncidentAlertPriority(request.severity)] > INCIDENT_ALERT_PRIORITY_RANK[getIncidentAlertPriority(currentMostUrgent.severity)]
+      ? request
+      : currentMostUrgent;
+  }, null);
+  const activeAlertPriority = mostUrgentAlert ? getIncidentAlertPriority(mostUrgentAlert.severity) : "standard";
+  const alertInterval = activeAlertPriority === "critical" ? 3000 : activeAlertPriority === "severe" ? 4500 : 7000;
 
   // Loop sound alerts while there are active unhandled reports
   useEffect(() => {
@@ -412,16 +434,16 @@ export default function VerificationPage() {
     if (!hasActiveAlerts) return;
 
     // Play initial sound immediately
-    playAlertSound(hasEmergency ? "emergency" : "warning");
+    playAlertSound(activeAlertPriority);
 
     const intervalId = setInterval(() => {
-      playAlertSound(hasEmergency ? "emergency" : "warning");
-    }, 4500); // Siren rhythm loop
+      playAlertSound(activeAlertPriority);
+    }, alertInterval);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [activeAlerts.length, hasEmergency, isLoading, isMuted]);
+  }, [activeAlerts.length, activeAlertPriority, alertInterval, isLoading, isMuted]);
 
   if (isLoading) {
     return (
@@ -435,23 +457,33 @@ export default function VerificationPage() {
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F3F4F6]">
       {/* Real-time Triage Alert HUD */}
       {activeAlerts.length > 0 && (
-        <div className="bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white px-6 py-2.5 flex items-center justify-between shadow-lg relative overflow-hidden shrink-0 border-b border-red-700">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className={cn(
+            "text-white px-6 py-2.5 flex items-center justify-between shadow-lg relative overflow-hidden shrink-0 border-b",
+            activeAlertPriority === "critical" ? "bg-red-700 border-red-800" : activeAlertPriority === "severe" ? "bg-orange-600 border-orange-700" : "bg-[#1E3A8A] border-[#172554]"
+          )}
+        >
           <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:40px_40px] opacity-10 animate-[pulse_2s_infinite]" />
           <div className="flex items-center gap-3 relative z-10">
             <div className="bg-white/20 p-1.5 rounded-full animate-bounce">
               <ShieldAlert className="size-5 text-white" />
             </div>
+            <span className="rounded-md bg-white/20 px-2 py-1 text-[11px] font-black tracking-wide">
+              {activeAlertPriority === "critical" ? "CRITICAL" : activeAlertPriority === "severe" ? "HIGH SEVERITY" : "STANDARD"}
+            </span>
             <span className="font-extrabold tracking-wide text-sm">
               🚨 {activeAlerts.length} URGENT INCIDENT(S) PENDING TRIAGE
             </span>
             <span className="text-white/80 text-xs hidden lg:inline border-l border-white/20 pl-3">
-              Most Urgent: <span className="font-black text-white">{activeAlerts[0].type}</span> at <span className="italic font-bold">{activeAlerts[0].location}</span>
+              Most Urgent: <span className="font-black text-white">{mostUrgentAlert?.type}</span> at <span className="italic font-bold">{mostUrgentAlert?.location}</span>
             </span>
           </div>
           
           <div className="flex items-center gap-3 relative z-10">
             <button 
-              onClick={() => setSelectedId(activeAlerts[0].id)}
+              onClick={() => setSelectedId(mostUrgentAlert?.id ?? activeAlerts[0].id)}
               className="bg-white text-red-600 font-bold px-3 py-1 rounded-lg text-xs hover:bg-red-50 hover:scale-105 active:scale-95 transition-all shadow-sm flex items-center gap-1.5"
             >
               <Sparkles className="size-3.5" />

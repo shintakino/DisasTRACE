@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
         requestId: r.requestId,
         status: r.status,
         nature: r.nature,
+        severity: r.severity,
         type: r.type,
         location: r.locationDescription || "Baliwag City",
         peopleInvolved: peopleCount,

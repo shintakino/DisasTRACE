@@ -11,6 +11,7 @@ import { NotificationDropdown } from "@/components/dashboard/notification-dropdo
 import { useEffect } from "react";
 import { createClientBrowser } from "@/lib/supabase";
 import { toast } from "sonner";
+import { getIncidentAlertPriority, type IncidentAlertPriority } from "@/lib/incident-severity";
 
 const UserMenu = dynamic(() => import("@/components/dashboard/user-menu"), { 
   ssr: false,
@@ -35,7 +36,7 @@ export default function DashboardLayout({
   const { user, role } = useAuth();
   const router = useRouter();
 
-  // Global Realtime Incident & Siren alerts listener for PACC Admins on other pages
+  // Global severity-based incident alerts for CDRRMO and PACC dashboard pages.
   useEffect(() => {
     if (!user || (role !== 'pacc_admin' && role !== 'cdrrmo_super_admin')) return;
 
@@ -45,46 +46,35 @@ export default function DashboardLayout({
     const supabase = createClientBrowser();
     
     // Synthesize alert warnings using standard Web Audio API (cross-browser compatible)
-    const playAlert = (type: 'emergency' | 'warning') => {
+    const playAlert = (priority: IncidentAlertPriority) => {
       try {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         if (!AudioContextClass) return;
         const ctx = new AudioContextClass();
-        
-        if (type === 'emergency') {
-          const playTone = (freq: number, startTime: number, duration: number) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.type = "sine";
-            osc.frequency.setValueAtTime(freq, startTime);
-            gain.gain.setValueAtTime(0.12, startTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-            osc.start(startTime);
-            osc.stop(startTime + duration);
-          };
-          const now = ctx.currentTime;
-          playTone(960, now, 0.3);
-          playTone(770, now + 0.35, 0.3);
-          playTone(960, now + 0.7, 0.3);
-          playTone(770, now + 1.05, 0.3);
+
+        const playTone = (frequency: number, startTime: number, duration: number, wave: OscillatorType, volume: number) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = wave;
+          osc.frequency.setValueAtTime(frequency, startTime);
+          gain.gain.setValueAtTime(volume, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+        };
+
+        const now = ctx.currentTime;
+        if (priority === "critical") {
+          [0, 0.68, 1.36, 2.04].forEach((offset) => playTone(960, now + offset, 0.55, "sawtooth", 0.16));
+        } else if (priority === "severe") {
+          playTone(960, now, 0.28, "square", 0.14);
+          playTone(760, now + 0.34, 0.28, "square", 0.14);
+          playTone(960, now + 0.68, 0.28, "square", 0.14);
         } else {
-          const playTone = (freq: number, startTime: number, duration: number) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.type = "triangle";
-            osc.frequency.setValueAtTime(freq, startTime);
-            gain.gain.setValueAtTime(0.1, startTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-            osc.start(startTime);
-            osc.stop(startTime + duration);
-          };
-          const now = ctx.currentTime;
-          playTone(587.33, now, 0.25);
-          playTone(587.33, now + 0.3, 0.25);
+          playTone(587.33, now, 0.25, "triangle", 0.1);
+          playTone(587.33, now + 0.3, 0.25, "triangle", 0.1);
         }
       } catch (err) {
         console.error("Layout Audio Alert failed:", err);
@@ -107,9 +97,32 @@ export default function DashboardLayout({
           const reqNum = newRequest.request_id || newRequest.requestId || "REQ-NEW";
           const reqType = newRequest.type || "Incident";
           const reqLoc = newRequest.location_description || "Baliwag City";
+          const priority = getIncidentAlertPriority(newRequest.severity);
+          const actionLabel = role === "pacc_admin" ? "Triage Now" : "Open Map";
+          const actionPath = role === "pacc_admin" ? "/verification" : `/map?select=${newRequest.id}`;
+
+          if (priority === "critical") {
+            playAlert("critical");
+            toast.error(`CRITICAL EMERGENCY: ${reqType}`, {
+              duration: 20000,
+              description: `Critical severity reported at ${reqLoc} (${reqNum}). Immediate dispatch coordination is required.`,
+              action: { label: actionLabel, onClick: () => router.push(actionPath) },
+            });
+            return;
+          }
+
+          if (priority === "severe") {
+            playAlert("severe");
+            toast.warning(`HIGH-SEVERITY INCIDENT: ${reqType}`, {
+              duration: 15000,
+              description: `High severity reported at ${reqLoc} (${reqNum}). Prioritize triage and unit readiness.`,
+              action: { label: actionLabel, onClick: () => router.push(actionPath) },
+            });
+            return;
+          }
 
           // Play alarm audio alert
-          playAlert(isEmergency ? 'emergency' : 'warning');
+          playAlert('standard');
 
           // Trigger Sonner toast notification with custom redirect action
           if (isEmergency) {
@@ -117,8 +130,8 @@ export default function DashboardLayout({
               duration: 12000,
               description: `Location: ${reqLoc} (${reqNum}). Click triage button to open.`,
               action: {
-                label: "Triage Now",
-                onClick: () => router.push('/verification')
+                label: actionLabel,
+                onClick: () => router.push(actionPath)
               }
             });
           } else {
@@ -126,8 +139,8 @@ export default function DashboardLayout({
               duration: 8000,
               description: `Location: ${reqLoc} (${reqNum}). Click review button to open.`,
               action: {
-                label: "Review",
-                onClick: () => router.push('/verification')
+                label: actionLabel,
+                onClick: () => router.push(actionPath)
               }
             });
           }
@@ -147,7 +160,7 @@ export default function DashboardLayout({
           const hadResponder = oldInc.responder_id || oldInc.current_offer_responder_id || oldInc.responderId || oldInc.currentOfferResponderId;
           
           if (isPaccManual && noResponder && (!wasAlreadyManual || hadResponder)) {
-            playAlert('emergency');
+            playAlert('critical');
             toast.error(`🚨 PACC MANUAL DISPATCH REQUIRED!`, {
               duration: 12000,
               description: "A responder rejected the offer or the timer expired. Click here to assign backup.",
@@ -168,7 +181,7 @@ export default function DashboardLayout({
             const notifType = notif.type || '';
             if (notifType.includes('manual_dispatch') || notifType.includes('dispatch_')) {
               const isRejectionOrExpiry = notifType.includes('rejected') || notifType.includes('expired');
-              playAlert(isRejectionOrExpiry ? 'emergency' : 'warning');
+              playAlert(isRejectionOrExpiry ? 'critical' : 'standard');
               
               if (isRejectionOrExpiry) {
                 toast.error(`🚨 ${notif.title}`, {

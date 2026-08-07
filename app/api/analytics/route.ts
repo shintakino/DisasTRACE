@@ -30,7 +30,7 @@ function getTrendQuery(period: AnalyticsPeriod) {
       .from(verificationRequests)
       .where(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= timezone('Asia/Manila', CURRENT_DATE) - interval '13 days'`)
       .groupBy(sql`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon DD')`)
-      .orderBy(sql`date_trunc('day', timezone('Asia/Manila', ${verificationRequests.createdAt}))`);
+      .orderBy(sql`min(date_trunc('day', timezone('Asia/Manila', ${verificationRequests.createdAt})))`);
   }
 
   if (period === "week") {
@@ -42,7 +42,7 @@ function getTrendQuery(period: AnalyticsPeriod) {
       .from(verificationRequests)
       .where(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('week', timezone('Asia/Manila', now())) - interval '11 weeks'`)
       .groupBy(sql`concat('Week of ', to_char(date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt})), 'Mon DD'))`)
-      .orderBy(sql`date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt}))`);
+      .orderBy(sql`min(date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt})))`);
   }
 
   return db
@@ -53,7 +53,7 @@ function getTrendQuery(period: AnalyticsPeriod) {
     .from(verificationRequests)
     .where(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('month', timezone('Asia/Manila', now())) - interval '11 months'`)
     .groupBy(sql`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon YYYY')`)
-    .orderBy(sql`date_trunc('month', timezone('Asia/Manila', ${verificationRequests.createdAt}))`);
+    .orderBy(sql`min(date_trunc('month', timezone('Asia/Manila', ${verificationRequests.createdAt})))`);
 }
 
 export async function GET(request: Request) {

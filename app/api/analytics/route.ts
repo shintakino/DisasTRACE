@@ -84,21 +84,64 @@ export async function GET(request: Request) {
     }
 
     const period = parsedPeriod.data;
-    const [frequencyRows, trendRows, totalRows, verifiedRows, pendingRows, resolvedRows, responseTimeRows] = await Promise.all([
-      db
+
+    // Run queries individually for debuggability
+    let frequencyRows, trendRows, totalRows, verifiedRows, pendingRows, resolvedRows, responseTimeRows;
+
+    try {
+      frequencyRows = await db
         .select({ type: verificationRequests.type, count: sql<number>`count(*)` })
         .from(verificationRequests)
-        .groupBy(verificationRequests.type),
-      getTrendQuery(period),
-      db.select({ count: sql<number>`count(*)` }).from(verificationRequests),
-      db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "VERIFIED")),
-      db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "PENDING")),
-      db.select({ count: sql<number>`count(*)` }).from(incidents).where(eq(incidents.status, "RESOLVED")),
-      db
-        .select({ avgResponseMinutes: sql<number>`coalesce(round(avg(extract(epoch from (${incidents.resolvedAt} - ${incidents.createdAt})) / 60), 0), 0)` })
+        .groupBy(verificationRequests.type);
+    } catch (e) {
+      console.error("[Analytics] frequencyRows query failed:", e);
+      throw e;
+    }
+
+    try {
+      trendRows = await getTrendQuery(period);
+    } catch (e) {
+      console.error("[Analytics] trendRows query failed:", e);
+      throw e;
+    }
+
+    try {
+      totalRows = await db.select({ count: sql<number>`count(*)` }).from(verificationRequests);
+    } catch (e) {
+      console.error("[Analytics] totalRows query failed:", e);
+      throw e;
+    }
+
+    try {
+      verifiedRows = await db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "VERIFIED"));
+    } catch (e) {
+      console.error("[Analytics] verifiedRows query failed:", e);
+      throw e;
+    }
+
+    try {
+      pendingRows = await db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "PENDING"));
+    } catch (e) {
+      console.error("[Analytics] pendingRows query failed:", e);
+      throw e;
+    }
+
+    try {
+      resolvedRows = await db.select({ count: sql<number>`count(*)` }).from(incidents).where(eq(incidents.status, "RESOLVED"));
+    } catch (e) {
+      console.error("[Analytics] resolvedRows query failed:", e);
+      throw e;
+    }
+
+    try {
+      responseTimeRows = await db
+        .select({ avgResponseMinutes: sql<number>`coalesce(round(avg(extract(epoch from (${incidents.resolvedAt} - ${incidents.createdAt})) / 60)::numeric, 0), 0)` })
         .from(incidents)
-        .where(eq(incidents.status, "RESOLVED")),
-    ]);
+        .where(eq(incidents.status, "RESOLVED"));
+    } catch (e) {
+      console.error("[Analytics] responseTimeRows query failed:", e);
+      throw e;
+    }
 
     const frequencies = INCIDENT_TYPES.map((incidentType) => ({
       ...incidentType,

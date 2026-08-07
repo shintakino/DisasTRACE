@@ -11,6 +11,7 @@ import {
   HelpCircle,
   Megaphone,
   MessageSquare,
+  ChartNoAxesCombined,
   type LucideIcon,
 } from "lucide-react"
 
@@ -25,6 +26,11 @@ export const CDRRMO_NAV: NavItem[] = [
     title: "Dashboard",
     url: "/dashboard",
     icon: LayoutGrid,
+  },
+  {
+    title: "Analytics",
+    url: "/analytics",
+    icon: ChartNoAxesCombined,
   },
   {
     title: "Map",

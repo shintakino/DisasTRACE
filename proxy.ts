@@ -54,6 +54,13 @@ export async function proxy(request: NextRequest) {
         }
       }
 
+      // Role-based route protection for administrative analytics
+      if (request.nextUrl.pathname.startsWith("/analytics")) {
+        if (role !== "cdrrmo_super_admin") {
+          return NextResponse.redirect(new URL("/unauthorized-platform", request.url));
+        }
+      }
+
       // Role-based route protection for Incident Request Verification
       if (request.nextUrl.pathname.startsWith("/verification")) {
         if (role !== "pacc_admin") {

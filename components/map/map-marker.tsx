@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { MapPin, Navigation, Hospital } from "lucide-react";
+import { MapPin, Navigation, Hospital, Siren } from "lucide-react";
 
 interface MapMarkerProps {
   type: "incident" | "responder" | "hospital";
@@ -14,6 +14,10 @@ interface MapMarkerProps {
   reporterName?: string | null;
   reporterPhone?: string | null;
   destination?: string;
+  severity?: "Low" | "Medium" | "High" | "Critical";
+  nature?: "EMERGENCY" | "NON-EMERGENCY";
+  responderName?: string;
+  lastUpdated?: string;
 }
 
 export function MapMarker({ 
@@ -26,7 +30,11 @@ export function MapMarker({
   caters = true,
   reporterName,
   reporterPhone,
-  destination
+  destination,
+  severity,
+  nature,
+  responderName,
+  lastUpdated,
 }: MapMarkerProps) {
   if (type === "hospital") {
     return (
@@ -68,6 +76,10 @@ export function MapMarker({
   }
 
   if (type === "incident") {
+    const isCritical = severity === "Critical";
+    const isEmergency = nature === "EMERGENCY";
+    const needsPriorityIndicator = (isCritical || isEmergency) && status !== "COMPLETED";
+
     return (
       <div className="relative group cursor-pointer flex flex-col items-center">
         {/* Google Maps-style Hover Preview Card */}
@@ -83,7 +95,10 @@ export function MapMarker({
               {status}
             </span>
           </div>
-          <div className="text-[10px] text-slate-500 font-bold">{status === "COMPLETED" ? "Resolved Incident" : "Active Request"}</div>
+          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+            <span>{status === "COMPLETED" ? "Resolved Incident" : "Active Request"}</span>
+            {severity && <span className={cn("rounded px-1.5 py-0.5 text-[8px] uppercase", isCritical ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600")}>{severity}</span>}
+          </div>
           <div className="h-px bg-slate-100 my-1" />
           {reporterName && (
             <div className="text-[9px] text-slate-600 font-medium">
@@ -103,17 +118,17 @@ export function MapMarker({
         </div>
 
         {/* Pulse Effect for Active Incidents */}
-        {status === "NEW" || status === "ONGOING" || status === "PENDING" ? (
+        {needsPriorityIndicator ? (
           <div className="absolute inset-0 m-auto w-8 h-8 rounded-full bg-red-500/30 animate-ping" />
         ) : null}
 
         {/* Marker Icon */}
         <div className={cn(
           "relative z-10 p-1 rounded-full border-2 transition-transform",
-          isSelected ? "scale-125 border-primary bg-primary text-primary-foreground" : "bg-red-500 border-red-200 text-white",
+          isSelected ? "scale-125 border-primary bg-primary text-primary-foreground" : needsPriorityIndicator ? "bg-red-600 border-red-200 text-white" : "bg-amber-500 border-amber-200 text-white",
           status === "COMPLETED" && !isSelected && "bg-green-500 border-green-200"
         )}>
-          <MapPin size={16} fill="currentColor" />
+          {needsPriorityIndicator ? <Siren size={16} fill="currentColor" /> : <MapPin size={16} fill="currentColor" />}
         </div>
       </div>
     );
@@ -126,6 +141,12 @@ export function MapMarker({
       {/* Label */}
       <div className="absolute -top-8 px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap bg-background border shadow-sm">
         {label}
+      </div>
+
+      <div className="absolute bottom-full mb-2 w-56 p-3 rounded-lg bg-white border border-slate-200 shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 text-left">
+        <p className="text-xs font-bold text-slate-900">{responderName || label}</p>
+        <p className="mt-1 text-[10px] font-medium text-slate-500">{status === "ONGOING" ? "Live dispatched ambulance" : "Responder location"}</p>
+        {lastUpdated && <p className="mt-1 text-[10px] text-slate-400">Updated {new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
       </div>
 
       {/* Marker Icon */}

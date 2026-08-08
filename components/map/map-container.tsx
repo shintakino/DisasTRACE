@@ -6,6 +6,25 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { MapIncident, MapResponder, MapHospital } from "@/types/map";
 import { MapMarker } from "./map-marker";
 
+interface RouteGeometry {
+  id: string;
+  color: string;
+  data: {
+    type: "Feature";
+    properties: Record<string, never>;
+    geometry: {
+      type: "LineString";
+      coordinates: number[][];
+    };
+  };
+}
+
+interface RouteCacheEntry {
+  responderLat: number;
+  responderLng: number;
+  route: RouteGeometry;
+}
+
 interface MapContainerProps {
   incidents: MapIncident[];
   responders: MapResponder[];
@@ -23,6 +42,17 @@ const BALIWAG_CENTER = {
 // OpenFreeMap Light style
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
+function distanceInMeters(firstLat: number, firstLng: number, secondLat: number, secondLng: number) {
+  const earthRadius = 6371e3;
+  const latitudeDelta = ((secondLat - firstLat) * Math.PI) / 180;
+  const longitudeDelta = ((secondLng - firstLng) * Math.PI) / 180;
+  const firstLatitude = (firstLat * Math.PI) / 180;
+  const secondLatitude = (secondLat * Math.PI) / 180;
+  const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(firstLatitude) * Math.cos(secondLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export function MapContainer({
   incidents,
   responders,
@@ -31,7 +61,8 @@ export function MapContainer({
   onSelectIncident,
 }: MapContainerProps) {
   const mapRef = useRef<MapRef>(null);
-  const [routeGeometry, setRouteGeometry] = useState<any>(null);
+  const routeCacheRef = useRef<globalThis.Map<string, RouteCacheEntry>>(new globalThis.Map());
+  const [routeGeometries, setRouteGeometries] = useState<RouteGeometry[]>([]);
 
   // Fly to incident when selected from the list
   useEffect(() => {
@@ -48,53 +79,71 @@ export function MapContainer({
     }
   }, [selectedIncidentId, incidents]);
 
-  // Fetch real road route between assigned responder and selected ongoing incident
+  // Keep a live road route for every active dispatched ambulance, not just the selected incident.
   useEffect(() => {
     let active = true;
+    const dispatchedPairs = responders.flatMap((responder) => {
+      if (responder.status !== "DISPATCHED" || !responder.activeIncidentId) return [];
 
-    if (!selectedIncidentId) {
-      setRouteGeometry(null);
-      return;
+      const incident = incidents.find((item) => item.id === responder.activeIncidentId && item.status === "ONGOING");
+      return incident ? [{ responder, incident }] : [];
+    });
+
+    if (dispatchedPairs.length === 0) {
+      setRouteGeometries([]);
+      return () => {
+        active = false;
+      };
     }
 
-    const selectedIncident = incidents.find((i) => i.id === selectedIncidentId);
-    if (!selectedIncident || selectedIncident.status !== "ONGOING") {
-      setRouteGeometry(null);
-      return;
-    }
+    const updateRoutes = async () => {
+      const nextRoutes = await Promise.all(dispatchedPairs.map(async ({ responder, incident }) => {
+        const cachedRoute = routeCacheRef.current.get(responder.id);
+        const hasMoved = !cachedRoute || distanceInMeters(cachedRoute.responderLat, cachedRoute.responderLng, responder.lat, responder.lng) >= 50;
 
-    // Find the assigned responder for this ongoing incident
-    const assignedResponder = responders.find((r) => r.vehicleId === selectedIncident.vehicleId);
-    if (!assignedResponder) {
-      setRouteGeometry(null);
-      return;
-    }
-
-    const fetchRoute = async () => {
-      try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${assignedResponder.lng},${assignedResponder.lat};${selectedIncident.lng},${selectedIncident.lat}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
-        const data = await res.json();
-        
-        if (active && data.routes && data.routes.length > 0) {
-          setRouteGeometry({
-            type: "Feature",
-            properties: {},
-            geometry: data.routes[0].geometry,
-          });
+        if (cachedRoute && !hasMoved) {
+          return cachedRoute.route;
         }
-      } catch (err) {
-        console.error("Failed to fetch road navigation route:", err);
+
+        try {
+          const url = `https://router.project-osrm.org/route/v1/driving/${responder.lng},${responder.lat};${incident.lng},${incident.lat}?overview=full&geometries=geojson`;
+          const response = await fetch(url);
+          const routeResponse: { routes?: Array<{ geometry?: RouteGeometry["data"]["geometry"] }> } = await response.json();
+          const geometry = routeResponse.routes?.[0]?.geometry;
+
+          if (!geometry || geometry.type !== "LineString") {
+            return cachedRoute?.route;
+          }
+
+          const route: RouteGeometry = {
+            id: responder.id,
+            color: incident.severity === "Critical" ? "#DC2626" : "#F97316",
+            data: { type: "Feature", properties: {}, geometry },
+          };
+
+          routeCacheRef.current.set(responder.id, {
+            responderLat: responder.lat,
+            responderLng: responder.lng,
+            route,
+          });
+          return route;
+        } catch (error) {
+          console.error("Failed to fetch road navigation route:", error);
+          return cachedRoute?.route;
+        }
+      }));
+
+      if (active) {
+        setRouteGeometries(nextRoutes.filter((route): route is RouteGeometry => Boolean(route)));
       }
     };
 
-    // Throttle / fetch
-    fetchRoute();
+    void updateRoutes();
 
     return () => {
       active = false;
     };
-  }, [selectedIncidentId, incidents, responders]);
+  }, [incidents, responders]);
 
   const handleMarkerClick = useCallback((id: string, lat: number, lng: number) => {
     onSelectIncident(id);
@@ -112,24 +161,17 @@ export function MapContainer({
       >
         <NavigationControl position="bottom-right" />
 
-        {/* Live Road Route layer for active dispatched ongoing incidents */}
-        {routeGeometry && (
-          <Source id="route-source" type="geojson" data={routeGeometry}>
+        {/* Live road routes for all active dispatched ambulances. */}
+        {routeGeometries.map((route) => (
+          <Source key={route.id} id={`route-source-${route.id}`} type="geojson" data={route.data}>
             <Layer
-              id="route-layer"
+              id={`route-layer-${route.id}`}
               type="line"
-              layout={{
-                "line-join": "round",
-                "line-cap": "round",
-              }}
-              paint={{
-                "line-color": "#f97316", // Vibrant orange route line matching active theme
-                "line-width": 5,
-                "line-opacity": 0.85,
-              }}
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": route.color, "line-width": 5, "line-opacity": 0.85 }}
             />
           </Source>
-        )}
+        ))}
 
         {/* Incident Markers */}
         {incidents.map((incident) => (
@@ -151,6 +193,8 @@ export function MapContainer({
               reporterName={incident.reporterName}
               reporterPhone={incident.reporterPhone}
               destination={incident.destination}
+              severity={incident.severity}
+              nature={incident.nature}
             />
           </Marker>
         ))}
@@ -169,6 +213,8 @@ export function MapContainer({
                 type="responder"
                 status={responder.status === "DISPATCHED" ? "ONGOING" : "STANDBY"}
                 label={responder.vehicleId}
+                responderName={responder.responderName}
+                lastUpdated={responder.lastUpdated}
               />
             </Marker>
           ))}

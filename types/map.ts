@@ -10,6 +10,8 @@ export const MapIncidentSchema = z.object({
   id: z.string(),
   caseId: z.string(),
   vehicleId: z.string().optional(),
+  severity: z.enum(["Low", "Medium", "High", "Critical"]),
+  nature: z.enum(["EMERGENCY", "NON-EMERGENCY"]),
   status: IncidentStatusSchema,
   type: z.string(),
   origin: z.string(),
@@ -32,12 +34,14 @@ export type ResponderStatus = z.infer<typeof ResponderStatusSchema>;
 
 export const MapResponderSchema = z.object({
   id: z.string(),
+  responderName: z.string(),
   vehicleId: z.string(),
   status: ResponderStatusSchema,
   lat: z.number(),
   lng: z.number(),
   heading: z.number().optional(),
   lastUpdated: z.string(),
+  activeIncidentId: z.string().optional(),
 });
 export type MapResponder = z.infer<typeof MapResponderSchema>;
 

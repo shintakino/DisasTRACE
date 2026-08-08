@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { MapResponderSchema } from "@/types/map";
 import { db } from "@/db";
+import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -24,6 +25,21 @@ export async function GET() {
       })
       .from(users)
       .where(eq(users.role, "ambulance_responder"));
+
+    const activeIncidents = await db
+      .select({
+        id: incidents.id,
+        responderId: incidents.responderId,
+        assignedAmbulance: incidents.assignedAmbulance,
+        status: incidents.status,
+      })
+      .from(incidents);
+
+    const activeIncidentByResponder = new Map(
+      activeIncidents
+        .filter((incident) => incident.responderId && incident.status !== "RESOLVED")
+        .map((incident) => [incident.responderId as string, incident])
+    );
 
     const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -48,10 +64,12 @@ export async function GET() {
         .toUpperCase()
         .slice(0, 3);
       const vehicleId = `AMB-${initials || `00${i + 1}`}`;
+      const activeIncident = activeIncidentByResponder.get(r.id);
 
       return {
         id: r.id,
-        vehicleId,
+        responderName: r.fullName,
+        vehicleId: activeIncident?.assignedAmbulance || vehicleId,
         status: mappedStatus,
         // Fallback to CDRRMO HQ coordinates if not yet updated
         lat: r.lastLatitude ?? 14.9516,
@@ -60,6 +78,7 @@ export async function GET() {
         lastUpdated: r.lastLocationUpdatedAt
           ? r.lastLocationUpdatedAt.toISOString()
           : new Date().toISOString(),
+        activeIncidentId: activeIncident?.id,
       };
     });
 

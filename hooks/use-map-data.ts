@@ -5,6 +5,13 @@ import { MapIncident, MapResponder, MapSummary, MapHospital, MapIncidentSchema, 
 import { z } from "zod";
 import { createClientBrowser } from "@/lib/supabase";
 
+const TelemetryPayloadSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  heading: z.number().nullable().optional(),
+  timestamp: z.string(),
+});
+
 export function useMapData() {
   const [incidents, setIncidents] = useState<MapIncident[]>([]);
   const [responders, setResponders] = useState<MapResponder[]>([]);
@@ -12,6 +19,11 @@ export function useMapData() {
   const [summary, setSummary] = useState<MapSummary>({ new: 0, ongoing: 0, completed: 0, standby: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const activeDispatchIds = responders
+    .filter((responder) => responder.status === "DISPATCHED" && responder.activeIncidentId)
+    .map((responder) => responder.activeIncidentId as string)
+    .sort();
+  const activeDispatchKey = activeDispatchIds.join(":");
 
   const fetchData = async (showSkeleton = true) => {
     if (showSkeleton) setIsLoading(true);
@@ -92,6 +104,41 @@ export function useMapData() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Responder clients broadcast GPS updates every few seconds while dispatched.
+  // Admin maps subscribe to each active incident channel for immediate marker movement.
+  useEffect(() => {
+    if (!activeDispatchKey) return;
+
+    const supabase = createClientBrowser();
+    const channels = activeDispatchKey.split(":").map((incidentId) => (
+      supabase
+        .channel(`map-telemetry-${incidentId}`)
+        .on("broadcast", { event: "telemetry" }, ({ payload }) => {
+          const telemetry = TelemetryPayloadSchema.safeParse(payload);
+          if (!telemetry.success) return;
+
+          setResponders((currentResponders) => currentResponders.map((responder) => (
+            responder.activeIncidentId === incidentId
+              ? {
+                  ...responder,
+                  lat: telemetry.data.latitude,
+                  lng: telemetry.data.longitude,
+                  heading: telemetry.data.heading ?? responder.heading,
+                  lastUpdated: telemetry.data.timestamp,
+                }
+              : responder
+          )));
+        })
+        .subscribe()
+    ));
+
+    return () => {
+      channels.forEach((channel) => {
+        supabase.removeChannel(channel);
+      });
+    };
+  }, [activeDispatchKey]);
 
   return { incidents, responders, hospitals, summary, isLoading, error, refresh: () => fetchData(true) };
 }

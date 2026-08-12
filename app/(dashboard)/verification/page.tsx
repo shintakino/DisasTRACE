@@ -6,7 +6,8 @@ import { VerificationDetails } from "@/components/verification/verification-deta
 import { ResidentPanel } from "@/components/verification/resident-panel"
 import { ManualDispatchModal } from "@/components/verification/manual-dispatch-modal"
 import { MergeDuplicateModal } from "@/components/verification/merge-duplicate-modal"
-import { VerificationRequest, VerificationStatus } from "@/types/verification"
+import { VerificationRequest, VerificationStatus, TriageClassification } from "@/types/verification"
+import { VerificationQueueFilter } from "@/components/verification/verification-queue"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
 import { createClientBrowser } from "@/lib/supabase"
@@ -20,7 +21,7 @@ export default function VerificationPage() {
   const { user } = useAuth()
   const [requests, setRequests] = useState<VerificationRequest[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [filter, setFilter] = useState<VerificationStatus>("PENDING")
+  const [filter, setFilter] = useState<VerificationQueueFilter>("REVIEW")
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -353,6 +354,34 @@ export default function VerificationPage() {
     }
   }
 
+  const handleClassificationOverride = async (id: string, triageClassification: TriageClassification) => {
+    setIsProcessing(true)
+    try {
+      const response = await fetch(`/api/verification/${id}/classification`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ triageClassification }) })
+      if (!response.ok) throw new Error('Unable to override classification')
+      setRequests((current) => current.map((request) => request.id === id ? { ...request, triageClassification, triageReasons: ['PACC manually overrode the automated classification.'] } : request))
+      toast.success('PACC classification override saved')
+    } catch (error) {
+      toast.error('Failed to override classification')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleCoordinationUpdate = async (id: string, agencies: string[]) => {
+    setIsProcessing(true)
+    try {
+      const response = await fetch(`/api/verification/${id}/coordination`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agencies }) })
+      if (!response.ok) throw new Error('Unable to update agency coordination')
+      setRequests((current) => current.map((request) => request.id === id ? { ...request, coordinationAgencies: agencies } : request))
+      toast.success(agencies.length ? 'Agency coordination updated' : 'Agency coordination cleared')
+    } catch (error) {
+      toast.error('Failed to update agency coordination')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   const handleDispatchSuccess = async () => {
     const dispatchedId = dispatchReqId;
     await fetchRequests()
@@ -524,7 +553,7 @@ export default function VerificationPage() {
           filter={filter}
           onFilterChange={setFilter}
         />
-        <VerificationDetails request={selectedRequest} />
+        <VerificationDetails request={selectedRequest} onOverrideClassification={handleClassificationOverride} onUpdateCoordination={handleCoordinationUpdate} isProcessing={isProcessing} />
         <ResidentPanel
           request={selectedRequest}
           onAccept={handleAccept}

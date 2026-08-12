@@ -43,6 +43,7 @@ function InitialLayout() {
     const inVerificationGroup = rawSegments[0] === '(verification)';
     const atRoot = rawSegments.length === 0 || (rawSegments.length === 1 && rawSegments[0] === '');
     const isResetPassword = inAuthGroup && rawSegments[1] === 'reset-password';
+    const inEmergencyIntake = rawSegments[0] === 'help';
 
     // Allow the EntryScreen in app/index.tsx to handle the splash sequence
     // and route the user when the animation finishes.
@@ -52,7 +53,7 @@ function InitialLayout() {
 
     if (!isSignedIn) {
       // Not signed in: allow root (for role selection), redirect otherwise
-      if (!inAuthGroup) {
+      if (!inAuthGroup && !inEmergencyIntake) {
         router.replace('/(auth)/sign-in');
       }
     } else {

@@ -6,7 +6,7 @@ import { useLocationPermission } from '../../hooks/use-location-permission';
 import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
 import { HelpButton } from '../../components/dashboard/HelpButton';
 import { OfflineBanner } from '../../components/dashboard/OfflineBanner';
-import { MapPin, HelpCircle, Bell, Shield, Check } from 'lucide-react-native';
+import { MapPin, HelpCircle, Bell, Shield, Check, MessageCircle } from 'lucide-react-native';
 import { useOfflineReports } from '../../hooks/use-offline-reports';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, Tabs } from 'expo-router';
@@ -597,13 +597,25 @@ export default function HomeScreen() {
         </Text>
 
         <View className="flex-1 items-center pt-2">
-          <HelpButton onPress={() => router.push('/help/camera')} />
+          <HelpButton onPress={() => router.push('/help/camera' as any)} />
           
-          <View className="mt-14 px-4">
+          <View className="mt-10 px-4">
             <Text className="text-slate-500 text-center text-sm leading-relaxed">
-              Takes a <Text className="font-bold text-slate-700">live photo</Text> of the scene and files a report. Help reaches you faster.
+              Take a <Text className="font-bold text-slate-700">live photo</Text> and submit a direct incident report.
             </Text>
           </View>
+
+          <TouchableOpacity
+            className="mt-5 w-full flex-row items-center justify-center gap-2 rounded-xl border border-[#1E3A8A] bg-blue-50 px-5 py-4"
+            onPress={() => router.push('/help/chatbot?mode=resident' as any)}
+            activeOpacity={0.8}
+          >
+            <MessageCircle color="#1E3A8A" size={20} />
+            <View>
+              <Text className="text-[#1E3A8A] text-center font-extrabold">Emergency Chatbot</Text>
+              <Text className="text-slate-500 text-center text-[11px] mt-0.5">Guided questions for a faster report</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Service Improvement Banner */}

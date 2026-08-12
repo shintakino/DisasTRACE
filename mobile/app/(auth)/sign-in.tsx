@@ -189,6 +189,14 @@ export default function SignInScreen() {
               )}
             </TouchableOpacity>
 
+            <TouchableOpacity
+              onPress={() => router.replace('/help/chatbot?mode=guest' as any)}
+              className="mt-3 border border-[#EF4444] p-4 rounded-xl items-center"
+            >
+              <Text className="text-[#B91C1C] font-bold">Login as Guest</Text>
+              <Text className="text-slate-500 text-xs mt-1">Report an emergency without an account</Text>
+            </TouchableOpacity>
+
             <View className="flex-row justify-center mt-6">
               <Text className="text-gray-500">Don't have an account? </Text>
               <Link href="/(auth)/sign-up" asChild>

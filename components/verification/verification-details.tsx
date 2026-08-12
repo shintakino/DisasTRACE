@@ -2,16 +2,21 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { VerificationRequest } from "@/types/verification"
+import { TriageClassification, VerificationRequest } from "@/types/verification"
 import { formatDistanceToNow } from "date-fns"
 import { MapPin, Users, Info, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface VerificationDetailsProps {
   request: VerificationRequest | null
+  onOverrideClassification: (id: string, value: TriageClassification) => void
+  onUpdateCoordination: (id: string, agencies: string[]) => void
+  isProcessing: boolean
 }
 
-export function VerificationDetails({ request }: VerificationDetailsProps) {
+const AGENCIES = ['PNP', 'BFP', 'CDRRMO', 'Barangay', 'DSWD', 'Hospital'];
+
+export function VerificationDetails({ request, onOverrideClassification, onUpdateCoordination, isProcessing }: VerificationDetailsProps) {
   if (!request) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground italic">
@@ -48,6 +53,32 @@ export function VerificationDetails({ request }: VerificationDetailsProps) {
           </div>
         </div>
       </div>
+
+      <Card className="mb-6 p-4 border-amber-200 bg-amber-50/50">
+        <div className="text-xs font-bold uppercase tracking-wider text-amber-900">Automated initial verification</div>
+        <div className="mt-1 font-bold text-sm text-slate-900">{request.triageClassification.replaceAll('_', ' ')}</div>
+        <div className="mt-1 text-xs text-slate-600">{request.triageReasons.join(' ')}</div>
+        <label className="mt-3 block text-xs font-semibold text-slate-700">PACC override</label>
+        <select disabled={isProcessing} value={request.triageClassification} onChange={(event) => onOverrideClassification(request.id, event.target.value as TriageClassification)} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
+          <option value="HIGH_CONFIDENCE_EMERGENCY">High-confidence emergency</option>
+          <option value="HIGH_CONFIDENCE_NON_EMERGENCY">High-confidence non-emergency</option>
+          <option value="UNCERTAIN_INCOMPLETE">Uncertain / incomplete</option>
+          <option value="SUSPICIOUS_POSSIBLE_PRANK">Suspicious / possible prank</option>
+        </select>
+      </Card>
+
+      <Card className="mb-6 p-4 border-blue-200 bg-blue-50/50">
+        <div className="text-xs font-bold uppercase tracking-wider text-blue-900">PACC agency coordination</div>
+        <p className="mt-1 text-xs text-slate-600">Select every agency PACC is actively coordinating with. The reporter sees this status immediately.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {AGENCIES.map((agency) => {
+            const active = request.coordinationAgencies.includes(agency)
+            return <button key={agency} type="button" disabled={isProcessing} onClick={() => onUpdateCoordination(request.id, active ? request.coordinationAgencies.filter((item) => item !== agency) : [...request.coordinationAgencies, agency])} className={cn('rounded-md border px-3 py-1.5 text-xs font-bold transition-colors', active ? 'border-[#1E3A8A] bg-[#1E3A8A] text-white' : 'border-blue-200 bg-white text-[#1E3A8A] hover:bg-blue-100')}>
+              {agency}
+            </button>
+          })}
+        </div>
+      </Card>
 
       <div className="relative rounded-xl overflow-hidden aspect-video bg-muted mb-8 border shadow-sm">
         {request.imageUrl ? (

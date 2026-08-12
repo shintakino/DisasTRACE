@@ -40,6 +40,15 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 4. Admin tracks all active incidents and ambulance positions on a real-time map.
 5. CDRRMO Super Admin accesses KPI dashboards, analytics, user management, account banning, and report exports.
 
+## Guest Emergency Intake
+
+- A person can choose **Login as Guest** from the launch or sign-in screen during an emergency.
+- The person goes directly to the Emergency Chatbot; no account is created and no general app access is granted.
+- The chatbot captures a callback number, GPS and written location, incident details, people affected, condition, and optional evidence.
+- Automated initial triage sends high-confidence emergencies into ambulance dispatch and routes non-emergency or flagged reports to PACC.
+- When a response starts, the device can view its live response/tracking status.
+- PACC can record coordination with PNP, BFP, CDRRMO, Barangay, DSWD, or Hospital; residents and guests see the dynamic agencies and responder status.
+
 ## Features
 
 ### Authentication & Verification

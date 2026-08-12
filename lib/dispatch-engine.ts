@@ -65,7 +65,7 @@ export async function notifyPaccAndCdrrmo({
 
 export async function autoDispatchIncident(
   requestId: string,
-  residentId: string,
+  _residentId: string | null,
   latitude: number,
   longitude: number
 ) {

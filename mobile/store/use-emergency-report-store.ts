@@ -6,7 +6,7 @@ export const EmergencyReportSchema = z.object({
   id: z.string().optional(), // Server-generated Request ID
   requestId: z.string().optional(), // Human-readable Request ID (e.g., REQ-2026-XXXX)
   incidentId: z.string().optional(), // Server-generated Incident ID
-  photoUri: z.string().min(1, "Live photo is required"),
+  photoUri: z.string().min(1, "Photo URI is invalid").optional(),
   incidentType: z.enum([
     "Medical Emergency",
     "Vehicular Collision",
@@ -27,6 +27,9 @@ export const EmergencyReportSchema = z.object({
   responderFullName: z.string().optional(),
   responderVehicleId: z.string().optional(),
   isMergedDuplicate: z.boolean().optional(),
+  reporterMode: z.enum(['guest', 'resident']).optional(),
+  guestAccessToken: z.string().optional(),
+  triageClassification: z.enum(['HIGH_CONFIDENCE_EMERGENCY', 'HIGH_CONFIDENCE_NON_EMERGENCY', 'UNCERTAIN_INCOMPLETE', 'SUSPICIOUS_POSSIBLE_PRANK']).optional(),
 });
 
 export type EmergencyReportType = z.infer<typeof EmergencyReportSchema>;

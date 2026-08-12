@@ -39,21 +39,20 @@ export async function GET(req: NextRequest) {
       });
 
       // Count actual prior reports in the database
-      const priorCount = await db
+      const resident = r.resident;
+      const priorCount = resident ? await db
         .select({ count: sql<number>`count(*)` })
         .from(verificationRequests)
-        .where(
-          sql`${verificationRequests.residentId} = ${r.resident.id} AND ${verificationRequests.id} != ${r.id}`
-        );
+        .where(sql`${verificationRequests.residentId} = ${resident.id} AND ${verificationRequests.id} != ${r.id}`)
+        : [];
       const priorReportsCount = priorCount[0]?.count ? Number(priorCount[0].count) : 0;
 
       // Count actual rejected reports in the database
-      const rejectedCount = await db
+      const rejectedCount = resident ? await db
         .select({ count: sql<number>`count(*)` })
         .from(verificationRequests)
-        .where(
-          sql`${verificationRequests.residentId} = ${r.resident.id} AND ${verificationRequests.id} != ${r.id} AND ${verificationRequests.status} = 'REJECTED'`
-        );
+        .where(sql`${verificationRequests.residentId} = ${resident.id} AND ${verificationRequests.id} != ${r.id} AND ${verificationRequests.status} = 'REJECTED'`)
+        : [];
       const rejectedReportsCount = rejectedCount[0]?.count ? Number(rejectedCount[0].count) : 0;
 
       // Calculate Reliability Score: starts at 100, subtracts 33 per rejected report, min 0
@@ -80,6 +79,10 @@ export async function GET(req: NextRequest) {
         id: r.id,
         requestId: r.requestId,
         status: r.status,
+        triageClassification: r.triageClassification,
+        triageReasons: r.triageReasons,
+        coordinationAgencies: r.coordinationAgencies,
+        reporterType: r.reporterType,
         nature: r.nature,
         severity: r.severity,
         type: r.type,
@@ -88,12 +91,12 @@ export async function GET(req: NextRequest) {
         imageUrl: imageUrlStr,
         receivedAt: r.createdAt.toISOString(),
         resident: {
-          id: r.resident.id,
-          fullName: r.resident.fullName,
-          phone: r.resident.phone || "No phone provided",
-          address: r.resident.address || "No address recorded",
+          id: resident?.id || 'guest',
+          fullName: resident?.fullName || 'Guest Reporter',
+          phone: resident?.phone || r.contactNumber || "No phone provided",
+          address: resident?.address || 'Guest report — no home address collected',
           priorReports: priorReportsCount,
-          isVerified: r.resident.verificationStatus === 'APPROVED',
+          isVerified: resident?.verificationStatus === 'APPROVED',
           reliabilityScore,
         },
         incident: incident ? {

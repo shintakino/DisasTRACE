@@ -43,6 +43,8 @@ export async function GET(
         scenePhotos: reports.scenePhotos,
         participants: reports.participants,
         residentId: verificationRequests.residentId,
+        reporterType: verificationRequests.reporterType,
+        contactNumber: verificationRequests.contactNumber,
         verificationRequestId: verificationRequests.id,
       })
       .from(reports)
@@ -124,9 +126,9 @@ export async function GET(
           return 0;
         })(),
         scenePhotos: [],
-        residentName: userReq.resident?.fullName || "Anonymous",
-        residentPhone: userReq.resident?.phone || "N/A",
-        residentAddress: userReq.resident?.address || "N/A",
+        residentName: userReq.resident?.fullName || (userReq.reporterType === 'GUEST' ? 'Guest Reporter' : 'Anonymous'),
+        residentPhone: userReq.resident?.phone || userReq.contactNumber || "N/A",
+        residentAddress: userReq.resident?.address || (userReq.reporterType === 'GUEST' ? 'Guest report — no home address collected' : 'N/A'),
         logs: [
           { action: "Incident Reported by Resident", time: new Date(userReq.createdAt).toLocaleTimeString() },
           ...(userReq.status === "VERIFIED" ? [{ action: "Incident Verified by Dispatcher", time: new Date(userReq.updatedAt).toLocaleTimeString() }] : []),
@@ -187,9 +189,9 @@ export async function GET(
     const r = results[0];
 
     // Fetch resident user details separately
-    let residentName = "Anonymous";
-    let residentPhone = "N/A";
-    let residentAddress = "N/A";
+    let residentName = r.reporterType === 'GUEST' ? 'Guest Reporter' : 'Anonymous';
+    let residentPhone = r.contactNumber || "N/A";
+    let residentAddress = r.reporterType === 'GUEST' ? 'Guest report — no home address collected' : "N/A";
 
     if (r.residentId) {
       const resUser = await db.query.users.findFirst({

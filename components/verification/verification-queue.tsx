@@ -37,12 +37,14 @@ function SummaryCard({ label, count, gradient, isActive, onClick }: SummaryCardP
   )
 }
 
+export type VerificationQueueFilter = 'ACTION' | 'REVIEW' | VerificationStatus;
+
 interface VerificationQueueProps {
   requests: VerificationRequest[]
   selectedId: string | null
   onSelect: (request: VerificationRequest) => void
-  filter: VerificationStatus
-  onFilterChange: (status: VerificationStatus) => void
+  filter: VerificationQueueFilter
+  onFilterChange: (status: VerificationQueueFilter) => void
 }
 
 export function VerificationQueue({
@@ -63,13 +65,18 @@ export function VerificationQueue({
     );
   };
 
+  const isAction = (r: VerificationRequest) => r.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY' || r.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY';
+  const isReview = (r: VerificationRequest) => r.triageClassification === 'UNCERTAIN_INCOMPLETE' || r.triageClassification === 'SUSPICIOUS_POSSIBLE_PRANK';
   const counts = {
-    PENDING: requests.filter((r) => r.status === "PENDING" || needsManualDispatch(r)).length,
+    ACTION: requests.filter(isAction).length,
+    REVIEW: requests.filter(isReview).length,
     VERIFIED: requests.filter((r) => r.status === "VERIFIED" && !needsManualDispatch(r)).length,
     REJECTED: requests.filter((r) => r.status === "REJECTED").length,
   }
 
   const filteredRequests = requests.filter((r) => {
+    if (filter === "ACTION") return isAction(r);
+    if (filter === "REVIEW") return isReview(r);
     if (filter === "PENDING") {
       return r.status === "PENDING" || needsManualDispatch(r);
     }
@@ -92,7 +99,7 @@ export function VerificationQueue({
 
     // Priority 3: Oldest first or newest first? Usually older emergencies need immediate attention. Let's do oldest first if they are pending, newest if not.
     // For now, let's keep it oldest first for PENDING queue so older items get handled.
-    if (filter === "PENDING") {
+    if (filter === "PENDING" || filter === 'REVIEW') {
       return new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime();
     }
     return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
@@ -102,22 +109,22 @@ export function VerificationQueue({
     <div className="flex flex-col h-full gap-4 w-80 shrink-0 border-r bg-white p-4">
       <div className="grid grid-cols-1 gap-3">
         <SummaryCard
-          label="Pending"
-          count={counts.PENDING}
+          label="For Action"
+          count={counts.ACTION}
           gradient="from-[#4776E6] to-[#3843D0]"
-          isActive={filter === "PENDING"}
-          onClick={() => onFilterChange("PENDING")}
+          isActive={filter === "ACTION"}
+          onClick={() => onFilterChange("ACTION")}
         />
         <div className="grid grid-cols-2 gap-3">
           <SummaryCard
-            label="Verified"
-            count={counts.VERIFIED}
-            gradient="from-[#11998e] to-[#38ef7d]"
-            isActive={filter === "VERIFIED"}
-            onClick={() => onFilterChange("VERIFIED")}
+            label="For Review"
+            count={counts.REVIEW}
+            gradient="from-[#F97316] to-[#FB923C]"
+            isActive={filter === "REVIEW"}
+            onClick={() => onFilterChange("REVIEW")}
           />
           <SummaryCard
-            label="Rejected"
+            label="Closed"
             count={counts.REJECTED}
             gradient="from-[#FF416C] to-[#FF4B2B]"
             isActive={filter === "REJECTED"}
@@ -126,7 +133,7 @@ export function VerificationQueue({
         </div>
       </div>
 
-      <div className="font-semibold text-sm mt-2">Queue List</div>
+      <div className="font-semibold text-sm mt-2">{filter === 'ACTION' ? 'For Action' : filter === 'REVIEW' ? 'For Review' : 'Queue List'}</div>
 
       <div 
         className="flex-1 -mx-4 px-4 overflow-y-auto pacc-queue-scroll pr-2"

@@ -205,6 +205,14 @@ export default function EntryScreen() {
           >
             <Text style={styles.signUpButtonText}>Create Account</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.guestButton}
+            onPress={() => router.push('/help/chatbot?mode=guest' as any)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.guestButtonText}>Login as Guest</Text>
+          </TouchableOpacity>
         </Animated.View>
       )}
     </View>
@@ -308,6 +316,18 @@ const styles = StyleSheet.create({
   signUpButtonText: {
     color: '#15286A',
     fontSize: 18,
+    fontWeight: '700',
+  },
+  guestButton: {
+    marginTop: 12,
+    paddingVertical: 13,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    alignItems: 'center',
+  },
+  guestButtonText: {
+    color: '#B91C1C',
     fontWeight: '700',
   },
 });

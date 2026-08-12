@@ -10,6 +10,9 @@ export type IncidentNature = z.infer<typeof IncidentNatureSchema>;
 export const IncidentSeveritySchema = z.enum(["Low", "Medium", "High", "Critical"]);
 export type IncidentSeverity = z.infer<typeof IncidentSeveritySchema>;
 
+export const TriageClassificationSchema = z.enum(['HIGH_CONFIDENCE_EMERGENCY', 'HIGH_CONFIDENCE_NON_EMERGENCY', 'UNCERTAIN_INCOMPLETE', 'SUSPICIOUS_POSSIBLE_PRANK']);
+export type TriageClassification = z.infer<typeof TriageClassificationSchema>;
+
 export const ResidentInfoSchema = z.object({
   id: z.string(),
   fullName: z.string(),
@@ -33,6 +36,10 @@ export const VerificationRequestSchema = z.object({
   id: z.string(),
   requestId: z.string(), // e.g., REQ-2026-0047
   status: VerificationStatusSchema,
+  triageClassification: TriageClassificationSchema,
+  triageReasons: z.array(z.string()),
+  coordinationAgencies: z.array(z.string()),
+  reporterType: z.enum(['REGISTERED', 'GUEST']),
   nature: IncidentNatureSchema,
   severity: IncidentSeveritySchema,
   type: IncidentTypeSchema,

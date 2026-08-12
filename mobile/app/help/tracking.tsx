@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase';
 import * as Haptics from 'expo-haptics';
 
 const { height, width } = Dimensions.get('window');
-const COLLAPSED_HEIGHT = 220;
+const COLLAPSED_HEIGHT = 300;
 const EXPANDED_HEIGHT = height * 0.85;
 
 export default function TrackingScreen() {
@@ -73,6 +73,16 @@ export default function TrackingScreen() {
   const [isFindingAmbulance, setIsFindingAmbulance] = useState(true);
   const [liveResponderStatus, setLiveResponderStatus] = useState<string | null>(null);
   const [liveTargetHospital, setLiveTargetHospital] = useState<any | null>(null);
+  const [coordinationAgencies, setCoordinationAgencies] = useState<string[]>([]);
+
+  const coordinationMessage = () => {
+    const coordination = coordinationAgencies.length === 0
+      ? null
+      : `Coordinating with ${coordinationAgencies.length === 1 ? coordinationAgencies[0] : `${coordinationAgencies.slice(0, -1).join(', ')} and ${coordinationAgencies[coordinationAgencies.length - 1]}`}`;
+    if (isArrived) return 'Responders have arrived at your location.';
+    if (assignedResponder) return `${coordination ? `${coordination}. ` : ''}Responders are on the way. Please remain available for further instructions.`;
+    return coordination || 'PACC is coordinating the appropriate response.';
+  };
 
   const handleResolutionRedirect = () => {
     const currentResponder = assignedResponderRef.current;
@@ -235,6 +245,32 @@ export default function TrackingScreen() {
     };
   }, [report.id]);
 
+  // Guest reporters receive only this report's safe tracking data through the
+  // access-token endpoint, then join the same telemetry channel as residents.
+  useEffect(() => {
+    if (report.reporterMode !== 'guest' || !report.id || !report.guestAccessToken) return;
+    let active = true;
+    const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+    void fetch(`${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(report.id)}&accessToken=${encodeURIComponent(report.guestAccessToken)}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((result) => {
+        if (!active || !result?.data?.incident) return;
+        const incident = result.data.incident as { id: string; status: string; responderId: string | null };
+        useEmergencyReportStore.setState((state) => ({ report: { ...state.report, incidentId: incident.id } }));
+        if (incident.status === 'ARRIVED') setIsArrived(true);
+        const responder = result.data.responder as { id: string; fullName: string; lastLatitude: number | null; lastLongitude: number | null } | null;
+        if (responder) {
+          updateAssignedResponder({ id: responder.id, full_name: responder.fullName, last_latitude: responder.lastLatitude, last_longitude: responder.lastLongitude });
+          setIsFindingAmbulance(false);
+          if (responder.lastLatitude !== null && responder.lastLongitude !== null) {
+            setAmbulanceLocation({ latitude: responder.lastLatitude, longitude: responder.lastLongitude });
+          }
+        }
+      })
+      .catch((error) => console.error('[TrackingScreen] Guest tracking initialization failed:', error));
+    return () => { active = false; };
+  }, [report.guestAccessToken, report.id, report.reporterMode]);
+
   // 2. Request-level Incident Lifecycle Listener (Tracks inserts, updates, and deletes)
   useEffect(() => {
     const requestId = report.id;
@@ -343,6 +379,10 @@ export default function TrackingScreen() {
         },
         async (payload) => {
           console.log('[TrackingScreen] Request lifecycle event received:', payload);
+          const updatedAgencies = payload.new?.coordination_agencies;
+          if (Array.isArray(updatedAgencies)) {
+            setCoordinationAgencies(updatedAgencies);
+          }
           if (payload.new && payload.new.status === 'REJECTED') {
             // Error haptic vibe
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
@@ -376,6 +416,17 @@ export default function TrackingScreen() {
         }
       )
       .subscribe();
+
+    supabase
+      .from('verification_requests')
+      .select('coordination_agencies')
+      .eq('id', requestId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (Array.isArray(data?.coordination_agencies)) {
+          setCoordinationAgencies(data.coordination_agencies);
+        }
+      });
 
     return () => {
       supabase.removeChannel(reqChannel);
@@ -850,6 +901,15 @@ export default function TrackingScreen() {
           </View>
         </TouchableOpacity>
 
+        {/* Live PACC coordination status is visible even while the map is open. */}
+        <View style={styles.coordinationCard}>
+          <View style={styles.coordinationDot} />
+          <View style={styles.coordinationCopy}>
+            <Text style={styles.coordinationLabel}>LIVE RESPONSE STATUS</Text>
+            <Text style={styles.coordinationMessage}>{coordinationMessage()}</Text>
+          </View>
+        </View>
+
         {/* Ambulance Pill + Progress (always visible) */}
         <View>
           {/* Main Ambulance Pill */}
@@ -1236,6 +1296,42 @@ const styles = StyleSheet.create({
   },
   drawerScroll: {
     flex: 1,
+  },
+  coordinationCard: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 2,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  coordinationDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#2563EB',
+    marginTop: 5,
+    marginRight: 10,
+  },
+  coordinationCopy: {
+    flex: 1,
+  },
+  coordinationLabel: {
+    color: '#1E3A8A',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+  },
+  coordinationMessage: {
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: 2,
   },
   ambulancePillRow: {
     flexDirection: 'row',

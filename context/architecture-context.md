@@ -63,6 +63,13 @@
 - Rejection includes an optional reason; the user may re-submit.
 - Rejection notification is sent via textbee.dev SMS gateway.
 
+### Guest Emergency Exception and Initial Triage
+
+- An unauthenticated device may use only the Emergency Chatbot and its report-status view. Guest reports have no `resident_id`; a random report access token returned only to the submitting device authorizes guest status reads. Guests cannot access tabs, history, profile data, or protected APIs.
+- Approved residents and guests use the same validated REST intake. It records a callback number, incident details, people affected, condition, GPS and written location, plus optional evidence.
+- The API records deterministic initial triage with reasons: `HIGH_CONFIDENCE_EMERGENCY`, `HIGH_CONFIDENCE_NON_EMERGENCY`, `UNCERTAIN_INCOMPLETE`, or `SUSPICIOUS_POSSIBLE_PRANK`. Only the first class starts automated ambulance dispatch. PACC receives the other classes and can override any classification.
+- PACC-recorded coordination agencies live on the verification request and are delivered through its existing Realtime updates. The client derives human-readable coordination text from one or more recorded agencies and the actual incident/dispatch state. PNP, BFP, and other agencies are coordination entries; only ambulance responders are auto-dispatched by this system.
+
 ### OTP Verification
 
 - Phone number verification during registration uses textbee.dev (open-source SMS gateway).

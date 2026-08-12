@@ -31,10 +31,12 @@ export async function GET() {
         createdAt: incidents.createdAt,
         reporterName: users.fullName,
         reporterPhone: users.phone,
+        reporterType: verificationRequests.reporterType,
+        contactNumber: verificationRequests.contactNumber,
       })
       .from(incidents)
       .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
-      .innerJoin(users, eq(verificationRequests.residentId, users.id))
+      .leftJoin(users, eq(verificationRequests.residentId, users.id))
       .orderBy(desc(incidents.createdAt));
 
     // Query all verification requests
@@ -53,9 +55,11 @@ export async function GET() {
         updatedAt: verificationRequests.updatedAt,
         reporterName: users.fullName,
         reporterPhone: users.phone,
+        reporterType: verificationRequests.reporterType,
+        contactNumber: verificationRequests.contactNumber,
       })
       .from(verificationRequests)
-      .innerJoin(users, eq(verificationRequests.residentId, users.id))
+      .leftJoin(users, eq(verificationRequests.residentId, users.id))
       .orderBy(desc(verificationRequests.createdAt));
 
     const mappedIncidents = dbIncidents.map((inc) => {
@@ -89,8 +93,8 @@ export async function GET() {
           minute: '2-digit'
         }),
         lastUpdated: new Date(inc.createdAt).toLocaleString("en-US"),
-        reporterName: inc.reporterName,
-        reporterPhone: inc.reporterPhone,
+        reporterName: inc.reporterName || (inc.reporterType === 'GUEST' ? 'Guest Reporter' : 'Resident'),
+        reporterPhone: inc.reporterPhone || inc.contactNumber,
       };
     });
 
@@ -120,8 +124,8 @@ export async function GET() {
           minute: '2-digit'
         }),
         lastUpdated: new Date(req.updatedAt).toLocaleString("en-US"),
-        reporterName: req.reporterName,
-        reporterPhone: req.reporterPhone,
+        reporterName: req.reporterName || (req.reporterType === 'GUEST' ? 'Guest Reporter' : 'Resident'),
+        reporterPhone: req.reporterPhone || req.contactNumber,
       };
     });
 

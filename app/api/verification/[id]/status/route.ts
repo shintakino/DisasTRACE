@@ -114,12 +114,12 @@ export async function PATCH(
         imageUrl: finalReq.imageUrl || undefined,
         receivedAt: finalReq.createdAt.toISOString(),
         resident: {
-          id: finalReq.resident.id,
-          fullName: finalReq.resident.fullName,
-          phone: finalReq.resident.phone || "No phone provided",
-          address: finalReq.resident.address || "No address recorded",
+          id: finalReq.resident?.id || 'guest',
+          fullName: finalReq.resident?.fullName || 'Guest Reporter',
+          phone: finalReq.resident?.phone || finalReq.contactNumber || "No phone provided",
+          address: finalReq.resident?.address || "Guest report — no home address collected",
           priorReports: 3,
-          isVerified: finalReq.resident.verificationStatus === 'APPROVED',
+          isVerified: finalReq.resident?.verificationStatus === 'APPROVED',
         }
       };
     }

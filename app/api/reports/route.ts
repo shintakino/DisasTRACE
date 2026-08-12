@@ -64,14 +64,14 @@ export async function GET(req: NextRequest) {
           peopleInvolved: verificationRequests.peopleInvolved,
         })
         .from(verificationRequests)
-        .innerJoin(users, eq(verificationRequests.residentId, users.id))
+        .leftJoin(users, eq(verificationRequests.residentId, users.id))
         .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
         .orderBy(desc(verificationRequests.createdAt));
 
       let filtered = [...dbRequests].map((r) => ({
         id: r.id,
         requestId: r.requestId,
-        responderName: r.residentName,
+        responderName: r.residentName || 'Guest Reporter',
         type: r.type,
         status: r.status, // PENDING, VERIFIED, REJECTED, DUPLICATE
         date: new Date(r.createdAt).toLocaleDateString("en-US", {
@@ -298,6 +298,11 @@ export async function POST(req: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const responder = await db.query.users.findFirst({ where: eq(users.id, user.id) });
+    if (!responder || responder.role !== 'ambulance_responder' || responder.status !== 'ACTIVE') {
+      return NextResponse.json({ error: 'Only active ambulance responders can submit an incident report.' }, { status: 403 });
     }
 
     const body = await req.json();

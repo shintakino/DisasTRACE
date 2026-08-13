@@ -12,7 +12,7 @@ export const verificationRequests = pgTable('verification_requests', {
   parentRequestId: varchar('parent_request_id', { length: 255 }).references((): any => verificationRequests.id),
   nature: text('nature', { enum: ['EMERGENCY', 'NON-EMERGENCY'] }).default('EMERGENCY').notNull(),
   type: text('type', { enum: ['Medical Emergency', 'Vehicular Collision', 'Fire Emergency', 'Structural Failure', 'Flood/Water', 'Unknown Cause'] }).notNull(),
-  peopleInvolved: text('people_involved', { enum: ['None', '1-2 Persons', '3-5 Persons', '6+ Persons'] }).default('None').notNull(),
+  peopleInvolved: text('people_involved').default('None').notNull(),
   severity: text('severity', { enum: ['Low', 'Medium', 'High', 'Critical'] }).default('Medium').notNull(),
   locationDescription: text('location_description'),
   latitude: doublePrecision('latitude').notNull(),

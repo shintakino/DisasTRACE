@@ -153,6 +153,34 @@ export async function uploadIncidentPhoto(randomId: string, imageUri: string): P
 }
 
 /**
+ * Uploads chatbot evidence through the emergency-intake API. Unlike direct
+ * Storage uploads, this works before a guest has an authenticated session.
+ */
+export async function uploadEmergencyEvidence(apiUrl: string, imageUri: string): Promise<string> {
+  const optimizedUri = await optimizeImage(imageUri, 1024);
+  const file = new File(optimizedUri);
+
+  if (!file.exists) throw new Error('Evidence photo no longer exists on this device. Please take it again.');
+  if (file.size === 0 || file.size > 5 * 1024 * 1024) throw new Error('Evidence photo must be no larger than 5MB.');
+
+  const formData = new FormData();
+  formData.append('file', {
+    uri: optimizedUri,
+    name: 'emergency-evidence.jpg',
+    type: 'image/jpeg',
+  } as any);
+
+  const response = await fetch(`${apiUrl}/emergency-intake/evidence`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    body: formData,
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.imageUrl) throw new Error(result.error || 'Unable to upload the evidence image.');
+  return result.imageUrl;
+}
+
+/**
  * Uploads a profile avatar using the optimized image pipeline.
  * 
  * @param imageUri - The local URI of the selected avatar image.

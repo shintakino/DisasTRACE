@@ -15,16 +15,27 @@ const IncidentTypeSchema = z.enum([
 ]);
 
 export const EmergencyIntakeSchema = z.object({
-  contactNumber: z.string().trim().min(7).max(32),
+  contactNumber: z.string()
+    .trim()
+    .transform((value) => value.replace(/[\s()-]/g, ''))
+    .refine((value) => /^(?:\+63|0)9\d{9}$/.test(value), {
+      message: 'Use a valid Philippine mobile number, such as 09171234567 or +639171234567.',
+    }),
   incidentType: IncidentTypeSchema,
-  peopleInvolved: z.enum(['None', '1-2 Persons', '3-5 Persons', '6+ Persons']),
+  peopleInvolved: z.coerce.number().int().min(1).max(999),
   landmarks: z.string().trim().min(5).max(600),
   victimCondition: z.string().trim().min(2).max(160),
   latitude: z.number().finite().min(-90).max(90),
   longitude: z.number().finite().min(-180).max(180),
   severity: z.enum(['Low', 'Medium', 'High', 'Critical']).default('Medium'),
   nature: z.enum(['EMERGENCY', 'NON-EMERGENCY']),
-  imageUrl: z.string().url().nullable().optional(),
+  imageUrl: z.string().url(),
+});
+
+// Registered residents authenticate before intake, so their callback number is
+// always taken from the verified account record rather than from device input.
+export const RegisteredEmergencyIntakeSchema = EmergencyIntakeSchema.omit({
+  contactNumber: true,
 });
 
 export type EmergencyIntake = z.infer<typeof EmergencyIntakeSchema>;
@@ -41,7 +52,7 @@ function isWithinBaliwag(latitude: number, longitude: number) {
 
 function isConsistent(input: EmergencyIntake) {
   if (input.nature === 'NON-EMERGENCY') return true;
-  return input.peopleInvolved !== 'None' && input.incidentType !== 'Unknown Cause' && input.victimCondition !== 'Unknown / Cannot assess';
+  return input.peopleInvolved > 0 && input.incidentType !== 'Unknown Cause' && input.victimCondition !== 'Unknown / cannot assess';
 }
 
 export async function submitEmergencyIntake(input: EmergencyIntake, actor: IntakeActor) {
@@ -64,7 +75,6 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
   if (!consistent) reasons.push('The incident answers need clarification.');
   if (nearbyDuplicate) reasons.push('A similar report was submitted nearby in the last 20 minutes.');
   if (repeatedContact) reasons.push('This contact number has repeated recent submissions.');
-  if (!input.imageUrl) reasons.push('No photo/evidence was supplied; this is optional.');
 
   let triageClassification: TriageClassification;
   if (nearbyDuplicate || repeatedContact) {
@@ -89,12 +99,12 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
     status: 'PENDING',
     nature: input.nature,
     type: input.incidentType,
-    peopleInvolved: input.peopleInvolved,
+    peopleInvolved: String(input.peopleInvolved),
     severity: input.severity,
     locationDescription: `${input.landmarks}\nCondition: ${input.victimCondition}`,
     latitude: input.latitude,
     longitude: input.longitude,
-    imageUrl: input.imageUrl ?? null,
+    imageUrl: input.imageUrl,
     triageClassification,
     triageReasons: reasons,
   }).returning();

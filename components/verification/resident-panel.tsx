@@ -39,6 +39,10 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
     !request.incident.responderId &&
     !request.incident.currentOfferResponderId;
 
+  const canMergeDuplicate =
+    request.status === "PENDING" &&
+    request.nature === "EMERGENCY";
+
   return (
     <div className="w-80 shrink-0 border-l bg-white p-4 flex flex-col gap-6">
       <div className="flex flex-col gap-3">
@@ -48,7 +52,7 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
             className="w-full flex items-center justify-center gap-2"
             onClick={() => onReject(request.id)}
             disabled={
-              isProcessing || 
+              isProcessing ||
               !(request.status === "PENDING" || needsManualDispatch)
             }
           >
@@ -59,7 +63,7 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
             className="w-full bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 text-white flex items-center justify-center gap-2"
             onClick={() => onAccept(request.id)}
             disabled={
-              isProcessing || 
+              isProcessing ||
               (request.status === "REJECTED") ||
               (request.status === "VERIFIED" && request.incident ? !!(request.incident.responderId || request.incident.currentOfferResponderId) : false)
             }
@@ -68,7 +72,7 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
             {request.status === "VERIFIED" ? "Dispatch" : "Accept"}
           </Button>
         </div>
-        {request.status === "PENDING" && request.nature === "EMERGENCY" && (
+        {canMergeDuplicate && (
           <Button
             className="w-full bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2"
             onClick={() => onMerge?.(request.id)}

@@ -9,11 +9,14 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 import { WebPreloader } from "@/components/ui/web-preloader";
 
 export default function ReportsPage() {
+  const { role } = useAuth();
   const [category, setCategory] = React.useState<"user" | "responder">("responder");
+  const [reporterSource, setReporterSource] = React.useState<"all" | "registered" | "guest">("all");
   const [data, setData] = React.useState<ReportEntry[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [filters, setFilters] = React.useState<ReportFilter>({});
@@ -50,6 +53,9 @@ export default function ReportsPage() {
     try {
       const params = new URLSearchParams();
       params.append("category", category);
+      if (category === "user" && role === "cdrrmo_super_admin") {
+        params.append("reporterSource", reporterSource);
+      }
       if (filters.search) params.append("search", filters.search);
       if (filters.type) params.append("type", filters.type);
       if (filters.status) params.append("status", filters.status);
@@ -63,7 +69,7 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, category]);
+  }, [filters, category, reporterSource, role]);
 
   React.useEffect(() => {
     fetchReports();
@@ -143,6 +149,7 @@ export default function ReportsPage() {
           type: filters.type,
           status: filters.status,
           category: category,
+          reporterSource: category === "user" ? reporterSource : undefined,
         });
       })(),
       {
@@ -169,6 +176,7 @@ export default function ReportsPage() {
           <button
             onClick={() => {
               setCategory("responder");
+              setReporterSource("all");
               setActiveTab("all");
               setFilters({});
               setRowSelection({});
@@ -185,6 +193,7 @@ export default function ReportsPage() {
           <button
             onClick={() => {
               setCategory("user");
+              setReporterSource("all");
               setActiveTab("all");
               setFilters({});
               setRowSelection({});
@@ -200,6 +209,33 @@ export default function ReportsPage() {
           </button>
         </div>
       </div>
+
+      {category === "user" && role === "cdrrmo_super_admin" && (
+        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+          <span className="px-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Reporter source</span>
+          {([
+            ["all", "All Reports"],
+            ["registered", "Registered Residents"],
+            ["guest", "Guest Reports"],
+          ] as const).map(([source, label]) => (
+            <button
+              key={source}
+              onClick={() => {
+                setReporterSource(source);
+                setRowSelection({});
+              }}
+              className={cn(
+                "rounded-lg px-4 py-2 text-xs font-bold transition-colors",
+                reporterSource === source
+                  ? "bg-[#1E3A8A] text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col rounded-xl shadow-xl border border-slate-200/80 overflow-hidden bg-white">
         <ReportsHeader

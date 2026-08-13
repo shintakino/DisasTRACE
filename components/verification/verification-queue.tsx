@@ -65,8 +65,9 @@ export function VerificationQueue({
     );
   };
 
-  const isAction = (r: VerificationRequest) => r.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY' || r.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY';
-  const isReview = (r: VerificationRequest) => r.triageClassification === 'UNCERTAIN_INCOMPLETE' || r.triageClassification === 'SUSPICIOUS_POSSIBLE_PRANK';
+  const isActiveQueueRequest = (r: VerificationRequest) => r.status !== 'DUPLICATE' && r.status !== 'REJECTED';
+  const isAction = (r: VerificationRequest) => isActiveQueueRequest(r) && (r.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY' || r.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY');
+  const isReview = (r: VerificationRequest) => isActiveQueueRequest(r) && (r.triageClassification === 'UNCERTAIN_INCOMPLETE' || r.triageClassification === 'SUSPICIOUS_POSSIBLE_PRANK');
   const counts = {
     ACTION: requests.filter(isAction).length,
     REVIEW: requests.filter(isReview).length,

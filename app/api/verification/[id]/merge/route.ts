@@ -4,6 +4,11 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+import { z } from "zod";
+
+const MergeRequestSchema = z.object({
+  parentRequestId: z.string().min(1),
+});
 
 export async function POST(
   req: NextRequest,
@@ -11,15 +16,14 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body = await req.json();
-    const { parentRequestId } = body;
-
-    if (!parentRequestId) {
+    const payload = MergeRequestSchema.safeParse(await req.json());
+    if (!payload.success) {
       return NextResponse.json(
         { error: "Parent request ID is required" },
         { status: 400 }
       );
     }
+    const { parentRequestId } = payload.data;
 
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();

@@ -44,7 +44,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 
 - A person can choose **Login as Guest** from the launch or sign-in screen during an emergency.
 - The person goes directly to the Emergency Chatbot; no account is created and no general app access is granted.
-- The chatbot captures a callback number, GPS and written location, incident details, people affected, condition, and optional evidence.
+- The guest chatbot captures a valid Philippine mobile callback number, automatic GPS, a nearby landmark/reference, incident details, the exact number of people affected, condition, and required photo/evidence. The registered-resident chatbot uses the verified phone number already stored on the account and follows the same automatic GPS/landmark process; location permission is required to continue.
 - Automated initial triage sends high-confidence emergencies into ambulance dispatch and routes non-emergency or flagged reports to PACC.
 - When a response starts, the device can view its live response/tracking status.
 - PACC can record coordination with PNP, BFP, CDRRMO, Barangay, DSWD, or Hospital; residents and guests see the dynamic agencies and responder status.

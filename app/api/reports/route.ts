@@ -21,6 +21,8 @@ const SubmitReportSchema = z.object({
   driverTripTicket: DriverTripTicketPayloadSchema.optional().nullable(),
 });
 
+const ReporterSourceSchema = z.enum(['all', 'registered', 'guest']).catch('all');
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -42,11 +44,20 @@ export async function GET(req: NextRequest) {
     });
 
     const category = searchParams.get("category") || "responder";
+    const reporterSource = ReporterSourceSchema.parse(searchParams.get('reporterSource'));
+    const reporterSourceCondition = reporterSource === 'guest'
+      ? eq(verificationRequests.reporterType, 'GUEST')
+      : reporterSource === 'registered'
+        ? eq(verificationRequests.reporterType, 'REGISTERED')
+        : undefined;
 
     if (category === "user") {
       const whereConditions: any[] = [];
       if (userProfile && userProfile.role === 'public_user') {
         whereConditions.push(eq(verificationRequests.residentId, user.id));
+      }
+      if (reporterSourceCondition) {
+        whereConditions.push(reporterSourceCondition);
       }
 
       const dbRequests = await db
@@ -139,6 +150,9 @@ export async function GET(req: NextRequest) {
         // Residents can only view verification reports they created
         whereConditions.push(eq(verificationRequests.residentId, user.id));
       }
+    }
+    if (reporterSourceCondition) {
+      whereConditions.push(reporterSourceCondition);
     }
 
     // Fetch reports by joining Drizzle schema tables with dynamic filters

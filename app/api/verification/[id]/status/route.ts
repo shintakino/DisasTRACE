@@ -102,6 +102,10 @@ export async function PATCH(
       if (finalReq.peopleInvolved === '1-2 Persons') peopleCount = 2;
       else if (finalReq.peopleInvolved === '3-5 Persons') peopleCount = 4;
       else if (finalReq.peopleInvolved === '6+ Persons') peopleCount = 6;
+      else {
+        const parsedPeopleCount = Number.parseInt(finalReq.peopleInvolved, 10);
+        if (Number.isFinite(parsedPeopleCount)) peopleCount = parsedPeopleCount;
+      }
 
       mappedReq = {
         id: finalReq.id,

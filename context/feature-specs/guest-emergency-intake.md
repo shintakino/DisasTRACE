@@ -9,11 +9,30 @@ keeping account verification in place for all non-emergency app access.
 
 Guests use the conversational intake. Approved residents have two explicitly
 separate reporting choices: **HELP** opens the direct camera/form path, while
-**Emergency Chatbot** opens the conversational intake. The chatbot collects a
-contact number, GPS coordinates plus a written location, what happened, people
-affected, victim condition, and an optional photo/evidence attachment. Follow-up
-questions are selected from the stated incident type; the conversation never
-requires evidence before an emergency can be submitted.
+**Emergency Chatbot** opens the conversational intake. Guests provide a valid
+Philippine mobile contact number. Registered residents skip that question: the
+server uses their verified account number. The chatbot collects automatic GPS
+coordinates plus a nearby landmark/reference (not a full address), what
+happened, the exact number of people affected, victim condition, and a required
+photo/evidence attachment. It automatically requests the device's current
+location when the bot opens for both guests and registered residents; location
+permission and a GPS capture are required to continue.
+Follow-up questions are selected from the stated incident type.
+
+The mobile presentation is a compact, step-by-step emergency conversation: a
+bot prompt is followed by a single focused response card, red response and
+emergency accents, captured GPS/evidence cards, progress indicators, and a
+separate review-and-submit summary. This presentation is shared by guest and
+registered-resident chatbot reporting; it does not replace the resident HELP
+camera/form flow. Required steps show immediate, specific validation guidance;
+the user can attach required evidence with either the camera or photo library.
+GPS outside the Baliwag service area is visibly warned but remains submittable
+for PACC coordination rather than silently blocking a person in need.
+
+Before submission, chatbot evidence is sent to the server-mediated emergency-intake
+evidence API rather than directly from a guest device to Supabase Storage. The
+API accepts only JPEG, PNG, or WebP images up to 5MB and returns the stored
+public URL for the report.
 
 ## Initial triage
 
@@ -45,6 +64,18 @@ registered residents without gaining access to any other protected data.
 The queue is grouped into **For Action** (both high-confidence emergency and
 non-emergency) and **For Review** (uncertain or suspicious). Existing verified,
 rejected, and duplicate outcomes remain available as operational states.
+
+PACC has the same reject, manual-dispatch, and duplicate-merge controls for
+guest and registered reports. Merging a duplicate marks it `DUPLICATE` and
+removes it from the active PACC queues.
+
+## CDRRMO Super Admin report separation
+
+In **User Submitted Reports**, the CDRRMO Super Admin can switch between **All
+Reports**, **Registered Residents**, and **Guest Reports**. The selection is
+enforced by the report API using the recorded reporter type, so the table,
+count, and PDF summary export all cover only the selected report source. Guest
+reports remain incident-linked and never imply a registered resident account.
 
 ## Agency coordination status
 

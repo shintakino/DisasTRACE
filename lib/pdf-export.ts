@@ -74,7 +74,7 @@ const convertSvgPathToDataUrl = async (d: string, width = 400, height = 150): Pr
  */
 export async function exportReportsSummaryPDF(
   reports: ReportEntry[],
-  filters: { search?: string; type?: string; status?: string; category?: "user" | "responder" } = {}
+  filters: { search?: string; type?: string; status?: string; category?: "user" | "responder"; reporterSource?: "all" | "registered" | "guest" } = {}
 ) {
   if (typeof window === "undefined") return;
 
@@ -137,6 +137,9 @@ export async function exportReportsSummaryPDF(
     const activeFilters = [];
     if (filters.search) activeFilters.push(`Search: "${filters.search}"`);
     if (filters.type) activeFilters.push(`Type: ${filters.type}`);
+    if (filters.reporterSource && filters.reporterSource !== 'all') {
+      activeFilters.push(filters.reporterSource === 'guest' ? 'Source: Guest Reports' : 'Source: Registered Residents');
+    }
     if (filters.status) activeFilters.push(`Status: ${filters.status}`);
     const filterText = activeFilters.length > 0 ? activeFilters.join(" | ") : "None";
 

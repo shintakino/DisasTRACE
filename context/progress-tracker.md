@@ -12,6 +12,53 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed
 
+- **Registered Chatbot Profile Contact and Required GPS**: Removed the editable contact-number step from the registered-resident chatbot while preserving it for guest emergency intake. The registered intake route now derives and validates the callback number from the approved resident account instead of accepting a client-supplied value. The resident chatbot requests foreground GPS permission on entry, makes the captured location mandatory before progression, and gives a persistent retry/error explanation when permission or capture fails.
+
+- **Automatic GPS and Landmark-Only Chatbot Location**: Both guest and registered-resident chatbot reports now request and capture current foreground GPS immediately on entry. The supplementary location prompt asks only for a nearby recognizable landmark/reference (for example a building, shop, street sign, or barangay), rather than a full address; GPS permission and a captured position remain required before the report can continue. Verified with root and mobile `npx tsc --noEmit` plus a successful production `npm run build`.
+
+- **Guest Evidence Upload Reliability Fix**: Replaced direct guest-device
+  Supabase Storage uploads with `POST /api/emergency-intake/evidence`. The API
+  validates required JPEG/PNG/WebP evidence up to 5MB and uploads using the
+  server storage client, so a guest no longer needs an authenticated Supabase
+  Storage session or anonymous write policy. The chatbot now reports the actual
+  upload error and allows retaking/choosing another image. Verified with root
+  and mobile `npx tsc --noEmit` plus a successful production `npm run build`.
+
+- **Fool-Proof Emergency Chatbot Guardrails**: Added immediate inline feedback
+  for invalid Philippine mobile numbers, short location descriptions, and invalid
+  people counts; a clear GPS-outside-Baliwag coordination warning; camera and
+  photo-library evidence options; permission recovery messaging; upload-failure
+  feedback; and a final defensive completeness check before submission. The
+  server intake schema remains the authority for the same required data. Verified
+  with root and mobile `npx tsc --noEmit`.
+
+- **Required Chatbot Contact, Evidence, and Exact People Count**: The Emergency
+  Chatbot now requires a valid Philippine mobile number (`09XXXXXXXXX` or
+  `+639XXXXXXXXX`), an exact whole-number people count (1–999), and a successful
+  photo/evidence upload. The shared guest/registered intake schema enforces the
+  same rules server-side, normalizes allowable phone formatting, and stores the
+  exact people count while continuing to read older range-based reports. Verified
+  with root and mobile `npx tsc --noEmit`.
+
+- **Conversational Emergency Chatbot Redesign**: Redesigned the guest and
+  resident Emergency Chatbot to use the attached-reference style: emergency-red
+  bot/answer bubbles, incident cards, focused step cards, GPS and evidence
+  cards, progress steps, and a final review-and-confirm screen. The existing
+  guest/registered intake API, optional evidence behavior, and separate resident
+  HELP form path remain unchanged. Verified with mobile `npx tsc --noEmit`.
+
+- **PACC Guest Report Action Parity and Duplicate Merge**: PACC now has the
+  same reject, manual-dispatch, and original duplicate-merge controls for guest
+  and registered reports. The action APIs no longer block guest reporters, and
+  a report marked `DUPLICATE` is excluded from **For Action** and **For Review**
+  immediately. Verified with `npx tsc --noEmit`.
+
+- **CDRRMO Guest-versus-Registered Report Separation**: Added a CDRRMO Super
+  Admin-only reporter-source control in **User Submitted Reports** for **All
+  Reports**, **Registered Residents**, and **Guest Reports**. The reports API
+  filters on the persisted `reporter_type`, and PDF summary exports preserve the
+  same selected source. Verified with `npx tsc --noEmit`.
+
 - **Separate Resident HELP and Chatbot Choices**: Restored the resident HELP button to the direct camera/form report path and added a separate visible **Emergency Chatbot** action for the guided intake path. Approved residents can now choose either reporting experience. Verified with mobile `npx tsc --noEmit`.
 
 - **Revision V1 Workflow Documentation**: Added [RevisionV1.md](file:///D:/dev/freelance/disas_trace/RevisionV1.md), documenting all current guest, registered resident, PACC, responder, coordination, realtime-map, and CDRRMO export scenarios.

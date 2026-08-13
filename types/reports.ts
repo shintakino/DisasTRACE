@@ -39,6 +39,9 @@ export const ReportFilterSchema = z.object({
 });
 export type ReportFilter = z.infer<typeof ReportFilterSchema>;
 
+export const ReporterSourceSchema = z.enum(['all', 'registered', 'guest']);
+export type ReporterSource = z.infer<typeof ReporterSourceSchema>;
+
 export const DispatchInfoSchema = z.object({
   date: z.string().optional().nullable(),
   unit: z.string().optional().nullable(),

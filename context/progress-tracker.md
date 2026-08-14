@@ -12,7 +12,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed
 
-- **Visible PACC Agency Coordination Controls**: Replaced the missing/invisible agency chips in PACC verification details with explicit, keyboard-accessible checkbox cards. PACC can now clearly select one or multiple agencies (PNP, BFP, CDRRMO, Barangay, DSWD, and Hospital), while the existing coordination update API and live reporting-device status remain unchanged.
+- **Visible PACC Agency Coordination Controls**: Replaced the missing/invisible agency chips in PACC verification details with explicit, keyboard-accessible checkbox cards. Fixed the flex-column shrink behavior that caused the evidence image to overlap the lower half of the selector; each PACC detail section now keeps its full height and the column scrolls normally. PACC can clearly select one or multiple agencies (PNP, BFP, CDRRMO, Barangay, DSWD, and Hospital), while the existing coordination update API and live reporting-device status remain unchanged.
 
 - **Registered Chatbot Profile Contact and Required GPS**: Removed the editable contact-number step from the registered-resident chatbot while preserving it for guest emergency intake. The registered intake route now derives and validates the callback number from the approved resident account instead of accepting a client-supplied value. The resident chatbot requests foreground GPS permission on entry, makes the captured location mandatory before progression, and gives a persistent retry/error explanation when permission or capture fails.
 

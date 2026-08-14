@@ -54,7 +54,7 @@ export function VerificationDetails({ request, onOverrideClassification, onUpdat
         </div>
       </div>
 
-      <Card className="mb-6 p-4 border-amber-200 bg-amber-50/50">
+      <Card className="mb-6 shrink-0 p-4 border-amber-200 bg-amber-50/50">
         <div className="text-xs font-bold uppercase tracking-wider text-amber-900">Automated initial verification</div>
         <div className="mt-1 font-bold text-sm text-slate-900">{request.triageClassification.replaceAll('_', ' ')}</div>
         <div className="mt-1 text-xs text-slate-600">{request.triageReasons.join(' ')}</div>
@@ -67,7 +67,7 @@ export function VerificationDetails({ request, onOverrideClassification, onUpdat
         </select>
       </Card>
 
-      <Card className="mb-6 p-4 border-blue-200 bg-blue-50/50">
+      <Card className="mb-6 shrink-0 p-4 border-blue-200 bg-blue-50/50">
         <div className="text-xs font-bold uppercase tracking-wider text-blue-900">PACC agency coordination</div>
         <p className="mt-1 text-xs text-slate-600">Select every agency PACC is actively coordinating with. The reporter sees this status immediately.</p>
         <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Agencies being coordinated by PACC">
@@ -87,7 +87,7 @@ export function VerificationDetails({ request, onOverrideClassification, onUpdat
         </div>
       </Card>
 
-      <div className="relative rounded-xl overflow-hidden aspect-video bg-muted mb-8 border shadow-sm">
+      <div className="relative mb-8 shrink-0 overflow-hidden rounded-xl border bg-muted shadow-sm aspect-video">
         {request.imageUrl ? (
           <img
             src={request.imageUrl}

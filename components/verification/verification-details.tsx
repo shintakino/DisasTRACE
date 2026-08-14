@@ -70,12 +70,19 @@ export function VerificationDetails({ request, onOverrideClassification, onUpdat
       <Card className="mb-6 p-4 border-blue-200 bg-blue-50/50">
         <div className="text-xs font-bold uppercase tracking-wider text-blue-900">PACC agency coordination</div>
         <p className="mt-1 text-xs text-slate-600">Select every agency PACC is actively coordinating with. The reporter sees this status immediately.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Agencies being coordinated by PACC">
           {AGENCIES.map((agency) => {
             const active = request.coordinationAgencies.includes(agency)
-            return <button key={agency} type="button" disabled={isProcessing} onClick={() => onUpdateCoordination(request.id, active ? request.coordinationAgencies.filter((item) => item !== agency) : [...request.coordinationAgencies, agency])} className={cn('rounded-md border px-3 py-1.5 text-xs font-bold transition-colors', active ? 'border-[#1E3A8A] bg-[#1E3A8A] text-white' : 'border-blue-200 bg-white text-[#1E3A8A] hover:bg-blue-100')}>
-              {agency}
-            </button>
+            return <label key={agency} className={cn('flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-bold transition-colors', active ? 'border-[#1E3A8A] bg-[#1E3A8A] text-white' : 'border-blue-300 bg-white text-[#1E3A8A] hover:bg-blue-100', isProcessing && 'cursor-not-allowed opacity-60')}>
+              <input
+                type="checkbox"
+                checked={active}
+                disabled={isProcessing}
+                onChange={() => onUpdateCoordination(request.id, active ? request.coordinationAgencies.filter((item) => item !== agency) : [...request.coordinationAgencies, agency])}
+                className="size-4 shrink-0 accent-[#1E3A8A]"
+              />
+              <span>{agency}</span>
+            </label>
           })}
         </div>
       </Card>

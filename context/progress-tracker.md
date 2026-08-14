@@ -12,6 +12,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed
 
+- **Visible PACC Agency Coordination Controls**: Replaced the missing/invisible agency chips in PACC verification details with explicit, keyboard-accessible checkbox cards. PACC can now clearly select one or multiple agencies (PNP, BFP, CDRRMO, Barangay, DSWD, and Hospital), while the existing coordination update API and live reporting-device status remain unchanged.
+
 - **Registered Chatbot Profile Contact and Required GPS**: Removed the editable contact-number step from the registered-resident chatbot while preserving it for guest emergency intake. The registered intake route now derives and validates the callback number from the approved resident account instead of accepting a client-supplied value. The resident chatbot requests foreground GPS permission on entry, makes the captured location mandatory before progression, and gives a persistent retry/error explanation when permission or capture fails.
 
 - **Automatic GPS and Landmark-Only Chatbot Location**: Both guest and registered-resident chatbot reports now request and capture current foreground GPS immediately on entry. The supplementary location prompt asks only for a nearby recognizable landmark/reference (for example a building, shop, street sign, or barangay), rather than a full address; GPS permission and a captured position remain required before the report can continue. Verified with root and mobile `npx tsc --noEmit` plus a successful production `npm run build`.

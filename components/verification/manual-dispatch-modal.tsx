@@ -22,7 +22,7 @@ interface ManualDispatchModalProps {
   onClose: () => void
   requestId: string | null
   requestNum: string | null // e.g. REQ-2026-0046
-  onSuccess: () => void
+  onSuccess: () => Promise<void>
 }
 
 export function ManualDispatchModal({
@@ -101,7 +101,7 @@ export function ManualDispatchModal({
       const data = await response.json()
       if (data.success) {
         toast.success(`Manual dispatch offer sent to ${responderName}! Awaiting acceptance.`)
-        onSuccess()
+        await onSuccess()
         onClose()
       } else {
         throw new Error(data.error || "Failed to dispatch responder")

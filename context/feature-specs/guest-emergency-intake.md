@@ -59,6 +59,12 @@ to read its response status and the responder's safe live-tracking details. Afte
 a responder is assigned, guests can open the same live ambulance map/tracker as
 registered residents without gaining access to any other protected data.
 
+When a guest report is waiting in PACC, the pending screen refreshes only this
+token-authorized status every three seconds. Once PACC verifies or manually
+dispatches it, the guest moves to the response-status screen, which continues
+the same scoped refresh until responder movement is available. This avoids direct
+anonymous reads or Realtime subscriptions to protected report tables.
+
 ## PACC queue
 
 The queue is grouped into **For Action** (both high-confidence emergency and
@@ -68,6 +74,11 @@ rejected, and duplicate outcomes remain available as operational states.
 PACC has the same reject, manual-dispatch, and duplicate-merge controls for
 guest and registered reports. Merging a duplicate marks it `DUPLICATE` and
 removes it from the active PACC queues.
+
+Manual dispatch commits the responder offer, request verification state, and
+responder reservation as one database transaction. PACC receives success only
+after all three states commit, so an offer cannot reach a responder while PACC
+is told that dispatch failed.
 
 ## CDRRMO Super Admin report separation
 

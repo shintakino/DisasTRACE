@@ -65,7 +65,7 @@
 
 ### Guest Emergency Exception and Initial Triage
 
-- An unauthenticated device may use only the Emergency Chatbot and its report-status view. Guest reports have no `resident_id`; a random report access token returned only to the submitting device authorizes guest status reads. Guests cannot access tabs, history, profile data, or protected APIs.
+- An unauthenticated device may use only the Emergency Chatbot and its report-status view. Guest reports have no `resident_id`; a random report access token returned only to the submitting device authorizes guest status reads. Guests cannot access tabs, history, profile data, or protected APIs. Because a guest has no Supabase session, the guest pending and response-status views refresh that scoped token API every three seconds instead of subscribing directly to protected database Realtime channels.
 - Approved residents and guests use the same validated REST intake. Guests provide a valid Philippine mobile callback number; the registered route derives that number from the verified account record rather than trusting device input. Both record incident details, an exact people-affected count, condition, automatic GPS, a nearby landmark/reference, and required evidence. Both chatbots automatically request foreground location permission and cannot proceed without a GPS capture.
 - Guest chatbot evidence is uploaded through `POST /api/emergency-intake/evidence`, which validates a 5MB JPEG/PNG/WebP file and uses the server storage client. This avoids granting unauthenticated guest devices direct Storage write access; the endpoint returns the public incident-photo URL used by intake.
 - The API records deterministic initial triage with reasons: `HIGH_CONFIDENCE_EMERGENCY`, `HIGH_CONFIDENCE_NON_EMERGENCY`, `UNCERTAIN_INCOMPLETE`, or `SUSPICIOUS_POSSIBLE_PRANK`. Only the first class starts automated ambulance dispatch. PACC receives the other classes and can override any classification.
@@ -78,13 +78,13 @@
 
 ## Real-Time Model
 
-- **Supabase Realtime** powers all live data synchronization:
+- **Supabase Realtime** powers all authenticated live data synchronization:
   - New incident reports → PACC Admin dashboard.
   - Dispatch assignments → Ambulance Responder mobile app.
   - Ambulance GPS position updates → Public User tracking screen and admin map.
   - Responder status changes → Admin status monitoring panels.
   - Notification delivery → In-app notification panels.
-- Channels are scoped by role and incident context to minimize unnecessary data transfer.
+- Channels are scoped by role and incident context to minimize unnecessary data transfer. Guest response-state synchronization uses the restricted report-status API with the per-report token rather than exposing a direct anonymous Realtime subscription.
 
 ## Mapping Model
 
@@ -106,7 +106,7 @@
 2. Auth and role checks are enforced at every API mutation boundary.
 3. All database access goes through Drizzle ORM — no raw SQL.
 4. Binary assets (photos, IDs, PDFs) are stored in Supabase Storage, not in the database.
-5. Real-time data flows through Supabase Realtime — no polling.
+5. Authenticated real-time data flows through Supabase Realtime. The only polling exception is a guest device refreshing its own token-authorized response state; anonymous database subscriptions are never exposed.
 6. The REST API is the single source of truth — the mobile app and web dashboard are both consumers.
 7. All mapping uses OpenFreeMap + MapLibre — no paid map services.
 8. Notifications are in-app only — no external notification infrastructure.

@@ -19,6 +19,7 @@ export default function PendingScreen() {
   const [isAccepted, setIsAccepted] = useState(false); // Simulate acceptance
   const [isSecuringResponder, setIsSecuringResponder] = useState(false);
   const incidentChannelRef = useRef<any>(null);
+  const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
 
   // Lock gestures and navigation
   useEffect(() => {
@@ -83,6 +84,34 @@ export default function PendingScreen() {
 
     let active = true;
 
+    if (isGuest && report.guestAccessToken) {
+      const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+      const checkGuestStatus = async () => {
+        try {
+          const response = await fetch(`${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(requestId)}&accessToken=${encodeURIComponent(report.guestAccessToken!)}`);
+          const result = await response.json();
+          if (!active || !response.ok || !result.data) return;
+
+          const incident = result.data.incident as { id: string } | null;
+          if (result.data.status === 'VERIFIED' || incident) {
+            useEmergencyReportStore.setState((state) => ({
+              report: { ...state.report, incidentId: incident?.id },
+            }));
+            router.replace('/help/response-status');
+          }
+        } catch (error) {
+          console.error('[PendingScreen] Guest status check failed:', error);
+        }
+      };
+
+      void checkGuestStatus();
+      const interval = setInterval(() => void checkGuestStatus(), 3000);
+      return () => {
+        active = false;
+        clearInterval(interval);
+      };
+    }
+
     async function checkCurrentStatus() {
       try {
         const { data: request, error: reqError } = await supabase
@@ -132,12 +161,12 @@ export default function PendingScreen() {
     return () => {
       active = false;
     };
-  }, [report.id]);
+  }, [isGuest, report.guestAccessToken, report.id, router]);
 
   // Real-time verification request listener
   useEffect(() => {
     const requestId = report.id as string;
-    if (!requestId) return;
+    if (!requestId || isGuest) return;
 
     console.log('[PendingScreen] Subscribing to status changes for request ID:', requestId);
 
@@ -295,7 +324,7 @@ export default function PendingScreen() {
         incidentChannelRef.current = null;
       }
     };
-  }, [report.id]);
+  }, [isGuest, report.id, router]);
 
   // Trigger tactile haptic success feedback and start auto-navigation timer when accepted
   useEffect(() => {

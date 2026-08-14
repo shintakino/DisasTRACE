@@ -73,53 +73,51 @@ export async function POST(
       where: eq(incidents.requestId, id),
     });
 
-    let incidentResult;
-    if (existingIncident) {
-      // Update the existing incident (transmit offer to responder with PACC_MANUAL method)
-      const [updatedIncident] = await db.update(incidents)
-        .set({
+    // Keep the offer, report state, and responder reservation in one commit. This
+    // prevents a responder receiving an offer when PACC has received an API error.
+    const incidentResult = await db.transaction(async (tx) => {
+      const [incident] = existingIncident
+        ? await tx.update(incidents)
+          .set({
+            responderId: null,
+            status: "DISPATCHED",
+            assignedAmbulance: vehicleId,
+            etaMinutes: 8,
+            currentOfferResponderId: responderId,
+            offerExpiresAt,
+            dispatchMethod: "PACC_MANUAL",
+          })
+          .where(eq(incidents.id, existingIncident.id))
+          .returning()
+        : await tx.insert(incidents).values({
+          id: crypto.randomUUID(),
+          requestId: id,
           responderId: null,
           status: "DISPATCHED",
           assignedAmbulance: vehicleId,
           etaMinutes: 8,
           currentOfferResponderId: responderId,
-          offerExpiresAt: offerExpiresAt,
+          skippedResponderIds: [],
+          offerExpiresAt,
           dispatchMethod: "PACC_MANUAL",
-        })
-        .where(eq(incidents.id, existingIncident.id))
-        .returning();
-      incidentResult = updatedIncident;
-    } else {
-      // Create a new incident
-      const [newIncident] = await db.insert(incidents).values({
-        id: crypto.randomUUID(),
-        requestId: id,
-        responderId: null,
-        status: "DISPATCHED",
-        assignedAmbulance: vehicleId,
-        etaMinutes: 8,
-        currentOfferResponderId: responderId,
-        skippedResponderIds: [],
-        offerExpiresAt: offerExpiresAt,
-        dispatchMethod: "PACC_MANUAL",
-      }).returning();
-      incidentResult = newIncident;
-    }
+        }).returning();
 
-    // 5. Mark the verification request as VERIFIED
-    await db.update(verificationRequests)
-      .set({
-        status: "VERIFIED",
-        updatedAt: new Date()
-      })
-      .where(eq(verificationRequests.id, id));
+      if (!incident) throw new Error("Unable to create the dispatch offer.");
 
-    // 6. Reserve responder as ACTIVE_DISPATCH
-    await db.update(users)
-      .set({ dutyStatus: "ACTIVE_DISPATCH" })
-      .where(eq(users.id, responderId));
+      await tx.update(verificationRequests)
+        .set({ status: "VERIFIED", updatedAt: new Date() })
+        .where(eq(verificationRequests.id, id));
 
-    // 7. Notify PACC and CDRRMO of transmitted manual offer
+      const reserved = await tx.update(users)
+        .set({ dutyStatus: "ACTIVE_DISPATCH" })
+        .where(eq(users.id, responderId))
+        .returning({ id: users.id });
+      if (reserved.length === 0) throw new Error("Selected responder is no longer available.");
+
+      return incident;
+    });
+
+    // 5. Notify PACC and CDRRMO only after the transaction has committed.
     await notifyPaccAndCdrrmo({
       title: "Manual Dispatch Offer Transmitted",
       body: `Manual dispatch offer sent to ${responder.fullName} for Request #${existingReq.requestId || id}. Awaiting responder acceptance.`,

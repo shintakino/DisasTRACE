@@ -169,7 +169,7 @@ export default function VerificationPage() {
     }
   };
 
-  const fetchRequests = async () => {
+  const fetchRequests = async (): Promise<VerificationRequest[]> => {
     setIsLoading(true)
     try {
       const response = await fetch("/api/verification")
@@ -182,9 +182,11 @@ export default function VerificationPage() {
         const firstPending = data.find((r: VerificationRequest) => r.status === "PENDING" || needsManualDispatch(r))
         if (firstPending) setSelectedId(firstPending.id)
       }
+      return data
     } catch (error) {
       console.error(error)
       toast.error("Failed to load verification requests")
+      return []
     } finally {
       setIsLoading(false)
     }
@@ -384,12 +386,12 @@ export default function VerificationPage() {
 
   const handleDispatchSuccess = async () => {
     const dispatchedId = dispatchReqId;
-    await fetchRequests()
+    const refreshedRequests = await fetchRequests()
     if (dispatchedId) {
-      const currentIdx = requests.findIndex((r) => r.id === dispatchedId)
+      const currentIdx = refreshedRequests.findIndex((r) => r.id === dispatchedId)
       const nextPending =
-        requests.slice(currentIdx + 1).find((r) => r.status === "PENDING" || needsManualDispatch(r)) ||
-        requests.slice(0, currentIdx).find((r) => r.status === "PENDING" || needsManualDispatch(r))
+        refreshedRequests.slice(currentIdx + 1).find((r) => r.status === "PENDING" || needsManualDispatch(r)) ||
+        refreshedRequests.slice(0, currentIdx).find((r) => r.status === "PENDING" || needsManualDispatch(r))
 
       if (nextPending) {
         setSelectedId(nextPending.id)

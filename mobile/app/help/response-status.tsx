@@ -29,6 +29,7 @@ export default function EmergencyResponseStatusScreen() {
   const [incident, setIncident] = useState<IncidentStatus | null>(null);
   const [agencies, setAgencies] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
 
   useEffect(() => {
     if (!report.id) return;
@@ -36,7 +37,7 @@ export default function EmergencyResponseStatusScreen() {
     const requestId = report.id;
     const load = async () => {
       try {
-        if (report.reporterMode === 'guest' && report.guestAccessToken) {
+        if (isGuest && report.guestAccessToken) {
           const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
           const response = await fetch(`${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(requestId)}&accessToken=${encodeURIComponent(report.guestAccessToken)}`);
           const result = await response.json();
@@ -58,6 +59,13 @@ export default function EmergencyResponseStatusScreen() {
       }
     };
     void load();
+    if (isGuest) {
+      const interval = setInterval(() => void load(), 3000);
+      return () => {
+        mounted = false;
+        clearInterval(interval);
+      };
+    }
     const channel = supabase.channel(`response-status-${requestId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'incidents', filter: `request_id=eq.${requestId}` }, (payload) => {
       const record = payload.new as { status?: IncidentStatus['status']; responder_id?: string | null };
       if (record.status) setIncident({ status: record.status, responderId: record.responder_id ?? null });
@@ -66,7 +74,7 @@ export default function EmergencyResponseStatusScreen() {
       setAgencies(record.coordination_agencies || []);
     }).subscribe();
     return () => { mounted = false; supabase.removeChannel(channel); };
-  }, [report.guestAccessToken, report.id, report.reporterMode]);
+  }, [isGuest, report.guestAccessToken, report.id]);
 
   const message = useMemo(() => messageFor(incident, agencies), [agencies, incident]);
   return <View style={styles.page}>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
 import { X, Truck, Image as ImageIcon } from 'lucide-react-native';
+import { getReportLocation } from '../../lib/report-location';
 
 export function ReportDetailModal({ 
   visible, 
@@ -31,7 +32,7 @@ export function ReportDetailModal({
       type: report.type,
       severityLevel: report.severityLevel || 'Medium',
       peopleInvolved: report.peopleInvolved,
-      location: report.location,
+      location: getReportLocation(report.location),
       residentPhotoUrl: report.residentPhotoUrl,
       isPrimary: true,
     },
@@ -179,7 +180,7 @@ export function ReportDetailModal({
                 </View>
                 <View className="flex-row justify-between mb-6">
                   <Text className="text-sm font-medium text-slate-500">Location</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.location}</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{getReportLocation(currentReport.location)}</Text>
                 </View>
                 
                 {/* Attached Image */}
@@ -233,7 +234,7 @@ export function ReportDetailModal({
                     </View>
                     <View className="flex-row justify-between mb-4">
                       <Text className="text-sm font-medium text-slate-500">Location</Text>
-                      <Text className="text-sm font-bold text-[#1E3A8A]">{report.location}</Text>
+                      <Text className="text-sm font-bold text-[#1E3A8A]">{getReportLocation(report.location)}</Text>
                     </View>
 
                     {/* Dynamic Crew Notes */}

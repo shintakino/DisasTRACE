@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Sms, TickCircle } from 'iconsax-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import * as Linking from 'expo-linking';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [emailCooldown, setEmailCooldown] = useState(0);
 
   // OTP State
   const [showOtpSheet, setShowOtpSheet] = useState(false);
@@ -52,6 +54,12 @@ export default function ForgotPasswordScreen() {
     }
     return () => clearInterval(interval);
   }, [showOtpSheet, otpTimer]);
+
+  useEffect(() => {
+    if (emailCooldown <= 0) return;
+    const timer = setTimeout(() => setEmailCooldown((current) => current - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [emailCooldown]);
 
   // Direct validation triggering on full 6-digit OTP code input
   useEffect(() => {
@@ -88,7 +96,8 @@ export default function ForgotPasswordScreen() {
       }
 
       try {
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/otp`, {
+        const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'https://disas-trace.vercel.app/api';
+        const response = await fetch(`${apiUrl}/auth/otp`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -125,6 +134,10 @@ export default function ForgotPasswordScreen() {
       }
     } else {
       // Email Flow
+      if (emailCooldown > 0) {
+        setError(`Please wait ${emailCooldown} seconds before requesting another reset link.`);
+        return;
+      }
       const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
       if (!isEmail) {
         setError('Please enter a valid email address or mobile number.');
@@ -135,7 +148,7 @@ export default function ForgotPasswordScreen() {
       setIsLoading(true);
       try {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(input, {
-          redirectTo: 'disastrace://(auth)/reset-password',
+          redirectTo: Linking.createURL('reset-password'),
         });
 
         if (resetError) {
@@ -144,6 +157,7 @@ export default function ForgotPasswordScreen() {
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         setSuccessMessage('Password reset link sent to your email. Check your inbox!');
+        setEmailCooldown(60);
       } catch (err: any) {
         setError(err.message || 'Failed to send password recovery email.');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
@@ -158,7 +172,8 @@ export default function ForgotPasswordScreen() {
     setIsVerifyingOtp(true);
 
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/otp`, {
+      const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'https://disas-trace.vercel.app/api';
+      const response = await fetch(`${apiUrl}/auth/otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -201,7 +216,8 @@ export default function ForgotPasswordScreen() {
     setOtpCode(['', '', '', '', '', '']);
     
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/otp`, {
+      const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'https://disas-trace.vercel.app/api';
+      const response = await fetch(`${apiUrl}/auth/otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -293,6 +309,7 @@ export default function ForgotPasswordScreen() {
                     <TextInput
                       className={`bg-gray-50 p-4 rounded-xl border ${error ? 'border-red-500' : 'border-gray-200'} text-gray-800 pr-12`}
                       placeholder="e.g. name@email.com or 09XXXXXXXXX"
+                      placeholderTextColor="#64748B"
                       value={identifier}
                       onChangeText={(val) => {
                         setIdentifier(val);
@@ -325,13 +342,13 @@ export default function ForgotPasswordScreen() {
 
               <TouchableOpacity
                 onPress={handleIdentifierSubmit}
-                disabled={isLoading}
-                className={`mt-4 bg-[#15286A] p-4 rounded-xl items-center justify-center min-h-[56px] ${isLoading ? 'opacity-70' : ''}`}
+                disabled={isLoading || emailCooldown > 0}
+                className={`mt-4 bg-[#15286A] p-4 rounded-xl items-center justify-center min-h-[56px] ${(isLoading || emailCooldown > 0) ? 'opacity-70' : ''}`}
               >
                 {isLoading ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text className="text-white font-bold text-lg">Send Instructions</Text>
+                  <Text className="text-white font-bold text-lg">{emailCooldown > 0 ? `Resend in ${emailCooldown}s` : 'Send Instructions'}</Text>
                 )}
               </TouchableOpacity>
             </View>

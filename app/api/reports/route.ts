@@ -6,22 +6,38 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
-import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, like, desc, sql, inArray, type SQL } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import crypto from "crypto";
 import { PatientCareReportPayloadSchema, DriverTripTicketPayloadSchema } from "@/types/reports";
+import { getReportLocation } from "@/lib/report-location";
 
 const SubmitReportSchema = z.object({
   incidentId: z.string().uuid(),
   description: z.string().optional(),
   scenePhotos: z.array(z.string()).optional(),
-  participants: z.array(z.any()).optional(),
+  participants: z.array(z.unknown()).optional(),
   patientCareReports: z.array(PatientCareReportPayloadSchema).optional(),
   driverTripTicket: DriverTripTicketPayloadSchema.optional().nullable(),
 });
 
 const ReporterSourceSchema = z.enum(['all', 'registered', 'guest']).catch('all');
+
+type DuplicateRequest = {
+  id: string;
+  requestId: string;
+  parentRequestId: string | null;
+  residentName: string | null;
+  type: string;
+  status: string;
+  createdAt: Date;
+  location: string | null;
+  imageUrl: string | null;
+  nature: string;
+  severity: string;
+  peopleInvolved: string;
+};
 
 
 export async function GET(req: NextRequest) {
@@ -52,9 +68,11 @@ export async function GET(req: NextRequest) {
         : undefined;
 
     if (category === "user") {
-      const whereConditions: any[] = [];
+      const whereConditions: SQL<unknown>[] = [];
       if (userProfile && userProfile.role === 'public_user') {
         whereConditions.push(eq(verificationRequests.residentId, user.id));
+      } else if (!userProfile || (userProfile.role !== 'pacc_admin' && userProfile.role !== 'cdrrmo_super_admin')) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
       if (reporterSourceCondition) {
         whereConditions.push(reporterSourceCondition);
@@ -82,6 +100,7 @@ export async function GET(req: NextRequest) {
       let filtered = [...dbRequests].map((r) => ({
         id: r.id,
         requestId: r.requestId,
+        createdAt: r.createdAt.toISOString(),
         responderName: r.residentName || 'Guest Reporter',
         type: r.type,
         status: r.status, // PENDING, VERIFIED, REJECTED, DUPLICATE
@@ -94,7 +113,7 @@ export async function GET(req: NextRequest) {
           hour: '2-digit',
           minute: '2-digit'
         }),
-        location: r.location || "Baliwag City",
+        location: getReportLocation(r.location),
         residentPhotoUrl: r.imageUrl,
         natureOfCall: r.nature,
         severityLevel: r.severity,
@@ -140,7 +159,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const whereConditions: any[] = [];
+    const whereConditions: SQL<unknown>[] = [];
+
+    if (!userProfile) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     if (userProfile) {
       if (userProfile.role === 'ambulance_responder') {
@@ -149,6 +172,8 @@ export async function GET(req: NextRequest) {
       } else if (userProfile.role === 'public_user') {
         // Residents can only view verification reports they created
         whereConditions.push(eq(verificationRequests.residentId, user.id));
+      } else if (userProfile.role !== 'pacc_admin' && userProfile.role !== 'cdrrmo_super_admin') {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
     if (reporterSourceCondition) {
@@ -183,7 +208,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch duplicate requests for all fetched reports
     const primaryRequestIds = dbReports.map(r => r.verificationRequestId).filter(Boolean);
-    let allDuplicates: any[] = [];
+    let allDuplicates: DuplicateRequest[] = [];
     if (primaryRequestIds.length > 0) {
       allDuplicates = await db
         .select({
@@ -223,7 +248,7 @@ export async function GET(req: NextRequest) {
             hour: '2-digit',
             minute: '2-digit'
           }),
-          location: d.location || "Baliwag City",
+          location: getReportLocation(d.location),
           residentPhotoUrl: d.imageUrl,
           natureOfCall: d.nature,
           severityLevel: d.severity,
@@ -236,6 +261,7 @@ export async function GET(req: NextRequest) {
 
       return {
         id: r.id,
+        createdAt: r.createdAt.toISOString(),
         responderName: r.responderName,
         type: r.type,
         status: r.status === 'SUBMITTED' ? 'COMPLETED' : 'ONGOING',
@@ -248,7 +274,7 @@ export async function GET(req: NextRequest) {
           hour: '2-digit',
           minute: '2-digit'
         }),
-        location: r.location || "Baliwag City",
+        location: getReportLocation(r.location),
         residentPhotoUrl: r.residentPhotoUrl,
         natureOfCall: r.natureOfCall,
         severityLevel: r.severityLevel,
@@ -337,9 +363,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 });
     }
 
+    const existingReport = await db.query.reports.findFirst({
+      where: eq(reports.incidentId, incidentId),
+    });
+    if (existingReport) {
+      if (existingReport.responderId === user.id) {
+        return NextResponse.json({
+          success: true,
+          report: existingReport,
+          alreadySubmitted: true,
+          message: "Incident report was already submitted.",
+        });
+      }
+      return NextResponse.json({ error: "This incident already has a submitted report." }, { status: 409 });
+    }
+
+    if (incident.responderId !== user.id) {
+      return NextResponse.json({ error: "You are not assigned to this incident." }, { status: 403 });
+    }
+
     // Generate unique Report ID
     const year = new Date().getFullYear();
-    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const randNum = crypto.randomInt(1000, 10000);
     const reportId = `REP-${year}-${randNum}`;
 
     // 2. Insert into reports table
@@ -362,7 +407,7 @@ export async function POST(req: NextRequest) {
           id: pcrId,
           incidentId,
           patientName: pcr.patientName,
-          patientAddress: pcr.patientAddress || null,
+          patientAddress: pcr.patientAddress ? getReportLocation(pcr.patientAddress, "N/A") : null,
           patientContact: pcr.patientContact || null,
           patientAge: pcr.patientAge || null,
           patientGender: pcr.patientGender || null,
@@ -392,7 +437,7 @@ export async function POST(req: NextRequest) {
         driverName: dtt.driverName,
         vehiclePlate: dtt.vehiclePlate,
         passengerName: dtt.passengerName || null,
-        placesVisited: dtt.placesVisited || null,
+        placesVisited: dtt.placesVisited ? getReportLocation(dtt.placesVisited, "N/A") : null,
         purpose: dtt.purpose || null,
         tripLog: dtt.tripLog || null,
         gasolineConsumed: dtt.gasolineConsumed || null,

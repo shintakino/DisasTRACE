@@ -16,10 +16,12 @@ import { supabase } from '../../lib/supabase';
 export function DispatchSheet() {
   const { status, activeDispatch, acceptDispatch, completeIncident } = useResponderStore();
   const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds || 30;
+  const serverExpiry = activeDispatch?.offerExpiresAt ? Date.parse(activeDispatch.offerExpiresAt) : NaN;
   const insets = useSafeAreaInsets();
   const progress = useSharedValue(100);
   const [accepting, setAccepting] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(offerDurationSeconds);
   
   // Start off-screen at the top.
   const translateY = useSharedValue(-800);
@@ -38,6 +40,16 @@ export function DispatchSheet() {
 
   useEffect(() => {
     if (status === 'dispatch_offered') {
+      const expiresAt = Number.isFinite(serverExpiry)
+        ? serverExpiry
+        : Date.now() + offerDurationSeconds * 1000;
+      const remainingMilliseconds = Math.max(0, expiresAt - Date.now());
+      const updateCountdown = () => {
+        setRemainingSeconds(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
+      };
+      updateCountdown();
+      const countdownId = setInterval(updateCountdown, 250);
+
       // Trigger success notification haptic pulse immediately to get attention
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
@@ -49,8 +61,8 @@ export function DispatchSheet() {
       });
 
       // Reset and animate the progress bar
-      progress.value = 100;
-      progress.value = withTiming(0, { duration: offerDurationSeconds * 1000, easing: Easing.linear });
+      progress.value = Math.min(100, (remainingMilliseconds / (offerDurationSeconds * 1000)) * 100);
+      progress.value = withTiming(0, { duration: remainingMilliseconds, easing: Easing.linear });
 
       // Auto-dismiss timeout
       const timeoutId = setTimeout(async () => {
@@ -76,15 +88,19 @@ export function DispatchSheet() {
           }
           completeIncident(); // Dismiss
         }
-      }, offerDurationSeconds * 1000);
+      }, Math.max(0, expiresAt - Date.now()));
 
-      return () => clearTimeout(timeoutId);
+      return () => {
+        clearInterval(countdownId);
+        clearTimeout(timeoutId);
+      };
     } else {
       // Animate out back to the top
       translateY.value = withTiming(-800, { duration: 300, easing: Easing.out(Easing.cubic) });
       progress.value = 100;
+      setRemainingSeconds(offerDurationSeconds);
     }
-  }, [status, insets.top, offerDurationSeconds]);
+  }, [status, insets.top, offerDurationSeconds, serverExpiry]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -115,8 +131,10 @@ export function DispatchSheet() {
             <View className="items-center z-10 flex-row">
               <View className="w-4 h-4 border-2 border-[#1E3A8A] border-t-transparent rounded-full mr-3 animate-spin" />
               <View>
-                <Text className="text-[#1E3A8A] font-bold text-[13px] mb-0.5">Respond within {offerDurationSeconds} seconds</Text>
-                <Text className="text-[#475569] text-[11px] font-medium">Auto-dismissed passed to next available unit</Text>
+              <Text className="text-[#1E3A8A] font-black text-[16px] mb-0.5">
+                {remainingSeconds > 0 ? `${remainingSeconds}s remaining` : 'Offer expired'}
+              </Text>
+              <Text className="text-[#475569] text-[11px] font-medium">Auto-dismissed and passed to the next available unit</Text>
               </View>
             </View>
           </View>

@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { PatientCareModal } from './PatientCareModal';
 import { TripTicketModal } from './TripTicketModal';
 import { useAuthStatus } from '../../hooks/use-auth-status';
+import { getReportLocation } from '../../lib/report-location';
 
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -60,7 +61,12 @@ function InlineDropdown({
 }
 
 export function IncidentReportForm() {
-  const { status, setStatus, activeDispatch, isSubmittingReport, submitReport, saveDraft, drafts } = useResponderStore();
+  const status = useResponderStore((state) => state.status);
+  const setStatus = useResponderStore((state) => state.setStatus);
+  const activeDispatch = useResponderStore((state) => state.activeDispatch);
+  const isSubmittingReport = useResponderStore((state) => state.isSubmittingReport);
+  const submitReport = useResponderStore((state) => state.submitReport);
+  const saveDraft = useResponderStore((state) => state.saveDraft);
   const { profile } = useAuthStatus();
   
   const [natureOfCall, setNatureOfCall] = useState('Emergency');
@@ -78,6 +84,8 @@ export function IncidentReportForm() {
   const [isTripTicketOpen, setIsTripTicketOpen] = useState(false);
   const [tripTicketData, setTripTicketData] = useState<any>(null);
 
+  const [dispatchLocation, setDispatchLocation] = useState('');
+
 
   React.useEffect(() => {
     if (status === 'report_filling' && activeDispatch) {
@@ -91,6 +99,7 @@ export function IncidentReportForm() {
         setTypeOfEmergency(existingDraft.formData.typeOfEmergency || activeDispatch.typeOfEmergency || activeDispatch.type || 'Medical Emergency');
         setSeverityLevel(existingDraft.formData.severityLevel || 'Medium');
         setCrewNotes(existingDraft.formData.crewNotes || '');
+        setDispatchLocation(existingDraft.formData.location || getReportLocation(activeDispatch.locationName));
         setPatients(existingDraft.formData.patients || [
           { id: 1, status: 'Stable — Conscious', bp: '', hr: '', spo2: '', pcrDetails: null }
         ]);
@@ -101,6 +110,7 @@ export function IncidentReportForm() {
         setTypeOfEmergency(activeDispatch.typeOfEmergency || activeDispatch.type || 'Medical Emergency');
         setSeverityLevel('Medium');
         setCrewNotes('');
+        setDispatchLocation(getReportLocation(activeDispatch.locationName));
         setTripTicketData(null);
         
         // Match the number of people involved from resident findings
@@ -129,13 +139,14 @@ export function IncidentReportForm() {
           severityLevel, 
           patients, 
           crewNotes, 
+          location: dispatchLocation,
           tripTicketData 
         });
       }, 1500); // 1.5s debounce
       
       return () => clearTimeout(timer);
     }
-  }, [natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, tripTicketData, status, activeDispatch?.id]);
+  }, [natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, dispatchLocation, tripTicketData, status, activeDispatch?.id]);
 
 
   const toggleDropdown = (id: string) => {
@@ -168,7 +179,7 @@ export function IncidentReportForm() {
 
   const handleSaveDraft = () => {
     if (activeDispatch) {
-      saveDraft(activeDispatch, { natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, tripTicketData });
+      saveDraft(activeDispatch, { natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, location: dispatchLocation, tripTicketData });
       setStatus('idle');
     }
   };
@@ -198,7 +209,7 @@ export function IncidentReportForm() {
         
         return {
           patientName: `Patient ${idx + 1}`,
-          patientAddress: activeDispatch.locationName || '',
+          patientAddress: dispatchLocation,
           patientContact: '',
           patientAge: null,
           patientGender: 'Male',
@@ -214,7 +225,7 @@ export function IncidentReportForm() {
             arrivalPerson: 'Bystander'
           },
           incidentInfo: {
-            siteOfIncident: activeDispatch.locationName || '',
+            siteOfIncident: dispatchLocation,
             chiefComplaints: typeOfEmergency
           },
           initialAssessment: {
@@ -264,7 +275,7 @@ export function IncidentReportForm() {
         driverName: 'Ambulance Driver',
         vehiclePlate: activeDispatch.assignedAmbulance || 'AMB-001',
         passengerName: 'Responder Crew',
-        placesVisited: activeDispatch.locationName || 'Baliwag City',
+        placesVisited: dispatchLocation,
         purpose: 'Emergency Response',
         tripLog: { departureOffice: '', arrivalScene: '', departureScene: '', arrivalOffice: '', distance: '' },
         gasolineConsumed: { balance: '', issued: '', purchase: '', total: '', deduction: '', balanceEnd: '' },
@@ -415,10 +426,20 @@ export function IncidentReportForm() {
               </View>
 
               <View>
-                <Text className="text-[#1E3A8A] font-black text-[10px] uppercase tracking-widest mb-2">LOCATION</Text>
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-[#1E3A8A] font-black text-[10px] uppercase tracking-widest">LOCATION</Text>
+                  <Text className="text-slate-400 font-bold text-[10px]" numberOfLines={1}>Just now</Text>
+                </View>
                 <TextInput 
                   className="border border-slate-200 rounded-xl px-4 py-3.5 bg-white text-[#1E3A8A] font-medium"
-                  value={activeDispatch?.locationName || 'Brgy. Sabang, near corner of Rizal St.'}
+                  value={dispatchLocation}
+                  onChangeText={setDispatchLocation}
+                  editable={!isSubmittingReport}
+                  placeholder="Enter or update the incident location"
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                  numberOfLines={2}
+                  textAlignVertical="top"
                 />
               </View>
 
@@ -521,7 +542,7 @@ export function IncidentReportForm() {
           {/* Sticky Footer */}
           <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 p-4 pb-8 flex-row space-x-3">
             <TouchableOpacity 
-              onPress={handleSaveDraft}
+                onPress={handleSaveDraft}
               className="flex-1 bg-yellow-50 border border-yellow-100 rounded-2xl py-4 flex-row justify-center items-center shadow-sm"
             >
               <FolderDown size={18} color="#92400E" />

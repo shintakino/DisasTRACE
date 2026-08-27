@@ -66,8 +66,14 @@ export function VerificationQueue({
   };
 
   const isActionable = (r: VerificationRequest) => r.status === 'PENDING' || needsManualDispatch(r);
-  const isAction = (r: VerificationRequest) => isActionable(r) && (r.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY' || r.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY');
-  const isReview = (r: VerificationRequest) => isActionable(r) && (r.triageClassification === 'UNCERTAIN_INCOMPLETE' || r.triageClassification === 'SUSPICIOUS_POSSIBLE_PRANK');
+  const isAction = (r: VerificationRequest) => isActionable(r) && (
+    r.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY' ||
+    r.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY'
+  );
+  // Unknown classifications are treated as review items. This keeps legacy or
+  // partially migrated Guest Mode reports visible to PACC instead of silently
+  // dropping them from both dashboard sections.
+  const isReview = (r: VerificationRequest) => isActionable(r) && !isAction(r);
   const counts = {
     ACTION: requests.filter(isAction).length,
     REVIEW: requests.filter(isReview).length,
@@ -105,6 +111,19 @@ export function VerificationQueue({
     }
     return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
   });
+
+  const classificationLabel = (request: VerificationRequest) => {
+    switch (request.triageClassification) {
+      case "HIGH_CONFIDENCE_EMERGENCY":
+        return "High-confidence emergency";
+      case "HIGH_CONFIDENCE_NON_EMERGENCY":
+        return "High-confidence non-emergency";
+      case "SUSPICIOUS_POSSIBLE_PRANK":
+        return "Suspicious / possible prank";
+      default:
+        return "Uncertain / incomplete";
+    }
+  };
 
   return (
     <div className="flex flex-col h-full gap-4 w-80 shrink-0 border-r bg-white p-4">
@@ -169,6 +188,9 @@ export function VerificationQueue({
               </div>
               <div className="font-bold text-sm leading-tight mb-1">
                 {request.type}
+              </div>
+              <div className="text-[10px] font-semibold text-[#1E3A8A] mb-1">
+                {classificationLabel(request)}
               </div>
               <div className="text-[11px] text-muted-foreground truncate">
                 {request.location}

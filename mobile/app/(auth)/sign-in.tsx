@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { useRouter, Link, useLocalSearchParams } from 'expo-router';
+import { useRouter, Link } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LoginSchema, LoginType } from '../../schemas/auth';
@@ -76,12 +76,16 @@ export default function SignInScreen() {
 
   return (
     <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      enabled={Platform.OS === 'ios'}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       className="flex-1"
     >
       <LinearGradient colors={['#0A1332', '#15286A']} className="flex-1">
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
         <View className="flex-1 p-6 justify-center mt-10">
           <TouchableOpacity 
             onPress={() => {
@@ -105,7 +109,7 @@ export default function SignInScreen() {
             />
             <Text className="text-3xl font-bold text-white mb-2">Log In</Text>
             <Text className="text-white/80 text-center text-base">
-              Hi! Welcome back, you've been missed.
+              Hi! Welcome back, you&apos;ve been missed.
             </Text>
           </View>
 
@@ -120,6 +124,7 @@ export default function SignInScreen() {
                     <TextInput
                       className={`bg-gray-50 p-4 rounded-xl border ${errors.identifier ? 'border-red-500' : 'border-gray-200'} text-gray-800`}
                       placeholder="Enter email or mobile number"
+                      placeholderTextColor="#64748B"
                       onBlur={onBlur}
                       onChangeText={onChange}
                       value={value}
@@ -141,6 +146,7 @@ export default function SignInScreen() {
                       <TextInput
                         className={`bg-gray-50 p-4 rounded-xl border ${errors.password ? 'border-red-500' : 'border-gray-200'} pr-12 text-gray-800`}
                         placeholder="Enter your password"
+                        placeholderTextColor="#64748B"
                         onBlur={onBlur}
                         onChangeText={onChange}
                         value={value}
@@ -190,7 +196,7 @@ export default function SignInScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.replace('/help/chatbot?mode=guest' as any)}
+              onPress={() => router.replace('/help/chatbot?mode=guest&returnTo=/' as any)}
               className="mt-3 border border-[#EF4444] p-4 rounded-xl items-center"
             >
               <Text className="text-[#B91C1C] font-bold">Login as Guest</Text>
@@ -198,7 +204,7 @@ export default function SignInScreen() {
             </TouchableOpacity>
 
             <View className="flex-row justify-center mt-6">
-              <Text className="text-gray-500">Don't have an account? </Text>
+              <Text className="text-gray-500">Don&apos;t have an account? </Text>
               <Link href="/(auth)/sign-up" asChild>
                 <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Text className="text-[#EF4444] font-bold">Sign Up</Text>

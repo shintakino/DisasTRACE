@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Add, FolderOpen } from 'iconsax-react-native';
@@ -7,8 +7,20 @@ import { SelectIncidentModal } from '../../components/responder/SelectIncidentMo
 import { IncidentReportForm } from '../../components/responder/IncidentReportForm';
 
 export default function FormsScreen() {
-  const { drafts, openFormForIncident } = useResponderStore();
+  const { drafts, submittedIncidentIds, openFormForIncident, removeDraft } = useResponderStore();
   const [modalVisible, setModalVisible] = useState(false);
+  const visibleDrafts = useMemo(
+    () => drafts.filter((draft) => draft.incidentDetails && !submittedIncidentIds.includes(draft.incidentId)),
+    [drafts, submittedIncidentIds],
+  );
+
+  useEffect(() => {
+    // Older persisted drafts may not have incident context. They cannot be
+    // resumed safely, so do not render them as a fabricated incident card.
+    drafts
+      .filter((draft) => !draft.incidentDetails || submittedIncidentIds.includes(draft.incidentId))
+      .forEach((draft) => removeDraft(draft.id));
+  }, [drafts, submittedIncidentIds, removeDraft]);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
@@ -39,33 +51,20 @@ export default function FormsScreen() {
         <View className="flex-row items-center justify-between mb-4 mt-2">
           <Text className="text-slate-800 font-bold text-lg">Drafts</Text>
           <View className="bg-blue-100 px-3 py-1 rounded-full">
-            <Text className="text-[#1E3A8A] font-bold text-xs">{drafts.length}</Text>
+          <Text className="text-[#1E3A8A] font-bold text-xs">{visibleDrafts.length}</Text>
           </View>
         </View>
 
-        {drafts.length === 0 ? (
+        {visibleDrafts.length === 0 ? (
           <View className="py-10 items-center">
             <FolderOpen size={48} color="#CBD5E1" variant="Bulk" />
             <Text className="text-slate-400 font-medium mt-4">No drafts found.</Text>
           </View>
         ) : (
-          drafts.map((draft) => (
+          visibleDrafts.map((draft) => (
             <TouchableOpacity 
               key={draft.id}
-              onPress={() => openFormForIncident(draft.incidentDetails || {
-                id: draft.incidentId,
-                type: draft.incidentType,
-                locationName: 'Draft Location',
-                distance: '1.2 km',
-                natureOfCall: 'Emergency',
-                peopleInvolved: 1,
-                eta: 'Completed',
-                reporterName: 'Resident',
-                reporterInitials: 'R',
-                timestamp: 'Completed',
-                coordinates: { latitude: 14.9516, longitude: 120.9011 },
-                typeOfEmergency: draft.incidentType
-              })}
+              onPress={() => openFormForIncident(draft.incidentDetails!)}
               className="bg-[#FEFCE8] border border-[#FEF08A] rounded-2xl p-5 mb-4 shadow-sm"
             >
               <View className="flex-row items-start justify-between">

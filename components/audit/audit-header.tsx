@@ -72,15 +72,15 @@ export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">User Role</label>
                 <Select value={role} onValueChange={handleRoleChange}>
-                  <SelectTrigger className="uppercase">
-                    <SelectValue placeholder="ALL" />
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">ALL</SelectItem>
-                    <SelectItem value="cdrrmo_super_admin">SUPER ADMIN</SelectItem>
-                    <SelectItem value="pacc_admin">PACC ADMIN</SelectItem>
-                    <SelectItem value="ambulance_responder">RESPONDER</SelectItem>
-                    <SelectItem value="public_user">PUBLIC USER</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="cdrrmo_super_admin">Super Admin</SelectItem>
+                    <SelectItem value="pacc_admin">PACC Admin</SelectItem>
+                    <SelectItem value="ambulance_responder">Responder</SelectItem>
+                    <SelectItem value="public_user">Public User</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

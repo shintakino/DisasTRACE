@@ -9,7 +9,10 @@ import { z } from "zod";
 import crypto from "crypto";
 
 const SettingsUpdateSchema = z.object({
-  dispatchOfferTimeoutSeconds: z.number().int().min(5, "Minimum timeout is 5 seconds").max(120, "Maximum timeout is 120 seconds"),
+  dispatchOfferTimeoutSeconds: z.number().int().min(5, "Minimum timeout is 5 seconds").max(120, "Maximum timeout is 120 seconds").optional(),
+  guestRequestsPerDay: z.number().int().min(1, "Guest request limit must be at least 1").max(10000, "Guest request limit cannot exceed 10,000").optional(),
+}).refine((settings) => settings.dispatchOfferTimeoutSeconds !== undefined || settings.guestRequestsPerDay !== undefined, {
+  message: "At least one setting must be provided",
 });
 
 export async function GET(req: NextRequest) {
@@ -31,6 +34,7 @@ export async function GET(req: NextRequest) {
       const [newConfig] = await db.insert(systemSettings).values({
         id: 'current',
         dispatchOfferTimeoutSeconds: 30,
+        guestRequestsPerDay: 50,
       }).returning();
       config = newConfig;
     }
@@ -39,6 +43,7 @@ export async function GET(req: NextRequest) {
       success: true,
       settings: {
         dispatchOfferTimeoutSeconds: config.dispatchOfferTimeoutSeconds,
+        guestRequestsPerDay: config.guestRequestsPerDay,
         updatedAt: config.updatedAt,
       }
     });
@@ -67,25 +72,40 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    const includesGuestLimit = Object.prototype.hasOwnProperty.call(body, 'guestRequestsPerDay');
+    if (includesGuestLimit && dbUser.role !== 'cdrrmo_super_admin') {
+      return NextResponse.json({ error: "Forbidden: Only CDRRMO Super Admins can change the Guest Mode request limit" }, { status: 403 });
+    }
+
     const result = SettingsUpdateSchema.safeParse(body);
 
     if (!result.success) {
       return NextResponse.json({ error: "Invalid parameters", details: result.error.format() }, { status: 400 });
     }
 
-    const { dispatchOfferTimeoutSeconds } = result.data;
+    const currentConfig = await db.query.systemSettings.findFirst({
+      where: eq(systemSettings.id, 'current'),
+    });
+    const dispatchOfferTimeoutSeconds = result.data.dispatchOfferTimeoutSeconds
+      ?? currentConfig?.dispatchOfferTimeoutSeconds
+      ?? 30;
+    const guestRequestsPerDay = result.data.guestRequestsPerDay
+      ?? currentConfig?.guestRequestsPerDay
+      ?? 50;
 
     // Upsert the system settings row
     const [updatedConfig] = await db.insert(systemSettings)
       .values({
         id: 'current',
         dispatchOfferTimeoutSeconds,
+        guestRequestsPerDay,
         updatedAt: new Date()
       })
       .onConflictDoUpdate({
         target: systemSettings.id,
         set: {
           dispatchOfferTimeoutSeconds,
+          guestRequestsPerDay,
           updatedAt: new Date()
         }
       })
@@ -95,7 +115,7 @@ export async function POST(req: NextRequest) {
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(),
       userId: user.id,
-      action: `Updated system settings: Dispatch Offer Timeout set to ${dispatchOfferTimeoutSeconds}s`,
+      action: `Updated system settings: Dispatch Offer Timeout set to ${dispatchOfferTimeoutSeconds}s; Guest Mode limit set to ${guestRequestsPerDay} requests/day`,
       entityType: "SETTINGS",
       entityId: "current",
     });
@@ -105,6 +125,7 @@ export async function POST(req: NextRequest) {
       message: "System settings updated successfully",
       settings: {
         dispatchOfferTimeoutSeconds: updatedConfig.dispatchOfferTimeoutSeconds,
+        guestRequestsPerDay: updatedConfig.guestRequestsPerDay,
         updatedAt: updatedConfig.updatedAt,
       }
     });

@@ -88,7 +88,7 @@ export default function DetailsScreen() {
   const [isAutoDispatched, setIsAutoDispatched] = useState(false);
 
   const handleSubmit = async () => {
-    if (!what || !where || !when || !how) return;
+    if (isSubmitting || showSubmitted || !what || !where || !when || !how) return;
 
     setIsSubmitting(true);
 
@@ -102,12 +102,10 @@ export default function DetailsScreen() {
       }
 
       // Combine local form data with global store
-      const localDescription = `Condition: ${what}\nAccess: ${where}\nTime: ${when}\nCause: ${how}\nOther: ${whatOther} ${whereOther} ${howOther}`;
-      
       const payload = {
         incidentType: report.incidentType || 'Unknown Cause',
         peopleInvolved: report.peopleInvolved || 'None',
-        landmarks: localDescription,
+        landmarks: report.landmarks || 'Baliwag City',
         latitude: report.latitude,
         longitude: report.longitude,
         severity: report.severity || 'Medium',
@@ -178,7 +176,7 @@ export default function DetailsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.topBlueArea}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => { if (!isSubmitting && !showSubmitted && router.canGoBack()) router.back(); }} disabled={isSubmitting || showSubmitted} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
           <ChevronLeft color="#FFF" size={24} />
           <Text style={styles.headerText}>More details</Text>
         </TouchableOpacity>

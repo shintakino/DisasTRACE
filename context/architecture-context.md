@@ -70,6 +70,7 @@
 - Guest chatbot evidence is uploaded through `POST /api/emergency-intake/evidence`, which validates a 5MB JPEG/PNG/WebP file and uses the server storage client. This avoids granting unauthenticated guest devices direct Storage write access; the endpoint returns the public incident-photo URL used by intake.
 - The API records deterministic initial triage with reasons: `HIGH_CONFIDENCE_EMERGENCY`, `HIGH_CONFIDENCE_NON_EMERGENCY`, `UNCERTAIN_INCOMPLETE`, or `SUSPICIOUS_POSSIBLE_PRANK`. Only the first class starts automated ambulance dispatch. PACC receives the other classes and can override any classification.
 - PACC-recorded coordination agencies live on the verification request and are delivered through its existing Realtime updates. The client derives human-readable coordination text from one or more recorded agencies and the actual incident/dispatch state. PNP, BFP, and other agencies are coordination entries; only ambulance responders are auto-dispatched by this system.
+- CDRRMO Super Admins control the daily Guest Mode capacity through the singleton `system_settings` row. The guest intake API counts guest requests from the current Asia/Manila calendar day and returns a controlled `429` response once `guest_requests_per_day` is reached.
 
 ### OTP Verification
 

@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, Trash, CloudLightning, Megaphone, FileText } from 'lucide-react-native';
 import { useAuthStatus } from '../hooks/use-auth-status';
 import { supabase } from '../lib/supabase';
+import { isNotificationVisibleForRole } from '../lib/report-location';
 
 type Notification = {
   id: string;
@@ -17,13 +18,27 @@ type Notification = {
   metadata?: any;
 };
 
+function normalizeNotification(raw: any): Notification {
+  return {
+    id: raw.id,
+    userId: raw.userId ?? raw.user_id,
+    type: raw.type,
+    title: raw.title,
+    body: raw.body,
+    unread: raw.unread ?? false,
+    createdAt: raw.createdAt ?? raw.created_at ?? '',
+    metadata: raw.metadata,
+  };
+}
+
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { user } = useAuthStatus();
+  const { user, role } = useAuthStatus();
   
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const navigationInProgressRef = useRef(false);
 
   const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
 
@@ -47,7 +62,7 @@ export default function NotificationsScreen() {
       });
       const data = await response.json();
       if (response.ok && data.notifications) {
-        setNotifications(data.notifications);
+        setNotifications(data.notifications.map(normalizeNotification).filter((item: Notification) => isNotificationVisibleForRole(item.type, role)));
       }
     } catch (err) {
       console.error('[Notifications] Failed to load:', err);
@@ -57,9 +72,32 @@ export default function NotificationsScreen() {
     }
   };
 
+  const markAllAsRead = async () => {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(`${apiUrl}/api/notifications`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({ markAllAsRead: true }),
+      });
+
+      if (response.ok) {
+        setNotifications((prev) => prev.map((notification) => ({ ...notification, unread: false })));
+      }
+    } catch (err) {
+      console.error('[Notifications] Failed to mark all as read:', err);
+    }
+  };
+
   useEffect(() => {
     if (user) {
-      fetchNotifications();
+      void (async () => {
+        await fetchNotifications();
+        await markAllAsRead();
+      })();
 
       // Subscribe to real-time database changes
       const instanceId = Math.random().toString(36).substring(7);
@@ -76,10 +114,15 @@ export default function NotificationsScreen() {
           (payload) => {
             console.log('[Mobile Realtime] Notification change received:', payload);
             if (payload.eventType === 'INSERT') {
-              setNotifications((prev) => [payload.new as Notification, ...prev]);
+              const notification = normalizeNotification(payload.new);
+              if (isNotificationVisibleForRole(notification.type, role)) {
+                setNotifications((prev) => [notification, ...prev]);
+              }
             } else if (payload.eventType === 'UPDATE') {
-              setNotifications((prev) =>
-                prev.map((n) => (n.id === payload.new.id ? (payload.new as Notification) : n))
+              const notification = normalizeNotification(payload.new);
+              setNotifications((prev) => isNotificationVisibleForRole(notification.type, role)
+                ? prev.map((n) => (n.id === notification.id ? notification : n))
+                : prev.filter((n) => n.id !== notification.id)
               );
             } else if (payload.eventType === 'DELETE') {
               setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
@@ -92,7 +135,7 @@ export default function NotificationsScreen() {
         supabase.removeChannel(channel);
       };
     }
-  }, [user]);
+  }, [user, role]);
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -116,41 +159,42 @@ export default function NotificationsScreen() {
   };
 
   const handleNotificationPress = async (item: Notification) => {
-    // 1. Mark as read immediately in the DB if it is unread
+    if (navigationInProgressRef.current || !isNotificationVisibleForRole(item.type, role)) return;
+    navigationInProgressRef.current = true;
+
+    // Do not hold navigation on a network round trip. A role change can
+    // remount this screen while the PATCH is still in flight.
     if (item.unread) {
-      await handleMarkAsRead(item.id);
+      void handleMarkAsRead(item.id);
     }
 
-    // 2. Perform redirection / actions based on notification type
+    // Route only to screens that are valid for the current mobile account.
     try {
       if (item.type === 'dispatch_alert' || item.type === 'new_incident') {
-        // Redirection for Responders to accept or resume active emergency
-        router.replace('/(tabs)');
+        router.replace('/(tabs)' as any);
       } else if (
         item.type === 'ambulance_dispatched' || 
         item.type === 'responder_arrived'
       ) {
-        // Redirection for Residents to track the responder in real-time
-        router.replace('/help/tracking');
+        router.replace('/help/tracking' as any);
       } else if (
         item.type === 'registration_approved' || 
         item.type === 'registration_rejected'
       ) {
-        // Redirection to profile settings
-        router.replace('/(tabs)/profile');
+        router.replace('/(tabs)/profile' as any);
       } else if (item.type === 'incident_resolved') {
-        // Redirection to the specific incident report if available, else fallback
-        if (item.metadata?.incidentId) {
-          router.replace(`/(tabs)/reports/${item.metadata.incidentId}`);
+        const incidentId = typeof item.metadata?.incidentId === 'string'
+          ? item.metadata.incidentId
+          : null;
+        if (incidentId) {
+          router.push(`/(tabs)/reports/${incidentId}` as any);
         } else {
-          router.replace('/(tabs)/reports');
+          router.push('/(tabs)/reports' as any);
         }
       } else if (item.type === 'report_audited') {
-        // Redirection to reports list (under profile stats)
-        router.replace('/(tabs)/profile');
+        router.replace('/(tabs)/profile' as any);
       } else if (item.type === 'pagasa_alert') {
-        // Route weather warnings to the Map view so they can see context
-        router.replace('/(tabs)/map');
+        router.replace('/(tabs)/map' as any);
       } else if (item.type === 'system_announcement') {
         // Display System Notices directly inside a native overlay alert dialog
         Alert.alert(
@@ -162,7 +206,16 @@ export default function NotificationsScreen() {
       }
     } catch (err) {
       console.error('[Notifications] Redirection action failed:', err);
+    } finally {
+      navigationInProgressRef.current = false;
     }
+  };
+
+  const handleBack = () => {
+    // Notifications is opened from the authenticated tab shell. Replacing
+    // the route avoids returning to a responder-only screen after a role
+    // switch and also works when this screen is the first stack entry.
+    router.replace('/(tabs)' as any);
   };
 
 
@@ -196,8 +249,10 @@ export default function NotificationsScreen() {
   };
 
   const formatTime = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const diffMs = Date.now() - d.getTime();
+    const timestamp = Date.parse(dateStr || '');
+    if (!Number.isFinite(timestamp)) return 'Recently';
+    const d = new Date(timestamp);
+    const diffMs = Date.now() - timestamp;
     const diffMins = Math.floor(diffMs / 60000);
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} min ago`;
@@ -234,7 +289,7 @@ export default function NotificationsScreen() {
       <SafeAreaView edges={['top', 'left', 'right']}>
         <View className="px-6 py-4 flex-row items-center justify-between">
           <TouchableOpacity 
-            onPress={() => router.back()} 
+            onPress={handleBack}
             className="flex-row items-center"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >

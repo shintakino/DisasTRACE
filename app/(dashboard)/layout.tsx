@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { createClientBrowser } from "@/lib/supabase";
 import { toast } from "sonner";
 import { getIncidentAlertPriority, type IncidentAlertPriority } from "@/lib/incident-severity";
+import { getReportLocation } from "@/lib/report-location";
 
 const UserMenu = dynamic(() => import("@/components/dashboard/user-menu"), { 
   ssr: false,
@@ -96,7 +97,7 @@ export default function DashboardLayout({
           const isEmergency = newRequest.nature === "EMERGENCY";
           const reqNum = newRequest.request_id || newRequest.requestId || "REQ-NEW";
           const reqType = newRequest.type || "Incident";
-          const reqLoc = newRequest.location_description || "Baliwag City";
+          const reqLoc = getReportLocation(newRequest.location_description);
           const priority = getIncidentAlertPriority(newRequest.severity);
           const actionLabel = role === "pacc_admin" ? "Triage Now" : "Open Map";
           const actionPath = role === "pacc_admin" ? "/verification" : `/map?select=${newRequest.id}`;

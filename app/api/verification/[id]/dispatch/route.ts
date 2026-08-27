@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { systemSettings } from "@/db/schema/system_settings";
 import { notifyPaccAndCdrrmo } from "@/lib/dispatch-engine";
@@ -42,6 +42,13 @@ export async function POST(
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
 
+    if (existingReq.status === "REJECTED" || existingReq.status === "DUPLICATE") {
+      return NextResponse.json(
+        { error: "Rejected or duplicate reports cannot be dispatched." },
+        { status: 409 }
+      );
+    }
+
     // 2. Fetch the selected responder to check details and generate deterministic vehicleId
     const responder = await db.query.users.findFirst({
       where: eq(users.id, responderId),
@@ -73,9 +80,35 @@ export async function POST(
       where: eq(incidents.requestId, id),
     });
 
+    if (
+      existingIncident &&
+      (existingIncident.status !== "DISPATCHED" ||
+        existingIncident.responderId ||
+        existingIncident.currentOfferResponderId)
+    ) {
+      return NextResponse.json(
+        { error: "This report already has an active dispatch offer." },
+        { status: 409 }
+      );
+    }
+
     // Keep the offer, report state, and responder reservation in one commit. This
     // prevents a responder receiving an offer when PACC has received an API error.
     const incidentResult = await db.transaction(async (tx) => {
+      // Reserve first, while the responder is still ON_DUTY. If the responder
+      // was taken by another dispatch after the list loaded, the whole
+      // transaction rolls back and no Guest report state is changed.
+      const reserved = await tx.update(users)
+        .set({ dutyStatus: "ACTIVE_DISPATCH" })
+        .where(and(
+          eq(users.id, responderId),
+          eq(users.role, "ambulance_responder"),
+          eq(users.status, "ACTIVE"),
+          eq(users.dutyStatus, "ON_DUTY"),
+        ))
+        .returning({ id: users.id });
+      if (reserved.length === 0) throw new Error("Selected responder is no longer available.");
+
       const [incident] = existingIncident
         ? await tx.update(incidents)
           .set({
@@ -107,12 +140,6 @@ export async function POST(
       await tx.update(verificationRequests)
         .set({ status: "VERIFIED", updatedAt: new Date() })
         .where(eq(verificationRequests.id, id));
-
-      const reserved = await tx.update(users)
-        .set({ dutyStatus: "ACTIVE_DISPATCH" })
-        .where(eq(users.id, responderId))
-        .returning({ id: users.id });
-      if (reserved.length === 0) throw new Error("Selected responder is no longer available.");
 
       return incident;
     });

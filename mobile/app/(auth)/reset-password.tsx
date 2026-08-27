@@ -40,7 +40,13 @@ type ResetPasswordType = z.infer<typeof ResetPasswordSchema>;
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
-  const { phone, token } = useLocalSearchParams<{ phone?: string; token?: string }>();
+  const { phone, token, access_token, refresh_token, code } = useLocalSearchParams<{
+    phone?: string;
+    token?: string;
+    access_token?: string;
+    refresh_token?: string;
+    code?: string;
+  }>();
   const isOtpFlow = !!(phone && token);
   const url = Linking.useURL();
 
@@ -48,6 +54,7 @@ export default function ResetPasswordScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [isVerifyingLink, setIsVerifyingLink] = useState(false);
+  const [recoveryReady, setRecoveryReady] = useState(isOtpFlow);
 
   // Success Modal & Redirect
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -58,47 +65,57 @@ export default function ResetPasswordScreen() {
     defaultValues: { password: '', confirmPassword: '' }
   });
 
-  // Capture and process deep linking session tokens (Email Reset Flow)
+  // Capture and process both Supabase recovery link formats. Depending on the
+  // project auth settings, Supabase can send either hash tokens or a PKCE code.
   useEffect(() => {
-    async function handleDeepLink() {
-      if (url && !isOtpFlow) {
-        console.log('[ResetPassword] Deep link received:', url);
-        const { queryParams } = Linking.parse(url);
-        
-        let accessToken = queryParams?.access_token as string;
-        let refreshToken = queryParams?.refresh_token as string;
-        
-        // Manually parse tokens from hash fragment if they are not in the queryParams
-        if (!accessToken && url.includes('#')) {
-          const hash = url.split('#')[1];
-          const parts = hash.split('&');
-          for (const part of parts) {
-            const [key, val] = part.split('=');
-            if (key === 'access_token') accessToken = val;
-            if (key === 'refresh_token') refreshToken = val;
-          }
+    if (isOtpFlow) return;
+
+    const parseUrlValue = (source: string | null | undefined, key: string) => {
+      if (!source) return undefined;
+      const match = source.match(new RegExp(`(?:[?#&])${key}=([^&#]*)`));
+      return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+    };
+
+    async function handleRecoveryLink() {
+      setIsVerifyingLink(true);
+      setGlobalError(null);
+
+      try {
+        const existing = await supabase.auth.getSession();
+        let session = existing.data.session;
+        const parsed = url ? Linking.parse(url) : { queryParams: {} };
+        const queryParams = (parsed.queryParams ?? {}) as Record<string, string | undefined>;
+        const accessToken = (queryParams.access_token as string | undefined) || access_token || parseUrlValue(url, 'access_token');
+        const refreshToken = (queryParams.refresh_token as string | undefined) || refresh_token || parseUrlValue(url, 'refresh_token');
+        const recoveryCode = (queryParams.code as string | undefined) || code || parseUrlValue(url, 'code');
+
+        if (!session && accessToken && refreshToken) {
+          const result = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          if (result.error) throw result.error;
+          session = result.data.session;
+        } else if (!session && recoveryCode) {
+          const result = await supabase.auth.exchangeCodeForSession(recoveryCode);
+          if (result.error) throw result.error;
+          session = result.data.session;
         }
 
-        if (accessToken && refreshToken) {
-          setIsVerifyingLink(true);
-          console.log('[ResetPassword] Parsed session tokens from deep link. Authenticating...');
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (error) {
-            console.error('[ResetPassword] Failed to set session from deep link:', error);
-            setGlobalError('The reset link is invalid or has expired.');
-          } else {
-            console.log('[ResetPassword] Session set successfully. Ready to reset password.');
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-          }
-          setIsVerifyingLink(false);
+        if (!session) {
+          throw new Error('Open the password reset link from your email before saving a new password.');
         }
+
+        setRecoveryReady(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      } catch (error) {
+        console.error('[ResetPassword] Recovery session setup failed:', error);
+        setRecoveryReady(false);
+        setGlobalError(error instanceof Error ? error.message : 'The reset link is invalid or has expired.');
+      } finally {
+        setIsVerifyingLink(false);
       }
     }
-    handleDeepLink();
-  }, [url, isOtpFlow]);
+
+    void handleRecoveryLink();
+  }, [access_token, code, isOtpFlow, refresh_token, url]);
 
   // Success Redirect Countdown Timer
   useEffect(() => {
@@ -122,7 +139,8 @@ export default function ResetPasswordScreen() {
     try {
       if (isOtpFlow) {
         // OTP Flow: Hit backend REST API
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/otp`, {
+        const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'https://disas-trace.vercel.app/api';
+        const response = await fetch(`${apiUrl}/auth/otp`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -143,6 +161,10 @@ export default function ResetPasswordScreen() {
 
       } else {
         // Email Link Flow: Client-side Supabase password update
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('Your reset link is no longer active. Request a new password reset link and open it from your email.');
+        }
         const { error: supabaseError } = await supabase.auth.updateUser({
           password: data.password
         });
@@ -211,6 +233,7 @@ export default function ResetPasswordScreen() {
                         <TextInput
                           className={`bg-gray-50 p-4 rounded-xl border ${errors.password ? 'border-red-500' : 'border-gray-200'} pr-12 text-gray-800`}
                           placeholder="At least 8 characters"
+                          placeholderTextColor="#64748B"
                           onBlur={onBlur}
                           onChangeText={onChange}
                           value={value}
@@ -246,6 +269,7 @@ export default function ResetPasswordScreen() {
                         <TextInput
                           className={`bg-gray-50 p-4 rounded-xl border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-200'} pr-12 text-gray-800`}
                           placeholder="Re-enter new password"
+                          placeholderTextColor="#64748B"
                           onBlur={onBlur}
                           onChangeText={onChange}
                           value={value}
@@ -279,8 +303,8 @@ export default function ResetPasswordScreen() {
 
               <TouchableOpacity
                 onPress={handleSubmit(onSubmit)}
-                disabled={isSubmitting || isVerifyingLink}
-                className={`mt-8 bg-[#15286A] p-4 rounded-xl items-center justify-center min-h-[56px] ${(isSubmitting || isVerifyingLink) ? 'opacity-70' : ''}`}
+                disabled={isSubmitting || isVerifyingLink || (!isOtpFlow && !recoveryReady)}
+                className={`mt-8 bg-[#15286A] p-4 rounded-xl items-center justify-center min-h-[56px] ${(isSubmitting || isVerifyingLink || (!isOtpFlow && !recoveryReady)) ? 'opacity-70' : ''}`}
               >
                 {isVerifyingLink ? (
                   <View className="flex-row items-center justify-center">

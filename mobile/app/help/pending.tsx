@@ -247,7 +247,7 @@ export default function PendingScreen() {
               [
                 { 
                   text: "OK", 
-                  onPress: () => router.replace('/(tabs)') 
+                  onPress: () => router.replace('/(tabs)/index' as any)
                 }
               ],
               { cancelable: false }
@@ -402,7 +402,7 @@ export default function PendingScreen() {
             } finally {
               // Clean up and return to home
               useEmergencyReportStore.getState().resetReport();
-              router.replace('/(tabs)');
+              router.replace('/(tabs)/index' as any);
             }
           }
         }

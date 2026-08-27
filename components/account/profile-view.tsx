@@ -120,7 +120,7 @@ export function ProfileView() {
     <div className="w-full" key={user?.id || "loading"}>
       <Tabs defaultValue="personal" className="w-full">
         <div className="flex justify-center mb-6">
-          <TabsList className="bg-transparent border-b border-[#E2E8F0] w-full max-w-md justify-start rounded-none h-auto p-0 gap-6 overflow-x-auto no-scrollbar flex-nowrap whitespace-nowrap shrink-0">
+          <TabsList className="bg-transparent border-b border-[#E2E8F0] w-full max-w-5xl justify-start rounded-none h-auto p-0 gap-6 overflow-x-auto no-scrollbar flex-nowrap whitespace-nowrap shrink-0">
             <TabsTrigger 
               value="personal"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A8A] data-[state=active]:bg-transparent px-2 py-3 text-base"
@@ -142,7 +142,7 @@ export function ProfileView() {
           </TabsList>
         </div>
 
-        <TabsContent value="personal" className="max-w-md mx-auto outline-none mt-0">
+        <TabsContent value="personal" className="w-full max-w-2xl mx-auto outline-none mt-0">
           <div className="flex flex-col items-center mb-6">
             <div className="relative">
               {avatarUrl ? (
@@ -225,7 +225,7 @@ export function ProfileView() {
           </div>
         </TabsContent>
         
-        <TabsContent value="notifications" className="max-w-lg mx-auto outline-none mt-0">
+        <TabsContent value="notifications" className="w-full max-w-3xl mx-auto outline-none mt-0">
           <div className="text-xs font-bold uppercase text-[#1E293B] mb-4">Alert Preferences</div>
           
           <div className="space-y-4">
@@ -256,7 +256,7 @@ export function ProfileView() {
           </div>
         </TabsContent>
 
-        <TabsContent value="terms" className="max-w-lg mx-auto outline-none mt-0">
+        <TabsContent value="terms" className="w-full max-w-4xl mx-auto outline-none mt-0">
           <div className="text-xs font-bold uppercase text-[#1E293B] mb-4">Terms & Conditions</div>
           <div className="p-5 rounded-2xl border border-[#E2E8F0] bg-white text-slate-600 text-xs leading-relaxed space-y-3">
             <p className="font-bold text-[#1E3A8A] text-sm">Welcome to DisasTRACE!</p>

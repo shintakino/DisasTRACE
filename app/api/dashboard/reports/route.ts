@@ -4,6 +4,7 @@ import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { eq, desc } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+import { getReportLocation } from "@/lib/report-location";
 
 export async function GET() {
   try {
@@ -42,7 +43,7 @@ export async function GET() {
       requestId: i.requestId,
       vehicleId: i.vehicleId || "AMB-001",
       origin: "CDRRMO HQ",
-      destination: i.destination || "Baliwag City",
+      destination: getReportLocation(i.destination),
       timestamp: new Date(i.createdAt).toISOString(),
     }));
 

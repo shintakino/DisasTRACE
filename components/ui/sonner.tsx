@@ -39,11 +39,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }
       toastOptions={{
         classNames: {
-          toast: "group toast group-[.toaster]:bg-white group-[.toaster]:text-slate-900 group-[.toaster]:border-slate-300 group-[.toaster]:shadow-2xl group-[.toaster]:rounded-2xl p-4 font-sans border text-left",
-          title: "group-[.toast]:text-slate-900 font-black text-sm tracking-tight",
-          description: "group-[.toast]:text-slate-800 font-medium text-xs mt-1 leading-normal",
-          actionButton: "group-[.toast]:bg-[#1E3A8A] group-[.toast]:text-white hover:group-[.toast]:bg-blue-900 font-bold text-xs px-3.5 py-2 rounded-xl shadow-sm transition-all",
-          cancelButton: "group-[.toast]:bg-slate-100 group-[.toast]:text-slate-700 font-bold text-xs px-3.5 py-2 rounded-xl transition-all",
+          toast: "group toast !bg-white !text-slate-900 !border-slate-300 shadow-2xl rounded-2xl p-4 font-sans border text-left",
+          title: "!text-slate-950 font-black text-sm tracking-tight",
+          description: "!text-slate-700 !opacity-100 font-medium text-xs mt-1 leading-relaxed",
+          actionButton: "!bg-[#1E3A8A] !text-white hover:!bg-blue-900 font-bold text-xs px-3.5 py-2 rounded-xl shadow-sm transition-all",
+          cancelButton: "!bg-slate-100 !text-slate-700 font-bold text-xs px-3.5 py-2 rounded-xl transition-all",
         },
       }}
       {...props}

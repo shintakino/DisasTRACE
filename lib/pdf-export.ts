@@ -42,6 +42,17 @@ const getBase64ImageFromUrl = async (url: string): Promise<string | null> => {
   }
 };
 
+const CDRRMO_LOGO_PATH = "/assets/logoBaliwag.png";
+
+const addOfficialLogo = (doc: any, logo: string | null, x: number, y: number, size: number) => {
+  if (!logo) return;
+  try {
+    doc.addImage(logo, "PNG", x, y, size, size);
+  } catch (error) {
+    console.warn("Unable to add the CDRRMO logo to the PDF header:", error);
+  }
+};
+
 /**
  * Convert SVG Path string to high-res PNG Data URL for jsPDF embedding
  */
@@ -91,6 +102,7 @@ export async function exportReportsSummaryPDF(
 
     const pageHeight = doc.internal.pageSize.height;
     const pageWidth = doc.internal.pageSize.width;
+    const logo = await getBase64ImageFromUrl(CDRRMO_LOGO_PATH);
 
     // --- Branded Header Styles ---
     // Background Navy Header Banner
@@ -101,21 +113,23 @@ export async function exportReportsSummaryPDF(
     doc.setFillColor(239, 68, 68); // #EF4444 Red
     doc.rect(0, 40, pageWidth, 2, "F");
 
+    addOfficialLogo(doc, logo, 14, 6, 24);
+
     // Header Typography
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("CDRRMO BALIWAG CITY", 14, 15);
+    doc.text("CDRRMO BALIWAG CITY", 44, 15);
     
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(147, 197, 253); // text-blue-300
-    doc.text("PUBLIC ASSISTANCE AND COMMAND CENTER (PACC)", 14, 21);
+    doc.text("PUBLIC ASSISTANCE AND COMMAND CENTER (PACC)", 44, 21);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(255, 255, 255);
-    doc.text(filters.category === "user" ? "USER INCIDENT REPORTS SUMMARY" : "EMERGENCY INCIDENT REPORTS SUMMARY", 14, 32);
+    doc.text(filters.category === "user" ? "USER INCIDENT REPORTS SUMMARY" : "EMERGENCY INCIDENT REPORTS SUMMARY", 44, 32);
 
     // --- Document Meta Information ---
     doc.setTextColor(75, 85, 99); // Gray-600
@@ -288,6 +302,7 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
 
     const pageHeight = doc.internal.pageSize.height;
     const pageWidth = doc.internal.pageSize.width;
+    const logo = await getBase64ImageFromUrl(CDRRMO_LOGO_PATH);
 
     // --- Header Section ---
     // Dark Navy Blue Accent
@@ -298,20 +313,22 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     doc.setFillColor(239, 68, 68); // #EF4444
     doc.rect(0, 40, pageWidth, 2, "F");
 
+    addOfficialLogo(doc, logo, 14, 6, 24);
+
     // Headings
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(15);
-    doc.text("CDRRMO BALIWAG CITY", 14, 15);
+    doc.text("CDRRMO BALIWAG CITY", 44, 15);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(147, 197, 253);
-    doc.text("PACC - DISASTRACE EMERGENCY REPORTING SERVICES", 14, 21);
+    doc.text("PACC - DISASTRACE EMERGENCY REPORTING SERVICES", 44, 21);
 
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
-    doc.text(`OFFICIAL INCIDENT REPORT FILE: ${report.id}`, 14, 32);
+    doc.text(`OFFICIAL INCIDENT REPORT FILE: ${report.id}`, 44, 32);
 
     // Dynamic Status Badge in Header
     const statusText = report.status;
@@ -398,11 +415,12 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     doc.setFontSize(11);
     doc.text("2. INITIAL EMERGENCY DISPATCH CALL DETAILS", 14, sec2TitleY);
 
-    const residentDescLines = doc.splitTextToSize(
-      report.residentReportDescription || "Emergency report filed by verified resident. Dispatch logs initiated automatically.",
-      pageWidth - 36
-    );
-    const sec2BoxHeight = Math.max(16, residentDescLines.length * 4.5 + 8);
+    const residentDescription = report.residentReportDescription || "Emergency report filed by verified resident. Dispatch logs initiated automatically.";
+    const residentDescLines = residentDescription
+      .split(/\r?\n/)
+      .flatMap((line) => doc.splitTextToSize(line || " ", pageWidth - 36));
+    const descriptionLineHeight = 4.8;
+    const sec2BoxHeight = Math.max(16, residentDescLines.length * descriptionLineHeight + 8);
 
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(229, 231, 235);
@@ -410,7 +428,7 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     doc.setTextColor(55, 65, 81); // Gray-700
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(residentDescLines, 18, sec2TitleY + 10);
+    doc.text(residentDescLines, 18, sec2TitleY + 10, { lineHeightFactor: descriptionLineHeight / 9 });
 
     // --- Section 3: Responder Clinical Findings & Notes ---
     let sec3TitleY = sec2TitleY + 4 + sec2BoxHeight + 8;
@@ -677,6 +695,7 @@ export async function exportUsersListPDF(
 
     const pageHeight = doc.internal.pageSize.height;
     const pageWidth = doc.internal.pageSize.width;
+    const logo = await getBase64ImageFromUrl(CDRRMO_LOGO_PATH);
 
     // --- Branded Header Styles ---
     doc.setFillColor(30, 58, 138); // #1E3A8A Navy
@@ -685,20 +704,22 @@ export async function exportUsersListPDF(
     doc.setFillColor(239, 68, 68); // #EF4444 Red
     doc.rect(0, 40, pageWidth, 2, "F");
 
+    addOfficialLogo(doc, logo, 14, 6, 24);
+
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("CDRRMO BALIWAG CITY", 14, 15);
+    doc.text("CDRRMO BALIWAG CITY", 44, 15);
     
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(147, 197, 253); // text-blue-300
-    doc.text("PUBLIC ASSISTANCE AND COMMAND CENTER (PACC)", 14, 21);
+    doc.text("PUBLIC ASSISTANCE AND COMMAND CENTER (PACC)", 44, 21);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(255, 255, 255);
-    doc.text("USER ACCOUNTS REGISTRY LOGS", 14, 32);
+    doc.text("USER ACCOUNTS REGISTRY LOGS", 44, 32);
 
     // --- Document Meta Information ---
     doc.setTextColor(75, 85, 99); // Gray-600
@@ -876,6 +897,7 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
 
     const pageHeight = doc.internal.pageSize.height;
     const pageWidth = doc.internal.pageSize.width;
+    const logo = await getBase64ImageFromUrl(CDRRMO_LOGO_PATH);
 
     const drawPCRPageHeader = (d: any, title: string) => {
       d.setFillColor(30, 58, 138); // Navy
@@ -883,10 +905,12 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
       d.setFillColor(239, 68, 68); // Red
       d.rect(0, 20, pageWidth, 1.5, "F");
 
+      addOfficialLogo(d, logo, 14, 1.5, 17);
+
       d.setTextColor(255, 255, 255);
       d.setFont("helvetica", "bold");
       d.setFontSize(11);
-      d.text(title, 14, 12);
+      d.text(title, 35, 12);
     };
 
     const checkPCRPageOverflow = (d: any, currentY: number, heightNeeded: number, title: string) => {
@@ -905,14 +929,16 @@ export async function exportPatientCareReportPDF(pcr: any, reportId: string, ind
     doc.setFillColor(239, 68, 68); // Red
     doc.rect(0, 25, pageWidth, 1.5, "F");
 
+    addOfficialLogo(doc, logo, 14, 3.5, 18);
+
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.text("Republic of the Philippines | Province of Bulacan | CITY OF BALIWAG", 14, 8);
+    doc.text("Republic of the Philippines | Province of Bulacan | CITY OF BALIWAG", 35, 8);
     doc.setFontSize(11);
-    doc.text("CITY DISASTER RISK REDUCTION AND MANAGEMENT OFFICE", 14, 13);
+    doc.text("CITY DISASTER RISK REDUCTION AND MANAGEMENT OFFICE", 35, 13);
     doc.setFontSize(13);
-    doc.text("PRE-HOSPITAL CARE REPORT", 14, 20);
+    doc.text("PRE-HOSPITAL CARE REPORT", 35, 20);
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(8);
@@ -1373,6 +1399,7 @@ export async function exportDriverTripTicketPDF(
       unit: "mm",
       format: "a4",
     });
+    const logo = await getBase64ImageFromUrl(CDRRMO_LOGO_PATH);
 
     const pageWidth = doc.internal.pageSize.width;
     const headerHeight = 28;
@@ -1381,14 +1408,16 @@ export async function exportDriverTripTicketPDF(
     doc.setFillColor(22, 32, 58);
     doc.rect(0, 0, pageWidth, headerHeight, "F");
 
+    addOfficialLogo(doc, logo, 14, 3, 20);
+
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text("BALIWAG CDRRMO RESCUE 5 FVE", 14, 12);
+    doc.text("BALIWAG CDRRMO RESCUE 5 FVE", 38, 12);
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("DRIVER'S TRIP TICKET & VEHICLE LOG SHEET", 14, 18);
+    doc.text("DRIVER'S TRIP TICKET & VEHICLE LOG SHEET", 38, 18);
     doc.text(`TICKET ID: DTT-${reportId.slice(0, 8).toUpperCase()}`, pageWidth - 14, 18, { align: "right" });
 
     // --- Section 1: Trip & Vehicle Details ---

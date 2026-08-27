@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { createClient } from '@/lib/supabase-server';
 import { db } from '@/db';
 import { users } from '@/db/schema/users';
-import { EmergencyIntakeSchema, RegisteredEmergencyIntakeSchema, submitEmergencyIntake } from '@/lib/emergency-intake';
+import { RegisteredEmergencyIntakeSchema, RegisteredEmergencyIntakeSubmissionSchema, submitEmergencyIntake } from '@/lib/emergency-intake';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid emergency report details', details: payload.error.flatten() }, { status: 400 });
     }
 
-    const report = EmergencyIntakeSchema.safeParse({
+    const report = RegisteredEmergencyIntakeSubmissionSchema.safeParse({
       ...payload.data,
       contactNumber: resident.phone,
     });

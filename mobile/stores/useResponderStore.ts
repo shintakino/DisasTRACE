@@ -65,6 +65,7 @@ export interface DispatchDetails {
   attachmentUrl?: string; // Mock URL
   typeOfEmergency?: string; // e.g. "Medical"
   dispatchOfferDurationSeconds?: number; // Configurable duration in seconds
+  offerExpiresAt?: string; // Server timestamp used for the responder countdown
   assignedAmbulance?: string; // e.g. "AMB-001"
 }
 
@@ -125,6 +126,7 @@ interface ResponderState {
   
   // Forms & Drafts Actions
   saveDraft: (incident: DispatchDetails, formData: any) => void;
+  removeDraft: (draftId: string) => void;
   openFormForIncident: (incident: DispatchDetails) => void;
 
   enqueueAction: (action: Omit<QueueAction, 'id' | 'timestamp'>) => Promise<void>;
@@ -476,6 +478,10 @@ export const useResponderStore = create<ResponderState>((set) => ({
     
     return { drafts: newDrafts };
   }),
+
+  removeDraft: (draftId) => set((state) => ({
+    drafts: state.drafts.filter((draft) => draft.id !== draftId),
+  })),
 
   openFormForIncident: (incident) => set({
     activeDispatch: incident,

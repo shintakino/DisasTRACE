@@ -16,12 +16,13 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { WebPreloader } from "@/components/ui/web-preloader"
 import { getIncidentAlertPriority, INCIDENT_ALERT_PRIORITY_RANK, type IncidentAlertPriority } from "@/lib/incident-severity"
+import { getReportLocation } from "@/lib/report-location"
 
 export default function VerificationPage() {
   const { user } = useAuth()
   const [requests, setRequests] = useState<VerificationRequest[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [filter, setFilter] = useState<VerificationQueueFilter>("REVIEW")
+  const [filter, setFilter] = useState<VerificationQueueFilter>("ACTION")
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -229,7 +230,7 @@ export default function VerificationPage() {
             const isEmergency = newRequest.nature === "EMERGENCY";
             const reqNum = newRequest.request_id || newRequest.requestId || "REQ-NEW";
             const reqType = newRequest.type || "Unknown Emergency";
-            const reqLoc = newRequest.location_description || newRequest.locationDescription || "Baliwag City";
+            const reqLoc = getReportLocation(newRequest.location_description || newRequest.locationDescription);
             
             if (isEmergency) {
               const priority = getIncidentAlertPriority(newRequest.severity);

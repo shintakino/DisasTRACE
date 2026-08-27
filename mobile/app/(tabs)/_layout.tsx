@@ -3,11 +3,13 @@ import { Tabs, useRouter } from 'expo-router';
 import { Home2, FolderOpen, Map, User, CalendarAdd } from 'iconsax-react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useResponderStore } from '../../stores/useResponderStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
   const router = useRouter();
   const { user, role } = useAuthStatus();
   const responderStatus = useResponderStore((state) => state.status);
+  const insets = useSafeAreaInsets();
 
   const isResponder = role === 'ambulance_responder';
 
@@ -26,8 +28,8 @@ export default function TabLayout() {
         backgroundColor: '#020617', // Deep navy blue (blue-950)
         borderTopWidth: 1,
         borderTopColor: '#1E293B', // border-blue-900
-        height: 65,
-        paddingBottom: 8,
+        height: 65 + insets.bottom,
+        paddingBottom: 8 + insets.bottom,
         paddingTop: 8,
         elevation: 0,
         shadowOpacity: 0,

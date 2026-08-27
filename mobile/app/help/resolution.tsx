@@ -65,7 +65,7 @@ export default function ResolutionScreen() {
     }
     
     resetReport();
-    router.replace('/(tabs)');
+    router.replace('/(tabs)/index' as any);
   };
 
   return (

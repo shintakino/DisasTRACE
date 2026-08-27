@@ -5,6 +5,7 @@ import { Flame, CarFront, Activity, AlertTriangle, MapPin } from 'lucide-react-n
 import { useAuthStatus } from '../../../hooks/use-auth-status';
 import { ReportDetailModal } from '../../../components/responder/ReportDetailModal';
 import { supabase } from '../../../lib/supabase';
+import { getReportLocation } from '../../../lib/report-location';
 
 export default function MyReportsScreen() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export default function MyReportsScreen() {
             type: r.type || 'Incident',
             date: r.date || 'Today',
             status: r.status || 'COMPLETED',
-            location: r.location || 'Baliwag City',
+            location: getReportLocation(r.location),
             response: r.responderName ? `AMB-${r.responderName.slice(0, 3).toUpperCase()} Dispatched` : 'Dispatched',
             icon,
           };
@@ -89,14 +90,16 @@ export default function MyReportsScreen() {
   const older: any[] = [];
 
   const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const oneDay = 24 * 60 * 60 * 1000;
 
   filteredReports.forEach((r) => {
-    // Parse r.date e.g., "March 21, 2026"
     try {
-      const rDate = new Date(r.date);
-      const diffTime = Math.abs(now.getTime() - rDate.getTime());
-      const diffDays = Math.round(diffTime / oneDay);
+      const timestamp = r.createdAt ? Date.parse(r.createdAt) : Date.parse(r.date);
+      if (!Number.isFinite(timestamp)) throw new Error('Invalid report timestamp');
+      const rDate = new Date(timestamp);
+      const reportStart = new Date(rDate.getFullYear(), rDate.getMonth(), rDate.getDate()).getTime();
+      const diffDays = Math.max(0, Math.floor((todayStart - reportStart) / oneDay));
       
       if (diffDays === 0 || r.date === 'Today') {
         today.push(r);
@@ -125,7 +128,7 @@ export default function MyReportsScreen() {
           if (isResponder) {
             setSelectedReport(report);
           } else {
-            router.push(`/reports/${report.id}`);
+            router.push(`/(tabs)/reports/${report.id}` as any);
           }
         }}
         className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100"
@@ -150,12 +153,14 @@ export default function MyReportsScreen() {
         
         <View className="h-[1px] bg-slate-100 w-full mb-4" />
         
-        <View className="flex-row justify-between items-center">
-          <View className="flex-row items-center flex-1 pr-2">
+        <View className="flex-row items-start">
+          <View className="flex-1 min-w-0 flex-row items-start pr-3">
             <MapPin size={16} color="#64748B" />
-            <Text className="text-sm font-medium text-slate-500 ml-1.5" numberOfLines={1}>{report.location}</Text>
+            <Text className="text-sm font-medium text-slate-500 ml-1.5 flex-1" numberOfLines={2}>{report.location}</Text>
           </View>
-          <Text className="text-sm font-medium text-slate-400">{report.response}</Text>
+          <View className="max-w-[38%] shrink-0">
+            <Text className="text-sm font-medium text-slate-400 text-right" numberOfLines={2}>{report.response}</Text>
+          </View>
         </View>
       </TouchableOpacity>
     );

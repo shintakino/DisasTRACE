@@ -4,6 +4,7 @@ import { CalendarTick, Location } from 'iconsax-react-native';
 import { X } from 'lucide-react-native';
 import { useResponderStore, DispatchDetails } from '../../stores/useResponderStore';
 import { supabase } from '../../lib/supabase';
+import { getReportLocation } from '../../lib/report-location';
 
 interface SelectIncidentModalProps {
   visible: boolean;
@@ -83,7 +84,7 @@ export function SelectIncidentModal({ visible, onClose }: SelectIncidentModalPro
         return {
           id: inc.id,
           type: vReq?.type || 'Emergency Response',
-          locationName: vReq?.location_description || vReq?.address || 'Baliwag City',
+          locationName: getReportLocation(vReq?.location_description || vReq?.address),
           distance: '1.2 km',
           natureOfCall: vReq?.nature || 'Emergency',
           peopleInvolved: peopleInvolvedCount,

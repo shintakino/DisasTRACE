@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { autoDispatchIncident } from "@/lib/dispatch-engine";
 import crypto from "crypto";
+import { getReportLocation } from "@/lib/report-location";
 
 export async function PATCH(
   req: NextRequest,
@@ -31,7 +32,15 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // 1. Fetch the request to verify existence and check details
+    if (validatedStatus === "DUPLICATE") {
+      return NextResponse.json(
+        { error: "Use the merge action to mark a report as a duplicate." },
+        { status: 400 }
+      );
+    }
+
+    // Fetch both records before changing state. Guest reports intentionally have
+    // no resident row, so all decisions below are based on the request itself.
     const existingReq = await db.query.verificationRequests.findFirst({
       where: eq(verificationRequests.id, id),
     });
@@ -40,27 +49,66 @@ export async function PATCH(
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
 
-    // 2. Update status in database
-    const [updatedReq] = await db.update(verificationRequests)
-      .set({ 
-        status: validatedStatus,
-        updatedAt: new Date()
-      })
-      .where(eq(verificationRequests.id, id))
-      .returning();
+    const existingIncident = await db.query.incidents.findFirst({
+      where: eq(incidents.requestId, id),
+    });
 
-    // If rejected, remove any associated pending incidents to clean up the DB
+    const hasActiveAssignment = Boolean(
+      existingIncident &&
+      existingIncident.status !== "RESOLVED" &&
+      (existingIncident.responderId || existingIncident.currentOfferResponderId)
+    );
+
     if (validatedStatus === "REJECTED") {
-      await db.delete(incidents).where(eq(incidents.requestId, id));
+      const canReject =
+        existingReq.status === "PENDING" ||
+        (existingReq.status === "VERIFIED" &&
+          existingIncident?.dispatchMethod === "PACC_MANUAL" &&
+          !hasActiveAssignment);
+
+      if (!canReject) {
+        return NextResponse.json(
+          { error: "Only pending or unassigned PACC-handled reports can be rejected." },
+          { status: 409 }
+        );
+      }
+
+      const [updatedReq] = await db.update(verificationRequests)
+        .set({ status: "REJECTED", updatedAt: new Date() })
+        .where(eq(verificationRequests.id, id))
+        .returning();
+
+      // A Guest report must be independently clearable. Remove only its own
+      // placeholder/manual incident; merging is not part of rejection.
+      if (existingIncident) {
+        await db.delete(incidents).where(eq(incidents.id, existingIncident.id));
+      }
+
+      return NextResponse.json({
+        success: true,
+        id,
+        status: updatedReq.status,
+        request: null,
+        incident: null,
+        autoDispatched: false,
+        message: `Verification request ${id} marked as REJECTED`,
+      });
     }
 
-    let incident = null;
+    if (existingReq.status === "REJECTED" || existingReq.status === "DUPLICATE") {
+      return NextResponse.json(
+        { error: `A ${existingReq.status.toLowerCase()} report cannot be verified.` },
+        { status: 409 }
+      );
+    }
+
+    let incident = existingIncident ?? null;
     let autoDispatched = false;
 
-    // 3. If verified, handle dispatch logic
+    // A verification action is valid for both registered and Guest Mode
+    // requests. Reuse an existing incident so retries cannot create duplicates.
     if (validatedStatus === "VERIFIED") {
-      // Auto-dispatch only if it's an emergency
-      if (existingReq.nature === "EMERGENCY") {
+      if (!incident && existingReq.nature === "EMERGENCY") {
         incident = await autoDispatchIncident(
           id,
           existingReq.residentId,
@@ -72,7 +120,9 @@ export async function PATCH(
         }
       }
 
-      // If non-emergency or if auto-dispatch found no responders:
+      // If this is non-emergency, or no responder was available, keep a
+      // PACC_MANUAL placeholder so the report remains actionable and can be
+      // dispatched later without requiring a merge.
       if (!incident) {
         const [manualIncident] = await db.insert(incidents).values({
           id: crypto.randomUUID(),
@@ -86,6 +136,10 @@ export async function PATCH(
         }).returning();
         incident = manualIncident;
       }
+
+      await db.update(verificationRequests)
+        .set({ status: "VERIFIED", updatedAt: new Date() })
+        .where(eq(verificationRequests.id, id));
     }
 
     // Fetch the updated request with resident relation to return fully mapped conformant object
@@ -113,7 +167,7 @@ export async function PATCH(
         status: finalReq.status,
         nature: finalReq.nature,
         type: finalReq.type,
-        location: finalReq.locationDescription || "Baliwag City",
+        location: getReportLocation(finalReq.locationDescription),
         peopleInvolved: peopleCount,
         imageUrl: finalReq.imageUrl || undefined,
         receivedAt: finalReq.createdAt.toISOString(),

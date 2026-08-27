@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Platform, StatusBar, TextInpu
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, User, MapPin, Award, CheckCircle, Edit3 } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
+import { getReportLocation } from '../../../lib/report-location';
 
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -150,7 +151,7 @@ export default function IncidentDetailScreen() {
     return (
       <View className="flex-1 bg-slate-50 justify-center items-center px-6">
         <Text className="text-slate-500 font-bold text-center mb-6">Report not found or has not been fully resolved by the responders.</Text>
-        <TouchableOpacity className="bg-[#1E3A8A] px-6 py-3 rounded-full" onPress={() => router.back()}>
+          <TouchableOpacity className="bg-[#1E3A8A] px-6 py-3 rounded-full" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/reports' as any)}>
           <Text className="text-white font-bold">Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -164,7 +165,7 @@ export default function IncidentDetailScreen() {
       <View className="bg-[#1E3A8A] pt-14 pb-8 px-6" style={{ paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 20 : 60 }}>
         <TouchableOpacity 
           className="flex-row items-center mb-1" 
-          onPress={() => router.back()}
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/reports' as any)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <ArrowLeft color="#FFFFFF" size={24} strokeWidth={2.5} />
@@ -213,7 +214,7 @@ export default function IncidentDetailScreen() {
           </View>
           <View className="flex-row justify-between mb-5">
             <Text className="text-sm font-medium text-slate-500">Location</Text>
-            <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>{report.location}</Text>
+            <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>{getReportLocation(report.location)}</Text>
           </View>
           <View className="flex-row justify-between mb-5">
             <Text className="text-sm font-medium text-slate-500">Nature of Call</Text>
@@ -281,7 +282,7 @@ export default function IncidentDetailScreen() {
 
             {existingFeedback.comment ? (
               <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-4">
-                <Text className="text-sm text-slate-600 leading-relaxed">"{existingFeedback.comment}"</Text>
+                <Text className="text-sm text-slate-600 leading-relaxed">&quot;{existingFeedback.comment}&quot;</Text>
               </View>
             ) : (
               <Text className="text-sm text-slate-400 text-center mb-4">No additional comments</Text>

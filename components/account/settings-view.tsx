@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { Mail, Clock } from "lucide-react";
+import { Mail, Clock, Gauge } from "lucide-react";
 import { toast } from "sonner";
 import { createClientBrowser } from "@/lib/supabase";
 import { HospitalSettings } from "./hospital-settings";
@@ -30,7 +30,9 @@ export function SettingsView() {
   const [passwordError, setPasswordError] = useState("");
 
   const [dispatchTimeout, setDispatchTimeout] = useState<number>(30);
+  const [guestRequestsPerDay, setGuestRequestsPerDay] = useState<number>(50);
   const [dispatchLoading, setDispatchLoading] = useState(false);
+  const [guestLimitLoading, setGuestLimitLoading] = useState(false);
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
 
   const fetchSettings = async () => {
@@ -40,6 +42,7 @@ export function SettingsView() {
       const data = await response.json();
       if (data.success && data.settings) {
         setDispatchTimeout(data.settings.dispatchOfferTimeoutSeconds);
+        setGuestRequestsPerDay(data.settings.guestRequestsPerDay ?? 50);
       }
     } catch (error) {
       console.error("Error fetching settings:", error);
@@ -79,6 +82,29 @@ export function SettingsView() {
       toast.error(err.message || "Failed to update settings.");
     } finally {
       setDispatchLoading(false);
+    }
+  };
+
+  const handleUpdateGuestLimit = async () => {
+    if (guestRequestsPerDay < 1 || guestRequestsPerDay > 10000) {
+      toast.error("Guest Mode requests per day must be between 1 and 10,000.");
+      return;
+    }
+    setGuestLimitLoading(true);
+
+    try {
+      const response = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guestRequestsPerDay }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "Failed to update Guest Mode limit");
+      toast.success("Guest Mode request limit saved successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update Guest Mode limit.");
+    } finally {
+      setGuestLimitLoading(false);
     }
   };
 
@@ -126,7 +152,7 @@ export function SettingsView() {
     <div className="w-full" key={user?.id || "loading"}>
       <Tabs defaultValue="signin" className="w-full">
         <div className="flex justify-center mb-10">
-          <TabsList className="bg-transparent border-b border-[#E2E8F0] w-full max-w-2xl justify-start rounded-none h-auto p-0 gap-6 overflow-x-auto no-scrollbar flex-nowrap whitespace-nowrap shrink-0">
+          <TabsList className="bg-transparent border-b border-[#E2E8F0] w-full max-w-5xl justify-start rounded-none h-auto p-0 gap-6 overflow-x-auto no-scrollbar flex-nowrap whitespace-nowrap shrink-0">
             <TabsTrigger 
               value="signin"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A8A] data-[state=active]:bg-transparent px-2 py-3 text-base"
@@ -158,7 +184,7 @@ export function SettingsView() {
           </TabsList>
         </div>
 
-        <TabsContent value="signin" className="max-w-xl mx-auto outline-none mt-0">
+        <TabsContent value="signin" className="w-full max-w-3xl mx-auto outline-none mt-0">
           <div className="space-y-8">
             <div>
               <div className="text-xs font-bold uppercase text-[#1E293B] mb-3">Login Method</div>
@@ -204,6 +230,7 @@ export function SettingsView() {
                 >
                   {emailLoading ? "Updating..." : "Update Email"}
                 </Button>
+
               </div>
             </div>
 
@@ -256,7 +283,7 @@ export function SettingsView() {
         </TabsContent>
 
         {(role === "cdrrmo_super_admin" || role === "pacc_admin") && (
-          <TabsContent value="dispatch" className="max-w-xl mx-auto outline-none mt-0">
+          <TabsContent value="dispatch" className="w-full max-w-3xl mx-auto outline-none mt-0">
             <div className="space-y-8">
               <div>
                 <div className="text-xs font-bold uppercase text-[#1E293B] mb-3">Incident Dispatch Configuration</div>
@@ -305,12 +332,56 @@ export function SettingsView() {
                 >
                   {dispatchLoading ? "Saving Configuration..." : "Save Configuration"}
                 </Button>
+
+                {role === "cdrrmo_super_admin" && (
+                  <div className="mt-8 space-y-4 border-t border-slate-200 pt-8">
+                    <div className="p-5 rounded-2xl border border-amber-100 bg-amber-50/30 flex gap-4">
+                      <div className="bg-amber-100 text-amber-700 p-2 rounded-xl flex items-center justify-center w-12 h-12 shrink-0">
+                        <Gauge className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-amber-900 text-sm">Guest Mode Capacity</h4>
+                        <p className="text-xs text-amber-800/80 mt-1 leading-relaxed">
+                          Limit the number of Guest Mode emergency requests accepted during each Manila calendar day. Requests are rejected safely once the limit is reached.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="guestRequestsPerDay" className="text-sm font-semibold text-[#1E293B]">
+                        Guest Mode Requests Per Day
+                      </Label>
+                      <div className="flex gap-3">
+                        <Input
+                          id="guestRequestsPerDay"
+                          type="number"
+                          min={1}
+                          max={10000}
+                          value={guestRequestsPerDay}
+                          onChange={(e) => setGuestRequestsPerDay(parseInt(e.target.value, 10) || 50)}
+                          className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white"
+                        />
+                        <div className="bg-slate-100 border border-slate-200 text-[#475569] font-bold px-4 rounded-xl flex items-center justify-center text-sm shrink-0">
+                          requests/day
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleUpdateGuestLimit}
+                      disabled={guestLimitLoading || !hasLoadedSettings}
+                      className="w-full h-12 bg-[#B91C1C] text-white hover:bg-red-800 font-semibold rounded-xl transition-all shadow-md active:scale-[0.99]"
+                    >
+                      {guestLimitLoading ? "Saving Guest Limit..." : "Save Guest Mode Limit"}
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
         )}
 
-        <TabsContent value="system" className="max-w-xl mx-auto outline-none mt-0">
+        <TabsContent value="system" className="w-full max-w-3xl mx-auto outline-none mt-0">
           <div className="text-xs font-bold uppercase text-[#1E293B] mb-3">System</div>
           
           <div className="space-y-4">

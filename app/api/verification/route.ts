@@ -6,6 +6,7 @@ import { users } from "@/db/schema/users";
 import { createClient } from "@/lib/supabase-server";
 import { eq, desc, sql } from "drizzle-orm";
 import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides, healOrphanedActiveDispatches } from "@/lib/dispatch-engine";
+import { getReportLocation } from "@/lib/report-location";
 
 export async function GET(req: NextRequest) {
   try {
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
         nature: r.nature,
         severity: r.severity,
         type: r.type,
-        location: r.locationDescription || "Baliwag City",
+        location: getReportLocation(r.locationDescription),
         peopleInvolved: peopleCount,
         imageUrl: imageUrlStr,
         receivedAt: r.createdAt.toISOString(),

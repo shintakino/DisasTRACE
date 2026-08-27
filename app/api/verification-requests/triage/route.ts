@@ -64,8 +64,13 @@ export async function POST(req: NextRequest) {
         })
         .where(eq(verificationRequests.id, requestId));
 
-      // 2. Call auto-dispatch engine only if it is an emergency
-      if (finalNature === 'EMERGENCY') {
+      // 2. Call auto-dispatch engine only if it is an emergency and there is no
+      // incident already associated with this request. This makes retries and
+      // Guest Mode submissions idempotent.
+      const existingIncident = await db.query.incidents.findFirst({
+        where: eq(incidents.requestId, requestId),
+      });
+      if (finalNature === 'EMERGENCY' && !existingIncident) {
         incident = await autoDispatchIncident(
           requestId,
           existingReq.residentId,
@@ -85,17 +90,20 @@ export async function POST(req: NextRequest) {
           })
           .where(eq(verificationRequests.id, requestId));
 
-        const [manualIncident] = await db.insert(incidents).values({
-          id: crypto.randomUUID(),
-          requestId: requestId,
-          responderId: null,
-          currentOfferResponderId: null,
-          status: "DISPATCHED",
-          dispatchMethod: "PACC_MANUAL",
-          assignedAmbulance: null,
-          skippedResponderIds: [],
-        }).returning();
-        incident = manualIncident;
+        incident = existingIncident;
+        if (!incident) {
+          const [manualIncident] = await db.insert(incidents).values({
+            id: crypto.randomUUID(),
+            requestId: requestId,
+            responderId: null,
+            currentOfferResponderId: null,
+            status: "DISPATCHED",
+            dispatchMethod: "PACC_MANUAL",
+            assignedAmbulance: null,
+            skippedResponderIds: [],
+          }).returning();
+          incident = manualIncident;
+        }
       }
 
       // Fetch the final request to return in response
@@ -107,7 +115,9 @@ export async function POST(req: NextRequest) {
       const [updated] = await db.update(verificationRequests)
         .set({
           status: 'REJECTED',
-          locationDescription: rejectionReason ? `REJECTED: ${rejectionReason}. ${existingReq.locationDescription || ''}` : existingReq.locationDescription,
+          triageReasons: rejectionReason
+            ? [...existingReq.triageReasons, `PACC rejection reason: ${rejectionReason}`]
+            : existingReq.triageReasons,
           updatedAt: new Date(),
         })
         .where(eq(verificationRequests.id, requestId))

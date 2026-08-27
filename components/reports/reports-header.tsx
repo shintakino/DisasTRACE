@@ -110,17 +110,17 @@ export function ReportsHeader({
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Incident Type</label>
                 <Select value={type} onValueChange={handleTypeChange}>
-                  <SelectTrigger className="uppercase">
-                    <SelectValue placeholder="ALL" />
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ALL</SelectItem>
-                    <SelectItem value="Fire Emergency">FIRE EMERGENCY</SelectItem>
-                    <SelectItem value="Vehicular Collision">VEHICULAR COLLISION</SelectItem>
-                    <SelectItem value="Medical Emergency">MEDICAL EMERGENCY</SelectItem>
-                    <SelectItem value="Structural Failure">STRUCTURAL FAILURE</SelectItem>
-                    <SelectItem value="Flood/Water">FLOOD/WATER</SelectItem>
-                    <SelectItem value="Unknown Cause">UNKNOWN CAUSE</SelectItem>
+                  <SelectContent className="min-w-[230px]">
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="Fire Emergency">Fire Emergency</SelectItem>
+                    <SelectItem value="Vehicular Collision">Vehicular Collision</SelectItem>
+                    <SelectItem value="Medical Emergency">Medical Emergency</SelectItem>
+                    <SelectItem value="Structural Failure">Structural Failure</SelectItem>
+                    <SelectItem value="Flood/Water">Flood/Water</SelectItem>
+                    <SelectItem value="Unknown Cause">Unknown Cause</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -132,11 +132,11 @@ export function ReportsHeader({
                     <SelectValue placeholder="All time" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All time</SelectItem>
+                    <SelectItem value="all">All Time</SelectItem>
                     <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="this_week">This week</SelectItem>
-                    <SelectItem value="this_month">This month</SelectItem>
-                    <SelectItem value="this_year">This year</SelectItem>
+                    <SelectItem value="this_week">This Week</SelectItem>
+                    <SelectItem value="this_month">This Month</SelectItem>
+                    <SelectItem value="this_year">This Year</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

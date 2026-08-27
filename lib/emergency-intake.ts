@@ -14,16 +14,17 @@ const IncidentTypeSchema = z.enum([
   'Unknown Cause',
 ]);
 
-export const EmergencyIntakeSchema = z.object({
-  contactNumber: z.string()
+const ContactNumberSchema = z.string()
     .trim()
     .transform((value) => value.replace(/[\s()-]/g, ''))
     .refine((value) => /^(?:\+63|0)9\d{9}$/.test(value), {
       message: 'Use a valid Philippine mobile number, such as 09171234567 or +639171234567.',
-    }),
+    });
+
+const IntakeDetailsSchema = z.object({
   incidentType: IncidentTypeSchema,
   peopleInvolved: z.coerce.number().int().min(1).max(999),
-  landmarks: z.string().trim().min(5).max(600),
+  landmarks: z.string().trim().max(600).optional().default(''),
   victimCondition: z.string().trim().min(2).max(160),
   latitude: z.number().finite().min(-90).max(90),
   longitude: z.number().finite().min(-180).max(180),
@@ -32,13 +33,26 @@ export const EmergencyIntakeSchema = z.object({
   imageUrl: z.string().url(),
 });
 
-// Registered residents authenticate before intake, so their callback number is
-// always taken from the verified account record rather than from device input.
-export const RegisteredEmergencyIntakeSchema = EmergencyIntakeSchema.omit({
-  contactNumber: true,
+// Guest reporters must provide a landmark because GPS is the only location
+// context available to responders without an account profile.
+export const EmergencyIntakeSchema = IntakeDetailsSchema.extend({
+  contactNumber: ContactNumberSchema,
+  landmarks: z.string().trim().min(5).max(600),
 });
 
-export type EmergencyIntake = z.infer<typeof EmergencyIntakeSchema>;
+// Registered residents authenticate before intake, so their callback number is
+// always taken from the verified account record rather than from device input.
+export const RegisteredEmergencyIntakeSchema = IntakeDetailsSchema.extend({
+  landmarks: z.string().trim().max(600).optional().default(''),
+});
+
+export const RegisteredEmergencyIntakeSubmissionSchema = IntakeDetailsSchema.extend({
+  contactNumber: ContactNumberSchema,
+});
+
+export const GuestEmergencyIntakeSchema = EmergencyIntakeSchema;
+
+export type EmergencyIntake = z.infer<typeof RegisteredEmergencyIntakeSubmissionSchema>;
 export type TriageClassification = 'HIGH_CONFIDENCE_EMERGENCY' | 'HIGH_CONFIDENCE_NON_EMERGENCY' | 'UNCERTAIN_INCOMPLETE' | 'SUSPICIOUS_POSSIBLE_PRANK';
 
 interface IntakeActor {
@@ -101,7 +115,9 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
     type: input.incidentType,
     peopleInvolved: String(input.peopleInvolved),
     severity: input.severity,
-    locationDescription: `${input.landmarks}\nCondition: ${input.victimCondition}`,
+    // Keep the location field location-only. The condition is already used by
+    // triage and must not be copied into addresses or places-visited fields.
+    locationDescription: input.landmarks || null,
     latitude: input.latitude,
     longitude: input.longitude,
     imageUrl: input.imageUrl,

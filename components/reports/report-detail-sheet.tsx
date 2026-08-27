@@ -240,7 +240,7 @@ export function ReportDetailSheet({
                           <img 
                             src={report.residentPhotoUrl} 
                             alt="Scene photo" 
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            className="w-full h-full object-contain transition-opacity duration-200 group-hover:opacity-90"
                           />
                           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-12 pb-3 px-4 flex justify-between items-end">
                             <span className="text-white text-xs font-medium tracking-wide">RESIDENT_ATTACHMENT.jpg</span>
@@ -316,12 +316,6 @@ export function ReportDetailSheet({
                     </div>
                   )}
 
-                  {/* Scroll Up indicator */}
-                  <div className="text-center pt-8 pb-4 opacity-50 hover:opacity-100 transition-opacity">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer">
-                      Scroll Up
-                    </span>
-                  </div>
                 </div>
               )}
 
@@ -390,7 +384,7 @@ export function ReportDetailSheet({
                             <img
                               src={photo}
                               alt={`Scene photo ${idx + 1}`}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              className="w-full h-full object-contain transition-opacity duration-200 group-hover:opacity-90"
                             />
                             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pt-8 pb-2 px-3">
                               <span className="text-white text-[10px] font-medium tracking-wide">SCENE_PHOTO_{idx + 1}.jpg</span>
@@ -401,12 +395,6 @@ export function ReportDetailSheet({
                     </div>
                   )}
 
-                  {/* Scroll Up indicator */}
-                  <div className="text-center pt-8 pb-4 opacity-50 hover:opacity-100 transition-opacity">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer">
-                      Scroll Up
-                    </span>
-                  </div>
                 </div>
               )}
 

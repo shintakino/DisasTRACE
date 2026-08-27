@@ -194,26 +194,22 @@ export function IncidentPanel({
             <SummaryCard
               label="PENDING"
               count={stats.user.PENDING}
-              className="bg-orange-50 text-orange-700 border-orange-100"
-              accent="bg-orange-500"
+              gradient="from-[#4776E6] to-[#3843D0]"
             />
             <SummaryCard
               label="VERIFIED"
               count={stats.user.VERIFIED}
-              className="bg-green-50 text-green-700 border-green-100"
-              accent="bg-green-500"
+              gradient="from-[#11998e] to-[#38ef7d]"
             />
             <SummaryCard
               label="REJECTED"
               count={stats.user.REJECTED}
-              className="bg-red-50 text-red-700 border-red-100"
-              accent="bg-red-500"
+              gradient="from-[#FF416C] to-[#FF4B2B]"
             />
             <SummaryCard
               label="DUPLICATE"
               count={stats.user.DUPLICATE}
-              className="bg-slate-50 text-slate-700 border-slate-100"
-              accent="bg-slate-500"
+              gradient="from-[#f09819] to-[#edde5d]"
             />
           </div>
         ) : (
@@ -221,14 +217,12 @@ export function IncidentPanel({
             <SummaryCard
               label="ONGOING"
               count={stats.responder.ONGOING}
-              className="bg-orange-50 text-orange-700 border-orange-100"
-              accent="bg-orange-500"
+              gradient="from-[#FF416C] to-[#FF4B2B]"
             />
             <SummaryCard
               label="COMPLETED"
               count={stats.responder.COMPLETED}
-              className="bg-emerald-50 text-emerald-700 border-emerald-100"
-              accent="bg-emerald-500"
+              gradient="from-[#11998e] to-[#38ef7d]"
             />
           </div>
         )}
@@ -296,13 +290,13 @@ export function IncidentPanel({
   );
 }
 
-function SummaryCard({ label, count, className, accent }: { label: string; count: number; className?: string; accent: string }) {
+function SummaryCard({ label, count, gradient }: { label: string; count: number; gradient: string }) {
   return (
-    <div className={cn("relative p-4 flex flex-col items-start justify-center rounded-2xl border shadow-sm h-24 overflow-hidden group hover:scale-[1.02] transition-transform", className)}>
-      <div className={cn("absolute top-0 left-0 w-full h-1", accent)} />
-      <span className="text-3xl font-black leading-none tracking-tighter">{count}</span>
-      <span className="text-[10px] font-black tracking-widest mt-2 opacity-70 uppercase">{label}</span>
-      <div className={cn("absolute -right-2 -bottom-2 w-12 h-12 rounded-full opacity-5 group-hover:scale-150 transition-transform", accent)} />
+    <div className={cn("relative p-4 flex flex-col items-start justify-center rounded-2xl border-none shadow-sm h-24 overflow-hidden group hover:scale-[1.02] transition-transform text-white bg-gradient-to-br", gradient)}>
+      <div className="absolute inset-0 bg-black/5" />
+      <span className="relative z-10 text-3xl font-black leading-none tracking-tighter">{count}</span>
+      <span className="relative z-10 text-[10px] font-black tracking-widest mt-2 opacity-80 uppercase">{label}</span>
+      <div className="absolute -right-2 -bottom-2 w-12 h-12 rounded-full bg-white/20 opacity-30 group-hover:scale-150 transition-transform" />
     </div>
   );
 }
@@ -388,8 +382,8 @@ function IncidentCard({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 relative">
-          <div className="flex items-center gap-3">
+        <div className="relative z-0 flex flex-col gap-3">
+          <div className="relative z-10 flex items-center gap-3">
             <div className="w-5 h-5 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
               <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
             </div>
@@ -400,9 +394,9 @@ function IncidentCard({
           </div>
 
           {/* Connection Line */}
-          <div className="absolute left-[9px] top-4 bottom-4 w-0.5 border-l-2 border-dashed border-slate-100" />
+          <div className="pointer-events-none absolute left-[9px] top-4 bottom-4 z-0 w-0.5 border-l-2 border-dashed border-slate-100" aria-hidden="true" />
 
-          <div className="flex items-center gap-3">
+          <div className="relative z-10 flex items-center gap-3">
             <div className="w-5 h-5 rounded-full bg-slate-900 flex items-center justify-center shadow-lg">
               <MapPin size={10} className="text-white" fill="currentColor" />
             </div>

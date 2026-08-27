@@ -31,7 +31,12 @@ export function VerificationDetails({ request, onOverrideClassification, onUpdat
     !request.incident.responderId &&
     !request.incident.currentOfferResponderId;
 
-  const displayStatus = isPendingDispatch ? "EMERGENCY (PENDING DISPATCH)" : request.status;
+  const displayStatus = isPendingDispatch ? "PENDING PACC DISPATCH" : request.status;
+  const classification = request.triageClassification || "UNCERTAIN_INCOMPLETE";
+  const triageReasons = request.triageReasons?.length
+    ? request.triageReasons
+    : ["No automated verification details were recorded."];
+  const coordinationAgencies = request.coordinationAgencies ?? [];
 
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto bg-white">
@@ -56,10 +61,10 @@ export function VerificationDetails({ request, onOverrideClassification, onUpdat
 
       <Card className="mb-6 shrink-0 p-4 border-amber-200 bg-amber-50/50">
         <div className="text-xs font-bold uppercase tracking-wider text-amber-900">Automated initial verification</div>
-        <div className="mt-1 font-bold text-sm text-slate-900">{request.triageClassification.replaceAll('_', ' ')}</div>
-        <div className="mt-1 text-xs text-slate-600">{request.triageReasons.join(' ')}</div>
+        <div className="mt-1 font-bold text-sm text-slate-900">{classification.replaceAll('_', ' ')}</div>
+        <div className="mt-1 text-xs text-slate-600">{triageReasons.join(' ')}</div>
         <label className="mt-3 block text-xs font-semibold text-slate-700">PACC override</label>
-        <select disabled={isProcessing} value={request.triageClassification} onChange={(event) => onOverrideClassification(request.id, event.target.value as TriageClassification)} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
+        <select disabled={isProcessing} value={classification} onChange={(event) => onOverrideClassification(request.id, event.target.value as TriageClassification)} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
           <option value="HIGH_CONFIDENCE_EMERGENCY">High-confidence emergency</option>
           <option value="HIGH_CONFIDENCE_NON_EMERGENCY">High-confidence non-emergency</option>
           <option value="UNCERTAIN_INCOMPLETE">Uncertain / incomplete</option>
@@ -72,13 +77,13 @@ export function VerificationDetails({ request, onOverrideClassification, onUpdat
         <p className="mt-1 text-xs text-slate-600">Select every agency PACC is actively coordinating with. The reporter sees this status immediately.</p>
         <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Agencies being coordinated by PACC">
           {AGENCIES.map((agency) => {
-            const active = request.coordinationAgencies.includes(agency)
+            const active = coordinationAgencies.includes(agency)
             return <label key={agency} className={cn('flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-bold transition-colors', active ? 'border-[#1E3A8A] bg-[#1E3A8A] text-white' : 'border-blue-300 bg-white text-[#1E3A8A] hover:bg-blue-100', isProcessing && 'cursor-not-allowed opacity-60')}>
               <input
                 type="checkbox"
                 checked={active}
                 disabled={isProcessing}
-                onChange={() => onUpdateCoordination(request.id, active ? request.coordinationAgencies.filter((item) => item !== agency) : [...request.coordinationAgencies, agency])}
+                onChange={() => onUpdateCoordination(request.id, active ? coordinationAgencies.filter((item) => item !== agency) : [...coordinationAgencies, agency])}
                 className="size-4 shrink-0 accent-[#1E3A8A]"
               />
               <span>{agency}</span>

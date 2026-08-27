@@ -3,7 +3,7 @@ import { View, Text, Platform, StatusBar, TouchableOpacity, Alert } from 'react-
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Play, Pause, LogOut } from 'lucide-react-native';
-import { Hospital } from 'iconsax-react-native';
+import { Hospital, Location as LocationIcon, MessageQuestion, NotificationBing } from 'iconsax-react-native';
 import { useResponderStore, checkConnectivity } from '../../stores/useResponderStore';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useOfflineReports } from '../../hooks/use-offline-reports';
@@ -21,6 +21,7 @@ import * as Location from 'expo-location';
 import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
 import * as Notifications from 'expo-notifications';
+import { getReportLocation, isNotificationVisibleForRole } from '../../lib/report-location';
 
 // Helper to calculate distance in meters
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -94,14 +95,14 @@ export function ResponderHome() {
 
     const fetchUnreadCount = async () => {
       try {
-        const { count, error } = await supabase
+        const { data, error } = await supabase
           .from('notifications')
-          .select('*', { count: 'exact', head: true })
+          .select('type')
           .eq('user_id', user.id)
           .eq('unread', true);
         
-        if (!error && count !== null) {
-          setUnreadCount(count);
+        if (!error && data) {
+          setUnreadCount(data.filter((notification) => isNotificationVisibleForRole(notification.type, role)).length);
         }
       } catch (err) {
         console.error('[ResponderHome] Failed to fetch unread count:', err);
@@ -129,7 +130,7 @@ export function ResponderHome() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, role]);
   
   // Mock initials
   const initials = profile?.fullName ? profile.fullName.trim().split(/\s+/).map(n => n ? n[0] : '').join('').slice(0, 2).toUpperCase() : 'RB';
@@ -446,7 +447,7 @@ export function ResponderHome() {
                 .single();
 
               if (!vReqError && vReq) {
-                locationName = vReq.location_description || vReq.address || 'Baliwag City';
+                locationName = getReportLocation(vReq.location_description || vReq.address);
                 typeOfEmergency = vReq.type || 'Emergency';
                 incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
                 incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
@@ -505,6 +506,7 @@ export function ResponderHome() {
                 },
                 typeOfEmergency,
                 dispatchOfferDurationSeconds: inc.dispatch_offer_duration_seconds || 30,
+                offerExpiresAt: inc.offer_expires_at || undefined,
                 assignedAmbulance: inc.assigned_ambulance || myVehicleId,
                 attachmentUrl,
               }
@@ -514,7 +516,7 @@ export function ResponderHome() {
             Notifications.scheduleNotificationAsync({
               content: {
                 title: '🚨 EMERGENCY DISPATCH OFFER',
-                body: `New emergency request: ${typeOfEmergency} at ${locationName}. You have 30s to accept.`,
+                body: `New emergency request: ${typeOfEmergency} at ${locationName}. You have ${inc.dispatch_offer_duration_seconds || 30}s to accept.`,
                 sound: true,
                 priority: Notifications.AndroidNotificationPriority.MAX,
                 android: {
@@ -543,7 +545,7 @@ export function ResponderHome() {
                 .single();
 
               if (!vReqError && vReq) {
-                locationName = vReq.location_description || vReq.address || 'Baliwag City';
+                locationName = getReportLocation(vReq.location_description || vReq.address);
                 typeOfEmergency = vReq.type || 'Emergency';
                 incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
                 incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
@@ -957,7 +959,7 @@ export function ResponderHome() {
               isMarkerPress.current = true;
               Alert.alert(
                 "Incident & Reporter Details",
-                `Incident: ${activeDispatch.type}\nReporter: ${activeDispatch.reporterName}\nLocation: ${activeDispatch.locationName}\nNature: ${activeDispatch.natureOfCall}\nPeople Involved: ${activeDispatch.peopleInvolved}`,
+                `Incident: ${activeDispatch.type}\nReporter: ${activeDispatch.reporterName}\nLocation: ${getReportLocation(activeDispatch.locationName)}\nNature: ${activeDispatch.natureOfCall}\nPeople Involved: ${activeDispatch.peopleInvolved}`,
                 [{ text: "Close", onPress: () => { isMarkerPress.current = false; } }]
               );
             }}
@@ -1042,7 +1044,7 @@ export function ResponderHome() {
         <View className="px-4 flex-row justify-between items-start pointer-events-auto">
           <View className="flex-row items-center bg-white/95 p-2 pl-2 pr-4 rounded-full backdrop-blur-xl border border-slate-200/80 shadow-sm">
             <View className="w-8 h-8 rounded-full bg-blue-50 items-center justify-center mr-2">
-              <MapPin size={16} color="#1E3A8A" fill="#DBEAFE" />
+              <LocationIcon size={16} color="#1E3A8A" variant="Bold" />
             </View>
             <View>
               <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Your Location</Text>
@@ -1065,13 +1067,16 @@ export function ResponderHome() {
               className="w-12 h-12 rounded-full bg-white/95 items-center justify-center backdrop-blur-xl border border-slate-200/80 shadow-sm"
               onPress={() => router.push('/support')}
             >
-              <HelpCircle size={22} color="#64748B" />
+              <MessageQuestion size={22} color="#64748B" variant="Bold" />
             </TouchableOpacity>
             <TouchableOpacity 
               className="w-12 h-12 rounded-full bg-white/95 items-center justify-center backdrop-blur-xl border border-slate-200/80 shadow-sm relative"
-              onPress={() => router.push('/notifications')}
+              onPress={() => {
+                setUnreadCount(0);
+                router.push('/notifications');
+              }}
             >
-              <Bell size={22} color="#64748B" />
+              <NotificationBing size={22} color="#64748B" variant="Bold" />
               {unreadCount > 0 && (
                 <View className="absolute top-1.5 right-1.5 flex h-[18px] w-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 border-2 border-white">
                   <Text className="text-white text-[8px] font-black px-0.5 text-center leading-none">
@@ -1229,7 +1234,7 @@ export function ResponderHome() {
                     ? "bg-red-50 border-red-200"
                     : "bg-slate-50 border-slate-200"
               }`}>
-                <View className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                <View className={`w-1.5 h-1.5 rounded-full mr-2 ${
                   profile?.dutyStatus === 'ON_DUTY'
                     ? "bg-green-500"
                     : profile?.dutyStatus === 'ACTIVE_DISPATCH'

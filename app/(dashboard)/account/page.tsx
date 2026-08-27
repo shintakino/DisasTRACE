@@ -43,7 +43,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 p-6 md:p-10 max-w-4xl mx-auto w-full overflow-y-auto">
+      <div className="flex-1 min-w-0 w-full overflow-y-auto p-6 md:p-10">
         <div className="md:hidden text-[10px] uppercase font-bold text-muted-foreground mb-6">
           HOME / ACCOUNT
         </div>

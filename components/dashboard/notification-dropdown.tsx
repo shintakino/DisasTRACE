@@ -21,6 +21,19 @@ type Notification = {
   metadata?: any;
 };
 
+function normalizeNotification(raw: any): Notification {
+  return {
+    id: raw.id,
+    userId: raw.userId ?? raw.user_id,
+    type: raw.type,
+    title: raw.title,
+    body: raw.body,
+    unread: raw.unread ?? false,
+    createdAt: raw.createdAt ?? raw.created_at ?? "",
+    metadata: raw.metadata,
+  };
+}
+
 export function NotificationDropdown() {
   const { user } = useAuth();
   const supabase = createClientBrowser();
@@ -36,7 +49,7 @@ export function NotificationDropdown() {
       const response = await fetch("/api/notifications");
       const data = await response.json();
       if (response.ok && data.notifications) {
-        setNotifications(data.notifications);
+        setNotifications(data.notifications.map(normalizeNotification));
       }
     } catch (err) {
       console.error("Failed to load notifications:", err);
@@ -61,10 +74,10 @@ export function NotificationDropdown() {
           (payload) => {
             console.log("Realtime notification change received:", payload);
             if (payload.eventType === "INSERT") {
-              setNotifications((prev) => [payload.new as Notification, ...prev]);
+              setNotifications((prev) => [normalizeNotification(payload.new), ...prev]);
             } else if (payload.eventType === "UPDATE") {
               setNotifications((prev) =>
-                prev.map((n) => (n.id === payload.new.id ? (payload.new as Notification) : n))
+                prev.map((n) => (n.id === payload.new.id ? normalizeNotification(payload.new) : n))
               );
             } else if (payload.eventType === "DELETE") {
               setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
@@ -147,8 +160,10 @@ export function NotificationDropdown() {
   );
 
   const formatTime = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const diffMs = Date.now() - d.getTime();
+    const timestamp = Date.parse(dateStr || "");
+    if (!Number.isFinite(timestamp)) return "Recently";
+    const d = new Date(timestamp);
+    const diffMs = Date.now() - timestamp;
     const diffMins = Math.floor(diffMs / 60000);
     if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins}m ago`;

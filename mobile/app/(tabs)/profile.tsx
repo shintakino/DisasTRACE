@@ -6,7 +6,6 @@ import { Edit2, Logout, User, FolderOpen, Notification, MessageQuestion, Lock1, 
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadAvatar } from '../../lib/storage';
-import { useResponderStore } from '../../stores/useResponderStore';
 
 export default function ProfileScreen() {
   const { user, role, profile } = useAuthStatus();
@@ -17,7 +16,6 @@ export default function ProfileScreen() {
   const [dbCount, setDbCount] = useState(0);
   const [dbActiveCount, setDbActiveCount] = useState(0);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const draftsLength = useResponderStore((state) => state.drafts.length);
 
   const [updatingDuty, setUpdatingDuty] = useState(false);
 
@@ -129,7 +127,7 @@ export default function ProfileScreen() {
     return () => {
       isMounted = false;
     };
-  }, [user, role, draftsLength]);
+  }, [user, role]);
 
   const handleSelectAvatar = async () => {
     if (!isResponder) {
@@ -359,7 +357,7 @@ export default function ProfileScreen() {
           FolderOpen, 
           'My Reports', 
           isResponder 
-            ? `${dbCount + draftsLength} total · ${dbActiveCount + draftsLength} active` 
+            ? `${dbCount} total · ${dbActiveCount} active`
             : `${dbCount} total · ${dbActiveCount} active`, 
           () => router.push('/(tabs)/reports')
         )}

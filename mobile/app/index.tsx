@@ -21,8 +21,6 @@ export default function EntryScreen() {
   const router = useRouter();
   const { isLoaded, isSignedIn, verificationStatus } = useAuthStatus();
 
-  const glowOpacity = useSharedValue(hasShownSplashGlobal ? 1 : 0);
-  const glowScale = useSharedValue(hasShownSplashGlobal ? 1.2 : 0.7);
   const logoOpacity = useSharedValue(hasShownSplashGlobal ? 1 : 0);
   const logoTranslate = useSharedValue(hasShownSplashGlobal ? (isSignedIn ? 0 : -220) : 20);
   const cardTranslate = useSharedValue(hasShownSplashGlobal ? 0 : 120);
@@ -51,16 +49,6 @@ export default function EntryScreen() {
         }
         return;
       }
-
-      glowOpacity.value = withTiming(1, {
-        duration: 1200,
-        easing: Easing.out(Easing.exp),
-      });
-
-      glowScale.value = withTiming(1.2, {
-        duration: 1800,
-        easing: Easing.out(Easing.exp),
-      });
 
       logoOpacity.value = withDelay(
         700,
@@ -125,11 +113,6 @@ export default function EntryScreen() {
     prepare();
   }, [isLoaded, isSignedIn, verificationStatus]);
 
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-    transform: [{ scale: glowScale.value }],
-  }));
-
   const logoStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
     transform: [{ translateY: logoTranslate.value }],
@@ -152,12 +135,11 @@ export default function EntryScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.glowWrapper, glowStyle]}>
-        <LinearGradient
-          colors={['#4FC3F7', '#42A5F500', '#42A5F500']}
-          style={styles.glow}
-        />
-      </Animated.View>
+      <LinearGradient
+        colors={['#192B70', '#1B4E96', '#2278B8']}
+        locations={[0, 0.52, 1]}
+        style={styles.backgroundGradient}
+      />
 
       <Animated.View style={[logoStyle, { alignItems: 'center', width }]}>
         <Image
@@ -222,19 +204,16 @@ export default function EntryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2E43B8',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
-  glowWrapper: {
+  backgroundGradient: {
     position: 'absolute',
-    bottom: -120,
-  },
-  glow: {
-    width: width * 1.2,
-    height: width * 1.2,
-    borderRadius: width,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   logo: {
     width: 260,

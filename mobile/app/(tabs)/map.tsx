@@ -6,9 +6,17 @@ import { Hospital } from 'iconsax-react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { supabase } from '../../lib/supabase';
+import { getReportLocation } from '../../lib/report-location';
 
 
 import * as Location from 'expo-location';
+
+interface IncidentHotspot {
+  id: string;
+  latitude: number;
+  longitude: number;
+  count: number;
+}
 
 export default function MapScreen() {
   const { profile, role, isLoaded, user } = useAuthStatus();
@@ -17,7 +25,10 @@ export default function MapScreen() {
   const isMarkerPress = useRef(false);
 
   const [hospitals, setHospitals] = useState<any[]>([]);
+  const [hotspots, setHotspots] = useState<IncidentHotspot[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number]>([120.880, 14.940]);
+  const [locationUpdatedAt, setLocationUpdatedAt] = useState<Date | null>(null);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   useEffect(() => {
     let isMounted = true;
@@ -25,24 +36,26 @@ export default function MapScreen() {
 
     async function startTracking() {
       try {
-        const { status } = await Location.getForegroundPermissionsAsync();
+        const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
           const current = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
+            accuracy: Location.Accuracy.High,
           });
           if (current && current.coords && isMounted) {
             setUserLocation([current.coords.longitude, current.coords.latitude]);
+            setLocationUpdatedAt(new Date());
           }
 
           subscription = await Location.watchPositionAsync(
             {
-              accuracy: Location.Accuracy.Balanced,
-              timeInterval: 10000,
-              distanceInterval: 10,
+              accuracy: Location.Accuracy.High,
+              timeInterval: 5000,
+              distanceInterval: 1,
             },
             (loc) => {
               if (loc && loc.coords && isMounted) {
                 setUserLocation([loc.coords.longitude, loc.coords.latitude]);
+                setLocationUpdatedAt(new Date());
               }
             }
           );
@@ -60,6 +73,11 @@ export default function MapScreen() {
         subscription.remove();
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -82,8 +100,26 @@ export default function MapScreen() {
       }
     };
 
+    const fetchHotspots = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          reqHeaders.Authorization = `Bearer ${session.access_token}`;
+        }
+        const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000';
+        const res = await fetch(`${baseUrl}/api/map/hotspots`, { headers: reqHeaders });
+        if (!res.ok) throw new Error('Failed to fetch incident hotspots');
+        const data = await res.json();
+        setHotspots(Array.isArray(data.data) ? data.data : []);
+      } catch (err) {
+        console.error('Error fetching mobile map hotspots:', err);
+      }
+    };
+
     if (isLoaded && user) {
-      fetchHospitals();
+      void fetchHospitals();
+      void fetchHotspots();
     }
   }, [isLoaded, user]);
 
@@ -106,6 +142,19 @@ export default function MapScreen() {
       <View className="absolute top-0 w-full z-10 px-6" style={{ paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 20 : 60 }} pointerEvents="none">
         <Text className="text-3xl font-black text-slate-900 tracking-tight shadow-sm">Incident Map</Text>
       </View>
+      <View
+        className="absolute left-6 right-6 z-10"
+        style={{ top: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 66 : 106 }}
+        pointerEvents="none"
+      >
+        <View className="self-start flex-row items-center bg-white/95 border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
+          <View className="w-3 h-3 rounded-full bg-red-500 border-2 border-red-200 mr-2" />
+          <View>
+            <Text className="text-slate-800 text-xs font-bold">High-incident area</Text>
+            <Text className="text-slate-500 text-[10px]">3+ reports in the last 30 days</Text>
+          </View>
+        </View>
+      </View>
 
       <Map
         style={{ flex: 1 }}
@@ -123,6 +172,22 @@ export default function MapScreen() {
             zoom: 13,
           }}
         />
+
+        {hotspots.map((hotspot) => {
+          const size = Math.min(68, 38 + hotspot.count * 4);
+          return (
+            <Marker key={hotspot.id} id={`incident-hotspot-${hotspot.id}`} lngLat={[hotspot.longitude, hotspot.latitude]}>
+              <View
+                className="items-center justify-center bg-red-500/25 border-2 border-red-500"
+                style={{ width: size, height: size, borderRadius: size / 2 }}
+              >
+                <View className="w-8 h-8 rounded-full bg-red-600 items-center justify-center border-2 border-white shadow-sm">
+                  <Text className="text-white text-xs font-black">{hotspot.count}</Text>
+                </View>
+              </View>
+            </Marker>
+          );
+        })}
 
         {hospitals.map(h => {
           const isSelected = selectedHospital?.id === h.id;
@@ -192,7 +257,7 @@ export default function MapScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-lg font-black text-[#7f1d1d]">{activeDispatch.type}</Text>
-                  <Text className="text-sm font-medium text-[#991b1b] opacity-90 mt-0.5" numberOfLines={1}>{activeDispatch.locationName}</Text>
+                  <Text className="text-sm font-medium text-[#991b1b] opacity-90 mt-0.5" numberOfLines={1}>{getReportLocation(activeDispatch.locationName)}</Text>
                   <Text className="text-xs font-bold text-[#b91c1c] opacity-80 mt-0.5">Active Incident: {activeDispatch.id}</Text>
                 </View>
               </React.Fragment>
@@ -238,7 +303,9 @@ export default function MapScreen() {
                     </Text>
                   ) : (
                     <Text className="text-[13px] font-medium text-[#5b21b6] opacity-80 mt-0.5">
-                      Since Sun 6:41pm
+                      {locationUpdatedAt
+                        ? `Location updated ${locationUpdatedAt.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+                        : `Current time ${currentTime.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
                     </Text>
                   )}
                 </View>

@@ -1,7 +1,7 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { LogBox } from 'react-native';
+import { LogBox, TextInput } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +13,14 @@ LogBox.ignoreLogs([
   '`new NativeEventEmitter()` was called with a non-null argument without the required `addListener` method.',
   '`new NativeEventEmitter()` was called with a non-null argument without the required `removeListeners` method.',
 ]);
+
+// Keep placeholder text readable in every light form field, including the
+// responder intake modals. Individual screens can still override this value.
+const TextInputWithDefaults = TextInput as typeof TextInput & { defaultProps?: Record<string, unknown> };
+TextInputWithDefaults.defaultProps = {
+  ...TextInputWithDefaults.defaultProps,
+  placeholderTextColor: '#64748B',
+};
 
 // Prevent the native splash screen from auto-hiding.
 SplashScreen.preventAutoHideAsync();

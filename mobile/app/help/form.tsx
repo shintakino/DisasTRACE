@@ -186,6 +186,7 @@ export default function FormScreen() {
       nature: nature as any,
       incidentType: nature === 'Emergency' ? emergencyType as any : nature as any,
       peopleInvolved: people === 0 ? "None" : (people >= 6 ? "6+ Persons" : `${people} Person${people > 1 ? 's' : ''}`) as any,
+      landmarks: address || 'Baliwag City',
       latitude: location.latitude,
       longitude: location.longitude,
       severity: severity as any,

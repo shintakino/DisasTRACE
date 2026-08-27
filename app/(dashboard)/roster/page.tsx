@@ -306,7 +306,7 @@ export default function RosterPage() {
       </Dialog>
 
       <Dialog open={!!userToBan} onOpenChange={(open) => !open && setUserToBan(null)}>
-        <DialogContent className="max-w-md p-0 border-0 shadow-2xl rounded-[24px] overflow-hidden bg-white flex flex-col" showCloseButton={true}>
+        <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
           <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
             <div className="relative z-10 flex items-center gap-3">

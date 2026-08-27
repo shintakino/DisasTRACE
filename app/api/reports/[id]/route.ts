@@ -5,8 +5,9 @@ import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
-import { eq, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+import { getReportDetailText, getReportLocation } from "@/lib/report-location";
 
 
 export async function GET(
@@ -22,6 +23,26 @@ export async function GET(
     }
 
     const { id } = await params;
+
+    const userProfile = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+    if (!userProfile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const isAdmin = userProfile.role === "pacc_admin" || userProfile.role === "cdrrmo_super_admin";
+    const accessCondition = isAdmin
+      ? undefined
+      : userProfile.role === "ambulance_responder"
+        ? eq(reports.responderId, user.id)
+        : userProfile.role === "public_user"
+          ? eq(verificationRequests.residentId, user.id)
+          : null;
+
+    if (accessCondition === null) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Fetch report details dynamically joining DB tables
     const results = await db
@@ -51,20 +72,24 @@ export async function GET(
       .innerJoin(incidents, eq(reports.incidentId, incidents.id))
       .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
       .innerJoin(users, eq(reports.responderId, users.id))
-      .where(
+      .where(and(
         or(
           eq(reports.id, id),
           eq(reports.incidentId, id)
-        )
-      )
+        ),
+        ...(accessCondition ? [accessCondition] : [])
+      ))
       .limit(1);
 
     if (results.length === 0) {
       // 2. If not found, check verification_requests (user report)
       const userReq = await db.query.verificationRequests.findFirst({
-        where: or(
-          eq(verificationRequests.id, id),
-          eq(verificationRequests.requestId, id)
+        where: and(
+          or(
+            eq(verificationRequests.id, id),
+            eq(verificationRequests.requestId, id)
+          ),
+          ...(accessCondition ? [accessCondition] : [])
         ),
         with: {
           resident: true,
@@ -108,8 +133,8 @@ export async function GET(
           hour: '2-digit',
           minute: '2-digit'
         }),
-        location: userReq.locationDescription || "Baliwag City",
-        residentReportDescription: userReq.locationDescription || "Awaiting detail logs.",
+        location: getReportLocation(userReq.locationDescription),
+        residentReportDescription: getReportDetailText(userReq.locationDescription, "Awaiting detail logs."),
         residentPhotoUrl: userReq.imageUrl,
         crewFindings: "No responder findings available yet (User Submitted Report).",
         natureOfCall: userReq.nature,
@@ -172,7 +197,7 @@ export async function GET(
           hour: '2-digit',
           minute: '2-digit'
         }),
-        location: d.location || "Baliwag City",
+        location: getReportLocation(d.location),
         residentPhotoUrl: d.imageUrl,
         natureOfCall: d.nature,
         severityLevel: d.severity,
@@ -216,6 +241,17 @@ export async function GET(
       .where(eq(driverTripTickets.incidentId, r.incidentId))
       .limit(1);
 
+    const normalizedPatientCare = patientCare.map((item) => ({
+      ...item,
+      patientAddress: getReportLocation(item.patientAddress, "N/A"),
+    }));
+    const normalizedTripTicket = tripTicket[0]
+      ? {
+          ...tripTicket[0],
+          placesVisited: getReportLocation(tripTicket[0].placesVisited, "N/A"),
+        }
+      : null;
+
     // Format output matching DetailedIncidentReport typescript contract
     const formatted = {
       id: r.id,
@@ -233,8 +269,8 @@ export async function GET(
         hour: '2-digit',
         minute: '2-digit'
       }),
-      location: r.location || "Baliwag City",
-      residentReportDescription: r.residentReportDescription || "Awaiting detail logs.",
+      location: getReportLocation(r.location),
+      residentReportDescription: getReportDetailText(r.residentReportDescription, "Awaiting detail logs."),
       residentPhotoUrl: r.residentPhotoUrl,
       crewFindings: r.crewFindings || "No findings recorded.",
       natureOfCall: r.natureOfCall,
@@ -266,8 +302,8 @@ export async function GET(
         { action: "Report Logs Submitted", time: new Date(r.createdAt).toLocaleTimeString() },
       ],
       participants: Array.isArray(r.participants) ? r.participants : [],
-      patientCareReports: patientCare || [],
-      driverTripTicket: tripTicket[0] || null,
+      patientCareReports: normalizedPatientCare,
+      driverTripTicket: normalizedTripTicket,
     };
 
     // Fetch duplicates for the responder report's associated verification request
@@ -304,7 +340,7 @@ export async function GET(
         hour: '2-digit',
         minute: '2-digit'
       }),
-      location: d.location || "Baliwag City",
+      location: getReportLocation(d.location),
       residentPhotoUrl: d.imageUrl,
       natureOfCall: d.nature,
       severityLevel: d.severity,

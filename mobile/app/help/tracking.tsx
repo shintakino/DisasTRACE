@@ -407,7 +407,7 @@ export default function TrackingScreen() {
               [
                 { 
                   text: "OK", 
-                  onPress: () => router.replace('/(tabs)') 
+                  onPress: () => router.replace('/(tabs)/index' as any)
                 }
               ],
               { cancelable: false }

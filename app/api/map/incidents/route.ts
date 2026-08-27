@@ -7,6 +7,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
+import { getReportLocation } from "@/lib/report-location";
 
 export async function GET() {
   if (!(await isAdmin())) {
@@ -77,7 +78,7 @@ export async function GET() {
         status: mappedStatus,
         type: inc.type,
         origin: "CDRRMO HQ",
-        destination: inc.locationDescription || "Baliwag City",
+        destination: getReportLocation(inc.locationDescription),
         lat: inc.latitude,
         lng: inc.longitude,
         createdAt: inc.createdAt.toISOString(),
@@ -108,7 +109,7 @@ export async function GET() {
         status: req.status as "PENDING" | "VERIFIED" | "REJECTED" | "DUPLICATE",
         type: req.type,
         origin: "CDRRMO HQ",
-        destination: req.locationDescription || "Baliwag City",
+        destination: getReportLocation(req.locationDescription),
         lat: req.latitude,
         lng: req.longitude,
         createdAt: req.createdAt.toISOString(),

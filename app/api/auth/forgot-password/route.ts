@@ -50,7 +50,10 @@ export async function POST(req: NextRequest) {
     const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(
       sanitizedEmail,
       {
-        redirectTo: `${process.env.NEXT_PUBLIC_API_URL}/reset-password`,
+        redirectTo: new URL(
+          "/reset-password",
+          process.env.NEXT_PUBLIC_API_URL || req.nextUrl.origin
+        ).toString(),
       }
     );
 

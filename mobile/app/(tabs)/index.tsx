@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useLocationPermission } from '../../hooks/use-location-permission';
 import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
 import { HelpButton } from '../../components/dashboard/HelpButton';
 import { OfflineBanner } from '../../components/dashboard/OfflineBanner';
-import { MapPin, HelpCircle, Bell, Shield, Check, MessageCircle } from 'lucide-react-native';
+import { HelpCircle, Shield, Check } from 'lucide-react-native';
+import { Location as LocationIcon, NotificationBing } from 'iconsax-react-native';
 import { useOfflineReports } from '../../hooks/use-offline-reports';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, Tabs } from 'expo-router';
@@ -15,6 +16,7 @@ import { useResponderStore } from '../../stores/useResponderStore';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
+import { getReportLocation, isNotificationVisibleForRole } from '../../lib/report-location';
 
 import * as Notifications from 'expo-notifications';
 import { Platform, Vibration } from 'react-native';
@@ -31,10 +33,21 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): 
   return R * c;
 }
 
+function formatIncidentTimestamp(value: string): string {
+  return new Date(value).toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { profile, verificationStatus, role, user, isLoaded } = useAuthStatus();
   const { isOnline } = useOfflineReports();
+  const insets = useSafeAreaInsets();
   const [isCheckingIncident, setIsCheckingIncident] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -93,14 +106,14 @@ export default function HomeScreen() {
 
     const fetchUnreadCount = async () => {
       try {
-        const { count, error } = await supabase
+        const { data, error } = await supabase
           .from('notifications')
-          .select('*', { count: 'exact', head: true })
+          .select('type')
           .eq('user_id', user.id)
           .eq('unread', true);
         
-        if (!error && count !== null) {
-          setUnreadCount(count);
+        if (!error && data) {
+          setUnreadCount(data.filter((notification) => isNotificationVisibleForRole(notification.type, role)).length);
         }
       } catch (err) {
         console.error('[HomeScreen] Failed to fetch unread count:', err);
@@ -123,7 +136,7 @@ export default function HomeScreen() {
           fetchUnreadCount();
           if (payload.eventType === 'INSERT') {
             const notif = payload.new as any;
-            if (notif && notif.id) {
+            if (notif && notif.id && isNotificationVisibleForRole(notif.type, role)) {
               if (processedNotifIds.current.has(notif.id)) return;
               processedNotifIds.current.add(notif.id);
 
@@ -156,7 +169,7 @@ export default function HomeScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, role]);
 
   useEffect(() => {
     let active = true;
@@ -279,7 +292,7 @@ export default function HomeScreen() {
               .single();
 
             if (vReq) {
-              locationName = vReq.location_description || vReq.address || 'Baliwag City';
+              locationName = getReportLocation(vReq.location_description || vReq.address);
               typeOfEmergency = vReq.type || 'Emergency';
               incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
               incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
@@ -335,10 +348,7 @@ export default function HomeScreen() {
                 eta: activeInc.eta_minutes ? `~${activeInc.eta_minutes} min` : '~8 min',
                 reporterName,
                 reporterInitials,
-                timestamp: new Date(activeInc.created_at).toLocaleTimeString("en-US", {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                }),
+                timestamp: formatIncidentTimestamp(activeInc.created_at),
                 coordinates: {
                   latitude: incidentLat,
                   longitude: incidentLng,
@@ -376,7 +386,7 @@ export default function HomeScreen() {
                 .single();
 
               if (vReq) {
-                locationName = vReq.location_description || vReq.address || 'Baliwag City';
+                locationName = getReportLocation(vReq.location_description || vReq.address);
                 typeOfEmergency = vReq.type || 'Emergency';
                 incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
                 incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
@@ -427,16 +437,14 @@ export default function HomeScreen() {
                   eta: offerInc.eta_minutes ? `~${offerInc.eta_minutes} min` : '~8 min',
                   reporterName,
                   reporterInitials,
-                  timestamp: new Date(offerInc.created_at).toLocaleTimeString("en-US", {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }),
+                  timestamp: formatIncidentTimestamp(offerInc.created_at),
                   coordinates: {
                     latitude: incidentLat,
                     longitude: incidentLng,
                   },
                   typeOfEmergency,
                   dispatchOfferDurationSeconds: offerInc.dispatch_offer_duration_seconds || 30,
+                  offerExpiresAt: offerInc.offer_expires_at || undefined,
                   assignedAmbulance: offerInc.assigned_ambulance || 'AMB-001',
                   attachmentUrl: vReq?.image_url || undefined,
                 }
@@ -470,6 +478,19 @@ export default function HomeScreen() {
       .slice(0, 2);
   };
 
+  const getBarangayLabel = (address?: string) => {
+    const parts = (address || '').split(',').map((part) => part.trim()).filter(Boolean);
+    const explicitBarangay = parts.find((part) => /^(barangay|brgy\.?)/i.test(part));
+    const barangay = explicitBarangay || (parts.length >= 4 ? parts[parts.length - 3] : parts[0]);
+    if (!barangay) return 'Barangay unavailable';
+
+    const name = barangay
+      .replace(/^(barangay|brgy\.?)\s*/i, '')
+      .toLowerCase()
+      .replace(/\b\w/g, (character) => character.toUpperCase());
+    return `Barangay ${name}`;
+  };
+
   const initials = profile?.fullName ? getInitials(profile.fullName) : '??';
 
   const { status } = useResponderStore();
@@ -494,8 +515,8 @@ export default function HomeScreen() {
             backgroundColor: '#020617',
             borderTopWidth: 1,
             borderTopColor: '#1E293B',
-            height: 65,
-            paddingBottom: 8,
+            height: 65 + insets.bottom,
+            paddingBottom: 8 + insets.bottom,
             paddingTop: 8,
             elevation: 0,
             shadowOpacity: 0,
@@ -507,35 +528,35 @@ export default function HomeScreen() {
   }
 
   return (
-    <View className="flex-1 bg-[#1E3A8A]">
+    <LinearGradient
+      colors={['#192B70', '#1B4E96', '#2278B8']}
+      locations={[0, 0.5, 1]}
+      style={{ flex: 1 }}
+    >
       <OfflineBanner />
       <StatusBar barStyle="light-content" />
       
       {/* Header Section */}
-      <View style={{ paddingTop: (StatusBar.currentHeight || 24) + 12 }}>
+      <View style={{ paddingTop: insets.top + 12 }}>
         <View className="px-6 py-4 flex-row justify-between items-start">
-          <View>
-            <View className="flex-row items-center">
-              <MapPin size={20} color="white" opacity={0.8} />
-              <Text className="text-white/80 text-xs ml-1 uppercase tracking-wider">Your Location</Text>
+          <View className="flex-row items-center flex-1">
+            <LocationIcon size={20} color="white" variant="Bold" />
+            <View className="ml-2">
+              <Text className="text-white/80 text-xs uppercase tracking-wider">Your Location</Text>
+              <Text className="text-white text-md font-bold mt-0.5">Baliwag City</Text>
             </View>
-            <Text className="text-white text-md font-bold mt-0.5">Baliwag City</Text>
           </View>
           
           <View className="flex-row space-x-4">
             <TouchableOpacity 
-              className="p-2" 
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              onPress={() => router.push('/support')}
-            >
-              <HelpCircle size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity 
               className="p-2 relative" 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              onPress={() => router.push('/notifications')}
+              onPress={() => {
+                setUnreadCount(0);
+                router.push('/notifications');
+              }}
             >
-              <Bell size={24} color="white" />
+              <NotificationBing size={24} color="white" variant="Bold" />
               {unreadCount > 0 && (
                 <View className="absolute top-1 right-1 flex h-[18px] w-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 border border-white">
                   <Text className="text-white text-[8px] font-black px-0.5 text-center leading-none">
@@ -572,17 +593,17 @@ export default function HomeScreen() {
                 {profile?.fullName || 'Eloisa Guibani'}
               </Text>
               <Text className="text-white/60 text-sm" numberOfLines={1} ellipsizeMode="tail">
-                {profile?.address || 'Barangay Paitan'}
+                {getBarangayLabel(profile?.address)}
               </Text>
             </View>
           </View>
 
-          <View className={`px-3 py-1 rounded-full border flex-row items-center space-x-2 shrink-0 ${
+          <View className={`px-3 py-1 rounded-full border flex-row items-center shrink-0 ${
             isOnline 
               ? "bg-emerald-500/20 border-emerald-500/30" 
               : "bg-orange-500/20 border-orange-500/30"
           }`}>
-            <View className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-orange-500"}`} />
+            <View className={`w-1.5 h-1.5 rounded-full mr-2 ${isOnline ? "bg-emerald-500" : "bg-orange-500"}`} />
             <Text className={`text-[10px] font-black tracking-widest uppercase ${isOnline ? "text-emerald-400" : "text-orange-400"}`}>
               {isOnline ? 'Online' : 'Offline'}
             </Text>
@@ -597,7 +618,7 @@ export default function HomeScreen() {
         </Text>
 
         <View className="flex-1 items-center pt-2">
-          <HelpButton onPress={() => router.push('/help/camera' as any)} />
+          <HelpButton onPress={() => router.push('/help/chatbot?mode=resident' as any)} />
           
           <View className="mt-10 px-4">
             <Text className="text-slate-500 text-center text-sm leading-relaxed">
@@ -605,17 +626,6 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <TouchableOpacity
-            className="mt-5 w-full flex-row items-center justify-center gap-2 rounded-xl border border-[#1E3A8A] bg-blue-50 px-5 py-4"
-            onPress={() => router.push('/help/chatbot?mode=resident' as any)}
-            activeOpacity={0.8}
-          >
-            <MessageCircle color="#1E3A8A" size={20} />
-            <View>
-              <Text className="text-[#1E3A8A] text-center font-extrabold">Emergency Chatbot</Text>
-              <Text className="text-slate-500 text-center text-[11px] mt-0.5">Guided questions for a faster report</Text>
-            </View>
-          </TouchableOpacity>
         </View>
 
         {/* Service Improvement Banner */}
@@ -653,6 +663,6 @@ export default function HomeScreen() {
         isVisible={isLocationGateActive} 
         onRequestPermission={requestPermissions}
       />
-    </View>
+    </LinearGradient>
   );
 }

@@ -26,14 +26,16 @@ export function ApprovalQueue({
     <div className="flex flex-col h-full bg-slate-50/50 border-r">
       <div className="p-4 border-b bg-white">
         <h2 className="text-lg font-bold text-[#1E3A8A] mb-4">Verification Gate</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
-            <p className="text-xs text-orange-600 font-semibold uppercase tracking-wider">Pending</p>
-            <p className="text-2xl font-bold text-orange-700">{summary.pending}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="relative h-24 overflow-hidden rounded-2xl bg-gradient-to-br from-[#4776E6] to-[#3843D0] p-4 text-white shadow-sm">
+            <div className="absolute inset-0 bg-black/5" />
+            <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-white/80">Pending</p>
+            <p className="relative z-10 mt-1 text-2xl font-black leading-none">{summary.pending}</p>
           </div>
-          <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-            <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider">Reviewed Today</p>
-            <p className="text-2xl font-bold text-blue-700">{summary.reviewedToday}</p>
+          <div className="relative h-24 overflow-hidden rounded-2xl bg-gradient-to-br from-[#11998e] to-[#38ef7d] p-4 text-white shadow-sm">
+            <div className="absolute inset-0 bg-black/5" />
+            <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-white/80">Reviewed Today</p>
+            <p className="relative z-10 mt-1 text-2xl font-black leading-none">{summary.reviewedToday}</p>
           </div>
         </div>
       </div>

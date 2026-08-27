@@ -589,7 +589,7 @@ export default function HelpPage() {
       </div>
 
       {/* Read-Only Content View */}
-      <div className="flex-1 p-10 overflow-y-auto max-w-4xl mx-auto">
+      <div className="flex-1 min-w-0 p-6 md:p-8 overflow-y-auto">
         {activeTab === "privacy" && (
           <div className="space-y-6">
             <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight border-b pb-4">Privacy Policy</h2>
@@ -616,15 +616,15 @@ export default function HelpPage() {
           <div className="space-y-6">
             <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight border-b pb-4">Hotlines & Support Contacts</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between h-40">
+            <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 lg:grid-cols-3">
+              <Card className="rounded-2xl border border-slate-100 shadow-sm p-5 flex min-w-0 flex-col justify-between min-h-40">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#1E3A8A]">
                     <Phone className="h-5 w-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hotline</div>
-                    <span className="font-black text-base text-slate-800">{support.phone}</span>
+                    <span className="block break-words font-black text-base text-slate-800">{support.phone}</span>
                   </div>
                 </div>
                 <a href={`tel:${support.phone.replace(/[^\d+]/g, "")}`} className="text-[#1E3A8A] font-bold text-xs hover:underline flex items-center gap-1">
@@ -632,14 +632,14 @@ export default function HelpPage() {
                 </a>
               </Card>
 
-              <Card className="rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between h-40">
+              <Card className="rounded-2xl border border-slate-100 shadow-sm p-5 flex min-w-0 flex-col justify-between min-h-40">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#1E3A8A]">
                     <Mail className="h-5 w-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email Address</div>
-                    <span className="font-black text-sm text-slate-800 truncate block max-w-[170px]">{support.email}</span>
+                    <span className="block break-all font-black text-sm leading-tight text-slate-800">{support.email}</span>
                   </div>
                 </div>
                 <a href={`mailto:${support.email}`} className="text-[#1E3A8A] font-bold text-xs hover:underline flex items-center gap-1">
@@ -647,14 +647,14 @@ export default function HelpPage() {
                 </a>
               </Card>
 
-              <Card className="rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between h-40 col-span-1">
+              <Card className="rounded-2xl border border-slate-100 shadow-sm p-5 flex min-w-0 flex-col justify-between min-h-40">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#1E3A8A]">
                     <MapPin className="h-5 w-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">HQ Center</div>
-                    <span className="font-bold text-xs text-slate-800 leading-tight block max-w-[170px]">CDRRMO Baliwag Gov Center</span>
+                    <span className="block break-words font-bold text-xs leading-tight text-slate-800">CDRRMO Baliwag Gov Center</span>
                   </div>
                 </div>
                 <span className="text-slate-400 font-medium text-[10px] italic">

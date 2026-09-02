@@ -4,7 +4,13 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
-import { eq, ne, and, or, notInArray, sql } from "drizzle-orm";
+import { eq, and, or, sql } from "drizzle-orm";
+
+type EligibleResponderBase = Pick<
+  typeof users.$inferSelect,
+  'id' | 'fullName' | 'email' | 'role' | 'status' | 'dutyStatus' | 'lastLatitude' | 'lastLongitude'
+>;
+type EligibleResponder = EligibleResponderBase | (EligibleResponderBase & { distanceMeters: number });
 
 // Haversine formula to compute distance in kilometers
 // Haversine formula to compute distance in kilometers
@@ -31,7 +37,7 @@ export async function notifyPaccAndCdrrmo({
   title: string;
   body: string;
   type: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }) {
   try {
     const admins = await db.query.users.findMany({
@@ -94,7 +100,7 @@ export async function autoDispatchIncident(
     }
 
     // 2. Fetch all clocked-in responders using PostGIS or standard query (dev fallback)
-    let eligibleResponders: any[];
+    let eligibleResponders: EligibleResponder[];
 
     if (isDevMode) {
       eligibleResponders = await db.query.users.findMany({
@@ -188,6 +194,21 @@ export async function autoDispatchIncident(
     //    UPDATE ... WHERE dutyStatus = 'ON_DUTY' — only one concurrent transaction
     //    can succeed per responder row.
     const result = await db.transaction(async (tx) => {
+      // Serialize dispatch against reporter cancellation and concurrent retry.
+      // Both paths lock the same verification row before inspecting incidents.
+      const [lockedRequest] = await tx
+        .select({ id: verificationRequests.id, status: verificationRequests.status })
+        .from(verificationRequests)
+        .where(eq(verificationRequests.id, requestId))
+        .limit(1)
+        .for('update');
+      if (!lockedRequest || lockedRequest.status !== 'PENDING') {
+        const [existingIncident] = await tx.select().from(incidents).where(eq(incidents.requestId, requestId)).limit(1);
+        return existingIncident ?? null;
+      }
+      const [existingIncident] = await tx.select().from(incidents).where(eq(incidents.requestId, requestId)).limit(1);
+      if (existingIncident) return existingIncident;
+
       for (const candidateItem of respondersWithDistance) {
         const candidate = candidateItem.responder;
 
@@ -242,7 +263,7 @@ export async function autoDispatchIncident(
         // Update the verification request to VERIFIED
         await tx.update(verificationRequests)
           .set({ status: "VERIFIED", updatedAt: new Date() })
-          .where(eq(verificationRequests.id, requestId));
+          .where(and(eq(verificationRequests.id, requestId), eq(verificationRequests.status, 'PENDING')));
 
         console.log(`[AutoDispatch] Successfully dispatched to ${candidate.fullName} for request ${requestId}`);
         return newIncident;
@@ -341,7 +362,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
     }
 
     // Fetch clocked-in responders who are not in the skipped list using PostGIS or standard query (dev fallback)
-    let eligibleResponders: any[];
+    let eligibleResponders: EligibleResponder[];
 
     if (isDevMode) {
       eligibleResponders = await db.query.users.findMany({

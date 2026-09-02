@@ -4,13 +4,19 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- 3rd Testing Feedback Resolution
+- Feature 29 connected release validation
 
 ## Current Goal
 
-- Resolve issues identified in the 3rd Testing Feedback ([DisasTRACE_3rd_Testing_Feedback.md](file:///D:/dev/freelance/disas_trace/context/issue/DisasTRACE_3rd_Testing_Feedback.md)).
+- Run the connected Android and PACC manual matrix for [Feature Spec 29](feature-specs/29-context-grounded-chatbot.md) using guest, approved-resident, dispatcher, and responder actors. The implementation and automated review loop have passed.
+
+## Planned Feature Work
+
+- **Feature 29 Connected Release Validation**: Automated implementation and code review pass with no known code gaps. Remaining environment-dependent validation is the Android permission/keyboard/viewport matrix and live guest/resident/PACC/dispatch flow against a configured backend. Confirm `DEEPSEEK_API_KEY` is present in the deployment server environment; it must never be configured in Expo public variables.
 
 ## Completed
+
+- **Context-Grounded Chatbot and Guided Incident Reporting — Implementation and Automated Review**: Completed the remediation loop for [Feature Spec 29](feature-specs/29-context-grounded-chatbot.md). The chatbot is limited to a reviewed local knowledge catalog, uses deterministic reporting controls first, and uses server-only DeepSeek V4 Flash solely to choose an approved knowledge ID. Added sensitive-message exclusion, strict provider result validation, timeout/retry/fallback behavior, sanitized usage telemetry, and guest/registered throttling. Added a securely persisted actor-scoped mobile lifecycle with inferred-intent confirmation, a draft-only adaptive five-phase indicator, the six current incident types, exact `1-999` chat-entered counts and corrections, evidence/GPS/guest-contact rules, outside-Baliwag warning, per-field review edits, stable retry identity, and restoration into locked pending/active status. Submitted reports keep independent real-status polling and approved Q&A; cancellation is token-scoped for guests, ownership-scoped for residents, transaction-locked against dispatch, and isolated from direct HELP cancellation. Automated gates passed: chatbot policy/contracts, mobile state/restoration, DeepSeek success/failure matrix, root/mobile TypeScript, touched-file root/mobile ESLint, client secret scans, `git diff --check`, and the Next.js production build.
 
 - **Post-Change Regression Hardening**: Fixed the mobile OTP resend URL so it uses the same configured API fallback as the initial send and verification calls, made OTP generation cryptographically random, prevented cooldown retries from consuming rate-limit quota, enforced server-side OTP/password payload validation, and made the web admin reset-link redirect fall back to the current site origin when `NEXT_PUBLIC_API_URL` is unset. Added idempotent responder report submission, enforced incident assignment ownership, replaced unsafe participant validation, scoped report list/detail reads to the authenticated user or administrative roles, and cleared lint errors in the touched sign-in/report-detail screens.
 

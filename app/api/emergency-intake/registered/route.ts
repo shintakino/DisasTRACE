@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     const submitted = await submitEmergencyIntake(report.data, { residentId: resident.id, reporterType: 'REGISTERED' });
-    return NextResponse.json({ success: true, request: submitted.request, incident: submitted.incident, autoDispatched: submitted.autoDispatched }, { status: 201 });
+    return NextResponse.json({ success: true, request: submitted.request, incident: submitted.incident, autoDispatched: submitted.autoDispatched, replayed: submitted.replayed }, { status: submitted.replayed ? 200 : 201 });
   } catch (error) {
     console.error('Registered emergency intake failed:', error);
     return NextResponse.json({ error: 'Unable to submit the emergency report.' }, { status: 500 });

@@ -1,9 +1,11 @@
 import crypto from 'crypto';
-import { and, gte } from 'drizzle-orm';
+import { and, eq, gte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
 import { verificationRequests } from '@/db/schema/verification_requests';
+import { incidents } from '@/db/schema/incidents';
 import { autoDispatchIncident } from '@/lib/dispatch-engine';
+import { ChatbotSubmissionIdSchema } from '@/lib/chatbot/contracts';
 
 const IncidentTypeSchema = z.enum([
   'Medical Emergency',
@@ -31,6 +33,9 @@ const IntakeDetailsSchema = z.object({
   severity: z.enum(['Low', 'Medium', 'High', 'Critical']).default('Medium'),
   nature: z.enum(['EMERGENCY', 'NON-EMERGENCY']),
   imageUrl: z.string().url(),
+  // Set only by the chatbot client. Reusing it makes a retry return the first
+  // persisted request instead of creating another report or dispatch.
+  chatbotSubmissionId: ChatbotSubmissionIdSchema.optional(),
 });
 
 // Guest reporters must provide a landmark because GPS is the only location
@@ -60,6 +65,26 @@ interface IntakeActor {
   reporterType: 'REGISTERED' | 'GUEST';
 }
 
+async function loadChatbotReplay(input: EmergencyIntake, actor: IntakeActor) {
+  if (!input.chatbotSubmissionId) return null;
+  const existing = await db.query.verificationRequests.findFirst({
+    where: eq(verificationRequests.id, input.chatbotSubmissionId),
+  });
+  if (!existing) return null;
+  const belongsToActor = actor.reporterType === 'REGISTERED'
+    ? existing.reporterType === 'REGISTERED' && existing.residentId === actor.residentId
+    : existing.reporterType === 'GUEST' && existing.contactNumber === input.contactNumber;
+  if (!belongsToActor) throw new Error('This chatbot submission ID is already in use.');
+  const incident = await db.query.incidents.findFirst({ where: eq(incidents.requestId, existing.id) });
+  return {
+    request: existing,
+    incident: incident ?? null,
+    guestAccessToken: existing.guestAccessToken,
+    autoDispatched: Boolean(incident),
+    replayed: true,
+  };
+}
+
 function isWithinBaliwag(latitude: number, longitude: number) {
   return latitude >= 14.9 && latitude <= 15.05 && longitude >= 120.8 && longitude <= 121;
 }
@@ -70,6 +95,9 @@ function isConsistent(input: EmergencyIntake) {
 }
 
 export async function submitEmergencyIntake(input: EmergencyIntake, actor: IntakeActor) {
+  const existingReplay = await loadChatbotReplay(input, actor);
+  if (existingReplay) return existingReplay;
+
   const recentReports = await db.query.verificationRequests.findMany({
     where: and(gte(verificationRequests.createdAt, new Date(Date.now() - 20 * 60 * 1000))),
     columns: { latitude: true, longitude: true, type: true, contactNumber: true },
@@ -103,32 +131,39 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
 
   const requestId = `REQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
   const guestAccessToken = actor.reporterType === 'GUEST' ? crypto.randomBytes(32).toString('hex') : null;
-  const [request] = await db.insert(verificationRequests).values({
-    id: crypto.randomUUID(),
-    requestId,
-    residentId: actor.residentId,
-    reporterType: actor.reporterType,
-    contactNumber: input.contactNumber,
-    guestAccessToken,
-    status: 'PENDING',
-    nature: input.nature,
-    type: input.incidentType,
-    peopleInvolved: String(input.peopleInvolved),
-    severity: input.severity,
-    // Keep the location field location-only. The condition is already used by
-    // triage and must not be copied into addresses or places-visited fields.
-    locationDescription: input.landmarks || null,
-    latitude: input.latitude,
-    longitude: input.longitude,
-    imageUrl: input.imageUrl,
-    triageClassification,
-    triageReasons: reasons,
-  }).returning();
+  let request: typeof verificationRequests.$inferSelect;
+  try {
+    [request] = await db.insert(verificationRequests).values({
+      id: input.chatbotSubmissionId ?? crypto.randomUUID(),
+      requestId,
+      residentId: actor.residentId,
+      reporterType: actor.reporterType,
+      contactNumber: input.contactNumber,
+      guestAccessToken,
+      status: 'PENDING',
+      nature: input.nature,
+      type: input.incidentType,
+      peopleInvolved: String(input.peopleInvolved),
+      severity: input.severity,
+      locationDescription: input.landmarks || null,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      imageUrl: input.imageUrl,
+      triageClassification,
+      triageReasons: reasons,
+    }).returning();
+  } catch (error) {
+    // A concurrent retry can win after the first lookup. Re-read the exact
+    // submission and return it; unrelated database errors still propagate.
+    const concurrentReplay = await loadChatbotReplay(input, actor);
+    if (concurrentReplay) return concurrentReplay;
+    throw error;
+  }
 
   let incident = null;
   if (triageClassification === 'HIGH_CONFIDENCE_EMERGENCY') {
     incident = await autoDispatchIncident(request.id, actor.residentId, input.latitude, input.longitude);
   }
 
-  return { request, incident, guestAccessToken, autoDispatched: Boolean(incident) };
+  return { request, incident, guestAccessToken, autoDispatched: Boolean(incident), replayed: false };
 }

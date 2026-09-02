@@ -1,342 +1,691 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { Camera, CheckCircle2, ChevronLeft, MapPin, Navigation, Send, ShieldAlert, UserRound } from 'lucide-react-native';
-import { supabase } from '../../lib/supabase';
+import {
+  Camera,
+  CheckCircle2,
+  ChevronLeft,
+  Navigation,
+  Send,
+  ShieldAlert,
+  UserRound,
+  X,
+} from 'lucide-react-native';
 import { uploadEmergencyEvidence } from '../../lib/storage';
+import { syncChatbotReportToEmergencyStore } from '../../lib/chatbot-report-bridge';
+import { supabase } from '../../lib/supabase';
+import {
+  CHATBOT_CONDITIONS,
+  CHATBOT_INCIDENT_TYPES,
+  deriveMobileIntakePhase,
+  getNextMissingSlot,
+  isReportProgressVisible,
+  isValidGuestPhone,
+  isWithinBaliwag,
+  parseExactPeopleInput,
+  type ChatbotDraft,
+  type ChatbotReporterMode,
+  type ChatbotSlot,
+} from '../../lib/chatbot-contracts';
+import { askChatbot, submitChatbotReport } from '../../services/chatbot-api';
+import { useChatbotStore } from '../../store/use-chatbot-store';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 
-const INCIDENTS = [
-  { value: 'Vehicular Collision', label: 'Vehicular Accident', symbol: '🚗' },
-  { value: 'Fire Emergency', label: 'Fire Emergency', symbol: '🔥' },
-  { value: 'Medical Emergency', label: 'Medical Emergency', symbol: '✚' },
-  { value: 'Structural Failure', label: 'Structural Failure', symbol: '⚠' },
-  { value: 'Flood/Water', label: 'Flood / Water', symbol: '≈' },
-  { value: 'Unknown Cause', label: 'Other / Unknown', symbol: '?' },
-] as const;
+const API_URL = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+const NAVY = '#1E3A8A';
+const BLUE = '#3B82F6';
+const WELCOME = 'Hi, I’m the DisasTRACE assistant. I can answer approved safety and Baliwag CDRRMO questions, or guide you through an incident report.';
 
-const CONDITIONS = ['Conscious and stable', 'Conscious and unstable', 'Unconscious / critical', 'No injuries reported', 'Unknown / cannot assess'] as const;
-const CHATBOT_RED = '#B91C1C';
-const GUEST_STEPS = ['Evidence', 'Incident', 'Contact', 'Location', 'Details', 'Condition', 'Review'] as const;
-const REGISTERED_STEPS = ['Evidence', 'Incident', 'Details', 'Condition', 'Location', 'Review'] as const;
+type ChatMessage = { id: string; role: 'bot' | 'user'; text: string };
+type LanguageStyle = 'en' | 'fil' | 'taglish';
 
-type IncidentType = typeof INCIDENTS[number]['value'];
+const PHASE_LABELS = ['Start', 'Location & contact', 'Incident details', 'Review', 'Submit'] as const;
+
+function promptFor(slot: ChatbotSlot, reporterMode: ChatbotReporterMode, languageStyle: LanguageStyle = 'en'): string {
+  const english: Record<ChatbotSlot, string> = {
+    evidence: 'Please take clear photo evidence when it is safe. Evidence is required before sending a report.',
+    incidentType: 'What happened? Choose the existing incident type that best fits.',
+    contactNumber: 'What Philippine mobile number can PACC use to reach you?',
+    location: reporterMode === 'guest'
+      ? 'I will use your GPS. Please also send a nearby landmark responders can recognize.'
+      : 'I will use your GPS. You may add a nearby landmark if it helps responders.',
+    peopleInvolved: 'How many people are involved? Type and send one exact whole number from 1 to 999, not a range.',
+    victimCondition: 'What is the victim’s condition? Choose the closest option.',
+    review: 'Review every report detail below. You can edit any field before explicitly submitting it.',
+  };
+  if (languageStyle === 'en') return english[slot];
+  const filipino: Record<ChatbotSlot, string> = {
+    evidence: 'Kumuha ng malinaw na litrato kung ligtas gawin. Kailangan ang ebidensiya bago maipadala ang ulat.',
+    incidentType: 'Ano ang nangyari? Pumili ng isang kasalukuyang uri ng insidente.',
+    contactNumber: 'Anong Philippine mobile number ang maaaring tawagan ng PACC?',
+    location: reporterMode === 'guest' ? 'Gagamitin ko ang GPS. Magpadala rin ng kalapit na palatandaan.' : 'Gagamitin ko ang GPS. Opsyonal ang kalapit na palatandaan.',
+    peopleInvolved: 'Ilang tao ang sangkot? Magpadala ng isang eksaktong buong bilang mula 1 hanggang 999, hindi range.',
+    victimCondition: 'Ano ang kalagayan ng biktima? Piliin ang pinakamalapit na sagot.',
+    review: 'Suriin ang bawat detalye. Maaari mong i-edit ang mga ito bago ipadala.',
+  };
+  if (languageStyle === 'fil') return filipino[slot];
+  return `${filipino[slot]} You can use the controls below.`;
+}
+
+function makeMessage(role: ChatMessage['role'], text: string): ChatMessage {
+  return { id: `${Date.now()}-${Math.random()}`, role, text };
+}
+
 export default function EmergencyChatbotScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string; returnTo?: string }>();
-  const isGuest = params.mode === 'guest';
-  const activeSteps = isGuest ? GUEST_STEPS : REGISTERED_STEPS;
-  const [step, setStep] = useState(0);
-  const [contactNumber, setContactNumber] = useState('');
-  const [nature, setNature] = useState<'EMERGENCY' | 'NON-EMERGENCY'>('EMERGENCY');
-  const [incidentType, setIncidentType] = useState<IncidentType | null>(null);
-  const [peopleCount, setPeopleCount] = useState('');
-  const [condition, setCondition] = useState<string | null>(null);
-  const [landmarks, setLandmarks] = useState('');
-  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationPermissionError, setLocationPermissionError] = useState<string | null>(null);
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [evidenceError, setEvidenceError] = useState<string | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const initialLocationRequested = useRef(false);
-  const intakeStep = activeSteps[step];
-  const previousIntakeStep = step > 0 ? activeSteps[step - 1] : null;
+  const requestedMode: ChatbotReporterMode = params.mode === 'guest' ? 'guest' : 'registered';
+  const {
+    lifecycle,
+    reporterMode,
+    submissionId,
+    draft,
+    activeReport,
+    editTarget,
+    hasHydrated,
+    startDraft,
+    updateDraft,
+    setEditTarget,
+    markSubmitting,
+    restoreDraftAfterFailure,
+    markSubmitted,
+    discardDraft,
+  } = useChatbotStore();
+  const [messages, setMessages] = useState<ChatMessage[]>([makeMessage('bot', WELCOME)]);
+  const [composer, setComposer] = useState('');
+  const [fieldValue, setFieldValue] = useState('');
+  const [pendingReportIntent, setPendingReportIntent] = useState<Partial<ChatbotDraft> | null>(null);
+  const [languageStyle, setLanguageStyle] = useState<LanguageStyle>('en');
+  const [waiting, setWaiting] = useState(false);
+  const [capturingLocation, setCapturingLocation] = useState(false);
+  const [actorReady, setActorReady] = useState(false);
+  const submissionLock = useRef(false);
+  const requestedLocation = useRef(false);
+  const restoredPromptShown = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
 
-  const incidentLabel = useMemo(
-    () => INCIDENTS.find((incident) => incident.value === incidentType)?.label ?? 'Not selected',
-    [incidentType],
+  const activeSlot = useMemo(
+    () => editTarget ?? getNextMissingSlot(draft, reporterMode),
+    [draft, editTarget, reporterMode],
   );
+  const phase = deriveMobileIntakePhase(draft, reporterMode, lifecycle);
+  const progressVisible = isReportProgressVisible(lifecycle);
 
-  const prompt = useMemo(() => {
-    if (intakeStep === 'Evidence') return 'Please add a photo or evidence of the incident. This is required for this report.';
-    if (intakeStep === 'Incident') return 'What happened? Please choose the incident type.';
-    if (intakeStep === 'Contact') return 'What is the best contact number for PACC to reach you?';
-    if (intakeStep === 'Location') return 'Where is this happening? Your current GPS is captured automatically; add a nearby landmark responders can recognize.';
-    if (intakeStep === 'Details') return 'How many people are affected? Enter the exact number.';
-    if (intakeStep === 'Condition') return 'What is the condition of the victim or victims?';
-    return 'Here is the summary of your report. Please confirm the details.';
-  }, [intakeStep]);
-
-  const hasValidContactNumber = () => /^(?:\+63|0)9\d{9}$/.test(contactNumber.replace(/[\s()-]/g, ''));
-  const hasValidPeopleCount = () => /^\d{1,3}$/.test(peopleCount) && Number(peopleCount) >= 1 && Number(peopleCount) <= 999;
-  const isWithinBaliwag = coordinates !== null && coordinates.latitude >= 14.9 && coordinates.latitude <= 15.05 && coordinates.longitude >= 120.8 && coordinates.longitude <= 121;
-
-  const captureLocation = async () => {
-    setIsLocating(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        throw new Error('Location permission is required to send this emergency report. Enable it in Settings, then try again.');
-      }
-      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setCoordinates({ latitude: location.coords.latitude, longitude: location.coords.longitude });
-      setLocationPermissionError(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to get your GPS location.';
-      setLocationPermissionError(message);
-      Alert.alert('Location needed', message);
-    } finally {
-      setIsLocating(false);
-    }
+  const addMessage = (role: ChatMessage['role'], text: string) => {
+    setMessages((current) => [...current, makeMessage(role, text)]);
   };
 
   useEffect(() => {
-    if (initialLocationRequested.current) return;
-    initialLocationRequested.current = true;
-    void captureLocation();
-  }, [isGuest]);
+    if (!hasHydrated) return;
+    let mounted = true;
+    const verifyActor = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const expectedOwnerId = requestedMode === 'guest' ? 'guest' : session?.user.id;
+      if (!expectedOwnerId) {
+        useChatbotStore.getState().clearReportToIdle();
+        useEmergencyReportStore.getState().resetReport();
+        router.replace('/(auth)/sign-in' as never);
+        return;
+      }
+      const current = useChatbotStore.getState();
+      if (current.lifecycle !== 'IDLE' && (current.reporterMode !== requestedMode || current.ownerId !== expectedOwnerId)) {
+        current.clearReportToIdle();
+        useEmergencyReportStore.getState().resetReport();
+      }
+      useChatbotStore.getState().setActor(requestedMode, expectedOwnerId);
+      if (mounted) setActorReady(true);
+    };
+    void verifyActor();
+    return () => { mounted = false; };
+  }, [hasHydrated, requestedMode, router]);
 
-  const captureEvidence = async () => {
+  useEffect(() => {
+    if (!actorReady) return;
+    if (activeReport) {
+      if (submissionId) syncChatbotReportToEmergencyStore({ draft, activeReport, submissionId });
+      router.replace((activeReport.hasIncident ? '/help/response-status' : '/help/chatbot-pending') as never);
+    }
+  }, [activeReport, actorReady, draft, router, submissionId]);
+
+  useEffect(() => {
+    if (!hasHydrated || lifecycle !== 'DRAFT' || restoredPromptShown.current) return;
+    restoredPromptShown.current = true;
+    addMessage('bot', `Your unfinished report draft was restored. ${promptFor(activeSlot, reporterMode, languageStyle)}`);
+  }, [activeSlot, hasHydrated, languageStyle, lifecycle, reporterMode]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollToEnd({ animated: true });
+  }, [activeSlot, messages]);
+
+  const captureLocation = useCallback(async () => {
+    if (capturingLocation) return;
+    setCapturingLocation(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        throw new Error('Location permission is required to submit an incident report.');
+      }
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      updateDraft({ latitude: location.coords.latitude, longitude: location.coords.longitude });
+    } catch (error) {
+      Alert.alert('Location needed', error instanceof Error ? error.message : 'Unable to capture your GPS location.');
+    } finally {
+      setCapturingLocation(false);
+    }
+  }, [capturingLocation, updateDraft]);
+
+  useEffect(() => {
+    if (lifecycle !== 'DRAFT' || draft.latitude !== undefined || requestedLocation.current) return;
+    requestedLocation.current = true;
+    void captureLocation();
+  }, [captureLocation, draft.latitude, lifecycle]);
+
+  const announceNextSlot = (nextDraft: ChatbotDraft, completedEdit = false, style = languageStyle) => {
+    const next = getNextMissingSlot(nextDraft, reporterMode);
+    if (completedEdit) {
+      setEditTarget(null);
+      addMessage('bot', promptFor('review', reporterMode, style));
+      return;
+    }
+    addMessage('bot', promptFor(next, reporterMode, style));
+  };
+
+  const completeSlot = (updates: Partial<ChatbotDraft>, confirmation: string) => {
+    const nextDraft = { ...draft, ...updates };
+    updateDraft(updates);
+    setFieldValue('');
+    addMessage('user', confirmation);
+    announceNextSlot(nextDraft, Boolean(editTarget));
+  };
+
+  const beginReport = (updates: Partial<ChatbotDraft> = {}) => {
+    const current = useChatbotStore.getState();
+    if (current.activeReport || current.lifecycle !== 'IDLE') return;
+    startDraft(updates);
+    addMessage('bot', promptFor(getNextMissingSlot(updates, reporterMode), reporterMode, languageStyle));
+  };
+
+  const discardCurrentDraft = () => {
+    Alert.alert(
+      'Discard draft report?',
+      'This draft has not been sent to PACC. Entered report details and this temporary conversation will be cleared.',
+      [
+        { text: 'Keep drafting', style: 'cancel' },
+        {
+          text: 'Discard draft',
+          style: 'destructive',
+          onPress: () => {
+            discardDraft();
+            requestedLocation.current = false;
+            restoredPromptShown.current = false;
+            setMessages([makeMessage('bot', `${WELCOME} Your draft was cancelled and no report was sent.`)]);
+          },
+        },
+      ],
+    );
+  };
+
+  const handleBack = () => {
+    if (lifecycle === 'DRAFT' || lifecycle === 'SUBMITTING') {
+      discardCurrentDraft();
+      return;
+    }
+    if (router.canGoBack()) router.back();
+    else router.replace((params.returnTo || (reporterMode === 'guest' ? '/' : '/(tabs)')) as never);
+  };
+
+  const handleChatbotResponse = (message: string, response: Awaited<ReturnType<typeof askChatbot>>) => {
+    const current = useChatbotStore.getState();
+    setLanguageStyle(response.languageStyle);
+    addMessage('bot', response.reply);
+    if (response.action === 'CANCEL_DRAFT' && current.lifecycle === 'DRAFT') {
+      discardCurrentDraft();
+      return;
+    }
+    if (response.action === 'CANCEL_SUBMITTED') return;
+
+    const updates = response.slotUpdates;
+    const shouldStart = current.lifecycle === 'IDLE' && (response.shouldStartDraft || response.action === 'START_REPORT');
+    if (shouldStart) {
+      if (/^(start|begin|make|create)\s+(an?\s+)?(incident\s+)?report$/i.test(message.trim())) {
+        startDraft(updates);
+        addMessage('bot', promptFor(getNextMissingSlot(updates, reporterMode), reporterMode, response.languageStyle));
+      } else {
+        setPendingReportIntent(updates);
+        addMessage('bot', response.languageStyle === 'en'
+          ? 'Would you like to start a report using those details? Report progress will begin only after you confirm.'
+          : 'Gusto mo bang magsimula ng report gamit ang mga detalyeng iyon? Magsisimula lang ang progress pagkatapos mong kumpirmahin.');
+      }
+      return;
+    }
+    if (current.lifecycle === 'DRAFT' && Object.keys(updates).length > 0) {
+      const nextDraft = { ...current.draft, ...updates };
+      updateDraft(updates);
+      if (!response.resumePending) announceNextSlot(nextDraft, Boolean(editTarget), response.languageStyle);
+    }
+  };
+
+  const sendComposer = async () => {
+    const message = composer.trim();
+    if (!message || waiting || lifecycle === 'SUBMITTING') return;
+    setComposer('');
+    addMessage('user', message);
+
+    if (lifecycle === 'DRAFT' && activeSlot === 'peopleInvolved') {
+      const exactCount = parseExactPeopleInput(message);
+      if (exactCount !== null) {
+        const nextDraft = { ...draft, peopleInvolved: exactCount };
+        updateDraft({ peopleInvolved: exactCount });
+        addMessage('bot', languageStyle === 'en'
+          ? `Thanks. I recorded exactly ${exactCount} ${exactCount === 1 ? 'person' : 'people'}.`
+          : `Salamat. Naitala ko ang eksaktong bilang na ${exactCount} ${exactCount === 1 ? 'tao' : 'katao'}.`);
+        announceNextSlot(nextDraft, Boolean(editTarget));
+        return;
+      }
+      const looksLikeCount = /^[\d\s.,+–—-]+$/.test(message)
+        || /\b(one|two|three|four|five|six|seven|eight|nine|ten|isa|dalawa|tatlo|apat|lima|anim|pito|walo|siyam|sampu)\b/i.test(message);
+      if (looksLikeCount) {
+        addMessage('bot', languageStyle === 'en'
+          ? 'Please send one exact whole number from 1 to 999. I cannot use a range or decimal.'
+          : 'Magpadala ng isang eksaktong buong bilang mula 1 hanggang 999. Hindi maaaring range o decimal.');
+        return;
+      }
+    }
+
+    setWaiting(true);
+    try {
+      const response = await askChatbot({
+        message,
+        reporterMode,
+        mode: lifecycle === 'IDLE' ? 'IDLE' : 'DRAFT',
+        draft,
+        pendingSlot: lifecycle === 'DRAFT' ? activeSlot : undefined,
+      });
+      handleChatbotResponse(message, response);
+    } catch (error) {
+      addMessage('bot', error instanceof Error
+        ? `${error.message} ${lifecycle === 'DRAFT' ? promptFor(activeSlot, reporterMode, languageStyle) : 'You can still start a report using the button below.'}`
+        : 'I could not process that message.');
+    } finally {
+      setWaiting(false);
+    }
+  };
+
+  const takeEvidence = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Evidence permission needed', 'Allow access so you can attach the required photo/evidence.');
+      Alert.alert('Camera permission needed', 'Allow camera access so you can attach the evidence required by the current report process.');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
-    if (!result.canceled) {
-      setPhotoUri(result.assets[0].uri);
-      setEvidenceError(null);
-    }
+    if (!result.canceled) completeSlot({ photoUri: result.assets[0].uri, imageUrl: undefined }, 'Photo evidence attached');
   };
 
-  const canContinue = () => {
-    if (intakeStep === 'Evidence') return photoUri !== null;
-    if (intakeStep === 'Incident') return incidentType !== null;
-    if (intakeStep === 'Contact') return hasValidContactNumber();
-    if (intakeStep === 'Location') return coordinates !== null && (!isGuest || landmarks.trim().length >= 5);
-    if (intakeStep === 'Details') return hasValidPeopleCount();
-    if (intakeStep === 'Condition') return condition !== null;
-    return true;
-  };
+  const submitReport = async () => {
+    if (submissionLock.current || lifecycle !== 'DRAFT' || activeSlot !== 'review' || !submissionId) return;
+    if (!draft.photoUri || !draft.incidentType || !draft.nature || draft.latitude === undefined
+      || draft.longitude === undefined || !draft.peopleInvolved || !draft.victimCondition) return;
+    if (reporterMode === 'guest' && (!isValidGuestPhone(draft.contactNumber) || (draft.landmarks?.trim().length ?? 0) < 5)) return;
 
-  const submit = async () => {
-    if (isSubmitting) return;
-    if (!incidentType || (isGuest && !hasValidContactNumber()) || !hasValidPeopleCount() || !condition || !coordinates || !photoUri || (isGuest && landmarks.trim().length < 5)) {
-      Alert.alert('Complete required details', `Check the incident, ${isGuest ? 'valid mobile number, ' : ''}exact location, people count, condition, and required evidence before submitting.`);
-      return;
-    }
-    setIsSubmitting(true);
+    submissionLock.current = true;
+    markSubmitting();
     try {
-      let imageUrl: string;
-      const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
-      try {
-        imageUrl = await uploadEmergencyEvidence(apiUrl, photoUri);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'The photo/evidence could not be uploaded.';
-        setEvidenceError(message);
-        Alert.alert('Evidence upload failed', `${message} Please try again or choose another photo.`);
-        return;
-      }
-      const payload = {
-        ...(isGuest ? { contactNumber: contactNumber.trim() } : {}),
-        incidentType,
-        peopleInvolved: Number(peopleCount),
-        victimCondition: condition,
-        landmarks: landmarks.trim() || undefined,
-        ...coordinates,
-        nature,
-        severity: condition.includes('critical') || condition.includes('Unconscious') ? 'Critical' : nature === 'EMERGENCY' ? 'High' : 'Low',
-        imageUrl,
-      };
-      const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch(`${apiUrl}/emergency-intake/${isGuest ? 'guest' : 'registered'}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success) throw new Error(result.error || 'Unable to submit the report.');
-
-      useEmergencyReportStore.setState((state) => ({ report: {
-        ...state.report,
+      const imageUrl = draft.imageUrl ?? await uploadEmergencyEvidence(API_URL, draft.photoUri);
+      markSubmitting(imageUrl);
+      const completeDraft = { ...draft, imageUrl } as Required<Pick<ChatbotDraft,
+        'imageUrl' | 'incidentType' | 'nature' | 'latitude' | 'longitude' | 'peopleInvolved' | 'victimCondition'>> & ChatbotDraft;
+      const result = await submitChatbotReport({ reporterMode, submissionId, draft: completeDraft });
+      const report = {
         id: result.request.id,
-        requestId: result.request.requestId,
+        displayId: result.request.requestId,
+        reporterMode,
+        guestAccessToken: result.guestAccessToken ?? undefined,
         incidentId: result.incident?.id,
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude,
-        photoUri: photoUri ?? undefined,
-        reporterMode: isGuest ? 'guest' : 'resident',
-        guestAccessToken: result.guestAccessToken,
+        trackingRequestId: result.request.id,
+        status: result.request.status,
+        responseStatus: result.incident ? 'PACC has started emergency response coordination.' : 'PACC is reviewing your report.',
         triageClassification: result.request.triageClassification,
-      }}));
-      router.replace(result.autoDispatched ? '/help/response-status' : '/help/pending');
+        hasIncident: Boolean(result.incident),
+        isMergedDuplicate: false,
+      };
+      markSubmitted(report);
+      syncChatbotReportToEmergencyStore({ draft: completeDraft, activeReport: report, submissionId });
+      router.replace((result.autoDispatched ? '/help/response-status' : '/help/chatbot-pending') as never);
     } catch (error) {
-      Alert.alert('Report not sent', error instanceof Error ? error.message : 'Please try again.');
+      restoreDraftAfterFailure();
+      Alert.alert('Report not sent', error instanceof Error ? error.message : 'Your draft was kept. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      submissionLock.current = false;
     }
   };
 
-  const handleExit = () => {
-    if (isSubmitting) return;
-    if (params.returnTo) {
-      router.replace(params.returnTo as any);
-    } else if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace((isGuest ? '/' : '/(tabs)') as any);
-    }
-  };
+  const renderOption = (label: string, onPress: () => void) => (
+    <TouchableOpacity key={label} style={styles.option} onPress={onPress} disabled={waiting}>
+      <Text style={styles.optionText}>{label}</Text>
+      <Text style={styles.chevron}>›</Text>
+    </TouchableOpacity>
+  );
 
-  const renderStepContent = () => {
-    if (intakeStep === 'Evidence') {
-      return <>
-        <TouchableOpacity style={[styles.evidenceButton, evidenceError && styles.evidenceInvalid]} onPress={() => void captureEvidence()}><Camera color={CHATBOT_RED} size={21} /><Text style={styles.evidenceText}>{photoUri ? 'Take a new photo' : 'Take a photo'}</Text></TouchableOpacity>
-        {photoUri && <Image source={{ uri: photoUri }} style={styles.preview} />}
-        <Text style={styles.requiredText}>A clear photo or evidence is required before continuing.</Text>
-        {evidenceError && <Text style={styles.errorText}>{evidenceError}</Text>}
-      </>;
-    }
-    if (intakeStep === 'Incident') {
-      return <>
-        <View style={styles.natureRow}>
-          {(['EMERGENCY', 'NON-EMERGENCY'] as const).map((option) => (
-            <TouchableOpacity key={option} style={[styles.natureChip, nature === option && styles.natureChipActive]} onPress={() => setNature(option)}>
-              <Text style={[styles.natureText, nature === option && styles.natureTextActive]}>{option === 'EMERGENCY' ? 'Emergency' : 'Non-emergency'}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={styles.incidentGrid}>
-          {INCIDENTS.map((incident) => (
-            <TouchableOpacity key={incident.value} style={[styles.incidentCard, incidentType === incident.value && styles.incidentCardSelected]} onPress={() => setIncidentType(incident.value)}>
-              <Text style={styles.incidentSymbol}>{incident.symbol}</Text>
-              <Text style={[styles.incidentText, incidentType === incident.value && styles.incidentTextSelected]}>{incident.label}</Text>
-              {incidentType === incident.value && <CheckCircle2 color="#FFFFFF" size={17} />}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </>;
-    }
-    if (intakeStep === 'Contact') return <><TextInput value={contactNumber} onChangeText={setContactNumber} placeholder="e.g. 0917 123 4567" placeholderTextColor="#64748B" keyboardType="phone-pad" maxLength={16} style={[styles.textInput, contactNumber.length > 0 && !hasValidContactNumber() && styles.inputInvalid]} /><Text style={contactNumber.length > 0 && !hasValidContactNumber() ? styles.errorText : styles.fieldHint}>{contactNumber.length > 0 && !hasValidContactNumber() ? 'Enter a valid Philippine mobile number: 09XXXXXXXXX or +639XXXXXXXXX.' : 'Use a Philippine mobile number: 09XXXXXXXXX or +639XXXXXXXXX.'}</Text></>;
-    if (intakeStep === 'Location') return <>
-      <TouchableOpacity style={styles.locationButton} onPress={captureLocation} disabled={isLocating}>
-        {isLocating ? <ActivityIndicator color="#FFFFFF" /> : <><Navigation color="#FFFFFF" size={18} /><Text style={styles.locationButtonText}>{coordinates ? 'Update GPS location' : 'Get current GPS location'}</Text></>}
-      </TouchableOpacity>
-      {locationPermissionError && <Text style={styles.errorText}>{locationPermissionError}</Text>}
-      {coordinates && <View style={styles.locationCard}><MapPin color={CHATBOT_RED} size={24} /><View style={styles.locationCopy}><Text style={styles.locationTitle}>Location captured</Text><Text style={styles.locationCoords}>{coordinates.latitude.toFixed(5)}, {coordinates.longitude.toFixed(5)}</Text></View><CheckCircle2 color={isWithinBaliwag ? '#22C55E' : '#F97316'} size={19} /></View>}
-      {coordinates && !isWithinBaliwag && <Text style={styles.warningText}>This GPS point is outside the Baliwag service area. PACC will review the report for coordination.</Text>}
-      <TextInput value={landmarks} onChangeText={setLandmarks} placeholder="Landmark (optional): building, shop, street sign, or barangay" placeholderTextColor="#64748B" multiline style={[styles.textInput, styles.landmarkInput, isGuest && landmarks.length > 0 && landmarks.trim().length < 5 && styles.inputInvalid]} />
-      <Text style={isGuest && landmarks.length > 0 && landmarks.trim().length < 5 ? styles.errorText : styles.fieldHint}>{isGuest && landmarks.length > 0 && landmarks.trim().length < 5 ? 'Enter at least 5 characters so responders can find you.' : 'Landmark is optional for registered accounts; GPS is used as the primary location.'}</Text>
-    </>;
-    if (intakeStep === 'Details') return <><TextInput value={peopleCount} onChangeText={(value) => setPeopleCount(value.replace(/\D/g, '').slice(0, 3))} placeholder="e.g. 2" placeholderTextColor="#64748B" keyboardType="number-pad" style={[styles.textInput, peopleCount.length > 0 && !hasValidPeopleCount() && styles.inputInvalid]} /><Text style={peopleCount.length > 0 && !hasValidPeopleCount() ? styles.errorText : styles.fieldHint}>{peopleCount.length > 0 && !hasValidPeopleCount() ? 'Use a whole number from 1 to 999.' : 'Enter a whole number from 1 to 999.'}</Text></>;
-    if (intakeStep === 'Condition') return <View style={styles.optionList}>{CONDITIONS.map((value) => <OptionButton key={value} label={value} selected={condition === value} onPress={() => setCondition(value)} />)}</View>;
-    return <View style={styles.summaryCard}>
-      <SummaryRow icon="⚠" label="Nature of Call" value={nature === 'EMERGENCY' ? 'Emergency' : 'Non-emergency'} />
-      <SummaryRow icon="🚗" label="Incident Type" value={incidentLabel} />
-      <SummaryRow icon="⌖" label="Location" value={landmarks} detail={coordinates ? `${coordinates.latitude.toFixed(5)}, ${coordinates.longitude.toFixed(5)}` : undefined} />
-      <SummaryRow icon="♟" label="People Affected" value={peopleCount ? `${peopleCount} ${Number(peopleCount) === 1 ? 'person' : 'people'}` : 'Not entered'} />
-      <SummaryRow icon="♥" label="Condition" value={condition ?? 'Not selected'} />
-      <SummaryRow icon="▣" label="Photo / Evidence" value={photoUri ? '1 photo attached' : 'No photo attached'} />
-    </View>;
-  };
-
-  return <SafeAreaView style={styles.page}>
-    <View style={styles.topBar}>
-      <TouchableOpacity style={styles.backCircle} onPress={handleExit} disabled={isSubmitting}><ChevronLeft color="#1E293B" size={22} /></TouchableOpacity>
-      <View style={styles.botIdentity}><View style={styles.botBadge}><ShieldAlert color="#FFFFFF" size={18} /></View><View><Text style={styles.botName}>DisasTRACE Emergency Bot</Text><Text style={styles.botSubtitle}>{isGuest ? 'Guest report — no account needed' : 'Guided emergency report'}</Text></View></View>
-    </View>
-
-    <View style={styles.progressTrack}>{activeSteps.map((label, index) => <View key={label} style={styles.progressItem}><View style={[styles.progressDot, index <= step && styles.progressDotActive]}><Text style={[styles.progressNumber, index <= step && styles.progressNumberActive]}>{index + 1}</Text></View>{index < activeSteps.length - 1 && <View style={[styles.progressLine, index < step && styles.progressLineActive]} />}</View>)}</View>
-
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={styles.botMessage}><View style={styles.messageIcon}><ShieldAlert color="#FFFFFF" size={16} /></View><View style={styles.botBubble}><Text style={styles.botBubbleText}>{prompt}</Text></View></View>
-      {step > 0 && <View style={styles.answerMessage}><View style={styles.answerBubble}><Text style={styles.answerLabel}>Your response</Text><Text style={styles.answerValue}>{previousIntakeStep === 'Evidence' ? (photoUri ? 'Photo attached' : 'Photo/evidence required') : previousIntakeStep === 'Incident' ? (incidentLabel || 'Choose an incident type') : previousIntakeStep === 'Contact' ? (contactNumber || 'Enter a valid mobile number') : previousIntakeStep === 'Location' ? (landmarks || 'GPS location captured') : previousIntakeStep === 'Details' ? (peopleCount ? `${peopleCount} ${Number(peopleCount) === 1 ? 'person' : 'people'}` : 'Enter the number of people') : previousIntakeStep === 'Condition' ? (condition ?? 'Select one') : 'Please check the summary below'}</Text></View><View style={styles.userIcon}><UserRound color="#FFFFFF" size={16} /></View></View>}
-      <View style={styles.inputCard}>{renderStepContent()}</View>
-    </ScrollView>
-
-    <View style={styles.footer}>
-      {step > 0 && <TouchableOpacity style={styles.backButton} onPress={() => setStep((current) => current - 1)} disabled={isSubmitting}><Text style={styles.backText}>Back</Text></TouchableOpacity>}
-      <TouchableOpacity style={[styles.primaryButton, !canContinue() && styles.primaryDisabled]} disabled={!canContinue() || isSubmitting} onPress={step === activeSteps.length - 1 ? submit : () => setStep((current) => current + 1)}>
-        {isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.primaryText}>{step === activeSteps.length - 1 ? 'Yes, submit report' : 'Continue'}</Text><Send color="#FFFFFF" size={17} /></>}
+  const renderFieldForm = (input: {
+    placeholder: string;
+    keyboard?: 'default' | 'phone-pad';
+    initialValue?: string;
+    onSubmit: (value: string) => void;
+  }) => (
+    <View style={styles.formBlock}>
+      <TextInput
+        value={fieldValue}
+        onChangeText={setFieldValue}
+        placeholder={input.placeholder}
+        placeholderTextColor="#64748B"
+        keyboardType={input.keyboard ?? 'default'}
+        style={styles.fieldInput}
+      />
+      <TouchableOpacity style={styles.primary} onPress={() => input.onSubmit(fieldValue.trim())}>
+        <Send color="#FFF" size={17} />
+        <Text style={styles.primaryText}>Send response</Text>
       </TouchableOpacity>
     </View>
-  </SafeAreaView>;
+  );
+
+  const renderControls = () => {
+    if (lifecycle === 'IDLE') {
+      return (
+        <View style={styles.formBlock}>
+          {pendingReportIntent ? (
+            <View style={styles.choiceRow}>
+              <TouchableOpacity style={styles.primaryChoice} onPress={() => {
+                const updates = pendingReportIntent;
+                setPendingReportIntent(null);
+                beginReport(updates);
+              }}><Text style={styles.primaryText}>Yes, start report</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.neutralChoice} onPress={() => {
+                setPendingReportIntent(null);
+                addMessage('bot', 'No report was started. You can continue asking approved questions.');
+              }}><Text style={styles.neutralChoiceText}>Not now</Text></TouchableOpacity>
+            </View>
+          ) : null}
+          <TouchableOpacity style={styles.primary} onPress={() => beginReport()}>
+            <ShieldAlert color="#FFF" size={18} />
+            <Text style={styles.primaryText}>Start incident report</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (lifecycle === 'SUBMITTING') {
+      return <View style={styles.submitting}><ActivityIndicator color={NAVY} /><Text style={styles.help}>Sending this report once. Keep this screen open.</Text></View>;
+    }
+    if (activeSlot === 'evidence') {
+      return (
+        <View style={styles.formBlock}>
+          <TouchableOpacity style={styles.primary} onPress={() => void takeEvidence()}>
+            <Camera color="#FFF" size={18} />
+            <Text style={styles.primaryText}>{draft.photoUri ? 'Retake photo evidence' : 'Take photo evidence'}</Text>
+          </TouchableOpacity>
+          {draft.photoUri ? <Image source={{ uri: draft.photoUri }} style={styles.preview} /> : null}
+        </View>
+      );
+    }
+    if (activeSlot === 'incidentType') {
+      return (
+        <View style={styles.formBlock}>
+          <View style={styles.choiceRow}>
+            {(['EMERGENCY', 'NON-EMERGENCY'] as const).map((nature) => (
+              <TouchableOpacity
+                key={nature}
+                style={[styles.choice, draft.nature === nature && styles.choiceActive]}
+                onPress={() => updateDraft({ nature })}
+              >
+                <Text style={[styles.choiceText, draft.nature === nature && styles.choiceTextActive]}>
+                  {nature === 'EMERGENCY' ? 'Emergency' : 'Non-emergency'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {CHATBOT_INCIDENT_TYPES.map((incidentType) => renderOption(incidentType, () => {
+            completeSlot({ incidentType, nature: draft.nature ?? 'EMERGENCY' }, incidentType);
+          }))}
+        </View>
+      );
+    }
+    if (activeSlot === 'contactNumber') {
+      return renderFieldForm({
+        placeholder: draft.contactNumber || '0917 123 4567',
+        keyboard: 'phone-pad',
+        onSubmit: (contactNumber) => {
+          if (!isValidGuestPhone(contactNumber)) {
+            addMessage('bot', 'Please enter a valid Philippine mobile number, such as 09171234567.');
+            return;
+          }
+          completeSlot({ contactNumber }, contactNumber);
+        },
+      });
+    }
+    if (activeSlot === 'location') {
+      const hasGps = draft.latitude !== undefined && draft.longitude !== undefined;
+      const outsideBaliwag = hasGps && !isWithinBaliwag(draft.latitude!, draft.longitude!);
+      return (
+        <View style={styles.formBlock}>
+          <TouchableOpacity style={styles.secondary} onPress={() => void captureLocation()} disabled={capturingLocation}>
+            {capturingLocation ? <ActivityIndicator color={NAVY} /> : <Navigation color={NAVY} size={17} />}
+            <Text style={styles.secondaryText}>{hasGps ? 'Update GPS location' : 'Capture GPS location'}</Text>
+          </TouchableOpacity>
+          {hasGps ? <Text style={styles.help}>GPS captured: {draft.latitude!.toFixed(5)}, {draft.longitude!.toFixed(5)}</Text> : null}
+          {outsideBaliwag ? <Text style={styles.warning}>This GPS point appears outside the Baliwag service area. PACC may need to clarify the location.</Text> : null}
+          <TextInput
+            value={fieldValue}
+            onChangeText={setFieldValue}
+            placeholder={draft.landmarks || (reporterMode === 'guest' ? 'Required nearby landmark' : 'Optional nearby landmark')}
+            placeholderTextColor="#64748B"
+            style={styles.fieldInput}
+          />
+          <TouchableOpacity style={styles.primary} onPress={() => {
+            const landmarks = fieldValue.trim() || draft.landmarks || '';
+            if (!hasGps) {
+              addMessage('bot', 'GPS location is required. Please capture it before continuing.');
+              return;
+            }
+            if (reporterMode === 'guest' && landmarks.length < 5) {
+              addMessage('bot', 'Please provide a recognizable nearby landmark using at least 5 characters.');
+              return;
+            }
+            completeSlot({ landmarks }, landmarks || 'GPS location confirmed');
+          }}>
+            <Send color="#FFF" size={17} />
+            <Text style={styles.primaryText}>Send location</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (activeSlot === 'peopleInvolved') {
+      return (
+        <View style={styles.countHint}>
+          <Text style={styles.countTitle}>Send one exact count in chat</Text>
+          <Text style={styles.help}>Examples: 3, three, or tatlo. Ranges such as 2–5 are not accepted.</Text>
+        </View>
+      );
+    }
+    if (activeSlot === 'victimCondition') {
+      return (
+        <View style={styles.formBlock}>
+          {CHATBOT_CONDITIONS.map((victimCondition) => renderOption(victimCondition, () => {
+            completeSlot({ victimCondition }, victimCondition);
+          }))}
+        </View>
+      );
+    }
+    return (
+      <View style={styles.reviewCard}>
+        <ReviewRow label="Evidence" value={draft.photoUri ? 'Photo attached' : 'Missing'} onEdit={() => setEditTarget('evidence')} />
+        <ReviewRow label="Nature" value={draft.nature === 'NON-EMERGENCY' ? 'Non-emergency' : 'Emergency'} onEdit={() => setEditTarget('incidentType')} />
+        <ReviewRow label="Incident" value={draft.incidentType ?? 'Missing'} onEdit={() => setEditTarget('incidentType')} />
+        {reporterMode === 'guest' ? <ReviewRow label="Contact" value={draft.contactNumber ?? 'Missing'} onEdit={() => setEditTarget('contactNumber')} /> : null}
+        <ReviewRow label="Location" value={draft.landmarks?.trim() || 'Verified GPS location'} onEdit={() => setEditTarget('location')} />
+        <ReviewRow label="People involved" value={String(draft.peopleInvolved ?? 'Missing')} onEdit={() => setEditTarget('peopleInvolved')} />
+        <ReviewRow label="Condition" value={draft.victimCondition ?? 'Missing'} onEdit={() => setEditTarget('victimCondition')} />
+        <TouchableOpacity style={styles.primary} onPress={() => void submitReport()}>
+          <CheckCircle2 color="#FFF" size={18} />
+          <Text style={styles.primaryText}>Submit report</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  if (!hasHydrated || !actorReady) {
+    return <SafeAreaView style={styles.loadingPage}><ActivityIndicator color={NAVY} size="large" /></SafeAreaView>;
+  }
+
+  return (
+    <SafeAreaView style={styles.page}>
+      <View style={styles.header}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={handleBack} style={styles.iconButton}><ChevronLeft color="#1E293B" size={22} /></TouchableOpacity>
+        <View style={styles.identity}>
+          <View style={styles.botBadge}><ShieldAlert color="#FFF" size={17} /></View>
+          <View style={styles.identityText}>
+            <Text style={styles.title}>DisasTRACE Assistant</Text>
+            <Text style={styles.subtitle}>{reporterMode === 'guest' ? 'Guest mode' : 'Guided reporting and safety help'}</Text>
+          </View>
+        </View>
+        {progressVisible ? (
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cancel draft report" onPress={discardCurrentDraft} disabled={waiting} style={styles.iconButton}><X color="#B91C1C" size={20} /></TouchableOpacity>
+        ) : <View style={styles.iconSpacer} />}
+      </View>
+
+      {progressVisible && phase ? <Progress phase={phase} /> : null}
+
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.chat} keyboardShouldPersistTaps="handled">
+        {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
+        {waiting ? <ActivityIndicator color={BLUE} /> : null}
+        <View pointerEvents={waiting ? 'none' : 'auto'} style={[styles.controls, waiting && styles.disabledControls]}>{renderControls()}</View>
+      </ScrollView>
+
+      <View style={styles.composer}>
+        <TextInput
+          value={composer}
+          onChangeText={setComposer}
+          onSubmitEditing={() => void sendComposer()}
+          editable={lifecycle !== 'SUBMITTING'}
+          placeholder={lifecycle === 'DRAFT' && activeSlot === 'peopleInvolved'
+            ? 'Type one exact number and send'
+            : 'Ask an approved safety or DisasTRACE question'}
+          placeholderTextColor="#64748B"
+          style={styles.composerInput}
+        />
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send chat message" style={styles.sendButton} onPress={() => void sendComposer()} disabled={waiting || lifecycle === 'SUBMITTING'}>
+          {waiting ? <ActivityIndicator color="#FFF" size="small" /> : <Send color="#FFF" size={18} />}
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
 }
 
-function OptionButton({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  return <TouchableOpacity style={[styles.optionButton, selected && styles.optionButtonSelected]} onPress={onPress}><View style={[styles.optionRadio, selected && styles.optionRadioSelected]}>{selected && <CheckCircle2 color="#FFFFFF" size={14} />}</View><Text style={[styles.optionText, selected && styles.optionTextSelected]}>{label}</Text></TouchableOpacity>;
+function Progress({ phase }: { phase: 1 | 2 | 3 | 4 | 5 }) {
+  return (
+    <View style={styles.progress}>
+      <View style={styles.progressHeading}>
+        <Text style={styles.progressText}>Report phase {phase} of 5</Text>
+        <Text style={styles.progressLabel}>{PHASE_LABELS[phase - 1]}</Text>
+      </View>
+      <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${phase * 20}%` }]} /></View>
+    </View>
+  );
 }
 
-function SummaryRow({ icon, label, value, detail }: { icon: string; label: string; value: string; detail?: string }) {
-  return <View style={styles.summaryRow}><Text style={styles.summaryIcon}>{icon}</Text><View style={styles.summaryCopy}><Text style={styles.summaryLabel}>{label}</Text><Text style={styles.summaryValue}>{value}</Text>{detail && <Text style={styles.summaryDetail}>{detail}</Text>}</View></View>;
+function MessageBubble({ message }: { message: ChatMessage }) {
+  const user = message.role === 'user';
+  return (
+    <View style={[styles.message, user ? styles.userMessage : styles.botMessage]}>
+      {!user ? <View style={styles.avatar}><ShieldAlert color="#FFF" size={14} /></View> : null}
+      <View style={[styles.bubble, user ? styles.userBubble : styles.botBubble]}>
+        <Text style={[styles.messageText, user && styles.userText]}>{message.text}</Text>
+      </View>
+      {user ? <View style={styles.userAvatar}><UserRound color="#FFF" size={14} /></View> : null}
+    </View>
+  );
+}
+
+function ReviewRow({ label, value, onEdit }: { label: string; value: string; onEdit: () => void }) {
+  return (
+    <View style={styles.reviewRow}>
+      <View style={styles.reviewCopy}><Text style={styles.reviewLabel}>{label}</Text><Text style={styles.reviewValue}>{value}</Text></View>
+      <TouchableOpacity onPress={onEdit}><Text style={styles.editText}>Edit</Text></TouchableOpacity>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#F8FAFC' },
-  topBar: { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  backCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  botIdentity: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  botBadge: { width: 34, height: 34, borderRadius: 17, backgroundColor: CHATBOT_RED, alignItems: 'center', justifyContent: 'center' },
-  botName: { color: '#0F172A', fontWeight: '800', fontSize: 14 },
-  botSubtitle: { color: '#64748B', fontSize: 11, marginTop: 1 },
-  progressTrack: { flexDirection: 'row', paddingHorizontal: 22, paddingVertical: 16, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  progressItem: { flexDirection: 'row', alignItems: 'center' },
-  progressDot: { width: 23, height: 23, borderRadius: 12, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  progressDotActive: { backgroundColor: CHATBOT_RED, borderColor: CHATBOT_RED },
-  progressNumber: { color: '#64748B', fontSize: 10, fontWeight: '800' },
-  progressNumberActive: { color: '#FFFFFF' },
-  progressLine: { width: 21, height: 2, backgroundColor: '#E2E8F0' },
-  progressLineActive: { backgroundColor: CHATBOT_RED },
-  content: { padding: 18, paddingBottom: 24, flexGrow: 1 },
-  botMessage: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 },
-  messageIcon: { width: 29, height: 29, borderRadius: 15, backgroundColor: CHATBOT_RED, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  botBubble: { backgroundColor: '#FFFFFF', borderRadius: 14, borderTopLeftRadius: 4, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: '#E2E8F0', flex: 1 },
-  botBubbleText: { color: '#1E293B', fontSize: 15, lineHeight: 21, fontWeight: '700' },
-  answerMessage: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 12, maxWidth: '88%' },
-  answerBubble: { backgroundColor: CHATBOT_RED, borderRadius: 14, borderBottomRightRadius: 4, paddingHorizontal: 13, paddingVertical: 10, flexShrink: 1 },
-  answerLabel: { color: '#FEE2E2', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
-  answerValue: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', marginTop: 2 },
-  userIcon: { width: 29, height: 29, borderRadius: 15, backgroundColor: '#64748B', alignItems: 'center', justifyContent: 'center' },
-  inputCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', padding: 14, shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-  natureRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  natureChip: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#F1F5F9', alignItems: 'center' },
-  natureChipActive: { backgroundColor: '#FEE2E2' },
-  natureText: { color: '#64748B', fontSize: 12, fontWeight: '800' },
-  natureTextActive: { color: CHATBOT_RED },
-  incidentGrid: { gap: 9 },
-  incidentCard: { minHeight: 49, borderWidth: 1, borderColor: '#F1E5E5', backgroundColor: '#FFF8F7', borderRadius: 9, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  incidentCardSelected: { backgroundColor: CHATBOT_RED, borderColor: CHATBOT_RED },
-  incidentSymbol: { fontSize: 18, width: 25, textAlign: 'center' },
-  incidentText: { color: '#B91C1C', fontSize: 13, fontWeight: '700', flex: 1 },
-  incidentTextSelected: { color: '#FFFFFF' },
-  textInput: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 9, color: '#0F172A', paddingHorizontal: 13, paddingVertical: 13, fontSize: 15, backgroundColor: '#FFFFFF' },
-  inputInvalid: { borderColor: CHATBOT_RED, backgroundColor: '#FFF7F7' },
-  landmarkInput: { minHeight: 88, marginTop: 12, textAlignVertical: 'top' },
-  locationButton: { backgroundColor: CHATBOT_RED, borderRadius: 9, paddingVertical: 13, paddingHorizontal: 14, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center' },
-  locationButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
-  locationCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', marginTop: 12 },
-  locationCopy: { flex: 1 },
-  locationTitle: { color: '#0F172A', fontWeight: '800', fontSize: 13 },
-  locationCoords: { color: '#64748B', fontSize: 11, marginTop: 2 },
-  optionList: { gap: 9 },
-  optionButton: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 9, minHeight: 48, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  optionButtonSelected: { borderColor: CHATBOT_RED, backgroundColor: '#FFF1F0' },
-  optionRadio: { width: 19, height: 19, borderRadius: 10, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
-  optionRadioSelected: { backgroundColor: CHATBOT_RED, borderColor: CHATBOT_RED },
-  optionText: { color: '#334155', fontSize: 13, fontWeight: '700', flex: 1 },
-  optionTextSelected: { color: '#B91C1C' },
-  evidenceButton: { borderWidth: 1, borderStyle: 'dashed', borderColor: '#FDA4AF', backgroundColor: '#FFF8F7', borderRadius: 10, minHeight: 74, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  evidenceInvalid: { borderColor: CHATBOT_RED, backgroundColor: '#FFF1F2' },
-  evidenceText: { color: CHATBOT_RED, fontWeight: '800', fontSize: 13 },
-  preview: { width: '100%', height: 190, borderRadius: 10, marginTop: 12 },
-  requiredText: { color: '#B91C1C', fontSize: 11, lineHeight: 16, marginTop: 12, fontWeight: '700' },
-  fieldHint: { color: '#64748B', fontSize: 11, lineHeight: 16, marginTop: 8 },
-  errorText: { color: CHATBOT_RED, fontSize: 11, lineHeight: 16, marginTop: 8, fontWeight: '700' },
-  warningText: { color: '#C2410C', fontSize: 11, lineHeight: 16, marginTop: 8, fontWeight: '700' },
-  summaryCard: { backgroundColor: '#FFF8F7', borderRadius: 10, padding: 12, gap: 13 },
-  summaryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  summaryIcon: { fontSize: 17, width: 22, textAlign: 'center' },
-  summaryCopy: { flex: 1 },
-  summaryLabel: { color: '#64748B', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
-  summaryValue: { color: '#0F172A', fontSize: 13, fontWeight: '800', marginTop: 1 },
-  summaryDetail: { color: '#64748B', fontSize: 11, marginTop: 1 },
-  footer: { backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingHorizontal: 18, paddingVertical: 13, flexDirection: 'row', gap: 10 },
-  backButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 9, alignItems: 'center', justifyContent: 'center', minWidth: 82, paddingHorizontal: 14 },
-  backText: { color: '#475569', fontWeight: '800', fontSize: 13 },
-  primaryButton: { flex: 1, borderRadius: 9, backgroundColor: CHATBOT_RED, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  primaryDisabled: { opacity: 0.42 },
-  primaryText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
+  loadingPage: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
+  page: { flex: 1, backgroundColor: '#F3F4F6' },
+  header: { minHeight: 66, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  iconSpacer: { width: 44 },
+  identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  identityText: { flex: 1 },
+  botBadge: { width: 34, height: 34, borderRadius: 17, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' },
+  title: { color: '#0F172A', fontSize: 16, fontWeight: '800' },
+  subtitle: { color: '#64748B', fontSize: 11, marginTop: 2 },
+  progress: { backgroundColor: '#FFF', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  progressHeading: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  progressText: { color: NAVY, fontSize: 12, fontWeight: '800' },
+  progressLabel: { color: '#64748B', fontSize: 12, fontWeight: '600' },
+  progressTrack: { height: 5, backgroundColor: '#DBEAFE', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: BLUE, borderRadius: 4 },
+  chat: { padding: 16, paddingBottom: 24, gap: 12 },
+  message: { flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
+  userMessage: { justifyContent: 'flex-end' },
+  botMessage: { justifyContent: 'flex-start' },
+  avatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' },
+  userAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center' },
+  bubble: { maxWidth: '78%', borderRadius: 14, paddingHorizontal: 13, paddingVertical: 10 },
+  botBubble: { backgroundColor: '#FFF', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#E2E8F0' },
+  userBubble: { backgroundColor: NAVY, borderBottomRightRadius: 4 },
+  messageText: { color: '#334155', fontSize: 14, lineHeight: 20 },
+  userText: { color: '#FFF' },
+  controls: { marginTop: 4 },
+  disabledControls: { opacity: 0.55 },
+  formBlock: { gap: 10 },
+  primary: { minHeight: 48, paddingHorizontal: 16, borderRadius: 10, backgroundColor: NAVY, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  primaryText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
+  secondary: { minHeight: 46, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: '#93C5FD', backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  secondaryText: { color: NAVY, fontWeight: '800' },
+  preview: { width: '100%', height: 180, borderRadius: 10, backgroundColor: '#E2E8F0' },
+  choiceRow: { flexDirection: 'row', gap: 8 },
+  choice: { flex: 1, minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' },
+  choiceActive: { backgroundColor: '#DBEAFE', borderColor: BLUE },
+  choiceText: { color: '#475569', fontWeight: '700', fontSize: 12 },
+  choiceTextActive: { color: NAVY },
+  primaryChoice: { flex: 1, minHeight: 44, borderRadius: 9, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  neutralChoice: { flex: 1, minHeight: 44, borderRadius: 9, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
+  neutralChoiceText: { color: '#334155', fontWeight: '800' },
+  option: { minHeight: 47, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center' },
+  optionText: { flex: 1, color: '#1E293B', fontWeight: '700', fontSize: 14 },
+  chevron: { color: BLUE, fontSize: 25, lineHeight: 25 },
+  fieldInput: { minHeight: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, backgroundColor: '#FFF', color: '#0F172A', paddingHorizontal: 14, fontSize: 14 },
+  help: { color: '#64748B', fontSize: 12, lineHeight: 18 },
+  warning: { color: '#9A3412', backgroundColor: '#FFF7ED', borderRadius: 8, padding: 10, fontSize: 12, lineHeight: 18 },
+  countHint: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 10, padding: 14 },
+  countTitle: { color: NAVY, fontWeight: '800', marginBottom: 4 },
+  reviewCard: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#DCE5F1', borderRadius: 12, padding: 15, gap: 2 },
+  reviewRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  reviewCopy: { flex: 1 },
+  reviewLabel: { color: '#64748B', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  reviewValue: { color: '#0F172A', fontSize: 14, fontWeight: '700', marginTop: 2 },
+  editText: { color: BLUE, fontSize: 13, fontWeight: '800', padding: 8 },
+  submitting: { padding: 18, alignItems: 'center', gap: 10, backgroundColor: '#EFF6FF', borderRadius: 10 },
+  composer: { padding: 12, paddingBottom: 14, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: '#FFF', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  composerInput: { flex: 1, minHeight: 46, maxHeight: 100, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 23, paddingHorizontal: 16, color: '#0F172A', backgroundColor: '#F8FAFC' },
+  sendButton: { width: 46, height: 46, borderRadius: 23, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' },
 });

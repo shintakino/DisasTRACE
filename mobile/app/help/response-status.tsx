@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Clock3, MapPinned, Radio } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { useChatbotStore } from '../../store/use-chatbot-store';
 
 interface IncidentStatus {
   status: 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'RESOLVED';
@@ -30,6 +31,12 @@ export default function EmergencyResponseStatusScreen() {
   const [agencies, setAgencies] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
+
+  useEffect(() => {
+    if (report.chatbotOrigin && incident?.status === 'RESOLVED') {
+      useChatbotStore.getState().clearReportToIdle();
+    }
+  }, [incident?.status, report.chatbotOrigin]);
 
   useEffect(() => {
     if (!report.id) return;

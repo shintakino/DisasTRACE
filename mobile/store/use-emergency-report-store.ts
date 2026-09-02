@@ -15,9 +15,10 @@ export const EmergencyReportSchema = z.object({
     "Flood/Water",
     "Unknown Cause"
   ], { required_error: "Please select the type of emergency" }),
-  peopleInvolved: z.enum(["None", "1-2 Persons", "3-5 Persons", "6+ Persons"], {
-    required_error: "Please specify number of participants"
-  }),
+  peopleInvolved: z.union([
+    z.enum(["None", "1-2 Persons", "3-5 Persons", "6+ Persons"]),
+    z.string().regex(/^[1-9]\d{0,2} Persons?$/, "Please provide one exact count from 1 to 999"),
+  ], { required_error: "Please specify number of participants" }),
   landmarks: z.string().max(150, "Description must not exceed 150 characters").optional(),
   latitude: z.number(),
   longitude: z.number(),
@@ -30,6 +31,15 @@ export const EmergencyReportSchema = z.object({
   reporterMode: z.enum(['guest', 'resident']).optional(),
   guestAccessToken: z.string().optional(),
   triageClassification: z.enum(['HIGH_CONFIDENCE_EMERGENCY', 'HIGH_CONFIDENCE_NON_EMERGENCY', 'UNCERTAIN_INCOMPLETE', 'SUSPICIOUS_POSSIBLE_PRANK']).optional(),
+  victimCondition: z.enum([
+    'Conscious and stable',
+    'Conscious and unstable',
+    'Unconscious / critical',
+    'No injuries reported',
+    'Unknown / cannot assess',
+  ]).optional(),
+  chatbotOrigin: z.boolean().optional(),
+  chatbotSubmissionId: z.string().uuid().optional(),
 });
 
 export type EmergencyReportType = z.infer<typeof EmergencyReportSchema>;

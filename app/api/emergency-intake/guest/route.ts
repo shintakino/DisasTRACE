@@ -23,31 +23,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid emergency report details', details: result.error.flatten() }, { status: 400 });
     }
 
-    const settings = await db.query.systemSettings.findFirst({
-      where: eq(systemSettings.id, 'current'),
-      columns: { guestRequestsPerDay: true },
-    });
-    const guestLimit = settings?.guestRequestsPerDay ?? 50;
-    const dayStart = startOfManilaDay();
-    const [{ total }] = await db
-      .select({ total: count() })
-      .from(verificationRequests)
-      .where(and(
-        eq(verificationRequests.reporterType, 'GUEST'),
-        gte(verificationRequests.createdAt, dayStart),
-      ));
-
-    if (Number(total) >= guestLimit) {
-      const nextReset = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-      return NextResponse.json({
-        error: 'Guest Mode has reached today\'s request limit. Please try again tomorrow or sign in to submit a report.',
-        limit: guestLimit,
-        used: Number(total),
-        resetAt: nextReset.toISOString(),
-      }, {
-        status: 429,
-        headers: { 'Retry-After': String(Math.max(1, Math.ceil((nextReset.getTime() - Date.now()) / 1000))) },
+    // A retry of an existing chatbot draft must not be rejected just because a
+    // daily limit was reached after its first successful submission.
+    const priorChatbotRequest = result.data.chatbotSubmissionId
+      ? await db.query.verificationRequests.findFirst({
+        where: eq(verificationRequests.id, result.data.chatbotSubmissionId),
+        columns: { id: true, reporterType: true, contactNumber: true },
+      })
+      : null;
+    const isOwnedRetry = priorChatbotRequest?.reporterType === 'GUEST' && priorChatbotRequest.contactNumber === result.data.contactNumber;
+    if (!isOwnedRetry) {
+      const settings = await db.query.systemSettings.findFirst({
+        where: eq(systemSettings.id, 'current'),
+        columns: { guestRequestsPerDay: true },
       });
+      const guestLimit = settings?.guestRequestsPerDay ?? 50;
+      const dayStart = startOfManilaDay();
+      const [{ total }] = await db.select({ total: count() }).from(verificationRequests).where(and(eq(verificationRequests.reporterType, 'GUEST'), gte(verificationRequests.createdAt, dayStart)));
+      if (Number(total) >= guestLimit) {
+        const nextReset = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+        return NextResponse.json({ error: 'Guest Mode has reached today\'s request limit. Please try again tomorrow or sign in to submit a report.', limit: guestLimit, used: Number(total), resetAt: nextReset.toISOString() }, { status: 429, headers: { 'Retry-After': String(Math.max(1, Math.ceil((nextReset.getTime() - Date.now()) / 1000))) } });
+      }
     }
 
     const submitted = await submitEmergencyIntake(result.data, { residentId: null, reporterType: 'GUEST' });
@@ -57,7 +53,8 @@ export async function POST(request: NextRequest) {
       incident: submitted.incident,
       guestAccessToken: submitted.guestAccessToken,
       autoDispatched: submitted.autoDispatched,
-    }, { status: 201 });
+      replayed: submitted.replayed,
+    }, { status: submitted.replayed ? 200 : 201 });
   } catch (error) {
     console.error('Guest emergency intake failed:', error);
     return NextResponse.json({ error: 'Unable to submit the emergency report.' }, { status: 500 });

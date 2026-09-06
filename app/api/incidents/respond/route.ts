@@ -3,10 +3,11 @@ import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
 import { verificationRequests } from "@/db/schema/verification_requests";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import { cascadeIncident, calculateHaversineDistance, notifyPaccAndCdrrmo } from "@/lib/dispatch-engine";
+import { canResponderAcceptDispatchOffer } from "@/lib/dispatch-policy";
 
 const RespondSchema = z.object({
   incidentId: z.string().min(1, "Incident ID is required"),
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Ensure the offer was actually sent to this responder
-    if (incident.currentOfferResponderId !== user.id) {
+    if (!canResponderAcceptDispatchOffer(incident, user.id)) {
       return NextResponse.json({ error: "Conflict: This offer is no longer valid or belongs to another responder" }, { status: 409 });
     }
 
@@ -96,21 +97,46 @@ export async function POST(req: NextRequest) {
         recalculatedEta = Math.max(2, Math.round(distanceKm * 5));
       }
 
-      // 1. Accept dispatch: Update incident state
-      const [updatedIncident] = await db.update(incidents)
-        .set({
-          status: 'EN_ROUTE',
-          responderId: user.id,
-          currentOfferResponderId: null,
-          offerExpiresAt: null,
-          assignedAmbulance: vehicleId,
-          etaMinutes: recalculatedEta,
-        })
-        .where(eq(incidents.id, incidentId))
-      // 2. Set responder state to ACTIVE_DISPATCH
-      await db.update(users)
-        .set({ dutyStatus: 'ACTIVE_DISPATCH' })
-        .where(eq(users.id, user.id));
+      // Accept and assign in one transaction. The conditional update is the
+      // final authority because an offer can expire or cascade after the first
+      // read but before the responder taps Accept.
+      const updatedIncident = await db.transaction(async (tx) => {
+        const [accepted] = await tx.update(incidents)
+          .set({
+            status: 'EN_ROUTE',
+            responderId: user.id,
+            currentOfferResponderId: null,
+            offerExpiresAt: null,
+            assignedAmbulance: vehicleId,
+            etaMinutes: recalculatedEta,
+          })
+          .where(and(
+            eq(incidents.id, incidentId),
+            eq(incidents.status, 'DISPATCHED'),
+            eq(incidents.currentOfferResponderId, user.id),
+            isNull(incidents.responderId),
+          ))
+          .returning();
+
+        if (!accepted) return null;
+
+        await tx.update(users)
+          .set({ dutyStatus: 'ACTIVE_DISPATCH' })
+          .where(and(
+            eq(users.id, user.id),
+            eq(users.role, 'ambulance_responder'),
+            eq(users.status, 'ACTIVE'),
+          ));
+
+        return accepted;
+      });
+
+      if (!updatedIncident) {
+        return NextResponse.json(
+          { error: "Conflict: This offer was already accepted, expired, or reassigned" },
+          { status: 409 },
+        );
+      }
 
       // 3. Notify PACC and CDRRMO of acceptance
       const reqNum = request?.requestId || request?.id || incident.requestId;

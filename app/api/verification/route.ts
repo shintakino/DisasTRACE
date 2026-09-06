@@ -173,6 +173,9 @@ export async function POST(req: NextRequest) {
       type: incidentType,
       peopleInvolved: peopleInvolved || 'None',
       severity: severityLevel,
+      triageClassification: requestNature === 'EMERGENCY'
+        ? 'HIGH_CONFIDENCE_EMERGENCY'
+        : 'HIGH_CONFIDENCE_NON_EMERGENCY',
       locationDescription: landmarks || null,
       latitude,
       longitude,

@@ -4,6 +4,7 @@ import { users } from "@/db/schema/users";
 import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
+import { retryPendingAutomaticDispatches } from "@/lib/dispatch-engine";
 
 const DutyStatusSchema = z.object({
   dutyStatus: z.enum(['OFF_DUTY', 'ON_DUTY']),
@@ -49,6 +50,10 @@ export async function PATCH(req: NextRequest) {
       })
       .where(eq(users.id, user.id))
       .returning();
+
+    if (dutyStatus === 'ON_DUTY') {
+      await retryPendingAutomaticDispatches();
+    }
 
     return NextResponse.json({
       success: true,

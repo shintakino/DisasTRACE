@@ -4,7 +4,8 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
-import { eq, and, or, sql } from "drizzle-orm";
+import { eq, and, or, sql, isNull } from "drizzle-orm";
+import { canCascadeDispatchOffer, shouldRetryAutomaticDispatch } from "@/lib/dispatch-policy";
 
 type EligibleResponderBase = Pick<
   typeof users.$inferSelect,
@@ -281,19 +282,70 @@ export async function autoDispatchIncident(
   }
 }
 
+// A report can arrive before a nearby responder has clocked in or published a
+// fresh GPS point. Re-check the bounded pending queue whenever a responder
+// becomes available so confirmed emergencies do not remain stranded at PACC.
+// autoDispatchIncident owns the row locks and responder reservation, keeping
+// concurrent heartbeats and submissions idempotent.
+export async function retryPendingAutomaticDispatches() {
+  try {
+    const pendingEmergencies = await db.query.verificationRequests.findMany({
+      where: and(
+        eq(verificationRequests.status, 'PENDING'),
+        eq(verificationRequests.nature, 'EMERGENCY'),
+        eq(verificationRequests.triageClassification, 'HIGH_CONFIDENCE_EMERGENCY'),
+      ),
+      orderBy: (request, { asc }) => [
+        sql`CASE ${request.severity}
+          WHEN 'Critical' THEN 0
+          WHEN 'High' THEN 1
+          WHEN 'Medium' THEN 2
+          ELSE 3
+        END`,
+        asc(request.createdAt),
+      ],
+      limit: 10,
+    });
+
+    for (const request of pendingEmergencies) {
+      if (!shouldRetryAutomaticDispatch(request)) continue;
+
+      const incident = await autoDispatchIncident(
+        request.id,
+        request.residentId,
+        request.latitude,
+        request.longitude,
+      );
+      if (incident) return incident;
+    }
+
+    return null;
+  } catch (error) {
+    // Telemetry and duty-status updates must still succeed when the best-effort
+    // recovery query is temporarily unavailable.
+    console.error('Error retrying pending automatic dispatches:', error);
+    return null;
+  }
+}
+
 export async function cascadeIncident(incidentId: string, timedOutResponderId: string | null) {
   try {
-    const incident = await db.query.incidents.findFirst({
+    const incidentSnapshot = await db.query.incidents.findFirst({
       where: eq(incidents.id, incidentId),
     });
 
-    if (!incident) {
+    if (!incidentSnapshot) {
       console.error(`Incident ${incidentId} not found during cascade.`);
       return;
     }
 
+    if (!timedOutResponderId || !canCascadeDispatchOffer(incidentSnapshot, timedOutResponderId)) {
+      console.log(`[Cascade] Offer ${incidentId} was already accepted, cleared, or reassigned.`);
+      return;
+    }
+
     const request = await db.query.verificationRequests.findFirst({
-      where: eq(verificationRequests.id, incident.requestId),
+      where: eq(verificationRequests.id, incidentSnapshot.requestId),
     });
 
     if (!request) {
@@ -302,17 +354,37 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
     }
 
     // Mark the timed-out/rejecting responder as skipped
-    const currentSkipped = incident.skippedResponderIds || [];
-    const updatedSkipped = timedOutResponderId 
-      ? (currentSkipped.includes(timedOutResponderId) ? currentSkipped : [...currentSkipped, timedOutResponderId])
-      : currentSkipped;
+    const currentSkipped = incidentSnapshot.skippedResponderIds || [];
+    const updatedSkipped = currentSkipped.includes(timedOutResponderId)
+      ? currentSkipped
+      : [...currentSkipped, timedOutResponderId];
 
-    if (timedOutResponderId) {
-      // Reset timed-out responder back to ON_DUTY so they can take other runs
-      await db.update(users)
-        .set({ dutyStatus: "ON_DUTY" })
-        .where(eq(users.id, timedOutResponderId));
+    // Atomically claim the still-current offer for cascading. If acceptance won
+    // the race, this update returns no row and must not reset or reassign the
+    // responder.
+    const [incident] = await db.update(incidents)
+      .set({
+        currentOfferResponderId: null,
+        offerExpiresAt: null,
+        skippedResponderIds: updatedSkipped,
+      })
+      .where(and(
+        eq(incidents.id, incidentId),
+        eq(incidents.status, 'DISPATCHED'),
+        eq(incidents.currentOfferResponderId, timedOutResponderId),
+        isNull(incidents.responderId),
+      ))
+      .returning();
+
+    if (!incident) {
+      console.log(`[Cascade] Offer ${incidentId} changed before cascade could claim it.`);
+      return;
     }
+
+    // The cascade owns the old offer now, so the responder can receive another.
+    await db.update(users)
+      .set({ dutyStatus: "ON_DUTY" })
+      .where(eq(users.id, timedOutResponderId));
 
     // Handle PACC_MANUAL incidents separately:
     if (incident.dispatchMethod === "PACC_MANUAL") {
@@ -325,15 +397,6 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         });
         if (rUser) timedOutResponderName = rUser.fullName;
       }
-
-      await db.update(incidents)
-        .set({
-          currentOfferResponderId: null,
-          offerExpiresAt: null,
-          responderId: null,
-          skippedResponderIds: updatedSkipped,
-        })
-        .where(eq(incidents.id, incident.id));
 
       await notifyPaccAndCdrrmo({
         title: "Manual Dispatch Re-assignment Required",

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, ActivityIndicator, Vibration, Image, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, ActivityIndicator, Vibration, Image, Modal, Alert } from 'react-native';
 import { MapPin, Camera, Maximize2, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -235,12 +235,17 @@ export function DispatchSheet() {
                   if (res.success) {
                     acceptDispatch();
                   } else {
-                    alert(res.error || "Failed to accept dispatch.");
+                    Alert.alert(
+                      "Dispatch not accepted",
+                      res.error || "This offer may have expired or been reassigned.",
+                    );
                   }
                 } catch (err) {
                   console.error("Failed to accept dispatch offer:", err);
-                  // Fallback to local state so UX remains intact during dev
-                  acceptDispatch();
+                  Alert.alert(
+                    "Dispatch not accepted",
+                    "The server could not confirm this dispatch. Check your connection and try again.",
+                  );
                 } finally {
                   setAccepting(false);
                 }

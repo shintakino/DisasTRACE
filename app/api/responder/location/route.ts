@@ -4,6 +4,7 @@ import { users } from "@/db/schema/users";
 import { eq, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
+import { retryPendingAutomaticDispatches } from "@/lib/dispatch-engine";
 
 const LocationSchema = z.object({
   latitude: z.number().min(-90).max(90),
@@ -47,6 +48,10 @@ export async function POST(req: NextRequest) {
         locationGeom: sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)`,
       })
       .where(eq(users.id, user.id));
+
+    if (dbUser.dutyStatus === 'ON_DUTY') {
+      await retryPendingAutomaticDispatches();
+    }
 
     return NextResponse.json({
       success: true,

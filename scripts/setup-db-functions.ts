@@ -87,7 +87,7 @@ const runSetup = async () => {
             from public.users u
             where u.role in ('pacc_admin', 'cdrrmo_super_admin');
           elsif TG_OP = 'UPDATE' then
-            if new.status = 'VERIFIED' and (old.status is null or old.status <> 'VERIFIED') then
+            if new.status = 'VERIFIED' and (old.status is null or old.status <> 'VERIFIED') and new.resident_id is not null then
               insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
               values (
                 gen_random_uuid()::text,
@@ -99,7 +99,7 @@ const runSetup = async () => {
                 now(),
                 jsonb_build_object('requestId', new.id)
               );
-            elsif new.status = 'REJECTED' and (old.status is null or old.status <> 'REJECTED') then
+            elsif new.status = 'REJECTED' and (old.status is null or old.status <> 'REJECTED') and new.resident_id is not null then
               insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
               values (
                 gen_random_uuid()::text,

@@ -6,7 +6,9 @@ import {
   isReportProgressVisible,
   parseExactPeopleInput,
   restorePersistedChatbotState,
+  deriveChatbotNature,
 } from '../mobile/lib/chatbot-contracts';
+import { shouldResumeResidentRequest } from '../mobile/lib/active-incident';
 
 function check(name: string, assertion: () => void) {
   try {
@@ -28,6 +30,18 @@ check('mobile exact-count parser never turns a range into a different count', ()
   for (const value of ['2-5', '2 to 5', '1.5', '0', '1000']) {
     assert.equal(parseExactPeopleInput(value), null);
   }
+});
+
+check('chatbot incident choices derive emergency nature without a user toggle', () => {
+  assert.equal(deriveChatbotNature('Fire Emergency'), 'EMERGENCY');
+  assert.equal(deriveChatbotNature('Medical Emergency'), 'EMERGENCY');
+});
+
+check('resident home resumes only active pending or verified requests', () => {
+  assert.equal(shouldResumeResidentRequest({ status: 'PENDING' }), true);
+  assert.equal(shouldResumeResidentRequest({ status: 'VERIFIED', incidentStatus: 'EN_ROUTE' }), true);
+  assert.equal(shouldResumeResidentRequest({ status: 'VERIFIED', incidentStatus: 'RESOLVED' }), false);
+  assert.equal(shouldResumeResidentRequest({ status: 'REJECTED' }), false);
 });
 
 check('idle questions never show report progress', () => {

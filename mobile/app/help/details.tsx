@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, CheckCircle, X } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
@@ -70,6 +71,7 @@ const RadioGroup = ({ options, selected, onSelect, otherText, setOtherText }: an
 
 export default function DetailsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { report } = useEmergencyReportStore();
   
   const [what, setWhat] = useState<string>('');
@@ -175,7 +177,7 @@ export default function DetailsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.topBlueArea}>
+      <View style={[styles.topBlueArea, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={styles.headerBtn} onPress={() => { if (!isSubmitting && !showSubmitted && router.canGoBack()) router.back(); }} disabled={isSubmitting || showSubmitted} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
           <ChevronLeft color="#FFF" size={24} />
           <Text style={styles.headerText}>More details</Text>
@@ -277,9 +279,8 @@ const styles = StyleSheet.create({
   },
   topBlueArea: {
     backgroundColor: '#1E3A8A',
-    paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: 24,
   },
   headerBtn: {
     flexDirection: 'row',

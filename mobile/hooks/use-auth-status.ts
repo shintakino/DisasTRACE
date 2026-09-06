@@ -13,7 +13,7 @@ export function useAuthStatus() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | 'loading' | 'unauthorized_platform'>('loading');
   const [role, setRole] = useState<string | null>(null);
-  const [profile, setProfile] = useState<{ fullName: string; address: string; dutyStatus?: string } | null>(null);
+  const [profile, setProfile] = useState<{ fullName: string; address: string; phone?: string; dutyStatus?: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const checkVerification = async (currentUser: User, currentSession: Session) => {
@@ -26,7 +26,7 @@ export function useAuthStatus() {
       // Direct Supabase query is more robust than a separate API call for mobile
       const { data: dbUser, error: dbError } = await supabase
         .from('users')
-        .select('role, verification_status, status, full_name, address, duty_status')
+        .select('role, verification_status, status, full_name, address, phone, duty_status')
         .eq('id', currentUser.id)
         .single();
 
@@ -54,6 +54,7 @@ export function useAuthStatus() {
       const userProfile = {
         fullName: dbUser.full_name,
         address: dbUser.address || '',
+        phone: dbUser.phone || '',
         dutyStatus: dbUser.duty_status || 'OFF_DUTY',
       };
       setProfile(userProfile);
@@ -100,21 +101,21 @@ export function useAuthStatus() {
             setProfile({
               fullName: currentUser.user_metadata?.full_name || 'Resident',
               address: currentUser.user_metadata?.address || '',
-              dutyStatus: 'OFF_DUTY',
+              phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
             });
           }
         } else {
           setProfile({
             fullName: currentUser.user_metadata?.full_name || 'Resident',
             address: currentUser.user_metadata?.address || '',
-            dutyStatus: 'OFF_DUTY',
+              phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
           });
         }
       }).catch(() => {
         setProfile({
           fullName: currentUser.user_metadata?.full_name || 'Resident',
           address: currentUser.user_metadata?.address || '',
-          dutyStatus: 'OFF_DUTY',
+          phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
         });
       });
     }
@@ -189,10 +190,11 @@ export function useAuthStatus() {
             setVerificationStatus(VerificationStatusSchema.parse(newStatus.toLowerCase()));
           }
           
-          if (payload.new.full_name || payload.new.address || payload.new.duty_status) {
+          if (payload.new.full_name || payload.new.address || payload.new.phone || payload.new.duty_status) {
             setProfile({
               fullName: payload.new.full_name || '',
               address: payload.new.address || '',
+              phone: payload.new.phone || '',
               dutyStatus: payload.new.duty_status || 'OFF_DUTY',
             });
           }

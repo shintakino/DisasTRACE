@@ -95,6 +95,14 @@ function isConsistent(input: EmergencyIntake) {
 }
 
 export async function submitEmergencyIntake(input: EmergencyIntake, actor: IntakeActor) {
+  // The mobile chatbot selector contains only the existing emergency types.
+  // Keep free-text patient-transport classification as the one supported
+  // non-emergency exception, but never allow a fire, collision, flood, or
+  // structural report to be downgraded by a client-supplied toggle.
+  const normalizedInput: EmergencyIntake = input.incidentType === 'Medical Emergency'
+    ? input
+    : { ...input, nature: 'EMERGENCY' };
+  input = normalizedInput;
   const existingReplay = await loadChatbotReplay(input, actor);
   if (existingReplay) return existingReplay;
 

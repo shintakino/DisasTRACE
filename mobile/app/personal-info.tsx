@@ -16,6 +16,9 @@ export default function PersonalInfoScreen() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [phoneChangePending, setPhoneChangePending] = useState(false);
+  const [pendingPhone, setPendingPhone] = useState('');
 
   // Initialize form details
   useEffect(() => {
@@ -24,12 +27,12 @@ export default function PersonalInfoScreen() {
       setMiddleName(user.user_metadata?.middle_name || '');
       setLastName(user.user_metadata?.last_name || profile?.fullName?.split(' ').slice(1).join(' ') || '');
       setSuffix(user.user_metadata?.suffix || '');
-      setPhone(user.user_metadata?.phone || '');
+      setPhone(user.user_metadata?.phone || profile?.phone || '');
       setEmail(user.email || '');
     }
   }, [user, profile]);
 
-  const handleSaveChanges = async () => {
+  const persistProfile = async (phoneValue?: string) => {
     if (!firstName.trim() || !lastName.trim()) {
       Alert.alert('Validation Error', 'First name and Last name are required.');
       return;
@@ -57,11 +60,11 @@ export default function PersonalInfoScreen() {
         method: 'PATCH',
         headers: reqHeaders,
         body: JSON.stringify({
-          firstName: firstName.trim().toUpperCase(),
-          middleName: middleName.trim().toUpperCase(),
-          lastName: lastName.trim().toUpperCase(),
-          suffix: suffix.trim().toUpperCase(),
-          phone: phone.trim(),
+          firstName: firstName.trim(),
+          middleName: middleName.trim(),
+          lastName: lastName.trim(),
+          suffix: suffix.trim(),
+          ...(phoneValue ? { phone: phoneValue } : {}),
           email: role === 'ambulance_responder' ? email.trim() : undefined,
         }),
       });
@@ -74,13 +77,72 @@ export default function PersonalInfoScreen() {
 
       // Dynamic refresh of client states
       await refreshStatus();
-
-      Alert.alert('Success', 'Your personal details have been updated successfully.', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      return true;
     } catch (err: any) {
       console.error('[PersonalInfo] Error updating details:', err);
       Alert.alert('Error', err.message || 'Connection failed. Please verify your networking.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!firstName.trim() || !lastName.trim()) {
+      Alert.alert('Validation Error', 'First name and Last name are required.');
+      return;
+    }
+    if (role === 'ambulance_responder' && !email.trim()) {
+      Alert.alert('Validation Error', 'Email address is required.');
+      return;
+    }
+    const currentPhone = user?.user_metadata?.phone || profile?.phone || '';
+    if (phone.trim() !== currentPhone.trim()) {
+      setLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000'}/api/auth/phone-change`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+          body: JSON.stringify({ action: 'send', phone: phone.trim() }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to send phone verification code.');
+        setPendingPhone(phone.trim());
+        setPhoneChangePending(true);
+        Alert.alert('Verification code sent', 'Enter the six-digit code sent to your new phone number before saving it.');
+      } catch (error: any) {
+        Alert.alert('Phone verification', error.message || 'Unable to send the verification code.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+    setLoading(true);
+    const saved = await persistProfile();
+    if (saved) Alert.alert('Success', 'Your personal details have been updated successfully.', [{ text: 'OK', onPress: () => router.back() }]);
+  };
+
+  const verifyPhoneChange = async () => {
+    if (!/^\d{6}$/.test(phoneOtp)) {
+      Alert.alert('Invalid code', 'Enter the six-digit OTP sent to your new phone number.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000'}/api/auth/phone-change`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ action: 'verify', phone: pendingPhone, code: phoneOtp }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to verify the phone number.');
+      await supabase.auth.refreshSession();
+      const saved = await persistProfile();
+      if (saved) Alert.alert('Success', 'Your phone number and personal details have been updated.', [{ text: 'OK', onPress: () => router.back() }]);
+    } catch (error: any) {
+      Alert.alert('Phone verification', error.message || 'Unable to verify the phone number.');
     } finally {
       setLoading(false);
     }
@@ -114,11 +176,11 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">First Name</Text>
               <TextInput 
                 value={firstName}
-                onChangeText={(val) => setFirstName(val.toUpperCase())}
+                onChangeText={setFirstName}
                 editable={!loading}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
                 placeholder="JUAN"
-                autoCapitalize="characters"
+                autoCapitalize="words"
               />
             </View>
 
@@ -126,11 +188,11 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">Middle Name (Optional)</Text>
               <TextInput 
                 value={middleName}
-                onChangeText={(val) => setMiddleName(val.toUpperCase())}
+                onChangeText={setMiddleName}
                 editable={!loading}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
                 placeholder="SANTOS"
-                autoCapitalize="characters"
+                autoCapitalize="words"
               />
             </View>
             
@@ -138,11 +200,11 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">Last Name</Text>
               <TextInput 
                 value={lastName}
-                onChangeText={(val) => setLastName(val.toUpperCase())}
+                onChangeText={setLastName}
                 editable={!loading}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
                 placeholder="DELA CRUZ"
-                autoCapitalize="characters"
+                autoCapitalize="words"
               />
             </View>
 
@@ -150,13 +212,32 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">Suffix Name (Optional)</Text>
               <TextInput 
                 value={suffix}
-                onChangeText={(val) => setSuffix(val.toUpperCase())}
+                onChangeText={setSuffix}
                 editable={!loading}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
                 placeholder="JR., SR., III"
-                autoCapitalize="characters"
+                autoCapitalize="words"
               />
             </View>
+
+            {phoneChangePending ? (
+              <View className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                <Text className="text-sm font-bold text-[#1E3A8A] mb-1">Verify new phone number</Text>
+                <Text className="text-xs text-slate-600 mb-3">Enter the six-digit code sent to {pendingPhone}.</Text>
+                <TextInput
+                  value={phoneOtp}
+                  onChangeText={(value) => setPhoneOtp(value.replace(/\D/g, '').slice(0, 6))}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  editable={!loading}
+                  placeholder="123456"
+                  className="bg-white border border-blue-200 rounded-xl px-4 py-3 text-slate-800 font-bold tracking-[4px]"
+                />
+                <TouchableOpacity onPress={() => void verifyPhoneChange()} disabled={loading} className="bg-[#1E3A8A] rounded-xl py-3 items-center mt-3">
+                  <Text className="text-white font-bold">Verify and save phone</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             <View className="mb-4">
               <Text className="text-sm font-semibold text-slate-700 mb-2">Phone Number</Text>

@@ -150,8 +150,8 @@ export default function MapScreen() {
         <View className="self-start flex-row items-center bg-white/95 border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
           <View className="w-3 h-3 rounded-full bg-red-500 border-2 border-red-200 mr-2" />
           <View>
-            <Text className="text-slate-800 text-xs font-bold">High-incident area</Text>
-            <Text className="text-slate-500 text-[10px]">3+ reports in the last 30 days</Text>
+            <Text className="text-slate-800 text-xs font-bold">Incident cluster</Text>
+            <Text className="text-slate-500 text-[10px]">Number = reports in the last 30 days</Text>
           </View>
         </View>
       </View>
@@ -178,6 +178,8 @@ export default function MapScreen() {
           return (
             <Marker key={hotspot.id} id={`incident-hotspot-${hotspot.id}`} lngLat={[hotspot.longitude, hotspot.latitude]}>
               <View
+                accessibilityRole="image"
+                accessibilityLabel={`${hotspot.count} incident reports in this area in the last 30 days`}
                 className="items-center justify-center bg-red-500/25 border-2 border-red-500"
                 style={{ width: size, height: size, borderRadius: size / 2 }}
               >
@@ -222,8 +224,8 @@ export default function MapScreen() {
 
         <Marker id="userLocation" lngLat={userLocation}>
           <View className="items-center justify-center relative">
-            <View className="absolute w-8 h-8 rounded-full bg-red-500/30 animate-ping" />
-            <View className="p-1 rounded-full border-2 border-red-200 bg-red-500 shadow-lg">
+            <View className="absolute w-8 h-8 rounded-full bg-blue-500/30 animate-ping" />
+            <View className="p-1 rounded-full border-2 border-blue-200 bg-blue-600 shadow-lg">
               <MapPin color="white" size={16} fill="white" />
             </View>
           </View>

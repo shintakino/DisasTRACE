@@ -17,6 +17,7 @@ import { useEmergencyReportStore } from '../../store/use-emergency-report-store'
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
 import { getReportLocation, isNotificationVisibleForRole } from '../../lib/report-location';
+import { shouldResumeResidentRequest } from '../../lib/active-incident';
 
 import * as Notifications from 'expo-notifications';
 import { Platform, Vibration } from 'react-native';
@@ -189,9 +190,12 @@ export default function HomeScreen() {
             .from('verification_requests')
             .select('*')
             .eq('resident_id', user.id)
+            .in('status', ['PENDING', 'VERIFIED'])
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
+
+          if (!active) return;
 
           if (reqError) {
             console.error('[HomeScreen] Error fetching active verification request:', reqError);
@@ -202,7 +206,7 @@ export default function HomeScreen() {
           if (request) {
             console.log('[HomeScreen] Latest verification request found:', request.id, 'status:', request.status);
             
-            if (request.status === 'PENDING') {
+            if (request.status === 'PENDING' && shouldResumeResidentRequest({ status: request.status })) {
               // Restore store state and route to pending
               useEmergencyReportStore.setState({
                 report: {
@@ -219,7 +223,7 @@ export default function HomeScreen() {
               });
               
               console.log('[HomeScreen] Redirecting to pending screen.');
-              router.replace('/help/pending');
+              if (active) router.replace('/help/pending');
               return;
             } else if (request.status === 'VERIFIED') {
               // Check if there is an active (unresolved) incident associated with it
@@ -233,7 +237,8 @@ export default function HomeScreen() {
                 console.error('[HomeScreen] Error fetching incident:', incError);
               }
 
-              if (incident && incident.status !== 'RESOLVED') {
+              if (!active) return;
+              if (incident && shouldResumeResidentRequest({ status: request.status, incidentStatus: incident.status })) {
                 console.log('[HomeScreen] Active incident found:', incident.id, 'status:', incident.status);
                 
                 // Restore store state and route to tracking
@@ -254,14 +259,18 @@ export default function HomeScreen() {
                 
                 if (incident.responder_id) {
                   console.log('[HomeScreen] Redirecting to tracking screen.');
-                  router.replace('/help/tracking');
+                  if (active) router.replace('/help/tracking');
                 } else {
                   console.log('[HomeScreen] Active incident has no responder assigned yet. Redirecting to pending screen.');
-                  router.replace('/help/pending');
+                  if (active) router.replace('/help/pending');
                 }
                 return;
               }
             }
+          } else if (active) {
+            // Clear a terminal report restored by an earlier screen so Home
+            // cannot keep presenting an obsolete pending/tracking state.
+            useEmergencyReportStore.getState().resetReport();
           }
         } else if (role === 'ambulance_responder') {
           console.log('[HomeScreen] Checking for active dispatch in database for responder:', user.id);
@@ -273,6 +282,8 @@ export default function HomeScreen() {
             .maybeSingle();
 
           if (error) throw error;
+
+          if (!active) return;
 
           if (activeInc) {
             console.log('[HomeScreen] Found active incident in DB to resume:', activeInc);
@@ -464,6 +475,10 @@ export default function HomeScreen() {
     if (isLoaded) {
       checkForActiveIncident();
     }
+
+    return () => {
+      active = false;
+    };
   }, [isLoaded, role, user]);
 
   const { isLocationGateActive, requestPermissions } = useLocationPermission();

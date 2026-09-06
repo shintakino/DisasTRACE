@@ -9,6 +9,16 @@ export const CHATBOT_INCIDENT_TYPES = [
   'Unknown Cause',
 ] as const;
 
+/**
+ * The selector exposes only the existing emergency incident types. Nature is
+ * therefore a system classification, not a reporter choice. Free-text intake
+ * can still classify a patient-transport request as non-emergency in policy.
+ */
+export function deriveChatbotNature(incidentType: typeof CHATBOT_INCIDENT_TYPES[number]): 'EMERGENCY' {
+  if (!CHATBOT_INCIDENT_TYPES.includes(incidentType)) return 'EMERGENCY';
+  return 'EMERGENCY';
+}
+
 export const CHATBOT_CONDITIONS = [
   'Conscious and stable',
   'Conscious and unstable',

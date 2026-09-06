@@ -368,6 +368,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 - None.
 
+- **System Test Findings 14 follow-up**: Fixed chatbot incident-type classification so the mobile selector derives emergency nature from the existing six incident types (with server-side protection against downgrading fire, collision, flood, or structural reports), clarified hotspot marker counts and separated the user-location marker color, and hardened Incident Details safe-area spacing. Added Home-screen cancellation/active-status guards so notification back navigation cannot leave residents stuck in the active-incident check. Personal Information now preserves typed names, requires an authenticated OTP flow before phone changes, normalizes and persists verified phone updates (including Supabase E.164 phone storage), and exposes phone in the mobile profile cache. Re-applied the idempotent guest intake schema migration and corrected the deployed notification trigger so guest requests never attempt resident notifications with a null user. Verified chatbot contracts, DeepSeek gateway behavior, mobile state checks, both TypeScript projects, and the production Next.js build.
+
 ## Open Questions
 
 - **Resolved**:

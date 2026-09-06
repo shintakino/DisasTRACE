@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { isValidPhilippinePhone, normalizePhilippinePhone } from "@/lib/phone";
 
 const ProfileUpdateSchema = z.object({
   firstName: z.string().optional(),
@@ -75,7 +76,16 @@ export async function PATCH(req: Request) {
       updatedAt: new Date(),
     };
 
-    if (phone !== undefined) updatePayload.phone = phone;
+    if (phone !== undefined) {
+      const normalizedPhone = normalizePhilippinePhone(phone);
+      if (!isValidPhilippinePhone(phone)) {
+        return NextResponse.json({ error: "Enter a valid Philippine mobile number." }, { status: 400 });
+      }
+      if (dbUser.role === 'public_user' && normalizedPhone !== (dbUser.phone || '')) {
+        return NextResponse.json({ error: "Phone changes require OTP verification." }, { status: 403 });
+      }
+      updatePayload.phone = normalizedPhone;
+    }
     if (address !== undefined) updatePayload.address = address;
     if (email !== undefined) updatePayload.email = email.toLowerCase();
     // Map position to address column for administrative web profiles if address is omitted

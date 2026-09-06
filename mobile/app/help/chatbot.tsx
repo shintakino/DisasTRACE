@@ -30,6 +30,7 @@ import { supabase } from '../../lib/supabase';
 import {
   CHATBOT_CONDITIONS,
   CHATBOT_INCIDENT_TYPES,
+  deriveChatbotNature,
   deriveMobileIntakePhase,
   getNextMissingSlot,
   isReportProgressVisible,
@@ -442,21 +443,9 @@ export default function EmergencyChatbotScreen() {
     if (activeSlot === 'incidentType') {
       return (
         <View style={styles.formBlock}>
-          <View style={styles.choiceRow}>
-            {(['EMERGENCY', 'NON-EMERGENCY'] as const).map((nature) => (
-              <TouchableOpacity
-                key={nature}
-                style={[styles.choice, draft.nature === nature && styles.choiceActive]}
-                onPress={() => updateDraft({ nature })}
-              >
-                <Text style={[styles.choiceText, draft.nature === nature && styles.choiceTextActive]}>
-                  {nature === 'EMERGENCY' ? 'Emergency' : 'Non-emergency'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Text style={styles.help}>The system classifies the report from the selected incident type. You do not need to choose emergency status.</Text>
           {CHATBOT_INCIDENT_TYPES.map((incidentType) => renderOption(incidentType, () => {
-            completeSlot({ incidentType, nature: draft.nature ?? 'EMERGENCY' }, incidentType);
+            completeSlot({ incidentType, nature: deriveChatbotNature(incidentType) }, incidentType);
           }))}
         </View>
       );

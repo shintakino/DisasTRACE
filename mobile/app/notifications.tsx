@@ -171,7 +171,7 @@ export default function NotificationsScreen() {
     // Route only to screens that are valid for the current mobile account.
     try {
       if (item.type === 'dispatch_alert' || item.type === 'new_incident') {
-        router.replace('/(tabs)' as any);
+        router.replace('/(tabs)/index' as any);
       } else if (
         item.type === 'ambulance_dispatched' || 
         item.type === 'responder_arrived'
@@ -215,7 +215,7 @@ export default function NotificationsScreen() {
     // Notifications is opened from the authenticated tab shell. Replacing
     // the route avoids returning to a responder-only screen after a role
     // switch and also works when this screen is the first stack entry.
-    router.replace('/(tabs)' as any);
+    router.replace('/(tabs)/index' as any);
   };
 
 

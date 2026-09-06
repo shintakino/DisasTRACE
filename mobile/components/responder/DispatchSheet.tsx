@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, ActivityIndicator, Vibration, Image, Modal, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, ActivityIndicator, Vibration, Image, Modal, Alert, ScrollView } from 'react-native';
 import { MapPin, Camera, Maximize2, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -18,6 +18,7 @@ export function DispatchSheet() {
   const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds || 30;
   const serverExpiry = activeDispatch?.offerExpiresAt ? Date.parse(activeDispatch.offerExpiresAt) : NaN;
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = Dimensions.get('window');
   const progress = useSharedValue(100);
   const [accepting, setAccepting] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -123,7 +124,19 @@ export function DispatchSheet() {
         style={animatedStyle}
         pointerEvents={pointerEvents}
       >
-        <View className="bg-white rounded-[32px] p-6 shadow-2xl shadow-slate-900/40 max-h-[85vh]">
+        <View
+          className="bg-white rounded-[32px] p-6 shadow-2xl shadow-slate-900/40"
+          style={{
+            maxHeight: Math.max(420, screenHeight - insets.top - 24),
+            overflow: 'hidden',
+          }}
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={{ flexShrink: 1 }}
+            contentContainerStyle={{ paddingBottom: 8 }}
+            nestedScrollEnabled
+          >
           
           {/* Countdown Banner */}
           <View className="bg-[#E2E8F0]/40 rounded-2xl p-4 mb-4 relative overflow-hidden flex-row items-center justify-center">
@@ -153,7 +166,14 @@ export function DispatchSheet() {
           {/* Metrics Grid */}
           <View className="flex-row space-x-3 mb-4">
             <View className="flex-1 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center">
-              <Text className="text-[#991B1B] font-black text-[14px] uppercase tracking-tight">{activeDispatch?.natureOfCall || 'EMERGENCY'}</Text>
+              <Text
+                className="text-[#991B1B] font-black text-[12px] uppercase tracking-tight"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {activeDispatch?.natureOfCall || 'EMERGENCY'}
+              </Text>
               <Text className="text-[#64748B] text-[8px] font-bold mt-1 uppercase tracking-[0.15em]">NATURE OF CALL</Text>
             </View>
             <View className="flex-1 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center relative overflow-hidden">
@@ -205,6 +225,7 @@ export function DispatchSheet() {
               </View>
             </TouchableOpacity>
           ) : null}
+          </ScrollView>
 
           {/* Actions Button Row */}
           <View className="flex-row">

@@ -14,8 +14,13 @@ async function initSettings() {
       CREATE TABLE IF NOT EXISTS system_settings (
         id VARCHAR(50) PRIMARY KEY,
         dispatch_offer_timeout_seconds INTEGER NOT NULL DEFAULT 30,
+        guest_requests_per_day INTEGER NOT NULL DEFAULT 50,
         updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
       );
+    `));
+    await db.execute(sql.raw(`
+      ALTER TABLE system_settings
+      ADD COLUMN IF NOT EXISTS guest_requests_per_day INTEGER NOT NULL DEFAULT 50;
     `));
     console.log('✅ Table verified successfully.');
 

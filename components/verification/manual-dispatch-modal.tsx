@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { useEffect, useRef, useState } from "react"
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Truck, Phone, MapPin, Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -14,7 +14,20 @@ interface Responder {
   fullName: string
   phone: string
   address: string
-  status: string
+  status: "STANDBY" | "OFFLINE"
+  selectable: boolean
+  unavailableReason: string | null
+}
+
+interface DispatchApiResponse {
+  success?: boolean
+  message?: string
+  code?: string
+  error?: string
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Failed to dispatch responder"
 }
 
 interface ManualDispatchModalProps {
@@ -29,7 +42,6 @@ export function ManualDispatchModal({
   isOpen,
   onClose,
   requestId,
-  requestNum,
   onSuccess,
 }: ManualDispatchModalProps) {
   const [activeTab, setActiveTab] = useState<"CDRRMO" | "BARANGAY">("CDRRMO")
@@ -37,6 +49,7 @@ export function ManualDispatchModal({
   const [barangayResponders, setBarangayResponders] = useState<Responder[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submissionInFlight = useRef(false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -86,7 +99,8 @@ export function ManualDispatchModal({
   }, [isOpen])
 
   const handleSelectResponder = async (responderId: string, responderName: string) => {
-    if (!requestId) return
+    if (!requestId || submissionInFlight.current) return
+    submissionInFlight.current = true
     setIsSubmitting(true)
 
     try {
@@ -96,20 +110,26 @@ export function ManualDispatchModal({
         body: JSON.stringify({ responderId }),
       })
 
-      if (!response.ok) throw new Error("Failed to dispatch responder")
-      
-      const data = await response.json()
+      const data = await response.json().catch(() => null) as DispatchApiResponse | null
+      if (!response.ok || !data?.success) {
+        const shouldRefresh = data?.code === "REPORT_CLOSED" || data?.code === "ACTIVE_DISPATCH_EXISTS"
+        if (shouldRefresh) {
+          await onSuccess()
+          onClose()
+        }
+        throw new Error(data?.error || "Failed to dispatch responder")
+      }
+
       if (data.success) {
-        toast.success(`Manual dispatch offer sent to ${responderName}! Awaiting acceptance.`)
+        toast.success(data.message || `Manual dispatch offer sent to ${responderName}! Awaiting acceptance.`)
         await onSuccess()
         onClose()
-      } else {
-        throw new Error(data.error || "Failed to dispatch responder")
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
-      toast.error(error.message || "Failed to dispatch responder")
+      toast.error(getErrorMessage(error))
     } finally {
+      submissionInFlight.current = false
       setIsSubmitting(false)
     }
   }
@@ -180,8 +200,12 @@ export function ManualDispatchModal({
                 <button
                   key={resp.id}
                   onClick={() => handleSelectResponder(resp.id, resp.fullName)}
-                  disabled={isSubmitting}
-                  className="w-full text-left bg-white border border-slate-200 hover:border-[#1E3A8A] hover:bg-blue-50/10 p-3.5 rounded-xl flex items-center gap-4 transition-all hover:scale-[1.01] hover:shadow-md group active:scale-[0.99] disabled:opacity-50"
+                  disabled={isSubmitting || !resp.selectable}
+                  title={resp.unavailableReason || undefined}
+                  className={cn(
+                    "w-full text-left bg-white border border-slate-200 p-3.5 rounded-xl flex items-center gap-4 transition-all group disabled:opacity-60 disabled:cursor-not-allowed",
+                    resp.selectable && "hover:border-[#1E3A8A] hover:bg-blue-50/10 hover:scale-[1.01] hover:shadow-md active:scale-[0.99]",
+                  )}
                 >
                   <div className="w-11 h-11 bg-[#EFF6FF] rounded-xl flex items-center justify-center shrink-0 border border-blue-50/50 group-hover:bg-[#1E3A8A]/10">
                     <Truck className="w-5 h-5 text-[#1E3A8A]" />

@@ -4,8 +4,12 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
-import { eq, and, or, sql, isNull } from "drizzle-orm";
-import { canCascadeDispatchOffer, shouldRetryAutomaticDispatch } from "@/lib/dispatch-policy";
+import { eq, and, or, sql, isNull, gte } from "drizzle-orm";
+import {
+  canCascadeDispatchOffer,
+  RESPONDER_HEARTBEAT_FRESHNESS_MS,
+  shouldRetryAutomaticDispatch,
+} from "@/lib/dispatch-policy";
 
 type EligibleResponderBase = Pick<
   typeof users.$inferSelect,
@@ -88,6 +92,7 @@ export async function autoDispatchIncident(
     }
 
     const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+    const responderFreshAfter = new Date(Date.now() - RESPONDER_HEARTBEAT_FRESHNESS_MS);
 
     let reqLat = latitude;
     let reqLng = longitude;
@@ -108,6 +113,7 @@ export async function autoDispatchIncident(
         where: and(
           eq(users.role, "ambulance_responder"),
           eq(users.status, "ACTIVE"),
+          eq(users.verificationStatus, "APPROVED"),
           eq(users.dutyStatus, "ON_DUTY")
         ),
       });
@@ -132,8 +138,9 @@ export async function autoDispatchIncident(
           and(
             eq(users.role, "ambulance_responder"),
             eq(users.status, "ACTIVE"),
+            eq(users.verificationStatus, "APPROVED"),
             eq(users.dutyStatus, "ON_DUTY"),
-            sql`${users.lastLocationUpdatedAt} >= NOW() - INTERVAL '15 minutes'`,
+            gte(users.lastLocationUpdatedAt, responderFreshAfter),
             sql`ST_DWithin(
               ${users.locationGeom}::geography,
               ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography,
@@ -217,14 +224,20 @@ export async function autoDispatchIncident(
         // at this exact moment. If another concurrent transaction already reserved
         // this responder (set them to ACTIVE_DISPATCH), zero rows are returned
         // and we move to the next candidate.
+        const reservationConditions = [
+          eq(users.id, candidate.id),
+          eq(users.role, "ambulance_responder"),
+          eq(users.status, "ACTIVE"),
+          eq(users.verificationStatus, "APPROVED"),
+          eq(users.dutyStatus, "ON_DUTY"),
+        ];
+        if (!isDevMode) {
+          reservationConditions.push(gte(users.lastLocationUpdatedAt, responderFreshAfter));
+        }
+
         const reserved = await tx.update(users)
           .set({ dutyStatus: "ACTIVE_DISPATCH" })
-          .where(
-            and(
-              eq(users.id, candidate.id),
-              eq(users.dutyStatus, "ON_DUTY")
-            )
-          )
+          .where(and(...reservationConditions))
           .returning({ id: users.id });
 
         if (reserved.length === 0) {

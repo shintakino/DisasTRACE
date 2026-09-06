@@ -4,17 +4,19 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- Feature 29 connected release validation and dispatch regression remediation
+- Dispatch reliability remediation and connected release validation
 
 ## Current Goal
 
-- Run the connected Android dispatch matrix for [Feature Spec 29](feature-specs/29-context-grounded-chatbot.md) using guest, approved-resident, dispatcher, and responder actors, including a report submitted before a responder publishes fresh GPS and the responder Accept Dispatch transition.
+- Validate a new resident emergency from submission through automatic or PACC manual offer, responder acceptance, and resident status after deploying the dispatch reliability fix.
 
 ## Planned Feature Work
 
 - **Feature 29 Connected Release Validation**: Automated implementation and code review pass with no known code gaps. Remaining environment-dependent validation is the Android permission/keyboard/viewport matrix and live guest/resident/PACC/dispatch flow against a configured backend. Confirm `DEEPSEEK_API_KEY` is present in the deployment server environment; it must never be configured in Expo public variables.
 
 ## Completed
+
+- **PACC Manual Dispatch Failure Diagnosis and Transaction Hardening**: Traced `REQ-2026-3824` in the connected database and confirmed it was a valid critical high-confidence emergency, but no incident or responder notification was created because both nearby approved responders published fresh GPS only after the request had already been rejected. Reproduced the manual incident/responder reservation transaction successfully with a forced rollback, excluding schema constraints and notification triggers as the cause. Automatic and manual selection now share the approved, active, on-duty, fresh-five-minute-heartbeat rule. Manual dispatch locks and re-reads the report, incident, and responder within one transaction shared with automatic dispatch; PACC rejection uses the same report/incident lock so it cannot delete a concurrently created offer. The API rejects stale/closed reports, existing offers, unapproved/unavailable responders, and stale heartbeats with structured conflict responses, and cannot report failure merely because a secondary admin notification fails after commit. The PACC modal blocks OFFLINE responders, prevents rapid duplicate submissions, displays the server's actionable error, and refreshes stale report state. Regression coverage for manual eligibility, closed reports, and active-offer conflicts passes together with root/mobile TypeScript, touched-file ESLint, chatbot contract/mobile-state checks, `git diff --check`, and the Next.js production build.
 
 - **Emergency Auto-Dispatch Recovery and Responder Acceptance Fix**: Restored the missing transition between PACC's pending queue and responder offers. Confirmed emergencies that arrive before an eligible unit has fresh GPS now receive a bounded, severity-ordered, idempotent dispatch retry when an approved responder goes on duty or publishes a location. Direct resident emergency submissions persist the same high-confidence classification required by the retry policy; uncertain, suspicious, and non-emergency chatbot reports remain PACC-controlled. Responder acceptance now uses one conditional database transaction with a returned incident row, and timeout/rejection cascade first atomically claims the current offer, preventing stale/reassigned offers, accept-versus-timeout races, and partial incident/responder state. The mobile client no longer fabricates an accepted local dispatch when the server call fails. Added a dispatch recovery policy regression check; the targeted dispatch, chatbot contract, chatbot mobile-state, DeepSeek gateway, root TypeScript, mobile TypeScript, and production build checks pass.
 

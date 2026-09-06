@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema/users";
 import { and, eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+import { isResponderHeartbeatFresh } from "@/lib/dispatch-policy";
 
 export async function GET() {
   try {
@@ -23,6 +24,7 @@ export async function GET() {
     const whereConditions = [
       eq(users.role, "ambulance_responder"),
       eq(users.status, "ACTIVE"),
+      eq(users.verificationStatus, "APPROVED"),
       eq(users.dutyStatus, "ON_DUTY")
     ];
 
@@ -37,9 +39,9 @@ export async function GET() {
 
     const mappedResponders = activeResponders.map((r) => {
       const isDevResponder = isDevMode && r.email === "responder@disastrace.com";
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      const isRecent = r.lastLocationUpdatedAt && new Date(r.lastLocationUpdatedAt) >= fiveMinutesAgo;
-      const status = (isDevResponder || isRecent) ? "STANDBY" : "OFFLINE";
+      const isRecent = isResponderHeartbeatFresh(r.lastLocationUpdatedAt);
+      const status = (isDevResponder || isRecent) ? "STANDBY" as const : "OFFLINE" as const;
+      const selectable = status === "STANDBY";
 
       return {
         id: r.id,
@@ -47,6 +49,10 @@ export async function GET() {
         phone: r.phone || "N/A",
         address: r.address || "Baliwag City",
         status,
+        selectable,
+        unavailableReason: selectable
+          ? null
+          : "Location heartbeat is stale. Ask the responder to reopen the app and go on duty.",
         lat: r.lastLatitude,
         lng: r.lastLongitude,
         responderType: r.responderType,

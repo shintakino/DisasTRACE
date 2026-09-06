@@ -39,6 +39,73 @@ export async function PATCH(
       );
     }
 
+    if (validatedStatus === "REJECTED") {
+      const rejection = await db.transaction(async (tx) => {
+        const [lockedRequest] = await tx
+          .select()
+          .from(verificationRequests)
+          .where(eq(verificationRequests.id, id))
+          .limit(1)
+          .for('update');
+
+        if (!lockedRequest) {
+          return { success: false as const, status: 404, error: "Request not found" };
+        }
+
+        const [lockedIncident] = await tx
+          .select()
+          .from(incidents)
+          .where(eq(incidents.requestId, id))
+          .limit(1)
+          .for('update');
+
+        const hasActiveAssignment = Boolean(
+          lockedIncident &&
+          lockedIncident.status !== "RESOLVED" &&
+          (lockedIncident.responderId || lockedIncident.currentOfferResponderId)
+        );
+        const canReject =
+          lockedRequest.status === "PENDING" ||
+          (lockedRequest.status === "VERIFIED" &&
+            lockedIncident?.dispatchMethod === "PACC_MANUAL" &&
+            !hasActiveAssignment);
+
+        if (!canReject) {
+          return {
+            success: false as const,
+            status: 409,
+            error: "Only pending or unassigned PACC-handled reports can be rejected.",
+          };
+        }
+
+        if (lockedIncident) {
+          await tx.delete(incidents).where(eq(incidents.id, lockedIncident.id));
+        }
+
+        const [updatedRequest] = await tx
+          .update(verificationRequests)
+          .set({ status: "REJECTED", updatedAt: new Date() })
+          .where(eq(verificationRequests.id, id))
+          .returning();
+
+        return { success: true as const, request: updatedRequest };
+      });
+
+      if (!rejection.success) {
+        return NextResponse.json({ error: rejection.error }, { status: rejection.status });
+      }
+
+      return NextResponse.json({
+        success: true,
+        id,
+        status: rejection.request.status,
+        request: null,
+        incident: null,
+        autoDispatched: false,
+        message: `Verification request ${id} marked as REJECTED`,
+      });
+    }
+
     // Fetch both records before changing state. Guest reports intentionally have
     // no resident row, so all decisions below are based on the request itself.
     const existingReq = await db.query.verificationRequests.findFirst({
@@ -52,48 +119,6 @@ export async function PATCH(
     const existingIncident = await db.query.incidents.findFirst({
       where: eq(incidents.requestId, id),
     });
-
-    const hasActiveAssignment = Boolean(
-      existingIncident &&
-      existingIncident.status !== "RESOLVED" &&
-      (existingIncident.responderId || existingIncident.currentOfferResponderId)
-    );
-
-    if (validatedStatus === "REJECTED") {
-      const canReject =
-        existingReq.status === "PENDING" ||
-        (existingReq.status === "VERIFIED" &&
-          existingIncident?.dispatchMethod === "PACC_MANUAL" &&
-          !hasActiveAssignment);
-
-      if (!canReject) {
-        return NextResponse.json(
-          { error: "Only pending or unassigned PACC-handled reports can be rejected." },
-          { status: 409 }
-        );
-      }
-
-      const [updatedReq] = await db.update(verificationRequests)
-        .set({ status: "REJECTED", updatedAt: new Date() })
-        .where(eq(verificationRequests.id, id))
-        .returning();
-
-      // A Guest report must be independently clearable. Remove only its own
-      // placeholder/manual incident; merging is not part of rejection.
-      if (existingIncident) {
-        await db.delete(incidents).where(eq(incidents.id, existingIncident.id));
-      }
-
-      return NextResponse.json({
-        success: true,
-        id,
-        status: updatedReq.status,
-        request: null,
-        incident: null,
-        autoDispatched: false,
-        message: `Verification request ${id} marked as REJECTED`,
-      });
-    }
 
     if (existingReq.status === "REJECTED" || existingReq.status === "DUPLICATE") {
       return NextResponse.json(

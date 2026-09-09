@@ -77,7 +77,7 @@ export default function SignInScreen() {
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      keyboardVerticalOffset={0}
       className="flex-1"
     >
       <LinearGradient colors={['#0A1332', '#15286A']} className="flex-1">

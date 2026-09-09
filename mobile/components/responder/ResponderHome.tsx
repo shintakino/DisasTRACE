@@ -19,9 +19,11 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
 import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
+import { useLiveBarangay } from '../../hooks/use-live-barangay';
+import { formatBaliwagLocation } from '../../lib/baliwag-location';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
 import * as Notifications from 'expo-notifications';
-import { getReportLocation, isNotificationVisibleForRole } from '../../lib/report-location';
+import { isNotificationVisibleForRole } from '../../lib/report-location';
 
 // Helper to calculate distance in meters
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -141,6 +143,7 @@ export function ResponderHome() {
 
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number]>([120.895, 14.945]);
+  const [hasLiveLocation, setHasLiveLocation] = useState(false);
   const [heading, setHeading] = useState<number>(0);
   const [isSearchingHospital, setIsSearchingHospital] = useState(false);
   const [searchStatus, setSearchStatus] = useState('');
@@ -152,6 +155,19 @@ export function ResponderHome() {
   const lastDbUpdateRef = useRef<number>(0);
   const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const [hospitals, setHospitals] = useState<any[]>([]);
+  const liveLocation = useLiveBarangay(
+    role === 'ambulance_responder' && hasLiveLocation,
+    hasLiveLocation
+      ? { latitude: currentLocation[1], longitude: currentLocation[0] }
+      : null,
+  );
+  const currentLocationDisplay = liveLocation.state === 'ready'
+    ? formatBaliwagLocation(liveLocation.barangay)
+    : liveLocation.state === 'loading'
+      ? 'Finding your location…'
+      : liveLocation.state === 'outside_service_area'
+        ? 'Outside Baliwag City'
+        : 'Location unavailable';
 
   const hospitalsWithDistance = useMemo(() => {
     if (!currentLocation || hospitals.length === 0) return [];
@@ -432,7 +448,8 @@ export function ResponderHome() {
             
             let reporterName = 'Resident';
             let reporterInitials = 'R';
-            let locationName = 'Baliwag City';
+            let reporterPhone: string | undefined;
+            let locationName = 'Location unavailable';
             let typeOfEmergency = 'Medical Emergency';
             let peopleInvolved = 1;
             let incidentLat = 14.9538;
@@ -447,11 +464,12 @@ export function ResponderHome() {
                 .single();
 
               if (!vReqError && vReq) {
-                locationName = getReportLocation(vReq.location_description || vReq.address);
+                locationName = formatBaliwagLocation(vReq.barangay) ?? 'Location unavailable';
                 typeOfEmergency = vReq.type || 'Emergency';
                 incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
                 incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
                 attachmentUrl = vReq.image_url || undefined;
+                reporterPhone = vReq.contact_number || undefined;
                 
                 if (vReq.people_involved) {
                   const matched = vReq.people_involved.match(/\d+/);
@@ -467,13 +485,15 @@ export function ResponderHome() {
                 if (resUser) {
                   reporterName = resUser.full_name || 'Resident';
                   reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
+                  reporterPhone = reporterPhone || resUser.phone || undefined;
                 }
               }
             } catch (err) {
               console.error('Error fetching verification request details for dispatch offer:', err);
             }
 
-            let offerDist = '1.7 km';
+            let offerDist = 'Distance pending';
+            let offerEta = inc.eta_minutes ? `~${inc.eta_minutes} min` : 'Calculating';
             if (currentLocation && incidentLat && incidentLng) {
               const meters = calculateDistanceMeters(
                 currentLocation[1],
@@ -481,7 +501,9 @@ export function ResponderHome() {
                 incidentLat,
                 incidentLng
               );
-              offerDist = `${(meters / 1000).toFixed(1)} km`;
+              const distanceKm = Number((meters / 1000).toFixed(1));
+              offerDist = `${distanceKm} km`;
+              offerEta = `~${Math.max(2, Math.round(distanceKm * 5))} min`;
             }
 
             useResponderStore.setState({
@@ -493,9 +515,10 @@ export function ResponderHome() {
                 distance: offerDist,
                 natureOfCall: 'Emergency',
                 peopleInvolved,
-                eta: '~8 min',
+                eta: offerEta,
                 reporterName,
                 reporterInitials,
+                reporterPhone,
                 timestamp: new Date(inc.created_at).toLocaleTimeString("en-US", {
                   hour: '2-digit',
                   minute: '2-digit'
@@ -530,7 +553,8 @@ export function ResponderHome() {
             
             let reporterName = 'Resident';
             let reporterInitials = 'R';
-            let locationName = 'Baliwag City';
+            let reporterPhone: string | undefined;
+            let locationName = 'Location unavailable';
             let typeOfEmergency = 'Medical Emergency';
             let peopleInvolved = 1;
             let incidentLat = 14.9538;
@@ -545,11 +569,12 @@ export function ResponderHome() {
                 .single();
 
               if (!vReqError && vReq) {
-                locationName = getReportLocation(vReq.location_description || vReq.address);
+                locationName = formatBaliwagLocation(vReq.barangay) ?? 'Location unavailable';
                 typeOfEmergency = vReq.type || 'Emergency';
                 incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
                 incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
                 attachmentUrl = vReq.image_url || undefined;
+                reporterPhone = vReq.contact_number || undefined;
                 
                 if (vReq.people_involved) {
                    const matched = vReq.people_involved.match(/\d+/);
@@ -565,14 +590,15 @@ export function ResponderHome() {
                 if (resUser) {
                   reporterName = resUser.full_name || 'Resident';
                   reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
+                  reporterPhone = reporterPhone || resUser.phone || undefined;
                 }
               }
             } catch (err) {
               console.error('Error fetching verification request details for manual dispatch:', err);
             }
 
-            let manualDist = '1.7 km';
-            let initialDistanceKm = 1.7;
+            let manualDist = 'Distance pending';
+            let initialDistanceKm = 0;
             if (currentLocation && incidentLat && incidentLng) {
               const meters = calculateDistanceMeters(
                 currentLocation[1],
@@ -594,9 +620,10 @@ export function ResponderHome() {
                 distance: manualDist,
                 natureOfCall: 'Emergency',
                 peopleInvolved,
-                eta: inc.eta_minutes ? `~${inc.eta_minutes} min` : '~8 min',
+                eta: inc.eta_minutes ? `~${inc.eta_minutes} min` : 'Calculating',
                 reporterName,
                 reporterInitials,
+                reporterPhone,
                 timestamp: new Date(inc.created_at).toLocaleTimeString("en-US", {
                   hour: '2-digit',
                   minute: '2-digit'
@@ -727,6 +754,7 @@ export function ResponderHome() {
             }
             
             setCurrentLocation([lng, lat]);
+            setHasLiveLocation(true);
             useResponderStore.setState({ currentLocation: [lng, lat] });
             if (loc.coords.heading !== null && loc.coords.heading !== undefined) {
               setHeading(loc.coords.heading);
@@ -773,6 +801,7 @@ export function ResponderHome() {
             }
             
             setCurrentLocation([lng, lat]);
+            setHasLiveLocation(true);
             useResponderStore.setState({ currentLocation: [lng, lat] });
           }
         }
@@ -959,7 +988,7 @@ export function ResponderHome() {
               isMarkerPress.current = true;
               Alert.alert(
                 "Incident & Reporter Details",
-                `Incident: ${activeDispatch.type}\nReporter: ${activeDispatch.reporterName}\nLocation: ${getReportLocation(activeDispatch.locationName)}\nNature: ${activeDispatch.natureOfCall}\nPeople Involved: ${activeDispatch.peopleInvolved}`,
+                `Incident: ${activeDispatch.type}\nReporter: ${activeDispatch.reporterName}\nContact: ${activeDispatch.reporterPhone || 'Not provided'}\nLocation: ${activeDispatch.locationName || 'Location unavailable'}\nNature: ${activeDispatch.natureOfCall}\nPeople Involved: ${activeDispatch.peopleInvolved}`,
                 [{ text: "Close", onPress: () => { isMarkerPress.current = false; } }]
               );
             }}
@@ -1037,6 +1066,16 @@ export function ResponderHome() {
         })}
       </Map>
 
+      {/* Retain the light base map while softly tying its header area to the
+          operational blue palette. This layer is visual only and never
+          intercepts map gestures. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(30, 58, 138, 0.18)', 'rgba(59, 130, 246, 0.05)', 'rgba(255, 255, 255, 0)']}
+        locations={[0, 0.55, 1]}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '42%' }}
+      />
+
       {/* Overlay UI */}
       <View className="absolute top-0 w-full" style={{ paddingTop: (StatusBar.currentHeight || 24) + 12 }} pointerEvents="box-none">
         
@@ -1048,7 +1087,7 @@ export function ResponderHome() {
             </View>
             <View>
               <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Your Location</Text>
-              <Text className="text-slate-900 text-sm font-black tracking-tight">Baliwag City</Text>
+              <Text className="text-slate-900 text-sm font-black tracking-tight" numberOfLines={1}>{currentLocationDisplay}</Text>
             </View>
           </View>
           
@@ -1116,7 +1155,7 @@ export function ResponderHome() {
 
         {/* Floating Camera Mode Toggle Button */}
         {(status === 'en_route' || status === 'to_hospital') && (
-          <View className="absolute right-6 top-[160px] pointer-events-auto" style={{ zIndex: 999 }}>
+          <View className="absolute left-6 top-[160px] pointer-events-auto" style={{ zIndex: 999 }}>
             <TouchableOpacity
               onPress={() => setCameraMode(prev => prev === 'follow' ? 'overview' : 'follow')}
               activeOpacity={0.85}

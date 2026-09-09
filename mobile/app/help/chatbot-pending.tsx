@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -48,7 +50,7 @@ export default function ChatbotPendingScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [actorReady, setActorReady] = useState(false);
   const refreshLock = useRef(false);
-  const terminalHandled = useRef(false);
+  const rejectionHandled = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
   const activeReportId = activeReport?.id;
   const activeReporterMode = activeReport?.reporterMode;
@@ -59,7 +61,12 @@ export default function ChatbotPendingScreen() {
   };
 
   const returnHome = useCallback(() => {
-    router.replace((activeReport?.reporterMode === 'guest' ? '/' : '/(tabs)') as never);
+    if (activeReport?.reporterMode === 'guest') {
+      router.dismissAll();
+      router.replace('/');
+      return;
+    }
+    router.replace('/(tabs)');
   }, [activeReport?.reporterMode, router]);
 
   useEffect(() => {
@@ -87,6 +94,7 @@ export default function ChatbotPendingScreen() {
   useEffect(() => {
     if (!hasHydrated || !actorReady) return;
     if (!activeReport) {
+      if (rejectionHandled.current) return;
       router.replace('/help/chatbot' as never);
       return;
     }
@@ -111,6 +119,24 @@ export default function ChatbotPendingScreen() {
         requestId: activeReportId,
         guestAccessToken: activeGuestToken,
       });
+      if (status.status === 'REJECTED') {
+        if (!rejectionHandled.current) {
+          rejectionHandled.current = true;
+          const rejectedReporterMode = activeReporterMode;
+          clearReportToIdle();
+          useEmergencyReportStore.getState().resetReport();
+          Alert.alert(
+            'Report not accepted',
+            'PACC has closed this report. You can submit a new report if emergency assistance is still needed.',
+            [{
+              text: 'Start new report',
+              onPress: () => router.replace(`/help/chatbot?mode=${rejectedReporterMode === 'guest' ? 'guest' : 'resident'}` as never),
+            }],
+            { cancelable: false },
+          );
+        }
+        return;
+      }
       const hasIncident = Boolean(status.incident);
       updateActiveReport({
         status: status.status,
@@ -130,16 +156,6 @@ export default function ChatbotPendingScreen() {
       if (hasIncident) {
         markActiveResponse();
         router.replace('/help/response-status' as never);
-      } else if (status.status === 'REJECTED' && !terminalHandled.current) {
-        terminalHandled.current = true;
-        Alert.alert('Report review completed', status.responseStatus, [{
-          text: 'Return',
-          onPress: () => {
-            clearReportToIdle();
-            useEmergencyReportStore.getState().resetReport();
-            returnHome();
-          },
-        }]);
       }
     } catch {
       // Preserve the last verified status. Polling continues independently.
@@ -147,7 +163,7 @@ export default function ChatbotPendingScreen() {
       refreshLock.current = false;
       setRefreshing(false);
     }
-  }, [activeGuestToken, activeReportId, activeReporterMode, clearReportToIdle, markActiveResponse, returnHome, router, updateActiveReport]);
+  }, [activeGuestToken, activeReportId, activeReporterMode, clearReportToIdle, markActiveResponse, router, updateActiveReport]);
 
   useEffect(() => {
     if (!activeReportId) return;
@@ -237,8 +253,28 @@ export default function ChatbotPendingScreen() {
   }
 
   const canCancel = activeReport.status === 'PENDING' && !activeReport.hasIncident;
+  const isRejected = activeReport.status === 'REJECTED';
+  const removeClosedReport = () => {
+    Alert.alert(
+      'Remove closed report?',
+      'This only removes the closed report from this device. PACC keeps the report in its closed-record queue.',
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Remove from device',
+          style: 'destructive',
+          onPress: () => {
+            clearReportToIdle();
+            useEmergencyReportStore.getState().resetReport();
+            returnHome();
+          },
+        },
+      ],
+    );
+  };
   return (
     <SafeAreaView style={styles.page}>
+      <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
       <View style={styles.header}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Return home" style={styles.iconButton} onPress={returnHome}><ChevronLeft color="#1E293B" size={22} /></TouchableOpacity>
         <View style={styles.badge}><ShieldAlert color="#FFF" size={18} /></View>
@@ -258,7 +294,11 @@ export default function ChatbotPendingScreen() {
         </View>
         <Text style={styles.statusText}>{activeReport.responseStatus}</Text>
         {refreshing ? <Text style={styles.refreshing}>Checking for updates…</Text> : null}
-        {canCancel ? (
+        {isRejected ? (
+          <TouchableOpacity style={styles.removeButton} onPress={removeClosedReport}>
+            <X color="#B91C1C" size={16} /><Text style={styles.removeText}>Remove from this device</Text>
+          </TouchableOpacity>
+        ) : canCancel ? (
           <TouchableOpacity style={styles.cancelButton} onPress={confirmCancellation} disabled={waiting}>
             <X color="#B91C1C" size={16} /><Text style={styles.cancelText}>Cancel report</Text>
           </TouchableOpacity>
@@ -276,7 +316,7 @@ export default function ChatbotPendingScreen() {
         </Text>
       </View>
 
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.chat} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} style={styles.chatScroll} contentContainerStyle={styles.chat} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
         {waiting ? <ActivityIndicator color={BLUE} /> : null}
       </ScrollView>
@@ -289,11 +329,13 @@ export default function ChatbotPendingScreen() {
           placeholder="Ask an approved general question"
           placeholderTextColor="#64748B"
           style={styles.input}
+          onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
         />
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send chat message" style={styles.sendButton} onPress={() => void ask()} disabled={waiting}>
           {waiting ? <ActivityIndicator color="#FFF" size="small" /> : <Send color="#FFF" size={18} />}
         </TouchableOpacity>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -314,6 +356,7 @@ function MessageBubble({ message }: { message: Message }) {
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
   page: { flex: 1, backgroundColor: '#F3F4F6' },
+  keyboardArea: { flex: 1 },
   header: { minHeight: 66, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   badge: { width: 34, height: 34, borderRadius: 17, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' },
@@ -330,11 +373,14 @@ const styles = StyleSheet.create({
   refreshing: { color: '#64748B', fontSize: 11, marginTop: 7 },
   cancelButton: { alignSelf: 'flex-start', minHeight: 44, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
   cancelText: { color: '#B91C1C', fontSize: 13, fontWeight: '800' },
+  removeButton: { alignSelf: 'flex-start', minHeight: 44, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
+  removeText: { color: '#B91C1C', fontSize: 13, fontWeight: '800' },
   callButton: { alignSelf: 'flex-start', minHeight: 44, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
   callText: { color: NAVY, fontSize: 13, fontWeight: '800' },
   lockedSummary: { marginHorizontal: 16, marginBottom: 4, backgroundColor: '#EFF6FF', borderRadius: 9, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 8 },
   lockedText: { flex: 1, color: '#334155', fontSize: 12, lineHeight: 17 },
-  chat: { padding: 16, paddingBottom: 24, gap: 12 },
+  chatScroll: { flex: 1 },
+  chat: { flexGrow: 1, padding: 16, paddingBottom: 24, gap: 12 },
   message: { flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
   userMessage: { justifyContent: 'flex-end' },
   botMessage: { justifyContent: 'flex-start' },

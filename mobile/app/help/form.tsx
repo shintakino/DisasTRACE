@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { ChevronLeft, ChevronDown, ChevronUp, Image as ImageIcon, CheckCircle, MapPin, AlertCircle, Minus, Plus } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { isWithinBaliwag } from '../../lib/chatbot-contracts';
+import { formatBaliwagLocation, resolveBaliwagLocation } from '../../lib/baliwag-location';
 
 const NATURE_OPTIONS = ["Emergency", "Non-emergency"];
 const EMERGENCY_TYPES = [
@@ -59,26 +61,19 @@ export default function FormScreen() {
     if (!location) {
       getLocation();
     } else if (location.latitude && location.longitude && !address) {
-      reverseGeocode(location.latitude, location.longitude);
+      void resolveOfficialLocation(location.latitude, location.longitude);
     }
   }, [location]);
 
-  const reverseGeocode = async (lat: number, lng: number) => {
+  const resolveOfficialLocation = async (lat: number, lng: number) => {
     try {
-      const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-      if (geocode && geocode.length > 0) {
-        const current = geocode[0];
-        const formattedAddress = [
-          current.name || current.street,
-          current.city || current.subregion,
-          current.region
-        ].filter(Boolean).join(', ');
-        setAddress(formattedAddress || 'Location found');
-      } else {
-        setAddress('Location detected');
-      }
+      const resolved = await resolveBaliwagLocation(lat, lng);
+      const formatted = formatBaliwagLocation(resolved?.barangay);
+      setAddress(formatted || 'Outside Baliwag City service area');
+      return formatted;
     } catch (error) {
-      setAddress('Coordinates: ' + lat.toFixed(4) + ', ' + lng.toFixed(4));
+      setAddress('Unable to determine barangay');
+      return null;
     }
   };
 
@@ -92,9 +87,8 @@ export default function FormScreen() {
         return;
       }
       
-      let lat = 14.945;
-      let lng = 120.895;
-      let usedFallback = false;
+      let lat: number | undefined;
+      let lng: number | undefined;
 
       try {
         // Attempt high-accuracy GPS with a 4-second timeout limit
@@ -125,44 +119,27 @@ export default function FormScreen() {
           }
         } catch (cacheError) {
           console.warn('[GPS] Cached location fallback failed, using default Baliwag coordinates:', cacheError);
-          // Fallback 2: Sensible default Baliwag command center coordinates with a small random offset
-          lat = 14.945 + (Math.random() - 0.5) * 0.005;
-          lng = 120.895 + (Math.random() - 0.5) * 0.005;
-          usedFallback = true;
+          throw new Error('No usable GPS position available');
         }
       }
 
       // Geofence enforcement: DisasTRACE is only active within the municipality of Baliwag City
-      const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
-      const isOutsideBaliwag = lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00;
-
-      if (isOutsideBaliwag) {
-        if (isDevMode) {
-          // Mock coordinates inside Baliwag for developer testing convenience
-          lat = 14.945 + (Math.random() - 0.5) * 0.01;
-          lng = 120.895 + (Math.random() - 0.5) * 0.01;
-          console.log('[DevMode] User is outside Baliwag. Mocked location to center.');
-        } else {
-          // Strictly fail/warn in production/deployment
-          Alert.alert(
-            'Out of Service Area',
-            'DisasTRACE emergency response services are currently only active within the municipality of Baliwag City. We are unable to dispatch an ambulance to your current location.',
-            [{ text: 'OK' }]
-          );
-          setIsLoadingLocation(false);
-          return;
-        }
+      if (lat === undefined || lng === undefined || !isWithinBaliwag(lat, lng)) {
+        Alert.alert(
+          'Out of Service Area',
+          'DisasTRACE emergency response services are currently only active within the municipality of Baliwag City. Capture a GPS location inside Baliwag to continue.',
+          [{ text: 'OK' }]
+        );
+        return;
       }
       
-      setLocation({ latitude: lat, longitude: lng });
-      await reverseGeocode(lat, lng);
-
-      if (usedFallback) {
-        Alert.alert(
-          'Weak GPS Signal', 
-          'We estimated your local coordinates so you can still submit. Please describe your exact landmarks below to help responders.'
-        );
+      const officialLocation = await resolveOfficialLocation(lat, lng);
+      if (!officialLocation) {
+        Alert.alert('Out of Service Area', 'This GPS point is not inside an official Baliwag barangay boundary. Capture a new location to continue.');
+        return;
       }
+      setLocation({ latitude: lat, longitude: lng });
+
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Could not retrieve coordinates.');
@@ -172,7 +149,7 @@ export default function FormScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!nature || !location) {
+    if (!nature || !location || !isWithinBaliwag(location.latitude, location.longitude)) {
       Alert.alert('Missing Details', 'Please fill in required fields and allow location access.');
       return;
     }
@@ -186,7 +163,7 @@ export default function FormScreen() {
       nature: nature as any,
       incidentType: nature === 'Emergency' ? emergencyType as any : nature as any,
       peopleInvolved: people === 0 ? "None" : (people >= 6 ? "6+ Persons" : `${people} Person${people > 1 ? 's' : ''}`) as any,
-      landmarks: address || 'Baliwag City',
+      landmarks: address,
       latitude: location.latitude,
       longitude: location.longitude,
       severity: severity as any,

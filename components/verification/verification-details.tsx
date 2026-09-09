@@ -110,6 +110,11 @@ export function VerificationDetails({ request, onOverrideClassification, onUpdat
             USER SUBMITTED
           </Badge>
         </div>
+        {request.photoLatitude !== undefined && request.photoLongitude !== undefined && (
+          <Badge className="absolute bottom-4 left-4 bg-[#1E3A8A]/90 text-white border-none px-3 py-1">
+            Photo GPS {request.photoLatitude.toFixed(5)}, {request.photoLongitude.toFixed(5)}
+          </Badge>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-8">

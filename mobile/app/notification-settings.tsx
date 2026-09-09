@@ -12,7 +12,7 @@ export default function NotificationSettingsScreen() {
   const [alerts, setAlerts] = useState({
     emergencies: true,
     updates: true,
-    system: false
+    system: true
   });
   const [loading, setLoading] = useState(false);
 
@@ -23,7 +23,10 @@ export default function NotificationSettingsScreen() {
       setAlerts({
         emergencies: prefs.emergencies ?? true,
         updates: prefs.updates ?? true,
-        system: prefs.system ?? false,
+        // System notices are opt-out. This matches the broadcast service and
+        // prevents a responder from missing safety-critical CDRRMO notices
+        // solely because no preference was saved yet.
+        system: prefs.system ?? true,
       });
     }
   }, [user]);

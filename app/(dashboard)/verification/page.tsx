@@ -9,14 +9,13 @@ import { MergeDuplicateModal } from "@/components/verification/merge-duplicate-m
 import { VerificationRequest, VerificationStatus, TriageClassification } from "@/types/verification"
 import { VerificationQueueFilter } from "@/components/verification/verification-queue"
 import { toast } from "sonner"
-import { Spinner } from "@/components/ui/spinner"
 import { createClientBrowser } from "@/lib/supabase"
 import { Volume2, VolumeX, ShieldAlert, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { WebPreloader } from "@/components/ui/web-preloader"
 import { getIncidentAlertPriority, INCIDENT_ALERT_PRIORITY_RANK, type IncidentAlertPriority } from "@/lib/incident-severity"
-import { getReportLocation } from "@/lib/report-location"
+import { formatOfficialBaliwagLocation } from "@/lib/report-location"
 
 export default function VerificationPage() {
   const { user } = useAuth()
@@ -24,6 +23,7 @@ export default function VerificationPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filter, setFilter] = useState<VerificationQueueFilter>("ACTION")
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
 
@@ -58,7 +58,7 @@ export default function VerificationPage() {
   const initAudio = () => {
     if (audioCtxRef.current) return audioCtxRef.current;
     try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextClass) return null;
       const ctx = new AudioContextClass();
       audioCtxRef.current = ctx;
@@ -172,8 +172,11 @@ export default function VerificationPage() {
 
   const fetchRequests = async (): Promise<VerificationRequest[]> => {
     setIsLoading(true)
+    setLoadError(null)
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), 12_000)
     try {
-      const response = await fetch("/api/verification")
+      const response = await fetch("/api/verification", { signal: controller.signal })
       if (!response.ok) throw new Error("Failed to fetch requests")
       const data = await response.json()
       setRequests(data)
@@ -186,9 +189,14 @@ export default function VerificationPage() {
       return data
     } catch (error) {
       console.error(error)
-      toast.error("Failed to load verification requests")
+      const message = error instanceof DOMException && error.name === "AbortError"
+        ? "The verification queue took too long to respond."
+        : "Unable to load verification requests."
+      setLoadError(message)
+      toast.error(message)
       return []
     } finally {
+      window.clearTimeout(timeoutId)
       setIsLoading(false)
     }
   }
@@ -205,7 +213,10 @@ export default function VerificationPage() {
   }
 
   useEffect(() => {
-    fetchRequests()
+    // Defer the first stateful client fetch until after this effect commits.
+    // A stalled request has its own abort/retry handling in fetchRequests.
+    const requestId = window.setTimeout(() => void fetchRequests(), 0)
+    return () => window.clearTimeout(requestId)
   }, [])
 
   // Setup Real-Time Subscriptions
@@ -230,7 +241,7 @@ export default function VerificationPage() {
             const isEmergency = newRequest.nature === "EMERGENCY";
             const reqNum = newRequest.request_id || newRequest.requestId || "REQ-NEW";
             const reqType = newRequest.type || "Unknown Emergency";
-            const reqLoc = getReportLocation(newRequest.location_description || newRequest.locationDescription);
+            const reqLoc = formatOfficialBaliwagLocation(newRequest.barangay);
             
             if (isEmergency) {
               const priority = getIncidentAlertPriority(newRequest.severity);
@@ -330,6 +341,14 @@ export default function VerificationPage() {
         prev.map((r) => (r.id === id ? { ...r, status } : r))
       )
       
+      if (status === "REJECTED") {
+        // A rejection is a closed audit record, not a disappearance. Keep it
+        // selected and make its new location in the queue explicit to PACC.
+        setFilter("REJECTED")
+        setSelectedId(id)
+        return
+      }
+
       // Move to next pending request
       const currentIdx = requests.findIndex(r => r.id === id)
       const nextPending = requests.slice(currentIdx + 1).find(r => r.status === "PENDING" || needsManualDispatch(r)) || 
@@ -438,9 +457,9 @@ export default function VerificationPage() {
       } else {
         setSelectedId(null)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
-      toast.error(error.message || "Failed to merge incident")
+      toast.error(error instanceof Error ? error.message : "Failed to merge incident")
     } finally {
       setIsProcessing(false)
     }
@@ -481,6 +500,24 @@ export default function VerificationPage() {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#0B132B]">
         <WebPreloader title="Loading Verification & Dispatch..." subtitle="Synchronizing incident queues and establishing real-time communication" />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-[#F3F4F6] p-6">
+        <div className="max-w-md rounded-xl border border-red-200 bg-white p-6 text-center shadow-sm" role="alert">
+          <h2 className="text-lg font-bold text-slate-900">Verification queue unavailable</h2>
+          <p className="mt-2 text-sm text-slate-600">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void fetchRequests()}
+            className="mt-5 rounded-md bg-[#1E3A8A] px-4 py-2 text-sm font-bold text-white hover:bg-[#172F6E]"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     )
   }

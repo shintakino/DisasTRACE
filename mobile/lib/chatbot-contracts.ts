@@ -57,6 +57,8 @@ export const ChatbotDraftSchema = z.object({
   landmarks: z.string().max(600).optional(),
   latitude: z.number().finite().min(-90).max(90).optional(),
   longitude: z.number().finite().min(-180).max(180).optional(),
+  photoLatitude: z.number().finite().min(-90).max(90).optional(),
+  photoLongitude: z.number().finite().min(-180).max(180).optional(),
   peopleInvolved: z.number().int().min(1).max(999).optional(),
   victimCondition: z.enum(CHATBOT_CONDITIONS).optional(),
 }).strict();
@@ -160,7 +162,9 @@ export function getNextMissingSlot(draft: ChatbotDraft, reporterMode: ChatbotRep
   if (!draft.photoUri) return 'evidence';
   if (!draft.incidentType || !draft.nature) return 'incidentType';
   if (reporterMode === 'guest' && !isValidGuestPhone(draft.contactNumber)) return 'contactNumber';
-  const hasCoordinates = draft.latitude !== undefined && draft.longitude !== undefined;
+  const hasCoordinates = draft.latitude !== undefined
+    && draft.longitude !== undefined
+    && isWithinBaliwag(draft.latitude, draft.longitude);
   const hasRequiredLandmark = reporterMode === 'registered' || (draft.landmarks?.trim().length ?? 0) >= 5;
   if (!hasCoordinates || !hasRequiredLandmark) return 'location';
   if (!draft.peopleInvolved) return 'peopleInvolved';

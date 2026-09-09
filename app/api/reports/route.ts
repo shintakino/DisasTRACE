@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import crypto from "crypto";
 import { PatientCareReportPayloadSchema, DriverTripTicketPayloadSchema } from "@/types/reports";
-import { getReportLocation } from "@/lib/report-location";
+import { formatOfficialBaliwagLocation, getReportLocation } from "@/lib/report-location";
 
 const SubmitReportSchema = z.object({
   incidentId: z.string().uuid(),
@@ -33,6 +33,7 @@ type DuplicateRequest = {
   status: string;
   createdAt: Date;
   location: string | null;
+  barangay: string | null;
   imageUrl: string | null;
   nature: string;
   severity: string;
@@ -87,6 +88,7 @@ export async function GET(req: NextRequest) {
           status: verificationRequests.status,
           createdAt: verificationRequests.createdAt,
           location: verificationRequests.locationDescription,
+          barangay: verificationRequests.barangay,
           imageUrl: verificationRequests.imageUrl,
           nature: verificationRequests.nature,
           severity: verificationRequests.severity,
@@ -113,7 +115,8 @@ export async function GET(req: NextRequest) {
           hour: '2-digit',
           minute: '2-digit'
         }),
-        location: getReportLocation(r.location),
+        location: formatOfficialBaliwagLocation(r.barangay),
+        barangay: r.barangay,
         residentPhotoUrl: r.imageUrl,
         natureOfCall: r.nature,
         severityLevel: r.severity,
@@ -189,6 +192,7 @@ export async function GET(req: NextRequest) {
         status: reports.status,
         createdAt: reports.createdAt,
         location: verificationRequests.locationDescription,
+        barangay: verificationRequests.barangay,
         residentPhotoUrl: verificationRequests.imageUrl,
         natureOfCall: verificationRequests.nature,
         severityLevel: verificationRequests.severity,
@@ -220,6 +224,7 @@ export async function GET(req: NextRequest) {
           status: verificationRequests.status,
           createdAt: verificationRequests.createdAt,
           location: verificationRequests.locationDescription,
+          barangay: verificationRequests.barangay,
           imageUrl: verificationRequests.imageUrl,
           nature: verificationRequests.nature,
           severity: verificationRequests.severity,
@@ -248,7 +253,8 @@ export async function GET(req: NextRequest) {
             hour: '2-digit',
             minute: '2-digit'
           }),
-          location: getReportLocation(d.location),
+          location: formatOfficialBaliwagLocation(d.barangay),
+          barangay: d.barangay,
           residentPhotoUrl: d.imageUrl,
           natureOfCall: d.nature,
           severityLevel: d.severity,
@@ -274,7 +280,8 @@ export async function GET(req: NextRequest) {
           hour: '2-digit',
           minute: '2-digit'
         }),
-        location: getReportLocation(r.location),
+        location: formatOfficialBaliwagLocation(r.barangay),
+        barangay: r.barangay,
         residentPhotoUrl: r.residentPhotoUrl,
         natureOfCall: r.natureOfCall,
         severityLevel: r.severityLevel,

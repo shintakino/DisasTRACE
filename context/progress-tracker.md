@@ -1,5 +1,55 @@
 # Progress Tracker
 
+## 2026-09-09 — Release hardening follow-up
+
+- Made the official 27-polygon Barangay resolver the authoritative service-area check for every chatbot and legacy report intake path. Reports in the old rectangular GPS envelope but outside City of Baliwag are rejected before they can be stored or dispatched.
+- Reworked PACC verification queue hydration from up to three database reads per report into three bounded batch queries for the full queue, while retaining the existing dispatch recovery checks. This removes the connection-pool pressure behind intermittent verification loading failures.
+- Completed official location-label coverage for the CDRRMO live-report feed and PACC realtime alerts. These surfaces now use `Barangay Name, Baliwag City` and never display free-text landmarks as an incident location.
+
+## 2026-09-09 — Official location labels in report history
+
+- Updated the mobile and CDRRMO Reports list/detail APIs, PACC verification queue, and CDRRMO/PACC map feeds to return the report's official GPS-derived barangay rather than the legacy free-text `location_description` field. Resident and responder report history, duplicate-report details, and the responder's unsubmitted-incident picker now display `Barangay Name, Baliwag City`.
+- Legacy records without a valid official boundary attribution now display `Location unavailable`; user-entered landmarks such as `Sass apartment` are never presented as the incident location.
+
+## 2026-09-09 — Shared mobile profile branding
+
+- Replaced the cropped profile-header watermark with an accessible, full-width partnership banner for both residents and responders. It uses the bundled DisasTrace logo and the approved Baliwag CDRRMO logo supplied in `public/assets/logoBaliwag.png`.
+- Kept the responder home map on the existing light map style per the latest design direction.
+- Added a gesture-safe, subtle blue header tint over the responder's light map so the map, location controls, and white operational card share the same visual palette without switching to dark mode.
+
+## 2026-09-09 — Mobile report-detail and launch cleanup
+
+- Removed the ambulance animation from the in-app launch screen while preserving the DisasTrace logo and emergency tagline animation.
+- Removed severity labels from historical resident report details and responder report-summary details; severity remains available to dispatch and verification workflows where it is operationally required.
+
+## 2026-09-09 — Public home live-barangay location
+
+- Replaced the public home card's saved-address parser and hard-coded city label with foreground GPS tracking. The app resolves each fresh point against the checked-in official Baliwag boundary polygons through an authenticated API and refreshes after material movement. It now clearly distinguishes locating, permission, out-of-service-area, and unavailable states instead of falsely claiming a barangay.
+- Applied the same official live-barangay display to the responder map header, reusing its existing telemetry GPS stream instead of opening a second location watcher.
+- Standardized resident/guest chatbot and legacy help-form GPS labels, resident profile location formatting, and responder dispatch-card locations to `Barangay Name, Baliwag City`. Guest lookups are read-only and use the same official boundary source before a report exists.
+
+## 2026-09-09 — Legacy report GPS boundary hardened
+
+- Removed the legacy photo-preview form's fallback/default coordinates so reports cannot be submitted when location is unavailable or outside the Baliwag service boundary.
+- Added the same coordinate and service-area validation to the verification API, ensuring older mobile flows cannot bypass the client-side restriction.
+
+## 2026-09-09 — Duplicate dispatch and responder announcement hardening
+
+- Replaced the coordinate-box duplicate check with a server-enforced Haversine radius (250 m by default, configurable through `INCIDENT_DEDUPLICATION_RADIUS_METERS`) over a 20-minute window. Both chatbot and legacy submissions now require PACC review rather than automatically dispatching a likely duplicate.
+- Fixed mass-announcement recipient selection by paging through all Supabase Auth users, filtering only active matching roles, and honoring both legacy and current system-notice preferences. Mobile system notices now default to enabled, consistently with the broadcast service.
+- Added a CDRRMO Super Admin dashboard control for the server-enforced deduplication radius (50–1,000 m); persisted it in system settings and applied it to chatbot and legacy report intake.
+
+## 2026-09-09 — Official barangay boundary foundation
+
+- Added the 27-polygon City of Baliwag subset from the PSA GeoRisk Barangay Boundary service, keyed by official PSGC codes. New chatbot and legacy reports now resolve GPS coordinates against these polygons and persist the resulting barangay fields for filtering and workload analysis.
+- Added a CDRRMO Analytics barangay selector backed by server-side validation and filtering for report totals, statuses, incident types, and daily/weekly/monthly trends.
+
+## 2026-09-09 — Versioned reporting migration and analytics scope repair
+
+- Added canonical Drizzle migration `0011_reporting_geography_and_deduplication` for evidence GPS fields, official barangay fields and index, the CDRRMO duplicate-radius setting, its database range constraint, and duplicate-report status protection. It is idempotent for environments where temporary repair scripts were already run.
+- Added a batch-safe `backfill-report-barangays` data migration so historical reports inside the official boundary set participate in barangay analytics without overwriting reports that are outside the service area.
+- Corrected barangay analytics so resolved-incident and average-response metrics join to the filtered report geography instead of leaking city-wide values into a barangay view.
+
 Update this file whenever the current phase, active feature, or implementation state changes.
 
 ## Current Phase
@@ -15,6 +65,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - **Feature 29 Connected Release Validation**: Automated implementation and code review pass with no known code gaps. Remaining environment-dependent validation is the Android permission/keyboard/viewport matrix and live guest/resident/PACC/dispatch flow against a configured backend. Confirm `DEEPSEEK_API_KEY` is present in the deployment server environment; it must never be configured in Expo public variables.
 
 ## Completed
+
+- **PACC Queue Recovery and Rejected-Report Exit Fix**: The active chatbot pending flow now recognizes a PACC `REJECTED` result, clears only the submitting device's local report state, explains the closure, and sends the reporter to a fresh-report screen rather than leaving them permanently on status. The PACC verification queue already refreshes after dispatch completion and receives Realtime request/incident updates; its initial fetch now aborts after 12 seconds and renders an accessible retry state instead of leaving the full-page loader indefinitely visible.
+
+- **Mobile Dispatch, Reporting, and Evidence Reliability Fixes**: Registered the notification route explicitly and made its back action return to the actual source screen, preventing unmatched routes for public users and responders. The responder offer card now remains within the safe viewport, uses server/route-derived ETA rather than a fabricated eight-minute value, and exposes the reporter callback number in both the card and map detail. Moved the map orientation control to the opposite side of the screen so it cannot overlap the notification action. Incident Report and Driver's Trip Ticket modals now resize and scroll with the software keyboard, preventing form/keyboard flicker. The emergency camera requests EXIF and preserves available photo GPS coordinates alongside the evidence record for PACC display, while report GPS remains the authoritative dispatch coordinate. Added an additive photo-geotag schema script for deployment. Root and mobile TypeScript checks plus focused lint complete with no errors; the state-script runner is sandbox-blocked from spawning its `tsx` helper.
+
+- **Public Emergency Intake Reliability Fixes**: Configured Android to resize for the software keyboard and applied keyboard-aware, scrollable layouts to sign-in, sign-up, and both chatbot states, keeping focused inputs and the composer visible without content clipping under the header. Guest phone input is explicitly a telephone field with credential autofill disabled, preventing the Google Password Manager prompt. Guest chatbot, pending, tracking, and response-status routes are registered explicitly; guest return paths now target the unauthenticated landing page rather than the authenticated tabs route. Evidence review now offers **Keep current photo** so an existing attachment need not be retaken. Rejected reports stay selected in PACC's **Closed** queue rather than appearing to vanish; reporters receive a persistent **Remove from this device** action that only clears their local status and preserves PACC's audit record. GPS captured outside Baliwag City is blocked at the chatbot state, submission UI, and server schema. Verified with the root and mobile TypeScript checks, focused root/mobile ESLint, chatbot contract/mobile-state checks, and `git diff --check`.
 
 - **Database Migration Ledger Reconciliation**: Added read-only audit and guarded repair utilities for the configured database. After verifying every expected public table, critical column, spatial index, location trigger, and guest-report nullability, transactionally restored the seven missing canonical Drizzle ledger rows (`0004`, `0005_quiet`, `0006`–`0010`). The ledger now has all 11 canonical journal entries, the audit reports zero unapplied canonical migrations and zero missing schema invariants, and the normal Drizzle migration runner completes successfully. The historical `0005_add_gist_spatial_indexing.sql` remains a non-journal SQL file and is intentionally excluded from the canonical ledger.
 

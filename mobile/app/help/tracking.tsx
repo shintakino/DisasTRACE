@@ -16,6 +16,7 @@ export default function TrackingScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const report = useEmergencyReportStore((state) => state.report);
+  const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
 
   // Lock gestures and navigation
   useEffect(() => {
@@ -407,7 +408,7 @@ export default function TrackingScreen() {
               [
                 { 
                   text: "OK", 
-                  onPress: () => router.replace('/(tabs)/index' as any)
+                  onPress: () => router.replace(isGuest ? '/' : '/(tabs)/index' as any)
                 }
               ],
               { cancelable: false }
@@ -431,7 +432,7 @@ export default function TrackingScreen() {
     return () => {
       supabase.removeChannel(reqChannel);
     };
-  }, [report.id]);
+  }, [isGuest, report.id, router]);
 
   // 3. Incident-specific high-frequency telemetry broadcasts receiver
   useEffect(() => {

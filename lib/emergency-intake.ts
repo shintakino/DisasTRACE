@@ -6,6 +6,9 @@ import { verificationRequests } from '@/db/schema/verification_requests';
 import { incidents } from '@/db/schema/incidents';
 import { autoDispatchIncident } from '@/lib/dispatch-engine';
 import { ChatbotSubmissionIdSchema } from '@/lib/chatbot/contracts';
+import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS, isLikelyDuplicateIncident } from '@/lib/incident-deduplication';
+import { isWithinOfficialBaliwagBoundary, resolveBaliwagBarangay } from '@/lib/barangay-boundaries';
+import { systemSettings } from '@/db/schema/system_settings';
 
 const IncidentTypeSchema = z.enum([
   'Medical Emergency',
@@ -30,6 +33,8 @@ const IntakeDetailsSchema = z.object({
   victimCondition: z.string().trim().min(2).max(160),
   latitude: z.number().finite().min(-90).max(90),
   longitude: z.number().finite().min(-180).max(180),
+  photoLatitude: z.number().finite().min(-90).max(90).optional(),
+  photoLongitude: z.number().finite().min(-180).max(180).optional(),
   severity: z.enum(['Low', 'Medium', 'High', 'Critical']).default('Medium'),
   nature: z.enum(['EMERGENCY', 'NON-EMERGENCY']),
   imageUrl: z.string().url(),
@@ -43,16 +48,34 @@ const IntakeDetailsSchema = z.object({
 export const EmergencyIntakeSchema = IntakeDetailsSchema.extend({
   contactNumber: ContactNumberSchema,
   landmarks: z.string().trim().min(5).max(600),
+}).refine(({ photoLatitude, photoLongitude }) => (photoLatitude === undefined) === (photoLongitude === undefined), {
+  message: 'Photo GPS coordinates must include both latitude and longitude.',
+  path: ['photoLatitude'],
+}).refine(({ latitude, longitude }) => isWithinBaliwag(latitude, longitude), {
+  message: 'Reports must be submitted from inside the Baliwag City service area.',
+  path: ['latitude'],
 });
 
 // Registered residents authenticate before intake, so their callback number is
 // always taken from the verified account record rather than from device input.
 export const RegisteredEmergencyIntakeSchema = IntakeDetailsSchema.extend({
   landmarks: z.string().trim().max(600).optional().default(''),
+}).refine(({ photoLatitude, photoLongitude }) => (photoLatitude === undefined) === (photoLongitude === undefined), {
+  message: 'Photo GPS coordinates must include both latitude and longitude.',
+  path: ['photoLatitude'],
+}).refine(({ latitude, longitude }) => isWithinBaliwag(latitude, longitude), {
+  message: 'Reports must be submitted from inside the Baliwag City service area.',
+  path: ['latitude'],
 });
 
 export const RegisteredEmergencyIntakeSubmissionSchema = IntakeDetailsSchema.extend({
   contactNumber: ContactNumberSchema,
+}).refine(({ photoLatitude, photoLongitude }) => (photoLatitude === undefined) === (photoLongitude === undefined), {
+  message: 'Photo GPS coordinates must include both latitude and longitude.',
+  path: ['photoLatitude'],
+}).refine(({ latitude, longitude }) => isWithinBaliwag(latitude, longitude), {
+  message: 'Reports must be submitted from inside the Baliwag City service area.',
+  path: ['latitude'],
 });
 
 export const GuestEmergencyIntakeSchema = EmergencyIntakeSchema;
@@ -85,8 +108,8 @@ async function loadChatbotReplay(input: EmergencyIntake, actor: IntakeActor) {
   };
 }
 
-function isWithinBaliwag(latitude: number, longitude: number) {
-  return latitude >= 14.9 && latitude <= 15.05 && longitude >= 120.8 && longitude <= 121;
+export function isWithinBaliwag(latitude: number, longitude: number) {
+  return isWithinOfficialBaliwagBoundary(latitude, longitude);
 }
 
 function isConsistent(input: EmergencyIntake) {
@@ -107,21 +130,24 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
   if (existingReplay) return existingReplay;
 
   const recentReports = await db.query.verificationRequests.findMany({
-    where: and(gte(verificationRequests.createdAt, new Date(Date.now() - 20 * 60 * 1000))),
+    where: and(gte(verificationRequests.createdAt, new Date(Date.now() - INCIDENT_DEDUPLICATION_WINDOW_MS))),
     columns: { latitude: true, longitude: true, type: true, contactNumber: true },
   });
+  const settings = await db.query.systemSettings.findFirst({ where: eq(systemSettings.id, 'current'), columns: { deduplicationRadiusMeters: true } });
+  const deduplicationRadiusMeters = settings?.deduplicationRadiusMeters ?? INCIDENT_DEDUPLICATION_RADIUS_METERS;
 
-  const nearbyDuplicate = recentReports.some((report) =>
-    report.type === input.incidentType &&
-    Math.abs(report.latitude - input.latitude) < 0.0015 &&
-    Math.abs(report.longitude - input.longitude) < 0.0015
-  );
+  const nearbyDuplicate = recentReports.some((report) => isLikelyDuplicateIncident(
+    { type: input.incidentType, latitude: input.latitude, longitude: input.longitude },
+    report, deduplicationRadiusMeters,
+  ));
   const repeatedContact = recentReports.filter((report) => report.contactNumber === input.contactNumber).length >= 2;
   const reasons: string[] = [];
-  const validGps = isWithinBaliwag(input.latitude, input.longitude);
+  const barangay = resolveBaliwagBarangay(input.latitude, input.longitude);
+  if (!barangay) {
+    throw new Error('Reports must be submitted from inside the Baliwag City service area.');
+  }
   const consistent = isConsistent(input);
 
-  if (!validGps) reasons.push('GPS location is outside the Baliwag service area.');
   if (!consistent) reasons.push('The incident answers need clarification.');
   if (nearbyDuplicate) reasons.push('A similar report was submitted nearby in the last 20 minutes.');
   if (repeatedContact) reasons.push('This contact number has repeated recent submissions.');
@@ -129,7 +155,7 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
   let triageClassification: TriageClassification;
   if (nearbyDuplicate || repeatedContact) {
     triageClassification = 'SUSPICIOUS_POSSIBLE_PRANK';
-  } else if (!validGps || !consistent) {
+  } else if (!consistent) {
     triageClassification = 'UNCERTAIN_INCOMPLETE';
   } else if (input.nature === 'NON-EMERGENCY') {
     triageClassification = 'HIGH_CONFIDENCE_NON_EMERGENCY';
@@ -154,8 +180,12 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
       peopleInvolved: String(input.peopleInvolved),
       severity: input.severity,
       locationDescription: input.landmarks || null,
+      barangay: barangay.name,
+      barangayPsgcCode: barangay.psgcCode,
       latitude: input.latitude,
       longitude: input.longitude,
+      photoLatitude: input.photoLatitude ?? null,
+      photoLongitude: input.photoLongitude ?? null,
       imageUrl: input.imageUrl,
       triageClassification,
       triageReasons: reasons,

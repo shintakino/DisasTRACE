@@ -4,6 +4,7 @@ import {
   deriveMobileIntakePhase,
   getNextMissingSlot,
   isReportProgressVisible,
+  isWithinBaliwag,
   parseExactPeopleInput,
   restorePersistedChatbotState,
   deriveChatbotNature,
@@ -59,6 +60,19 @@ check('guest and registered drafts have adaptive required slots', () => {
   };
   assert.equal(getNextMissingSlot(registeredDraft, 'registered'), 'peopleInvolved');
   assert.equal(getNextMissingSlot(registeredDraft, 'guest'), 'contactNumber');
+});
+
+check('out-of-area GPS cannot advance a chatbot report', () => {
+  const outsideBaliwagDraft = {
+    photoUri: 'file://evidence.jpg',
+    incidentType: 'Fire Emergency' as const,
+    nature: 'EMERGENCY' as const,
+    latitude: 14.5,
+    longitude: 121.1,
+    landmarks: 'Nearby landmark',
+  };
+  assert.equal(isWithinBaliwag(outsideBaliwagDraft.latitude, outsideBaliwagDraft.longitude), false);
+  assert.equal(getNextMissingSlot(outsideBaliwagDraft, 'registered'), 'location');
 });
 
 check('complete report reaches review then submission phase', () => {

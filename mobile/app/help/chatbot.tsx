@@ -3,17 +3,21 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  type TextInputProps,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import { formatBaliwagLocation, resolveBaliwagLocation } from '../../lib/baliwag-location';
 import {
   Camera,
   CheckCircle2,
@@ -54,6 +58,23 @@ type ChatMessage = { id: string; role: 'bot' | 'user'; text: string };
 type LanguageStyle = 'en' | 'fil' | 'taglish';
 
 const PHASE_LABELS = ['Start', 'Location & contact', 'Incident details', 'Review', 'Submit'] as const;
+
+function parseExifCoordinate(value: unknown, reference: unknown): number | undefined {
+  const raw = Array.isArray(value)
+    ? value.reduce<number>((total, part, index) => total + (Number(part) / (index === 0 ? 1 : index === 1 ? 60 : 3600)), 0)
+    : Number(value);
+  if (!Number.isFinite(raw) || raw < 0) return undefined;
+  const direction = typeof reference === 'string' ? reference.toUpperCase() : '';
+  return direction === 'S' || direction === 'W' ? -raw : raw;
+}
+
+function getPhotoExifCoordinates(exif: Record<string, unknown> | null | undefined) {
+  if (!exif) return undefined;
+  const latitude = parseExifCoordinate(exif.GPSLatitude ?? exif.latitude, exif.GPSLatitudeRef ?? exif.latitudeRef);
+  const longitude = parseExifCoordinate(exif.GPSLongitude ?? exif.longitude, exif.GPSLongitudeRef ?? exif.longitudeRef);
+  if (latitude === undefined || longitude === undefined || latitude > 90 || longitude > 180) return undefined;
+  return { latitude, longitude };
+}
 
 function promptFor(slot: ChatbotSlot, reporterMode: ChatbotReporterMode, languageStyle: LanguageStyle = 'en'): string {
   const english: Record<ChatbotSlot, string> = {
@@ -112,6 +133,7 @@ export default function EmergencyChatbotScreen() {
   const [languageStyle, setLanguageStyle] = useState<LanguageStyle>('en');
   const [waiting, setWaiting] = useState(false);
   const [capturingLocation, setCapturingLocation] = useState(false);
+  const [officialLocationLabel, setOfficialLocationLabel] = useState<string | null>(null);
   const [actorReady, setActorReady] = useState(false);
   const submissionLock = useRef(false);
   const requestedLocation = useRef(false);
@@ -174,12 +196,17 @@ export default function EmergencyChatbotScreen() {
   const captureLocation = useCallback(async () => {
     if (capturingLocation) return;
     setCapturingLocation(true);
+    setOfficialLocationLabel(null);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
         throw new Error('Location permission is required to submit an incident report.');
       }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const resolved = await resolveBaliwagLocation(location.coords.latitude, location.coords.longitude);
+      const formatted = formatBaliwagLocation(resolved?.barangay);
+      if (!formatted) throw new Error('This GPS point is outside an official Baliwag barangay boundary.');
+      setOfficialLocationLabel(formatted);
       updateDraft({ latitude: location.coords.latitude, longitude: location.coords.longitude });
     } catch (error) {
       Alert.alert('Location needed', error instanceof Error ? error.message : 'Unable to capture your GPS location.');
@@ -187,6 +214,13 @@ export default function EmergencyChatbotScreen() {
       setCapturingLocation(false);
     }
   }, [capturingLocation, updateDraft]);
+
+  useEffect(() => {
+    if (draft.latitude === undefined || draft.longitude === undefined || officialLocationLabel) return;
+    resolveBaliwagLocation(draft.latitude, draft.longitude)
+      .then((resolved) => setOfficialLocationLabel(formatBaliwagLocation(resolved?.barangay)))
+      .catch(() => setOfficialLocationLabel(null));
+  }, [draft.latitude, draft.longitude, officialLocationLabel]);
 
   useEffect(() => {
     if (lifecycle !== 'DRAFT' || draft.latitude !== undefined || requestedLocation.current) return;
@@ -331,14 +365,27 @@ export default function EmergencyChatbotScreen() {
       Alert.alert('Camera permission needed', 'Allow camera access so you can attach the evidence required by the current report process.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
-    if (!result.canceled) completeSlot({ photoUri: result.assets[0].uri, imageUrl: undefined }, 'Photo evidence attached');
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6, exif: true });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const photoCoordinates = getPhotoExifCoordinates(asset.exif);
+      completeSlot({
+        photoUri: asset.uri,
+        imageUrl: undefined,
+        photoLatitude: photoCoordinates?.latitude,
+        photoLongitude: photoCoordinates?.longitude,
+      }, photoCoordinates ? 'Photo evidence attached with embedded GPS coordinates' : 'Photo evidence attached');
+    }
   };
 
   const submitReport = async () => {
     if (submissionLock.current || lifecycle !== 'DRAFT' || activeSlot !== 'review' || !submissionId) return;
     if (!draft.photoUri || !draft.incidentType || !draft.nature || draft.latitude === undefined
       || draft.longitude === undefined || !draft.peopleInvolved || !draft.victimCondition) return;
+    if (!isWithinBaliwag(draft.latitude, draft.longitude)) {
+      Alert.alert('Outside service area', 'Reports can only be submitted from inside the Baliwag City service area. Update your GPS location and try again.');
+      return;
+    }
     if (reporterMode === 'guest' && (!isValidGuestPhone(draft.contactNumber) || (draft.landmarks?.trim().length ?? 0) < 5)) return;
 
     submissionLock.current = true;
@@ -384,6 +431,9 @@ export default function EmergencyChatbotScreen() {
     placeholder: string;
     keyboard?: 'default' | 'phone-pad';
     initialValue?: string;
+    autoComplete?: TextInputProps['autoComplete'];
+    importantForAutofill?: TextInputProps['importantForAutofill'];
+    textContentType?: TextInputProps['textContentType'];
     onSubmit: (value: string) => void;
   }) => (
     <View style={styles.formBlock}>
@@ -393,7 +443,12 @@ export default function EmergencyChatbotScreen() {
         placeholder={input.placeholder}
         placeholderTextColor="#64748B"
         keyboardType={input.keyboard ?? 'default'}
+        autoComplete={input.autoComplete}
+        importantForAutofill={input.importantForAutofill}
+        textContentType={input.textContentType}
+        autoCorrect={false}
         style={styles.fieldInput}
+        onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
       />
       <TouchableOpacity style={styles.primary} onPress={() => input.onSubmit(fieldValue.trim())}>
         <Send color="#FFF" size={17} />
@@ -437,6 +492,15 @@ export default function EmergencyChatbotScreen() {
             <Text style={styles.primaryText}>{draft.photoUri ? 'Retake photo evidence' : 'Take photo evidence'}</Text>
           </TouchableOpacity>
           {draft.photoUri ? <Image source={{ uri: draft.photoUri }} style={styles.preview} /> : null}
+          {draft.photoUri ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={styles.secondary}
+              onPress={() => completeSlot({}, 'Kept current photo evidence')}
+            >
+              <Text style={styles.secondaryText}>Keep current photo</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       );
     }
@@ -454,6 +518,9 @@ export default function EmergencyChatbotScreen() {
       return renderFieldForm({
         placeholder: draft.contactNumber || '0917 123 4567',
         keyboard: 'phone-pad',
+        autoComplete: 'tel',
+        importantForAutofill: 'noExcludeDescendants',
+        textContentType: 'telephoneNumber',
         onSubmit: (contactNumber) => {
           if (!isValidGuestPhone(contactNumber)) {
             addMessage('bot', 'Please enter a valid Philippine mobile number, such as 09171234567.');
@@ -472,19 +539,25 @@ export default function EmergencyChatbotScreen() {
             {capturingLocation ? <ActivityIndicator color={NAVY} /> : <Navigation color={NAVY} size={17} />}
             <Text style={styles.secondaryText}>{hasGps ? 'Update GPS location' : 'Capture GPS location'}</Text>
           </TouchableOpacity>
-          {hasGps ? <Text style={styles.help}>GPS captured: {draft.latitude!.toFixed(5)}, {draft.longitude!.toFixed(5)}</Text> : null}
-          {outsideBaliwag ? <Text style={styles.warning}>This GPS point appears outside the Baliwag service area. PACC may need to clarify the location.</Text> : null}
+          {hasGps ? <Text style={styles.help}>{officialLocationLabel ? `GPS location: ${officialLocationLabel}` : 'Verifying official barangay from GPS…'}</Text> : null}
+          {outsideBaliwag ? <Text style={styles.warning}>This GPS point is outside the Baliwag City service area. Capture a location inside Baliwag before continuing.</Text> : null}
           <TextInput
             value={fieldValue}
             onChangeText={setFieldValue}
             placeholder={draft.landmarks || (reporterMode === 'guest' ? 'Required nearby landmark' : 'Optional nearby landmark')}
             placeholderTextColor="#64748B"
             style={styles.fieldInput}
+            autoCorrect={false}
+            onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
           />
           <TouchableOpacity style={styles.primary} onPress={() => {
             const landmarks = fieldValue.trim() || draft.landmarks || '';
             if (!hasGps) {
               addMessage('bot', 'GPS location is required. Please capture it before continuing.');
+              return;
+            }
+            if (outsideBaliwag) {
+              addMessage('bot', 'This report can only be submitted from inside the Baliwag City service area. Please update your GPS location before continuing.');
               return;
             }
             if (reporterMode === 'guest' && landmarks.length < 5) {
@@ -522,7 +595,7 @@ export default function EmergencyChatbotScreen() {
         <ReviewRow label="Nature" value={draft.nature === 'NON-EMERGENCY' ? 'Non-emergency' : 'Emergency'} onEdit={() => setEditTarget('incidentType')} />
         <ReviewRow label="Incident" value={draft.incidentType ?? 'Missing'} onEdit={() => setEditTarget('incidentType')} />
         {reporterMode === 'guest' ? <ReviewRow label="Contact" value={draft.contactNumber ?? 'Missing'} onEdit={() => setEditTarget('contactNumber')} /> : null}
-        <ReviewRow label="Location" value={draft.landmarks?.trim() || 'Verified GPS location'} onEdit={() => setEditTarget('location')} />
+        <ReviewRow label="Location" value={officialLocationLabel || 'Verified GPS location'} onEdit={() => setEditTarget('location')} />
         <ReviewRow label="People involved" value={String(draft.peopleInvolved ?? 'Missing')} onEdit={() => setEditTarget('peopleInvolved')} />
         <ReviewRow label="Condition" value={draft.victimCondition ?? 'Missing'} onEdit={() => setEditTarget('victimCondition')} />
         <TouchableOpacity style={styles.primary} onPress={() => void submitReport()}>
@@ -539,6 +612,7 @@ export default function EmergencyChatbotScreen() {
 
   return (
     <SafeAreaView style={styles.page}>
+      <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
       <View style={styles.header}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={handleBack} style={styles.iconButton}><ChevronLeft color="#1E293B" size={22} /></TouchableOpacity>
         <View style={styles.identity}>
@@ -555,7 +629,7 @@ export default function EmergencyChatbotScreen() {
 
       {progressVisible && phase ? <Progress phase={phase} /> : null}
 
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.chat} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} style={styles.chatScroll} contentContainerStyle={styles.chat} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
         {waiting ? <ActivityIndicator color={BLUE} /> : null}
         <View pointerEvents={waiting ? 'none' : 'auto'} style={[styles.controls, waiting && styles.disabledControls]}>{renderControls()}</View>
@@ -572,11 +646,13 @@ export default function EmergencyChatbotScreen() {
             : 'Ask an approved safety or DisasTRACE question'}
           placeholderTextColor="#64748B"
           style={styles.composerInput}
+          onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
         />
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send chat message" style={styles.sendButton} onPress={() => void sendComposer()} disabled={waiting || lifecycle === 'SUBMITTING'}>
           {waiting ? <ActivityIndicator color="#FFF" size="small" /> : <Send color="#FFF" size={18} />}
         </TouchableOpacity>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -618,6 +694,7 @@ function ReviewRow({ label, value, onEdit }: { label: string; value: string; onE
 const styles = StyleSheet.create({
   loadingPage: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
   page: { flex: 1, backgroundColor: '#F3F4F6' },
+  keyboardArea: { flex: 1 },
   header: { minHeight: 66, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   iconSpacer: { width: 44 },
@@ -632,7 +709,8 @@ const styles = StyleSheet.create({
   progressLabel: { color: '#64748B', fontSize: 12, fontWeight: '600' },
   progressTrack: { height: 5, backgroundColor: '#DBEAFE', borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: BLUE, borderRadius: 4 },
-  chat: { padding: 16, paddingBottom: 24, gap: 12 },
+  chatScroll: { flex: 1 },
+  chat: { flexGrow: 1, padding: 16, paddingBottom: 24, gap: 12 },
   message: { flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
   userMessage: { justifyContent: 'flex-end' },
   botMessage: { justifyContent: 'flex-start' },

@@ -61,7 +61,12 @@ const expectedColumns = [
   ['verification_requests', 'guest_access_token'],
   ['verification_requests', 'triage_classification'],
   ['verification_requests', 'coordination_agencies'],
+  ['verification_requests', 'photo_latitude'],
+  ['verification_requests', 'photo_longitude'],
+  ['verification_requests', 'barangay'],
+  ['verification_requests', 'barangay_psgc_code'],
   ['incidents', 'dispatch_offer_duration_seconds'],
+  ['system_settings', 'deduplication_radius_meters'],
 ] as const;
 
 async function audit() {
@@ -105,6 +110,7 @@ async function audit() {
       'users_location_geom_gist_idx',
       'users_location_geom_geog_gist_idx',
       'verification_requests_guest_access_token_unique',
+      'verification_requests_barangay_idx',
     ];
     const indexes = await sql<{ indexname: string }[]>`
       SELECT indexname
@@ -122,6 +128,14 @@ async function audit() {
     const triggerSet = new Set(triggers.map((row) => row.trigger_name));
     const missingTriggers = ['trg_update_location_geom']
       .filter((trigger) => !triggerSet.has(trigger));
+
+    const deduplicationConstraints = await sql<{ conname: string }[]>`
+      SELECT conname
+      FROM pg_constraint
+      WHERE conrelid = 'public.system_settings'::regclass
+        AND conname = 'system_settings_deduplication_radius_range'
+    `;
+    const missingDeduplicationConstraint = deduplicationConstraints.length === 0;
 
     const nullableColumns = await sql<{ table_name: string; column_name: string; is_nullable: string }[]>`
       SELECT table_name, column_name, is_nullable
@@ -163,6 +177,8 @@ async function audit() {
     for (const trigger of missingTriggers) console.log(`  MISSING_TRIGGER ${trigger}`);
     console.log(`Guest nullable-column mismatches: ${missingNullableColumns.length}`);
     for (const column of missingNullableColumns) console.log(`  NULLABILITY_MISMATCH ${column}`);
+    console.log(`Missing deduplication-radius constraint: ${missingDeduplicationConstraint ? 1 : 0}`);
+    if (missingDeduplicationConstraint) console.log('  MISSING_CONSTRAINT system_settings_deduplication_radius_range');
 
     const duplicatePrefixes = new Map<string, string[]>();
     for (const migration of localMigrations) {
@@ -183,6 +199,7 @@ async function audit() {
       || missingIndexes.length
       || missingTriggers.length
       || missingNullableColumns.length
+      || missingDeduplicationConstraint
     ) {
       process.exitCode = 1;
     }

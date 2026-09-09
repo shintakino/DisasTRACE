@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Platform, StatusBar, Modal, Image, Alert, ActivityIndicator } from 'react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
+import { formatBaliwagLocation } from '../../lib/baliwag-location';
 import { supabase } from '../../lib/supabase';
 import { Edit2, Logout, User, FolderOpen, Notification, MessageQuestion, Lock1, ArrowLeft2 } from 'iconsax-react-native';
 import { useRouter } from 'expo-router';
@@ -203,7 +204,8 @@ export default function ProfileScreen() {
   const vehicleInitials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
   const suffix = user?.id ? user.id.slice(-3).toUpperCase() : "";
   const vehicleId = `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
-  const barangayName = profile?.address?.split(',')[1]?.trim() || (profile?.address || 'Paitan');
+  const registeredBarangay = profile?.address?.split(',')[1]?.trim();
+  const registeredLocation = formatBaliwagLocation(registeredBarangay) || profile?.address || 'Address unavailable';
 
   const renderPillRow = (Icon: any, title: string, subtitle: string, onPress?: () => void) => (
     <TouchableOpacity 
@@ -333,8 +335,8 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <>
-                <Text className="text-sm text-blue-200">Barangay</Text>
-                <Text className="text-base font-bold text-white mb-2">{barangayName}</Text>
+                <Text className="text-sm text-blue-200">Registered location</Text>
+                <Text className="text-base font-bold text-white mb-2">{registeredLocation}</Text>
                 <Text className="text-sm text-blue-200">Date Joined</Text>
                 <Text className="text-base font-bold text-white">{formatDate(user?.created_at)}</Text>
               </>
@@ -342,10 +344,20 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View className="absolute -bottom-2 -right-4 opacity-40">
-          <Image 
-            source={require('../../assets/images/DisasTRACELogo.png')} 
-            style={{ width: 150, height: 40, resizeMode: 'contain' }} 
+        <View
+          className="mt-6 h-14 flex-row items-center justify-center rounded-xl border border-white/15 bg-[#255CA8] px-4"
+          accessibilityLabel="DisasTrace and City of Baliwag branding"
+        >
+          <Image
+            source={require('../../assets/images/DisasTRACELogo.png')}
+            style={{ width: 154, height: 34, resizeMode: 'contain' }}
+            accessibilityLabel="DisasTrace"
+          />
+          <Text className="mx-3 text-xl font-bold text-white" accessibilityLabel="in partnership with">×</Text>
+          <Image
+            source={require('../../assets/images/logoBaliwag.png')}
+            style={{ width: 38, height: 38, resizeMode: 'contain' }}
+            accessibilityLabel="Baliwag CDRRMO logo"
           />
         </View>
       </View>

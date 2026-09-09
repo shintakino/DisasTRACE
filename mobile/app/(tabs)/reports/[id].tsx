@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Platform, StatusBar, TextInpu
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, User, MapPin, Award, CheckCircle, Edit3 } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
-import { getReportLocation } from '../../../lib/report-location';
+import { formatBaliwagLocation } from '../../../lib/baliwag-location';
 
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -206,15 +206,9 @@ export default function IncidentDetailScreen() {
             <Text className="text-sm font-medium text-slate-500">Type</Text>
             <Text className="text-sm font-bold text-slate-800">{report.type}</Text>
           </View>
-          <View className="flex-row justify-between mb-5 items-center">
-            <Text className="text-sm font-medium text-slate-500">Severity</Text>
-            <View className="bg-blue-100 px-3 py-1 rounded-full">
-              <Text className="text-xs font-bold text-[#1E3A8A] uppercase">{report.severityLevel || 'MODERATE'}</Text>
-            </View>
-          </View>
           <View className="flex-row justify-between mb-5">
             <Text className="text-sm font-medium text-slate-500">Location</Text>
-            <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>{getReportLocation(report.location)}</Text>
+            <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>{formatBaliwagLocation(report.barangay) ?? 'Location unavailable'}</Text>
           </View>
           <View className="flex-row justify-between mb-5">
             <Text className="text-sm font-medium text-slate-500">Nature of Call</Text>

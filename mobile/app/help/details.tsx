@@ -107,7 +107,7 @@ export default function DetailsScreen() {
       const payload = {
         incidentType: report.incidentType || 'Unknown Cause',
         peopleInvolved: report.peopleInvolved || 'None',
-        landmarks: report.landmarks || 'Baliwag City',
+        landmarks: report.landmarks || 'Location unavailable',
         latitude: report.latitude,
         longitude: report.longitude,
         severity: report.severity || 'Medium',

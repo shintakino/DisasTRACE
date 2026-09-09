@@ -31,6 +31,7 @@ export function SettingsView() {
 
   const [dispatchTimeout, setDispatchTimeout] = useState<number>(30);
   const [guestRequestsPerDay, setGuestRequestsPerDay] = useState<number>(50);
+  const [deduplicationRadiusMeters, setDeduplicationRadiusMeters] = useState<number>(250);
   const [dispatchLoading, setDispatchLoading] = useState(false);
   const [guestLimitLoading, setGuestLimitLoading] = useState(false);
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
@@ -43,6 +44,7 @@ export function SettingsView() {
       if (data.success && data.settings) {
         setDispatchTimeout(data.settings.dispatchOfferTimeoutSeconds);
         setGuestRequestsPerDay(data.settings.guestRequestsPerDay ?? 50);
+        setDeduplicationRadiusMeters(data.settings.deduplicationRadiusMeters ?? 250);
       }
     } catch (error) {
       console.error("Error fetching settings:", error);
@@ -103,6 +105,24 @@ export function SettingsView() {
       toast.success("Guest Mode request limit saved successfully!");
     } catch (err: any) {
       toast.error(err.message || "Failed to update Guest Mode limit.");
+    } finally {
+      setGuestLimitLoading(false);
+    }
+  };
+
+  const handleUpdateDeduplicationRadius = async () => {
+    if (deduplicationRadiusMeters < 50 || deduplicationRadiusMeters > 1000) {
+      toast.error("Deduplication radius must be between 50 and 1,000 meters.");
+      return;
+    }
+    setGuestLimitLoading(true);
+    try {
+      const response = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deduplicationRadiusMeters }) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "Failed to update deduplication radius");
+      toast.success("Deduplication radius saved successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update deduplication radius.");
     } finally {
       setGuestLimitLoading(false);
     }
@@ -374,6 +394,17 @@ export function SettingsView() {
                     >
                       {guestLimitLoading ? "Saving Guest Limit..." : "Save Guest Mode Limit"}
                     </Button>
+                    <div className="mt-8 space-y-4 border-t border-slate-200 pt-8">
+                      <div className="space-y-2">
+                        <Label htmlFor="deduplicationRadiusMeters" className="text-sm font-semibold text-[#1E293B]">Incident Deduplication Radius</Label>
+                        <p className="text-xs text-[#64748B]">Same-type reports inside this radius within 20 minutes require PACC review instead of another automatic dispatch.</p>
+                        <div className="flex gap-3">
+                          <Input id="deduplicationRadiusMeters" type="number" min={50} max={1000} value={deduplicationRadiusMeters} onChange={(e) => setDeduplicationRadiusMeters(parseInt(e.target.value, 10) || 250)} className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white" />
+                          <div className="bg-slate-100 border border-slate-200 text-[#475569] font-bold px-4 rounded-xl flex items-center justify-center text-sm shrink-0">meters</div>
+                        </div>
+                      </div>
+                      <Button onClick={handleUpdateDeduplicationRadius} disabled={guestLimitLoading || !hasLoadedSettings} className="w-full h-12 bg-[#1E3A8A] text-white hover:bg-blue-900 font-semibold rounded-xl">{guestLimitLoading ? "Saving Radius..." : "Save Deduplication Radius"}</Button>
+                    </div>
                   </div>
                 )}
               </div>

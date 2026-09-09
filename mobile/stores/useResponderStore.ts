@@ -54,9 +54,10 @@ export interface DispatchDetails {
   distance: string; // e.g. "1.7 km"
   natureOfCall: string; // e.g. "EMERGENCY"
   peopleInvolved: number;
-  eta: string; // e.g. "~8 min"
+  eta?: string; // Server or route-derived, e.g. "~5 min"
   reporterName: string;
   reporterInitials: string;
+  reporterPhone?: string;
   timestamp: string; // e.g. "09:43 PM"
   coordinates: {
     latitude: number;

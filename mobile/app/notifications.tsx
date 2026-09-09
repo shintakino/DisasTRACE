@@ -212,9 +212,12 @@ export default function NotificationsScreen() {
   };
 
   const handleBack = () => {
-    // Notifications is opened from the authenticated tab shell. Replacing
-    // the route avoids returning to a responder-only screen after a role
-    // switch and also works when this screen is the first stack entry.
+    // Preserve the screen that opened notifications, including guest help
+    // flows. The tab fallback is only for a cold-open notification route.
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
     router.replace('/(tabs)/index' as any);
   };
 

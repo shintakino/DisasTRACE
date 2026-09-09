@@ -17,6 +17,9 @@ export default function HelpLayout() {
         <Stack.Screen name="pending" />
         <Stack.Screen name="tracking" />
         <Stack.Screen name="resolution" />
+        <Stack.Screen name="chatbot" />
+        <Stack.Screen name="chatbot-pending" />
+        <Stack.Screen name="response-status" />
       </Stack>
     </View>
   );

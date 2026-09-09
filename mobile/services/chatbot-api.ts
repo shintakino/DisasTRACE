@@ -105,6 +105,8 @@ export async function submitChatbotReport(input: {
       landmarks: input.draft.landmarks?.trim() || undefined,
       latitude: input.draft.latitude,
       longitude: input.draft.longitude,
+      photoLatitude: input.draft.photoLatitude,
+      photoLongitude: input.draft.photoLongitude,
       nature: input.draft.nature,
       severity: input.draft.victimCondition === 'Unconscious / critical'
         ? 'Critical'

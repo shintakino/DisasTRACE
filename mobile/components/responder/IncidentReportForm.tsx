@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, ActivityIndicator, Image, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, ActivityIndicator, Image, KeyboardAvoidingView, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Info, ChevronDown, Minus, Plus, FolderDown, Check } from 'lucide-react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -303,7 +303,9 @@ export function IncidentReportForm() {
       visible={status === 'report_filling'}
       animationType="slide"
       presentationStyle="formSheet"
+      onRequestClose={() => setStatus('to_hospital')}
     >
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <SafeAreaView className="flex-1 bg-[#16203A]">
         {/* Header */}
         <View className="px-4 py-4 flex-row items-center border-b border-blue-800/50">
@@ -317,7 +319,12 @@ export function IncidentReportForm() {
         </View>
 
         <View className="flex-1 bg-white">
-          <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 100 }}>
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{ padding: 24, paddingBottom: 116 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
             
             {/* Info Box */}
             <View className="bg-blue-50 rounded-xl p-4 flex-row items-start mb-6">
@@ -574,6 +581,7 @@ export function IncidentReportForm() {
         )}
 
       </SafeAreaView>
+      </KeyboardAvoidingView>
       
       {/* Report Submitted Modal */}
       <ReportSubmittedModal />

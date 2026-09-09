@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { createClient } from "@/lib/supabase-server";
 import { AnalyticsPeriodSchema, type AnalyticsPeriod } from "@/types/analytics";
+import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
 
 const INCIDENT_TYPES = [
   { type: "Vehicular Collision", color: "#1E3A8A" },
@@ -20,7 +21,8 @@ interface TrendRow {
   count: number;
 }
 
-function getTrendQuery(period: AnalyticsPeriod) {
+function getTrendQuery(period: AnalyticsPeriod, barangay?: string) {
+  const scope = (condition: SQL) => barangay ? and(condition, eq(verificationRequests.barangay, barangay)) : condition;
   if (period === "day") {
     return db
       .select({
@@ -28,7 +30,7 @@ function getTrendQuery(period: AnalyticsPeriod) {
         count: sql<number>`count(*)`,
       })
       .from(verificationRequests)
-      .where(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= timezone('Asia/Manila', CURRENT_DATE) - interval '13 days'`)
+      .where(scope(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= timezone('Asia/Manila', CURRENT_DATE) - interval '13 days'`))
       .groupBy(sql`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon DD')`)
       .orderBy(sql`min(date_trunc('day', timezone('Asia/Manila', ${verificationRequests.createdAt})))`);
   }
@@ -40,7 +42,7 @@ function getTrendQuery(period: AnalyticsPeriod) {
         count: sql<number>`count(*)`,
       })
       .from(verificationRequests)
-      .where(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('week', timezone('Asia/Manila', now())) - interval '11 weeks'`)
+      .where(scope(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('week', timezone('Asia/Manila', now())) - interval '11 weeks'`))
       .groupBy(sql`concat('Week of ', to_char(date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt})), 'Mon DD'))`)
       .orderBy(sql`min(date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt})))`);
   }
@@ -51,7 +53,7 @@ function getTrendQuery(period: AnalyticsPeriod) {
       count: sql<number>`count(*)`,
     })
     .from(verificationRequests)
-    .where(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('month', timezone('Asia/Manila', now())) - interval '11 months'`)
+    .where(scope(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('month', timezone('Asia/Manila', now())) - interval '11 months'`))
     .groupBy(sql`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon YYYY')`)
     .orderBy(sql`min(date_trunc('month', timezone('Asia/Manila', ${verificationRequests.createdAt})))`);
 }
@@ -84,6 +86,17 @@ export async function GET(request: Request) {
     }
 
     const period = parsedPeriod.data;
+    const requestedBarangay = new URL(request.url).searchParams.get("barangay") || undefined;
+    const barangay = requestedBarangay && BALIWAG_BARANGAYS.some((item) => item.name === requestedBarangay)
+      ? requestedBarangay
+      : undefined;
+    if (requestedBarangay && !barangay) {
+      return NextResponse.json({ error: "Invalid request", message: "barangay must be an official City of Baliwag barangay." }, { status: 400 });
+    }
+    const scope = (condition: SQL) => barangay ? and(condition, eq(verificationRequests.barangay, barangay)) : condition;
+    const incidentScope = (condition: SQL) => barangay
+      ? and(condition, eq(verificationRequests.barangay, barangay))
+      : condition;
 
     // Run queries individually for debuggability
     let frequencyRows, trendRows, totalRows, verifiedRows, pendingRows, resolvedRows, responseTimeRows;
@@ -92,6 +105,7 @@ export async function GET(request: Request) {
       frequencyRows = await db
         .select({ type: verificationRequests.type, count: sql<number>`count(*)` })
         .from(verificationRequests)
+        .where(scope(sql`true`))
         .groupBy(verificationRequests.type);
     } catch (e) {
       console.error("[Analytics] frequencyRows query failed:", e);
@@ -99,35 +113,39 @@ export async function GET(request: Request) {
     }
 
     try {
-      trendRows = await getTrendQuery(period);
+      trendRows = await getTrendQuery(period, barangay);
     } catch (e) {
       console.error("[Analytics] trendRows query failed:", e);
       throw e;
     }
 
     try {
-      totalRows = await db.select({ count: sql<number>`count(*)` }).from(verificationRequests);
+      totalRows = await db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(scope(sql`true`));
     } catch (e) {
       console.error("[Analytics] totalRows query failed:", e);
       throw e;
     }
 
     try {
-      verifiedRows = await db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "VERIFIED"));
+      verifiedRows = await db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(scope(eq(verificationRequests.status, "VERIFIED")));
     } catch (e) {
       console.error("[Analytics] verifiedRows query failed:", e);
       throw e;
     }
 
     try {
-      pendingRows = await db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "PENDING"));
+      pendingRows = await db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(scope(eq(verificationRequests.status, "PENDING")));
     } catch (e) {
       console.error("[Analytics] pendingRows query failed:", e);
       throw e;
     }
 
     try {
-      resolvedRows = await db.select({ count: sql<number>`count(*)` }).from(incidents).where(eq(incidents.status, "RESOLVED"));
+      resolvedRows = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(incidents)
+        .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
+        .where(incidentScope(eq(incidents.status, "RESOLVED")));
     } catch (e) {
       console.error("[Analytics] resolvedRows query failed:", e);
       throw e;
@@ -137,7 +155,8 @@ export async function GET(request: Request) {
       responseTimeRows = await db
         .select({ avgResponseMinutes: sql<number>`coalesce(round(avg(extract(epoch from (${incidents.resolvedAt} - ${incidents.createdAt})) / 60)::numeric, 0), 0)` })
         .from(incidents)
-        .where(eq(incidents.status, "RESOLVED"));
+        .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
+        .where(incidentScope(eq(incidents.status, "RESOLVED")));
     } catch (e) {
       console.error("[Analytics] responseTimeRows query failed:", e);
       throw e;

@@ -4,9 +4,12 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
 import { createClient } from "@/lib/supabase-server";
-import { eq, desc, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray } from "drizzle-orm";
 import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides, healOrphanedActiveDispatches } from "@/lib/dispatch-engine";
-import { getReportLocation } from "@/lib/report-location";
+import { formatOfficialBaliwagLocation } from "@/lib/report-location";
+import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS, isLikelyDuplicateIncident } from "@/lib/incident-deduplication";
+import { resolveBaliwagBarangay } from "@/lib/barangay-boundaries";
+import { systemSettings } from "@/db/schema/system_settings";
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,28 +36,50 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const mappedRequests = await Promise.all(requests.map(async (r) => {
-      // Query associated incident
-      const incident = await db.query.incidents.findFirst({
-        where: eq(incidents.requestId, r.id),
-      });
+    const requestIds = requests.map((request) => request.id);
+    const residentIds = [...new Set(
+      requests.flatMap((request) => request.residentId ? [request.residentId] : []),
+    )];
 
-      // Count actual prior reports in the database
+    // Resolve all related incidents and resident history in bounded queries.
+    // The former implementation issued up to three queries for every queue
+    // item, which could exhaust the connection pool and stall PACC loading.
+    const [requestIncidents, residentReportCounts, residentRejectedCounts] = await Promise.all([
+      requestIds.length
+        ? db.select().from(incidents).where(inArray(incidents.requestId, requestIds))
+        : Promise.resolve([]),
+      residentIds.length
+        ? db.select({ residentId: verificationRequests.residentId, total: count() })
+          .from(verificationRequests)
+          .where(inArray(verificationRequests.residentId, residentIds))
+          .groupBy(verificationRequests.residentId)
+        : Promise.resolve([]),
+      residentIds.length
+        ? db.select({ residentId: verificationRequests.residentId, total: count() })
+          .from(verificationRequests)
+          .where(and(
+            inArray(verificationRequests.residentId, residentIds),
+            eq(verificationRequests.status, 'REJECTED'),
+          ))
+          .groupBy(verificationRequests.residentId)
+        : Promise.resolve([]),
+    ]);
+
+    const incidentByRequestId = new Map(requestIncidents.map((incident) => [incident.requestId, incident]));
+    const reportCountByResidentId = new Map(
+      residentReportCounts.flatMap((row) => row.residentId ? [[row.residentId, Number(row.total)] as const] : []),
+    );
+    const rejectedCountByResidentId = new Map(
+      residentRejectedCounts.flatMap((row) => row.residentId ? [[row.residentId, Number(row.total)] as const] : []),
+    );
+
+    const mappedRequests = requests.map((r) => {
+      const incident = incidentByRequestId.get(r.id);
       const resident = r.resident;
-      const priorCount = resident ? await db
-        .select({ count: sql<number>`count(*)` })
-        .from(verificationRequests)
-        .where(sql`${verificationRequests.residentId} = ${resident.id} AND ${verificationRequests.id} != ${r.id}`)
-        : [];
-      const priorReportsCount = priorCount[0]?.count ? Number(priorCount[0].count) : 0;
-
-      // Count actual rejected reports in the database
-      const rejectedCount = resident ? await db
-        .select({ count: sql<number>`count(*)` })
-        .from(verificationRequests)
-        .where(sql`${verificationRequests.residentId} = ${resident.id} AND ${verificationRequests.id} != ${r.id} AND ${verificationRequests.status} = 'REJECTED'`)
-        : [];
-      const rejectedReportsCount = rejectedCount[0]?.count ? Number(rejectedCount[0].count) : 0;
+      const totalReports = r.residentId ? reportCountByResidentId.get(r.residentId) ?? 0 : 0;
+      const totalRejectedReports = r.residentId ? rejectedCountByResidentId.get(r.residentId) ?? 0 : 0;
+      const priorReportsCount = Math.max(0, totalReports - 1);
+      const rejectedReportsCount = Math.max(0, totalRejectedReports - (r.status === 'REJECTED' ? 1 : 0));
 
       // Calculate Reliability Score: starts at 100, subtracts 33 per rejected report, min 0
       const reliabilityScore = Math.max(0, 100 - (rejectedReportsCount * 33));
@@ -87,9 +112,11 @@ export async function GET(req: NextRequest) {
         nature: r.nature,
         severity: r.severity,
         type: r.type,
-        location: getReportLocation(r.locationDescription),
+        location: formatOfficialBaliwagLocation(r.barangay),
         peopleInvolved: peopleCount,
         imageUrl: imageUrlStr,
+        photoLatitude: r.photoLatitude ?? undefined,
+        photoLongitude: r.photoLongitude ?? undefined,
         receivedAt: r.createdAt.toISOString(),
         resident: {
           id: resident?.id || 'guest',
@@ -108,7 +135,7 @@ export async function GET(req: NextRequest) {
           dispatchMethod: incident.dispatchMethod
         } : null
       };
-    }));
+    });
 
     return NextResponse.json(mappedRequests);
   } catch (error) {
@@ -150,9 +177,31 @@ export async function POST(req: NextRequest) {
       nature,
     } = body;
 
-    if (!incidentType || !latitude || !longitude) {
+    const reportLatitude = Number(latitude);
+    const reportLongitude = Number(longitude);
+    if (!incidentType || !Number.isFinite(reportLatitude) || !Number.isFinite(reportLongitude)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+    const barangay = resolveBaliwagBarangay(reportLatitude, reportLongitude);
+    if (!barangay) {
+      return NextResponse.json({
+        error: 'Outside service area',
+        message: 'Reports must be submitted from inside the Baliwag City service area.',
+      }, { status: 400 });
+    }
+
+    // This older report form does not use the chatbot intake service. Keep the
+    // same duplicate protection here so it cannot create another ambulance
+    // offer for the same type of incident in the same place.
+    const recentReports = await db.query.verificationRequests.findMany({
+      where: gte(verificationRequests.createdAt, new Date(Date.now() - INCIDENT_DEDUPLICATION_WINDOW_MS)),
+      columns: { type: true, latitude: true, longitude: true },
+    });
+    const settings = await db.query.systemSettings.findFirst({ where: eq(systemSettings.id, 'current'), columns: { deduplicationRadiusMeters: true } });
+    const nearbyDuplicate = recentReports.some((report) => isLikelyDuplicateIncident(
+      { type: incidentType, latitude: reportLatitude, longitude: reportLongitude },
+      report, settings?.deduplicationRadiusMeters ?? INCIDENT_DEDUPLICATION_RADIUS_METERS,
+    ));
 
     // Generate Request ID
     const year = new Date().getFullYear();
@@ -173,19 +222,26 @@ export async function POST(req: NextRequest) {
       type: incidentType,
       peopleInvolved: peopleInvolved || 'None',
       severity: severityLevel,
-      triageClassification: requestNature === 'EMERGENCY'
+      triageClassification: nearbyDuplicate
+        ? 'SUSPICIOUS_POSSIBLE_PRANK'
+        : requestNature === 'EMERGENCY'
         ? 'HIGH_CONFIDENCE_EMERGENCY'
         : 'HIGH_CONFIDENCE_NON_EMERGENCY',
+      triageReasons: nearbyDuplicate
+        ? ['A similar report was submitted nearby in the last 20 minutes. PACC review is required before dispatch.']
+        : [],
       locationDescription: landmarks || null,
-      latitude,
-      longitude,
+      barangay: barangay.name,
+      barangayPsgcCode: barangay.psgcCode,
+      latitude: reportLatitude,
+      longitude: reportLongitude,
       imageUrl: imageUrl || null,
     }).returning();
 
     // Auto Dispatch Logic
-    if (severityLevel === 'Critical' || severityLevel === 'Emergency' || requestNature === 'EMERGENCY') {
+    if (!nearbyDuplicate && (severityLevel === 'Critical' || severityLevel === 'Emergency' || requestNature === 'EMERGENCY')) {
       const { autoDispatchIncident } = await import('@/lib/dispatch-engine');
-      const incident = await autoDispatchIncident(newRequest.id, user.id, latitude, longitude);
+      const incident = await autoDispatchIncident(newRequest.id, user.id, reportLatitude, reportLongitude);
       
       if (incident) {
         return NextResponse.json({ 

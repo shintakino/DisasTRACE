@@ -20,6 +20,7 @@ export default function PendingScreen() {
   const [isSecuringResponder, setIsSecuringResponder] = useState(false);
   const incidentChannelRef = useRef<any>(null);
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
+  const homeRoute = isGuest ? '/' : '/(tabs)/index';
 
   // Lock gestures and navigation
   useEffect(() => {
@@ -247,7 +248,7 @@ export default function PendingScreen() {
               [
                 { 
                   text: "OK", 
-                  onPress: () => router.replace('/(tabs)/index' as any)
+                  onPress: () => router.replace(homeRoute as any)
                 }
               ],
               { cancelable: false }
@@ -324,7 +325,7 @@ export default function PendingScreen() {
         incidentChannelRef.current = null;
       }
     };
-  }, [isGuest, report.id, router]);
+  }, [homeRoute, isGuest, report.id, router]);
 
   // Trigger tactile haptic success feedback and start auto-navigation timer when accepted
   useEffect(() => {
@@ -402,7 +403,7 @@ export default function PendingScreen() {
             } finally {
               // Clean up and return to home
               useEmergencyReportStore.getState().resetReport();
-              router.replace('/(tabs)/index' as any);
+              router.replace(homeRoute as any);
             }
           }
         }

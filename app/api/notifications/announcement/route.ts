@@ -2,15 +2,30 @@ import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase-server";
 import { db } from "@/db";
 import { notifications, users } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import { z } from "zod";
+import type { User } from "@supabase/supabase-js";
 
 const PostAnnouncementSchema = z.object({
   title: z.string().min(1, "Title is required"),
   body: z.string().min(1, "Announcement body is required"),
   targetRole: z.enum(["all", "ambulance_responder", "public_user"]).default("all"),
 });
+
+async function listAllAuthUsers() {
+  const supabaseAdmin = createAdminClient();
+  const authUsers: User[] = [];
+  let page = 1;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1_000 });
+    if (error) throw error;
+    authUsers.push(...(data.users ?? []));
+    if (!data.users || data.users.length < 1_000) return authUsers;
+    page += 1;
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -40,16 +55,16 @@ export async function POST(req: Request) {
     const { title, body, targetRole } = result.data;
 
     // 3. Query all users from auth utilizing Admin Client to check their notification preferences
-    const supabaseAdmin = createAdminClient();
-    const { data: { users: authUsers }, error: userFetchErr } = await supabaseAdmin.auth.admin.listUsers();
-
-    if (userFetchErr || !authUsers) {
-      console.error("[Announcement API] Failed to query auth users:", userFetchErr);
+    let authUsers;
+    try {
+      authUsers = await listAllAuthUsers();
+    } catch (userFetchError) {
+      console.error("[Announcement API] Failed to query auth users:", userFetchError);
       return NextResponse.json({ error: "Failed to query target users" }, { status: 500 });
     }
 
     // 4. Retrieve database users to filter roles
-    let dbUsersList = await db.select().from(users);
+    let dbUsersList = await db.select().from(users).where(eq(users.status, "ACTIVE"));
 
     if (targetRole !== "all") {
       dbUsersList = dbUsersList.filter(u => u.role === targetRole);
@@ -57,11 +72,13 @@ export async function POST(req: Request) {
 
     const dbUserIds = new Set(dbUsersList.map(u => u.id));
 
-    // Filter auth users who match the role and have "system" notices enabled (default is true if unset)
+    // `system_notices` is the legacy web preference key. Honour both it and
+    // the canonical mobile `system` key so existing responders are not
+    // silently excluded from a broadcast.
     const targetUsers = authUsers.filter((u) => {
       if (!dbUserIds.has(u.id)) return false;
       const prefs = u.user_metadata?.notification_preferences;
-      return prefs?.system !== false;
+      return prefs?.system !== false && prefs?.system_notices !== false;
     });
 
     if (targetUsers.length === 0) {

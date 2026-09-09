@@ -7,7 +7,7 @@ import { users } from "@/db/schema/users";
 import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
 import { and, eq, or } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
-import { getReportDetailText, getReportLocation } from "@/lib/report-location";
+import { formatOfficialBaliwagLocation, getReportDetailText, getReportLocation } from "@/lib/report-location";
 
 
 export async function GET(
@@ -55,6 +55,7 @@ export async function GET(
         status: reports.status,
         createdAt: reports.createdAt,
         location: verificationRequests.locationDescription,
+        barangay: verificationRequests.barangay,
         residentReportDescription: verificationRequests.locationDescription,
         residentPhotoUrl: verificationRequests.imageUrl,
         crewFindings: reports.description,
@@ -133,7 +134,8 @@ export async function GET(
           hour: '2-digit',
           minute: '2-digit'
         }),
-        location: getReportLocation(userReq.locationDescription),
+        location: formatOfficialBaliwagLocation(userReq.barangay),
+        barangay: userReq.barangay,
         residentReportDescription: getReportDetailText(userReq.locationDescription, "Awaiting detail logs."),
         residentPhotoUrl: userReq.imageUrl,
         crewFindings: "No responder findings available yet (User Submitted Report).",
@@ -173,6 +175,7 @@ export async function GET(
           status: verificationRequests.status,
           createdAt: verificationRequests.createdAt,
           location: verificationRequests.locationDescription,
+          barangay: verificationRequests.barangay,
           imageUrl: verificationRequests.imageUrl,
           nature: verificationRequests.nature,
           severity: verificationRequests.severity,
@@ -197,7 +200,8 @@ export async function GET(
           hour: '2-digit',
           minute: '2-digit'
         }),
-        location: getReportLocation(d.location),
+        location: formatOfficialBaliwagLocation(d.barangay),
+        barangay: d.barangay,
         residentPhotoUrl: d.imageUrl,
         natureOfCall: d.nature,
         severityLevel: d.severity,
@@ -269,7 +273,8 @@ export async function GET(
         hour: '2-digit',
         minute: '2-digit'
       }),
-      location: getReportLocation(r.location),
+      location: formatOfficialBaliwagLocation(r.barangay),
+      barangay: r.barangay,
       residentReportDescription: getReportDetailText(r.residentReportDescription, "Awaiting detail logs."),
       residentPhotoUrl: r.residentPhotoUrl,
       crewFindings: r.crewFindings || "No findings recorded.",
@@ -316,6 +321,7 @@ export async function GET(
         status: verificationRequests.status,
         createdAt: verificationRequests.createdAt,
         location: verificationRequests.locationDescription,
+        barangay: verificationRequests.barangay,
         imageUrl: verificationRequests.imageUrl,
         nature: verificationRequests.nature,
         severity: verificationRequests.severity,
@@ -340,7 +346,8 @@ export async function GET(
         hour: '2-digit',
         minute: '2-digit'
       }),
-      location: getReportLocation(d.location),
+      location: formatOfficialBaliwagLocation(d.barangay),
+      barangay: d.barangay,
       residentPhotoUrl: d.imageUrl,
       natureOfCall: d.nature,
       severityLevel: d.severity,

@@ -5,7 +5,7 @@ import { Flame, CarFront, Activity, AlertTriangle, MapPin } from 'lucide-react-n
 import { useAuthStatus } from '../../../hooks/use-auth-status';
 import { ReportDetailModal } from '../../../components/responder/ReportDetailModal';
 import { supabase } from '../../../lib/supabase';
-import { getReportLocation } from '../../../lib/report-location';
+import { formatBaliwagLocation } from '../../../lib/baliwag-location';
 
 export default function MyReportsScreen() {
   const router = useRouter();
@@ -48,7 +48,7 @@ export default function MyReportsScreen() {
             type: r.type || 'Incident',
             date: r.date || 'Today',
             status: r.status || 'COMPLETED',
-            location: getReportLocation(r.location),
+            location: formatBaliwagLocation(r.barangay) ?? 'Location unavailable',
             response: r.responderName ? `AMB-${r.responderName.slice(0, 3).toUpperCase()} Dispatched` : 'Dispatched',
             icon,
           };

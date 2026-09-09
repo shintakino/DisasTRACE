@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, Calendar, PenTool } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -229,7 +229,8 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="overFullScreen">
+    <Modal visible={visible} animationType="slide" presentationStyle="overFullScreen" onRequestClose={onClose}>
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <SafeAreaView className="flex-1 bg-[#16203A]">
         {/* Header */}
         <View className="px-4 py-4 flex-row items-center justify-between border-b border-blue-800/50">
@@ -242,7 +243,12 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
           </TouchableOpacity>
         </View>
 
-        <ScrollView className="flex-1 bg-slate-50" contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+        <ScrollView
+          className="flex-1 bg-slate-50"
+          contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
           {/* Trip Details */}
           <Text className="text-[#1E3A8A] font-bold text-xs tracking-widest uppercase mb-3">Trip & Vehicle Details</Text>
           <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-3">
@@ -527,7 +533,7 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
             {/* Driver E-Signature */}
             <View className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
               <Text className="text-slate-500 text-[10px] font-black uppercase tracking-wider">
-                Driver's Signature over Printed Name
+                {"Driver's Signature over Printed Name"}
               </Text>
               {signatures.driverSignature ? (
                 <View className="bg-white border border-slate-200 rounded-xl p-2 h-24 justify-center items-center relative">
@@ -559,7 +565,7 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                   className="bg-white border-2 border-dashed border-slate-300 rounded-xl py-4 justify-center items-center flex-row gap-2"
                 >
                   <PenTool size={16} color="#1E3A8A" />
-                  <Text className="text-[#1E3A8A] font-bold text-xs">Tap to Sign Driver's Signature</Text>
+                  <Text className="text-[#1E3A8A] font-bold text-xs">{"Tap to Sign Driver's Signature"}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -627,6 +633,7 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
           onClose={() => setActiveSigTarget({ ...activeSigTarget, visible: false })}
         />
       </SafeAreaView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -3,6 +3,18 @@ const DETAIL_ONLY = /^(?:Condition|Access|Time|Cause|Other):/i;
 const REJECTION_PREFIX = /^REJECTED:\s*[^.]+\.\s*/i;
 
 /**
+ * Formats the official barangay attributed from the report GPS coordinates.
+ * Free-text landmarks are deliberately not used as a location label.
+ */
+export function formatOfficialBaliwagLocation(
+  barangay: string | null | undefined,
+  fallback = 'Location unavailable',
+): string {
+  const name = barangay?.trim();
+  return name ? `${name}, Baliwag City` : fallback;
+}
+
+/**
  * Older mobile reports stored the location and follow-up answers in one
  * location_description value. Keep the raw value available for details, but
  * expose only the actual location anywhere a location field is rendered.

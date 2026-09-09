@@ -27,6 +27,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { WebPreloader } from "@/components/ui/web-preloader";
 import { AnalyticsDataSchema, type AnalyticsData, type AnalyticsPeriod } from "@/types/analytics";
+import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
 
 const analyticsResponseSchema = z.object({
   data: AnalyticsDataSchema,
@@ -89,6 +90,7 @@ function EmptyChart({ message }: { message: string }) {
 export function AnalyticsDashboard() {
   const { role, loading: authLoading } = useAuth();
   const [period, setPeriod] = useState<AnalyticsPeriod>("month");
+  const [barangay, setBarangay] = useState("");
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -112,7 +114,9 @@ export function AnalyticsDashboard() {
       setError(null);
 
       try {
-        const response = await fetch(`/api/analytics?period=${period}`, { signal: controller.signal });
+        const params = new URLSearchParams({ period });
+        if (barangay) params.set("barangay", barangay);
+        const response = await fetch(`/api/analytics?${params}`, { signal: controller.signal });
         const payload: unknown = await response.json();
         const parsed = analyticsResponseSchema.safeParse(payload);
 
@@ -136,7 +140,7 @@ export function AnalyticsDashboard() {
 
     void loadAnalytics();
     return () => controller.abort();
-  }, [authLoading, period, reloadKey, role]);
+  }, [authLoading, barangay, period, reloadKey, role]);
 
   const refresh = () => {
     setRefreshing(true);
@@ -195,6 +199,13 @@ export function AnalyticsDashboard() {
         >
           {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
         </Button>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+          Barangay
+          <select value={barangay} onChange={(event) => setBarangay(event.target.value)} className="h-9 max-w-48 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800">
+            <option value="">All barangays</option>
+            {BALIWAG_BARANGAYS.map((item) => <option key={item.psgcCode} value={item.name}>{item.name}</option>)}
+          </select>
+        </label>
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Incident statistics">

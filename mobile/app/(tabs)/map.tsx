@@ -7,6 +7,8 @@ import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { supabase } from '../../lib/supabase';
 import { getReportLocation } from '../../lib/report-location';
+import { useLiveBarangay } from '../../hooks/use-live-barangay';
+import { formatBaliwagLocation } from '../../lib/baliwag-location';
 
 
 import * as Location from 'expo-location';
@@ -27,6 +29,7 @@ export default function MapScreen() {
   const [hospitals, setHospitals] = useState<any[]>([]);
   const [hotspots, setHotspots] = useState<IncidentHotspot[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number]>([120.880, 14.940]);
+  const [hasLiveLocation, setHasLiveLocation] = useState(false);
   const [locationUpdatedAt, setLocationUpdatedAt] = useState<Date | null>(null);
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
@@ -43,6 +46,7 @@ export default function MapScreen() {
           });
           if (current && current.coords && isMounted) {
             setUserLocation([current.coords.longitude, current.coords.latitude]);
+            setHasLiveLocation(true);
             setLocationUpdatedAt(new Date());
           }
 
@@ -55,6 +59,7 @@ export default function MapScreen() {
             (loc) => {
               if (loc && loc.coords && isMounted) {
                 setUserLocation([loc.coords.longitude, loc.coords.latitude]);
+                setHasLiveLocation(true);
                 setLocationUpdatedAt(new Date());
               }
             }
@@ -134,7 +139,17 @@ export default function MapScreen() {
 
   const initials = profile?.fullName ? getInitials(profile.fullName) : 'RB';
   const displayName = profile?.fullName || 'Renzy Bastes';
-  const address = profile?.address || 'Baliwag City, Bulacan';
+  const liveLocation = useLiveBarangay(
+    Boolean(user && hasLiveLocation),
+    hasLiveLocation ? { latitude: userLocation[1], longitude: userLocation[0] } : null,
+  );
+  const address = liveLocation.state === 'ready'
+    ? formatBaliwagLocation(liveLocation.barangay)
+    : liveLocation.state === 'loading'
+      ? 'Finding your location…'
+      : liveLocation.state === 'outside_service_area'
+        ? 'Outside Baliwag City'
+        : 'Location unavailable';
 
   return (
     <View className="flex-1 bg-slate-50">

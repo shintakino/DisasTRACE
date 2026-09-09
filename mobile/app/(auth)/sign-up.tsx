@@ -144,8 +144,8 @@ export default function SignUpScreen() {
 
   return (
     <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      enabled={Platform.OS === 'ios'}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
       className="flex-1"
     >
       <LinearGradient colors={['#0A1332', '#15286A']} className="flex-1 pt-10">
@@ -182,7 +182,7 @@ export default function SignUpScreen() {
           />
         </View>
 
-        <ScrollView className="flex-1 px-6 py-6" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView className="flex-1 px-6 py-6" contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <View className="mb-6 flex-row justify-between items-end">
             <View className="flex-1 pr-4">
               <Text className="text-2xl font-bold text-white mb-1">

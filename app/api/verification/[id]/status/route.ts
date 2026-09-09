@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { autoDispatchIncident } from "@/lib/dispatch-engine";
 import crypto from "crypto";
-import { getReportLocation } from "@/lib/report-location";
+import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 
 export async function PATCH(
   req: NextRequest,
@@ -192,9 +192,11 @@ export async function PATCH(
         status: finalReq.status,
         nature: finalReq.nature,
         type: finalReq.type,
-        location: getReportLocation(finalReq.locationDescription),
+        location: formatOfficialBaliwagLocation(finalReq.barangay),
         peopleInvolved: peopleCount,
         imageUrl: finalReq.imageUrl || undefined,
+        photoLatitude: finalReq.photoLatitude ?? undefined,
+        photoLongitude: finalReq.photoLongitude ?? undefined,
         receivedAt: finalReq.createdAt.toISOString(),
         resident: {
           id: finalReq.resident?.id || 'guest',

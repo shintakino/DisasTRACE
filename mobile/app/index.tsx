@@ -10,7 +10,6 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
-import { Home, Ambulance, ChevronRight } from 'lucide-react-native';
 import { useAuthStatus } from '../hooks/use-auth-status';
 
 const { width } = Dimensions.get('window');
@@ -26,7 +25,6 @@ export default function EntryScreen() {
   const cardTranslate = useSharedValue(hasShownSplashGlobal ? 0 : 120);
   const cardOpacity = useSharedValue(hasShownSplashGlobal ? 1 : 0);
   const trackingTranslateX = useSharedValue(hasShownSplashGlobal ? 0 : -width * 1.5);
-  const ambulanceDriveOffX = useSharedValue(hasShownSplashGlobal ? width : 0);
 
   useEffect(() => {
     if (!isLoaded) return; // wait for auth session
@@ -68,14 +66,6 @@ export default function EntryScreen() {
         withTiming(0, {
           duration: 1400,
           easing: Easing.out(Easing.cubic),
-        })
-      );
-
-      ambulanceDriveOffX.value = withDelay(
-        2600,
-        withTiming(width, {
-          duration: 1000,
-          easing: Easing.in(Easing.cubic),
         })
       );
 
@@ -127,10 +117,6 @@ export default function EntryScreen() {
     transform: [{ translateX: trackingTranslateX.value }],
   }));
 
-  const ambulanceStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: ambulanceDriveOffX.value }],
-  }));
-
   if (!isLoaded) return null;
 
   return (
@@ -156,13 +142,6 @@ export default function EntryScreen() {
             >
               SECONDS COUNT. LIVES MATTER.
             </Text>
-            <Animated.View style={[styles.ambulanceWrapper, ambulanceStyle]}>
-              <Image
-                source={require('../assets/images/ambulance.png')}
-                style={{ width: 150, height: 90 }}
-                resizeMode="contain"
-              />
-            </Animated.View>
           </View>
         </Animated.View>
       </Animated.View>
@@ -233,12 +212,6 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingRight: 35,
     alignItems: 'flex-end',
-  },
-  ambulanceWrapper: {
-    position: 'absolute',
-    right: -165,
-    top: -35,
-    zIndex: 10,
   },
   bottomCard: {
     position: 'absolute',

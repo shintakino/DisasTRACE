@@ -7,7 +7,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
-import { getReportLocation } from "@/lib/report-location";
+import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 
 export async function GET() {
   if (!(await isAdmin())) {
@@ -27,6 +27,7 @@ export async function GET() {
         severity: verificationRequests.severity,
         nature: verificationRequests.nature,
         locationDescription: verificationRequests.locationDescription,
+        barangay: verificationRequests.barangay,
         latitude: verificationRequests.latitude,
         longitude: verificationRequests.longitude,
         createdAt: incidents.createdAt,
@@ -50,6 +51,7 @@ export async function GET() {
         severity: verificationRequests.severity,
         nature: verificationRequests.nature,
         locationDescription: verificationRequests.locationDescription,
+        barangay: verificationRequests.barangay,
         latitude: verificationRequests.latitude,
         longitude: verificationRequests.longitude,
         createdAt: verificationRequests.createdAt,
@@ -78,7 +80,7 @@ export async function GET() {
         status: mappedStatus,
         type: inc.type,
         origin: "CDRRMO HQ",
-        destination: getReportLocation(inc.locationDescription),
+        destination: formatOfficialBaliwagLocation(inc.barangay),
         lat: inc.latitude,
         lng: inc.longitude,
         createdAt: inc.createdAt.toISOString(),
@@ -109,7 +111,7 @@ export async function GET() {
         status: req.status as "PENDING" | "VERIFIED" | "REJECTED" | "DUPLICATE",
         type: req.type,
         origin: "CDRRMO HQ",
-        destination: getReportLocation(req.locationDescription),
+        destination: formatOfficialBaliwagLocation(req.barangay),
         lat: req.latitude,
         lng: req.longitude,
         createdAt: req.createdAt.toISOString(),

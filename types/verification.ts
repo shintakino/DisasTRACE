@@ -46,6 +46,8 @@ export const VerificationRequestSchema = z.object({
   location: z.string(),
   peopleInvolved: z.number(),
   imageUrl: z.string().url().optional(),
+  photoLatitude: z.number().finite().min(-90).max(90).optional(),
+  photoLongitude: z.number().finite().min(-180).max(180).optional(),
   receivedAt: z.string(), // ISO timestamp
   resident: ResidentInfoSchema,
   incident: VerificationIncidentSchema,

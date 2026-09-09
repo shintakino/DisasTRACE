@@ -30,7 +30,6 @@ export function ReportDetailModal({
       residentName: report.residentName || 'Primary Submitter',
       natureOfCall: report.natureOfCall || 'Emergency',
       type: report.type,
-      severityLevel: report.severityLevel || 'Medium',
       peopleInvolved: report.peopleInvolved,
       location: getReportLocation(report.location),
       residentPhotoUrl: report.residentPhotoUrl,
@@ -170,10 +169,6 @@ export function ReportDetailModal({
                   <Text className="text-sm font-medium text-slate-500">Type of Emergency</Text>
                   <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.type}</Text>
                 </View>
-                <View className="flex-row justify-between mb-4 items-center">
-                  <Text className="text-sm font-medium text-slate-500">Severity Level</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.severityLevel || 'Critical'}</Text>
-                </View>
                 <View className="flex-row justify-between mb-4">
                   <Text className="text-sm font-medium text-slate-500">People Involved</Text>
                   <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.peopleInvolved !== undefined ? String(currentReport.peopleInvolved) : '3'}</Text>
@@ -223,10 +218,6 @@ export function ReportDetailModal({
                     <View className="flex-row justify-between mb-4 items-center">
                       <Text className="text-sm font-medium text-slate-500">Type of Emergency</Text>
                       <Text className="text-sm font-bold text-[#1E3A8A]">{report.type}</Text>
-                    </View>
-                    <View className="flex-row justify-between mb-4 items-center">
-                      <Text className="text-sm font-medium text-slate-500">Severity Level</Text>
-                      <Text className="text-sm font-bold text-[#1E3A8A]">{report.severityLevel || 'Critical'}</Text>
                     </View>
                     <View className="flex-row justify-between mb-4">
                       <Text className="text-sm font-medium text-slate-500">People Involved</Text>

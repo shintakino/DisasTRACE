@@ -16,8 +16,10 @@ import { useResponderStore } from '../../stores/useResponderStore';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
-import { getReportLocation, isNotificationVisibleForRole } from '../../lib/report-location';
+import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { shouldResumeResidentRequest } from '../../lib/active-incident';
+import { useLiveBarangay } from '../../hooks/use-live-barangay';
+import { formatBaliwagLocation } from '../../lib/baliwag-location';
 
 import * as Notifications from 'expo-notifications';
 import { Platform, Vibration } from 'react-native';
@@ -216,7 +218,7 @@ export default function HomeScreen() {
                   longitude: request.longitude,
                   incidentType: request.type as any,
                   peopleInvolved: request.people_involved as any,
-                  landmarks: request.location_description || undefined,
+                  landmarks: formatBaliwagLocation(request.barangay) || 'Location unavailable',
                   photoUri: request.image_url || '',
                   severity: request.severity as any,
                 }
@@ -251,7 +253,7 @@ export default function HomeScreen() {
                     longitude: request.longitude,
                     incidentType: request.type as any,
                     peopleInvolved: request.people_involved as any,
-                    landmarks: request.location_description || undefined,
+                    landmarks: formatBaliwagLocation(request.barangay) || 'Location unavailable',
                     photoUri: request.image_url || '',
                     severity: request.severity as any,
                   }
@@ -290,7 +292,7 @@ export default function HomeScreen() {
             
             let reporterName = 'Resident';
             let reporterInitials = 'R';
-            let locationName = 'Baliwag City';
+            let locationName = 'Location unavailable';
             let typeOfEmergency = 'Medical Emergency';
             let peopleInvolved = 1;
             let incidentLat = 14.9538;
@@ -303,7 +305,7 @@ export default function HomeScreen() {
               .single();
 
             if (vReq) {
-              locationName = getReportLocation(vReq.location_description || vReq.address);
+              locationName = formatBaliwagLocation(vReq.barangay) || 'Location unavailable';
               typeOfEmergency = vReq.type || 'Emergency';
               incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
               incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
@@ -384,7 +386,7 @@ export default function HomeScreen() {
               
               let reporterName = 'Resident';
               let reporterInitials = 'R';
-              let locationName = 'Baliwag City';
+              let locationName = 'Location unavailable';
               let typeOfEmergency = 'Medical Emergency';
               let peopleInvolved = 1;
               let incidentLat = 14.9538;
@@ -397,7 +399,7 @@ export default function HomeScreen() {
                 .single();
 
               if (vReq) {
-                locationName = getReportLocation(vReq.location_description || vReq.address);
+                locationName = formatBaliwagLocation(vReq.barangay) || 'Location unavailable';
                 typeOfEmergency = vReq.type || 'Emergency';
                 incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
                 incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
@@ -482,8 +484,8 @@ export default function HomeScreen() {
   }, [isLoaded, role, user]);
 
   const { isLocationGateActive, requestPermissions } = useLocationPermission();
-  
-  // Fallback for initials
+  const liveLocation = useLiveBarangay(role === 'public_user' && isLoaded);
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -493,18 +495,13 @@ export default function HomeScreen() {
       .slice(0, 2);
   };
 
-  const getBarangayLabel = (address?: string) => {
-    const parts = (address || '').split(',').map((part) => part.trim()).filter(Boolean);
-    const explicitBarangay = parts.find((part) => /^(barangay|brgy\.?)/i.test(part));
-    const barangay = explicitBarangay || (parts.length >= 4 ? parts[parts.length - 3] : parts[0]);
-    if (!barangay) return 'Barangay unavailable';
-
-    const name = barangay
-      .replace(/^(barangay|brgy\.?)\s*/i, '')
-      .toLowerCase()
-      .replace(/\b\w/g, (character) => character.toUpperCase());
-    return `Barangay ${name}`;
-  };
+  const currentLocationDisplay = liveLocation.state === 'ready'
+    ? formatBaliwagLocation(liveLocation.barangay)
+    : liveLocation.state === 'loading'
+      ? 'Finding your location…'
+      : liveLocation.state === 'outside_service_area'
+        ? 'Outside Baliwag City'
+        : 'Location unavailable';
 
   const initials = profile?.fullName ? getInitials(profile.fullName) : '??';
 
@@ -558,7 +555,7 @@ export default function HomeScreen() {
             <LocationIcon size={20} color="white" variant="Bold" />
             <View className="ml-2">
               <Text className="text-white/80 text-xs uppercase tracking-wider">Your Location</Text>
-              <Text className="text-white text-md font-bold mt-0.5">Baliwag City</Text>
+              <Text className="text-white text-md font-bold mt-0.5" numberOfLines={1}>{currentLocationDisplay}</Text>
             </View>
           </View>
           
@@ -608,7 +605,7 @@ export default function HomeScreen() {
                 {profile?.fullName || 'Eloisa Guibani'}
               </Text>
               <Text className="text-white/60 text-sm" numberOfLines={1} ellipsizeMode="tail">
-                {getBarangayLabel(profile?.address)}
+                {currentLocationDisplay}
               </Text>
             </View>
           </View>

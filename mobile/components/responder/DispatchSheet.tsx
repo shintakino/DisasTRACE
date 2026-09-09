@@ -15,7 +15,7 @@ import { supabase } from '../../lib/supabase';
 
 export function DispatchSheet() {
   const { status, activeDispatch, acceptDispatch, completeIncident } = useResponderStore();
-  const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds || 30;
+  const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds ?? 30;
   const serverExpiry = activeDispatch?.offerExpiresAt ? Date.parse(activeDispatch.offerExpiresAt) : NaN;
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = Dimensions.get('window');
@@ -125,9 +125,11 @@ export function DispatchSheet() {
         pointerEvents={pointerEvents}
       >
         <View
-          className="bg-white rounded-[32px] p-6 shadow-2xl shadow-slate-900/40"
+          className="bg-white rounded-[28px] p-4 shadow-2xl shadow-slate-900/40"
           style={{
-            maxHeight: Math.max(420, screenHeight - insets.top - 24),
+            // Never force a card taller than the visible safe area. Its
+            // content scrolls while the accept action remains reachable.
+            maxHeight: Math.max(0, screenHeight - insets.top - insets.bottom - 32),
             overflow: 'hidden',
           }}
         >
@@ -159,7 +161,7 @@ export function DispatchSheet() {
           <View className="flex-row items-center mb-4">
             <MapPin size={14} color="#0F172A" strokeWidth={3} />
             <Text className="text-[#334155] text-xs ml-1.5 font-bold tracking-wide">
-              {activeDispatch?.locationName || 'Baliwag City'} · {activeDispatch?.distance || '1.7 km'}
+              {activeDispatch?.locationName || 'Location unavailable'} · {activeDispatch?.distance || 'Distance pending'}
             </Text>
           </View>
 
@@ -182,7 +184,7 @@ export function DispatchSheet() {
               <Text className="text-[#475569] text-[8px] font-bold mt-0.5 uppercase tracking-[0.15em] z-10">PERSONS</Text>
             </View>
             <View className="flex-1 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center">
-              <Text className="text-[#1E3A8A] font-black text-lg tracking-tight">{activeDispatch?.eta || '~8 min'}</Text>
+              <Text className="text-[#1E3A8A] font-black text-lg tracking-tight">{activeDispatch?.eta ?? 'Calculating'}</Text>
               <Text className="text-[#64748B] text-[8px] font-bold mt-0.5 uppercase tracking-[0.15em]">ETA</Text>
             </View>
           </View>
@@ -195,7 +197,7 @@ export function DispatchSheet() {
               </View>
               <View className="ml-3">
                 <Text className="text-[#0F172A] font-black text-[13px]">{activeDispatch?.reporterName || 'Resident'}</Text>
-                <Text className="text-[#64748B] text-[9px] mt-0.5 font-bold uppercase tracking-[0.05em]">{activeDispatch?.attachmentUrl ? 'Live photo attached' : 'No photo attached'}</Text>
+                <Text className="text-[#64748B] text-[9px] mt-0.5 font-bold uppercase tracking-[0.05em]">{activeDispatch?.reporterPhone || (activeDispatch?.attachmentUrl ? 'Live photo attached' : 'No photo attached')}</Text>
               </View>
             </View>
             <Text className="text-[#475569] text-[10px] font-semibold tracking-wide">{activeDispatch?.timestamp || ''}</Text>

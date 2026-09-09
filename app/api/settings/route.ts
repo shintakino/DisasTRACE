@@ -11,7 +11,8 @@ import crypto from "crypto";
 const SettingsUpdateSchema = z.object({
   dispatchOfferTimeoutSeconds: z.number().int().min(5, "Minimum timeout is 5 seconds").max(120, "Maximum timeout is 120 seconds").optional(),
   guestRequestsPerDay: z.number().int().min(1, "Guest request limit must be at least 1").max(10000, "Guest request limit cannot exceed 10,000").optional(),
-}).refine((settings) => settings.dispatchOfferTimeoutSeconds !== undefined || settings.guestRequestsPerDay !== undefined, {
+  deduplicationRadiusMeters: z.number().int().min(50, "Deduplication radius must be at least 50 meters").max(1000, "Deduplication radius cannot exceed 1,000 meters").optional(),
+}).refine((settings) => settings.dispatchOfferTimeoutSeconds !== undefined || settings.guestRequestsPerDay !== undefined || settings.deduplicationRadiusMeters !== undefined, {
   message: "At least one setting must be provided",
 });
 
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
         id: 'current',
         dispatchOfferTimeoutSeconds: 30,
         guestRequestsPerDay: 50,
+        deduplicationRadiusMeters: 250,
       }).returning();
       config = newConfig;
     }
@@ -44,6 +46,7 @@ export async function GET(req: NextRequest) {
       settings: {
         dispatchOfferTimeoutSeconds: config.dispatchOfferTimeoutSeconds,
         guestRequestsPerDay: config.guestRequestsPerDay,
+        deduplicationRadiusMeters: config.deduplicationRadiusMeters,
         updatedAt: config.updatedAt,
       }
     });
@@ -73,7 +76,8 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const includesGuestLimit = Object.prototype.hasOwnProperty.call(body, 'guestRequestsPerDay');
-    if (includesGuestLimit && dbUser.role !== 'cdrrmo_super_admin') {
+    const includesDeduplicationRadius = Object.prototype.hasOwnProperty.call(body, 'deduplicationRadiusMeters');
+    if ((includesGuestLimit || includesDeduplicationRadius) && dbUser.role !== 'cdrrmo_super_admin') {
       return NextResponse.json({ error: "Forbidden: Only CDRRMO Super Admins can change the Guest Mode request limit" }, { status: 403 });
     }
 
@@ -92,6 +96,7 @@ export async function POST(req: NextRequest) {
     const guestRequestsPerDay = result.data.guestRequestsPerDay
       ?? currentConfig?.guestRequestsPerDay
       ?? 50;
+    const deduplicationRadiusMeters = result.data.deduplicationRadiusMeters ?? currentConfig?.deduplicationRadiusMeters ?? 250;
 
     // Upsert the system settings row
     const [updatedConfig] = await db.insert(systemSettings)
@@ -99,6 +104,7 @@ export async function POST(req: NextRequest) {
         id: 'current',
         dispatchOfferTimeoutSeconds,
         guestRequestsPerDay,
+        deduplicationRadiusMeters,
         updatedAt: new Date()
       })
       .onConflictDoUpdate({
@@ -106,6 +112,7 @@ export async function POST(req: NextRequest) {
         set: {
           dispatchOfferTimeoutSeconds,
           guestRequestsPerDay,
+          deduplicationRadiusMeters,
           updatedAt: new Date()
         }
       })
@@ -115,7 +122,7 @@ export async function POST(req: NextRequest) {
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(),
       userId: user.id,
-      action: `Updated system settings: Dispatch Offer Timeout set to ${dispatchOfferTimeoutSeconds}s; Guest Mode limit set to ${guestRequestsPerDay} requests/day`,
+      action: `Updated system settings: Dispatch Offer Timeout ${dispatchOfferTimeoutSeconds}s; Guest Mode limit ${guestRequestsPerDay}/day; Deduplication radius ${deduplicationRadiusMeters}m`,
       entityType: "SETTINGS",
       entityId: "current",
     });
@@ -126,6 +133,7 @@ export async function POST(req: NextRequest) {
       settings: {
         dispatchOfferTimeoutSeconds: updatedConfig.dispatchOfferTimeoutSeconds,
         guestRequestsPerDay: updatedConfig.guestRequestsPerDay,
+        deduplicationRadiusMeters: updatedConfig.deduplicationRadiusMeters,
         updatedAt: updatedConfig.updatedAt,
       }
     });

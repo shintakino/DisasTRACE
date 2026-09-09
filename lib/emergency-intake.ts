@@ -9,6 +9,7 @@ import { ChatbotSubmissionIdSchema } from '@/lib/chatbot/contracts';
 import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS, isLikelyDuplicateIncident } from '@/lib/incident-deduplication';
 import { isWithinOfficialBaliwagBoundary, resolveBaliwagBarangay } from '@/lib/barangay-boundaries';
 import { systemSettings } from '@/db/schema/system_settings';
+import { distanceBetweenCoordinatesMeters } from '@/lib/location-integrity';
 
 const IncidentTypeSchema = z.enum([
   'Medical Emergency',
@@ -151,9 +152,20 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
   if (!consistent) reasons.push('The incident answers need clarification.');
   if (nearbyDuplicate) reasons.push('A similar report was submitted nearby in the last 20 minutes.');
   if (repeatedContact) reasons.push('This contact number has repeated recent submissions.');
+  const photoLocationConflict = input.photoLatitude !== undefined
+    && input.photoLongitude !== undefined
+    && distanceBetweenCoordinatesMeters(
+      input.latitude,
+      input.longitude,
+      input.photoLatitude,
+      input.photoLongitude,
+    ) > 1_500;
+  if (photoLocationConflict) {
+    reasons.push('The attached photo GPS differs materially from the reported GPS. PACC review is required.');
+  }
 
   let triageClassification: TriageClassification;
-  if (nearbyDuplicate || repeatedContact) {
+  if (nearbyDuplicate || repeatedContact || photoLocationConflict) {
     triageClassification = 'SUSPICIOUS_POSSIBLE_PRANK';
   } else if (!consistent) {
     triageClassification = 'UNCERTAIN_INCOMPLETE';

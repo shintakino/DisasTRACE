@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import { resolveBaliwagLocation } from '../lib/baliwag-location';
+import { isMockedLocation } from '../lib/location-integrity';
 
 const MINIMUM_REFRESH_DISTANCE_METERS = 50;
 
@@ -79,6 +80,10 @@ export function useLiveBarangay(enabled: boolean, observedCoordinate?: Coordinat
         }
 
         const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (isMockedLocation(current)) {
+          if (active) setLocation({ city: null, barangay: null, state: 'unavailable' });
+          return;
+        }
         await resolveBarangay(current.coords);
         subscription = await Location.watchPositionAsync(
           {
@@ -86,7 +91,13 @@ export function useLiveBarangay(enabled: boolean, observedCoordinate?: Coordinat
             timeInterval: 30_000,
             distanceInterval: MINIMUM_REFRESH_DISTANCE_METERS,
           },
-          (nextLocation) => { void resolveBarangay(nextLocation.coords); },
+          (nextLocation) => {
+            if (isMockedLocation(nextLocation)) {
+              if (active) setLocation({ city: null, barangay: null, state: 'unavailable' });
+              return;
+            }
+            void resolveBarangay(nextLocation.coords);
+          },
         );
       } catch (error) {
         console.warn('[LiveBarangay] Unable to read device location:', error);

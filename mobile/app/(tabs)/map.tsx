@@ -12,6 +12,7 @@ import { formatBaliwagLocation } from '../../lib/baliwag-location';
 
 
 import * as Location from 'expo-location';
+import { isMockedLocation } from '../../lib/location-integrity';
 
 interface IncidentHotspot {
   id: string;
@@ -44,7 +45,7 @@ export default function MapScreen() {
           const current = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.High,
           });
-          if (current && current.coords && isMounted) {
+          if (current && current.coords && !isMockedLocation(current) && isMounted) {
             setUserLocation([current.coords.longitude, current.coords.latitude]);
             setHasLiveLocation(true);
             setLocationUpdatedAt(new Date());
@@ -57,7 +58,7 @@ export default function MapScreen() {
               distanceInterval: 1,
             },
             (loc) => {
-              if (loc && loc.coords && isMounted) {
+              if (loc && loc.coords && !isMockedLocation(loc) && isMounted) {
                 setUserLocation([loc.coords.longitude, loc.coords.latitude]);
                 setHasLiveLocation(true);
                 setLocationUpdatedAt(new Date());

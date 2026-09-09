@@ -1,5 +1,11 @@
 # Progress Tracker
 
+## 2026-09-09 — Android location-integrity baseline
+
+- Added Android mock-location handling across resident reporting, resident location displays, responder foreground/background tracking, and the responder map. A location explicitly flagged by the Android provider as mocked is rejected before it can be used; responder mock signals receive a rate-limited audit event and do not replace the stored responder position.
+- Added server-side responder movement plausibility checks. A rapid position jump that exceeds 300 km/h plus a 250 m GPS allowance is held with the previous trusted position retained, and is recorded once per minute in the audit trail. A report whose optional evidence-photo GPS is more than 1.5 km from its captured report GPS is routed to PACC review rather than auto-dispatched.
+- The remaining hardening step is Google Play Integrity: request a standard integrity token immediately before protected report/telemetry calls, bind it to the exact request hash, and verify the verdict on the server. This needs the project owner to configure a Play Console/Google Cloud project and release signing, so it was intentionally not substituted with a client-only check.
+
 ## 2026-09-09 — Release hardening follow-up
 
 - Made the official 27-polygon Barangay resolver the authoritative service-area check for every chatbot and legacy report intake path. Reports in the old rectangular GPS envelope but outside City of Baliwag are rejected before they can be stored or dispatched.

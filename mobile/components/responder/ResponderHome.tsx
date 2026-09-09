@@ -24,6 +24,7 @@ import { formatBaliwagLocation } from '../../lib/baliwag-location';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
 import * as Notifications from 'expo-notifications';
 import { isNotificationVisibleForRole } from '../../lib/report-location';
+import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 
 // Helper to calculate distance in meters
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -48,6 +49,7 @@ export function ResponderHome() {
   const { profile, user, role } = useAuthStatus();
   const { isOnline } = useOfflineReports();
   const [unreadCount, setUnreadCount] = useState(0);
+  const mockLocationWarningShown = useRef(false);
 
   // Configure notifications permissions and foreground notification behavior
   useEffect(() => {
@@ -733,6 +735,13 @@ export function ResponderHome() {
           },
           (loc) => {
             if (isSimulatingRef.current) return;
+            if (isMockedLocation(loc)) {
+              if (!mockLocationWarningShown.current) {
+                mockLocationWarningShown.current = true;
+                Alert.alert('Responder GPS paused', MOCK_LOCATION_MESSAGE);
+              }
+              return;
+            }
             let lat = loc.coords.latitude;
             let lng = loc.coords.longitude;
             
@@ -791,6 +800,13 @@ export function ResponderHome() {
         if (fgStatus === 'granted') {
           const lastLoc = await Location.getLastKnownPositionAsync();
           if (lastLoc && lastLoc.coords) {
+            if (isMockedLocation(lastLoc)) {
+              if (!mockLocationWarningShown.current) {
+                mockLocationWarningShown.current = true;
+                Alert.alert('Responder GPS paused', MOCK_LOCATION_MESSAGE);
+              }
+              return;
+            }
             let lat = lastLoc.coords.latitude;
             let lng = lastLoc.coords.longitude;
             

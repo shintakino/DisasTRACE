@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
+import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 import { ChevronLeft, ChevronDown, ChevronUp, Image as ImageIcon, CheckCircle, MapPin, AlertCircle, Minus, Plus } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { isWithinBaliwag } from '../../lib/chatbot-contracts';
@@ -102,15 +103,18 @@ export default function FormScreen() {
         ]);
 
         if (loc && loc.coords) {
+          if (isMockedLocation(loc)) throw new Error(MOCK_LOCATION_MESSAGE);
           lat = loc.coords.latitude;
           lng = loc.coords.longitude;
         }
       } catch (gpsError) {
+        if (gpsError instanceof Error && gpsError.message === MOCK_LOCATION_MESSAGE) throw gpsError;
         console.warn('[GPS] High accuracy request failed/timed out, attempting cached location:', gpsError);
         try {
           // Fallback 1: Get last known cached location
           const lastLoc = await Location.getLastKnownPositionAsync();
           if (lastLoc && lastLoc.coords) {
+            if (isMockedLocation(lastLoc)) throw new Error(MOCK_LOCATION_MESSAGE);
             lat = lastLoc.coords.latitude;
             lng = lastLoc.coords.longitude;
             console.log('[GPS] Retrieved cached location successfully.');
@@ -118,6 +122,7 @@ export default function FormScreen() {
             throw new Error('No cached position available');
           }
         } catch (cacheError) {
+          if (cacheError instanceof Error && cacheError.message === MOCK_LOCATION_MESSAGE) throw cacheError;
           console.warn('[GPS] Cached location fallback failed, using default Baliwag coordinates:', cacheError);
           throw new Error('No usable GPS position available');
         }

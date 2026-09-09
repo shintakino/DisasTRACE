@@ -17,6 +17,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 import { formatBaliwagLocation, resolveBaliwagLocation } from '../../lib/baliwag-location';
 import {
   Camera,
@@ -203,6 +204,7 @@ export default function EmergencyChatbotScreen() {
         throw new Error('Location permission is required to submit an incident report.');
       }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      if (isMockedLocation(location)) throw new Error(MOCK_LOCATION_MESSAGE);
       const resolved = await resolveBaliwagLocation(location.coords.latitude, location.coords.longitude);
       const formatted = formatBaliwagLocation(resolved?.barangay);
       if (!formatted) throw new Error('This GPS point is outside an official Baliwag barangay boundary.');

@@ -104,6 +104,11 @@
 - Notification types: report verification updates, dispatch alerts, incident resolutions, account verification results, pending registration alerts (for admins).
 - Both all/unread filtering is supported in the notification panel.
 
+## Location Integrity
+
+- Android reports and responder telemetry reject locations explicitly marked by the Android location provider as mocked. Responder telemetry retains the last trusted server position when a fresh coordinate would require implausible travel; both events are rate-limited in the audit trail.
+- These signals are not device attestation. Release enforcement against a modified or rooted client requires a server-verified Google Play Integrity verdict bound to the protected request.
+
 ## Invariants
 
 1. Unverified mobile users are blocked from all app functionality — enforced at both API and client level.

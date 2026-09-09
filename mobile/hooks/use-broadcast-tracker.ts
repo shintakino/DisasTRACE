@@ -3,6 +3,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { supabase } from '../lib/supabase';
 import { useResponderStore, checkConnectivity } from '../stores/useResponderStore';
+import { isMockedLocation } from '../lib/location-integrity';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
@@ -18,8 +19,11 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
         const location = locations[0];
         const lat = location.coords.latitude;
         const lng = location.coords.longitude;
+        const isMockedLocationSignal = isMockedLocation(location);
         
-        console.log(`[Background GPS Task] Live background coordinate sync: ${lat}, ${lng}`);
+        console.log(isMockedLocationSignal
+          ? '[Background GPS Task] Mock location signal detected.'
+          : '[Background GPS Task] Live background coordinate sync.');
         
         try {
           const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -33,7 +37,8 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
             headers: reqHeaders,
             body: JSON.stringify({
               latitude: lat,
-              longitude: lng
+              longitude: lng,
+              isMockedLocation: isMockedLocationSignal,
             })
           });
         } catch (err) {
@@ -129,7 +134,7 @@ export function useBroadcastTracker(
     }
 
     // Helper to query location with high-accuracy, cache fallback, and safe defaults
-    const queryPosition = async (): Promise<{ latitude: number; longitude: number; heading: number; speed: number } | null> => {
+    const queryPosition = async (): Promise<{ latitude: number; longitude: number; heading: number; speed: number; isMockedLocation: boolean } | null> => {
       try {
         const loc = await Promise.race([
           Location.getCurrentPositionAsync({
@@ -144,7 +149,8 @@ export function useBroadcastTracker(
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
             heading: loc.coords.heading || 0,
-            speed: loc.coords.speed || 0
+            speed: loc.coords.speed || 0,
+            isMockedLocation: isMockedLocation(loc),
           };
         }
       } catch (err) {
@@ -156,7 +162,8 @@ export function useBroadcastTracker(
               latitude: lastLoc.coords.latitude,
               longitude: lastLoc.coords.longitude,
               heading: lastLoc.coords.heading || 0,
-              speed: lastLoc.coords.speed || 0
+              speed: lastLoc.coords.speed || 0,
+              isMockedLocation: isMockedLocation(lastLoc),
             };
           }
         } catch (cacheErr) {
@@ -170,10 +177,24 @@ export function useBroadcastTracker(
           latitude: 14.954 + (Math.random() - 0.5) * 0.002,
           longitude: 120.902 + (Math.random() - 0.5) * 0.002,
           heading: 0,
-          speed: 0
+          speed: 0,
+          isMockedLocation: false,
         };
       }
       return null;
+    };
+
+    const signalMockLocation = async (position: { latitude: number; longitude: number }) => {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetch(`${apiUrl}/api/responder/location`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ ...position, isMockedLocation: true }),
+      });
     };
 
     // Start location updates on a 3-second fixed interval
@@ -185,6 +206,10 @@ export function useBroadcastTracker(
 
         const pos = await queryPosition();
         if (pos) {
+          if (pos.isMockedLocation) {
+            await signalMockLocation(pos);
+            return;
+          }
           let lat = pos.latitude;
           let lng = pos.longitude;
 
@@ -315,6 +340,10 @@ export function useBroadcastTracker(
 
         const pos = await queryPosition();
         if (pos) {
+          if (pos.isMockedLocation) {
+            await signalMockLocation(pos);
+            return;
+          }
           let lat = pos.latitude;
           let lng = pos.longitude;
 

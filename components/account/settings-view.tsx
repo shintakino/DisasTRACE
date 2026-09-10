@@ -10,6 +10,7 @@ import { Mail, Clock, Gauge } from "lucide-react";
 import { toast } from "sonner";
 import { createClientBrowser } from "@/lib/supabase";
 import { HospitalSettings } from "./hospital-settings";
+import { DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT, MAX_GUEST_REPORTS_PER_PHONE_LIMIT } from "@/lib/guest-report-limit";
 
 
 export function SettingsView() {
@@ -30,7 +31,7 @@ export function SettingsView() {
   const [passwordError, setPasswordError] = useState("");
 
   const [dispatchTimeout, setDispatchTimeout] = useState<number>(30);
-  const [guestRequestsPerDay, setGuestRequestsPerDay] = useState<number>(50);
+  const [guestReportsPerPhoneLimit, setGuestReportsPerPhoneLimit] = useState<number>(DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT);
   const [deduplicationRadiusMeters, setDeduplicationRadiusMeters] = useState<number>(250);
   const [dispatchLoading, setDispatchLoading] = useState(false);
   const [guestLimitLoading, setGuestLimitLoading] = useState(false);
@@ -43,7 +44,7 @@ export function SettingsView() {
       const data = await response.json();
       if (data.success && data.settings) {
         setDispatchTimeout(data.settings.dispatchOfferTimeoutSeconds);
-        setGuestRequestsPerDay(data.settings.guestRequestsPerDay ?? 50);
+        setGuestReportsPerPhoneLimit(data.settings.guestReportsPerPhoneLimit ?? DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT);
         setDeduplicationRadiusMeters(data.settings.deduplicationRadiusMeters ?? 250);
       }
     } catch (error) {
@@ -88,8 +89,8 @@ export function SettingsView() {
   };
 
   const handleUpdateGuestLimit = async () => {
-    if (guestRequestsPerDay < 1 || guestRequestsPerDay > 10000) {
-      toast.error("Guest Mode requests per day must be between 1 and 10,000.");
+    if (guestReportsPerPhoneLimit < 1 || guestReportsPerPhoneLimit > MAX_GUEST_REPORTS_PER_PHONE_LIMIT) {
+      toast.error(`Guest reports per phone number must be between 1 and ${MAX_GUEST_REPORTS_PER_PHONE_LIMIT}.`);
       return;
     }
     setGuestLimitLoading(true);
@@ -98,11 +99,11 @@ export function SettingsView() {
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestRequestsPerDay }),
+        body: JSON.stringify({ guestReportsPerPhoneLimit }),
       });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || "Failed to update Guest Mode limit");
-      toast.success("Guest Mode request limit saved successfully!");
+      toast.success("Guest Mode phone limit saved successfully!");
     } catch (err: any) {
       toast.error(err.message || "Failed to update Guest Mode limit.");
     } finally {
@@ -360,29 +361,29 @@ export function SettingsView() {
                         <Gauge className="h-6 w-6" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-amber-900 text-sm">Guest Mode Capacity</h4>
+                        <h4 className="font-bold text-amber-900 text-sm">Guest Mode Reports per Phone</h4>
                         <p className="text-xs text-amber-800/80 mt-1 leading-relaxed">
-                          Limit the number of Guest Mode emergency requests accepted during each Manila calendar day. Requests are rejected safely once the limit is reached.
+                          Limit the total Guest Mode reports a phone number can submit. The limit applies for the lifetime of that guest number and encourages registration after it is reached.
                         </p>
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="guestRequestsPerDay" className="text-sm font-semibold text-[#1E293B]">
-                        Guest Mode Requests Per Day
+                      <Label htmlFor="guestReportsPerPhoneLimit" className="text-sm font-semibold text-[#1E293B]">
+                        Lifetime Reports per Phone Number
                       </Label>
                       <div className="flex gap-3">
                         <Input
-                          id="guestRequestsPerDay"
+                          id="guestReportsPerPhoneLimit"
                           type="number"
                           min={1}
-                          max={10000}
-                          value={guestRequestsPerDay}
-                          onChange={(e) => setGuestRequestsPerDay(parseInt(e.target.value, 10) || 50)}
+                          max={MAX_GUEST_REPORTS_PER_PHONE_LIMIT}
+                          value={guestReportsPerPhoneLimit}
+                          onChange={(e) => setGuestReportsPerPhoneLimit(parseInt(e.target.value, 10) || DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT)}
                           className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white"
                         />
                         <div className="bg-slate-100 border border-slate-200 text-[#475569] font-bold px-4 rounded-xl flex items-center justify-center text-sm shrink-0">
-                          requests/day
+                          reports/phone
                         </div>
                       </div>
                     </div>
@@ -392,7 +393,7 @@ export function SettingsView() {
                       disabled={guestLimitLoading || !hasLoadedSettings}
                       className="w-full h-12 bg-[#B91C1C] text-white hover:bg-red-800 font-semibold rounded-xl transition-all shadow-md active:scale-[0.99]"
                     >
-                      {guestLimitLoading ? "Saving Guest Limit..." : "Save Guest Mode Limit"}
+                      {guestLimitLoading ? "Saving Guest Limit..." : "Save Phone Report Limit"}
                     </Button>
                     <div className="mt-8 space-y-4 border-t border-slate-200 pt-8">
                       <div className="space-y-2">

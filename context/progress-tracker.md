@@ -1,5 +1,10 @@
 # Progress Tracker
 
+## 2026-09-10 — Guest Mode lifetime phone report limit
+
+- Replaced the shared Manila-calendar-day Guest Mode capacity with a server-enforced lifetime report limit per normalized guest phone number. The default is three reports per phone number; `09xx` and `+639xx` forms resolve to the same quota, including legacy records.
+- Added the CDRRMO Super Admin setting to increase or decrease that per-phone limit (1–100). Existing daily-cap storage remains only for deployment compatibility and is no longer enforced. The additive `0012_guest_phone_lifetime_report_limit` migration adds the canonical setting and its database range constraint.
+
 ## 2026-09-09 — Android location-integrity baseline
 
 - Added Android mock-location handling across resident reporting, resident location displays, responder foreground/background tracking, and the responder map. A location explicitly flagged by the Android provider as mocked is rejected before it can be used; responder mock signals receive a rate-limited audit event and do not replace the stored responder position.

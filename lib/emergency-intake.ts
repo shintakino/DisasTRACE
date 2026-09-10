@@ -10,6 +10,7 @@ import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS,
 import { isWithinOfficialBaliwagBoundary, resolveBaliwagBarangay } from '@/lib/barangay-boundaries';
 import { systemSettings } from '@/db/schema/system_settings';
 import { distanceBetweenCoordinatesMeters } from '@/lib/location-integrity';
+import { normalizePhilippineMobileNumber, samePhilippineMobileNumber } from '@/lib/phone-number';
 
 const IncidentTypeSchema = z.enum([
   'Medical Emergency',
@@ -22,8 +23,8 @@ const IncidentTypeSchema = z.enum([
 
 const ContactNumberSchema = z.string()
     .trim()
-    .transform((value) => value.replace(/[\s()-]/g, ''))
-    .refine((value) => /^(?:\+63|0)9\d{9}$/.test(value), {
+    .transform(normalizePhilippineMobileNumber)
+    .refine((value) => /^09\d{9}$/.test(value), {
       message: 'Use a valid Philippine mobile number, such as 09171234567 or +639171234567.',
     });
 
@@ -97,7 +98,7 @@ async function loadChatbotReplay(input: EmergencyIntake, actor: IntakeActor) {
   if (!existing) return null;
   const belongsToActor = actor.reporterType === 'REGISTERED'
     ? existing.reporterType === 'REGISTERED' && existing.residentId === actor.residentId
-    : existing.reporterType === 'GUEST' && existing.contactNumber === input.contactNumber;
+    : existing.reporterType === 'GUEST' && samePhilippineMobileNumber(existing.contactNumber, input.contactNumber);
   if (!belongsToActor) throw new Error('This chatbot submission ID is already in use.');
   const incident = await db.query.incidents.findFirst({ where: eq(incidents.requestId, existing.id) });
   return {
@@ -141,7 +142,7 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
     { type: input.incidentType, latitude: input.latitude, longitude: input.longitude },
     report, deduplicationRadiusMeters,
   ));
-  const repeatedContact = recentReports.filter((report) => report.contactNumber === input.contactNumber).length >= 2;
+  const repeatedContact = recentReports.filter((report) => samePhilippineMobileNumber(report.contactNumber, input.contactNumber)).length >= 2;
   const reasons: string[] = [];
   const barangay = resolveBaliwagBarangay(input.latitude, input.longitude);
   if (!barangay) {

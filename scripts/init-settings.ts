@@ -15,12 +15,17 @@ async function initSettings() {
         id VARCHAR(50) PRIMARY KEY,
         dispatch_offer_timeout_seconds INTEGER NOT NULL DEFAULT 30,
         guest_requests_per_day INTEGER NOT NULL DEFAULT 50,
+        guest_reports_per_phone_limit INTEGER NOT NULL DEFAULT 3,
         updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
       );
     `));
     await db.execute(sql.raw(`
       ALTER TABLE system_settings
       ADD COLUMN IF NOT EXISTS guest_requests_per_day INTEGER NOT NULL DEFAULT 50;
+    `));
+    await db.execute(sql.raw(`
+      ALTER TABLE system_settings
+      ADD COLUMN IF NOT EXISTS guest_reports_per_phone_limit INTEGER NOT NULL DEFAULT 3;
     `));
     console.log('✅ Table verified successfully.');
 

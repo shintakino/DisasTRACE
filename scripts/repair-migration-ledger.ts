@@ -39,6 +39,7 @@ const expectedTables = [
 
 const expectedColumns = [
   ['system_settings', 'guest_requests_per_day'],
+  ['system_settings', 'guest_reports_per_phone_limit'],
   ['system_settings', 'dispatch_offer_timeout_seconds'],
   ['users', 'location_geom'],
   ['users', 'duty_status'],

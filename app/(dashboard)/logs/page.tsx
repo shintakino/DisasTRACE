@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card"
 import { WebPreloader } from "@/components/ui/web-preloader"
 import { toast } from "sonner"
 import { createClientBrowser } from "@/lib/supabase"
+import { CommandPageHeading } from "@/components/dashboard/command-page-heading"
 
 export default function LogsPage() {
   const { role } = useAuth()
@@ -94,12 +95,10 @@ export default function LogsPage() {
   return (
     <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-50/50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight text-slate-800 uppercase">Status & Activity Logs</h2>
-          <p className="text-slate-500 font-medium text-sm">
-            Monitor real-time responder status transitions and event history.
-          </p>
-        </div>
+        <CommandPageHeading
+          title="Status and activity logs"
+          description="Monitor real-time responder status transitions and event history."
+        />
       </div>
 
       <div className="flex flex-col rounded-xl shadow-xl border border-slate-200/80 overflow-hidden bg-white">

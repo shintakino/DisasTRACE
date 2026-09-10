@@ -57,6 +57,8 @@ export async function GET(request: Request) {
       'Fire Emergency': { name: 'Fire / Explosion', fill: '#0F4503' },
       'Flood/Water': { name: 'Flood / Water', fill: '#2803A2' },
       'Unknown Cause': { name: 'Unknown Cause', fill: '#9B058C' },
+      'Patient Transport': { name: 'Patient Transport', fill: '#0F766E' },
+      'Other / non-emergency request': { name: 'Other / non-emergency request', fill: '#7C3AED' },
     };
 
     // Dynamic distribution computation
@@ -78,6 +80,8 @@ export async function GET(request: Request) {
       'Fire Emergency': 'fire',
       'Flood/Water': 'water',
       'Unknown Cause': 'unknown',
+      'Patient Transport': 'transport',
+      'Other / non-emergency request': 'other',
     };
 
     if (normalizedTrendFilter === 'today') {

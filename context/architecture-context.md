@@ -56,6 +56,8 @@
     - `pacc_admin` — PACC Admin (Dispatcher)
     - `cdrrmo_super_admin` — CDRRMO Super Admin
 
+Public Users and Ambulance Responders sign in through the mobile-auth API. A single row in `mobile_device_sessions` holds a SHA-256 digest of the Android app-scoped identifier for each account; an atomic conditional upsert admits the original device and rejects a different active device. The raw device identifier is never stored. Dashboard/admin browser sessions are intentionally outside this mobile-only rule.
+
 ### Account Verification Gate
 
 - Mobile users (Public User, Ambulance Responder) must be verified before accessing any app functionality.
@@ -71,6 +73,7 @@
 - Approved residents and guests use the same validated REST intake. Guests provide a valid Philippine mobile callback number; the registered route derives that number from the verified account record rather than trusting device input. Both record incident details, an exact people-affected count, condition, automatic GPS, a nearby landmark/reference, and required evidence. Both chatbots automatically request foreground location permission and cannot proceed without a GPS capture inside the Baliwag City service boundary; the client explains an out-of-area capture and the API rejects it as a defense in depth.
 - Guest chatbot evidence is uploaded through `POST /api/emergency-intake/evidence`, which validates a 5MB JPEG/PNG/WebP file and uses the server storage client. This avoids granting unauthenticated guest devices direct Storage write access; the endpoint returns the public incident-photo URL used by intake.
 - The API records deterministic initial triage with reasons: `HIGH_CONFIDENCE_EMERGENCY`, `HIGH_CONFIDENCE_NON_EMERGENCY`, `UNCERTAIN_INCOMPLETE`, or `SUSPICIOUS_POSSIBLE_PRANK`. Only the first class starts automated ambulance dispatch. PACC receives the other classes and can override any classification.
+- The mobile incident selector classifies `Patient Transport`, `Other / non-emergency request`, and `Unknown Cause` as non-emergency; the server normalizes all remaining categories to emergency so client-side changes cannot downgrade emergency categories.
 - If a high-confidence emergency initially has no eligible nearby unit, it remains visible to PACC as `PENDING`. A responder changing to `ON_DUTY` or publishing a fresh GPS location runs a bounded, priority-ordered retry of that confirmed-emergency queue. Automatic dispatch, PACC manual dispatch, and PACC rejection serialize on the same locked verification-request row, re-read incident/responder state inside the transaction, and use atomic responder reservations to prevent duplicate incidents, double assignment, or deletion of a newly created offer. Manual selection is limited to active, approved, on-duty responders with a fresh five-minute location heartbeat. Responder acceptance atomically changes the incident to `EN_ROUTE`; timeout/rejection cascading must first atomically claim the still-current offer, so acceptance and reassignment cannot both win. The server remains the source of truth.
 - PACC-recorded coordination agencies live on the verification request and are delivered through its existing Realtime updates. The client derives human-readable coordination text from one or more recorded agencies and the actual incident/dispatch state. PNP, BFP, and other agencies are coordination entries; only ambulance responders are auto-dispatched by this system.
 - CDRRMO Super Admins control the lifetime Guest Mode report limit per normalized Philippine mobile number through the singleton `system_settings` row. A guest retry for the same chatbot submission never consumes another allowance; new reports receive a controlled `429` once that phone number reaches `guest_reports_per_phone_limit`. The phone number is a routing/contact value, not proof of ownership.
@@ -113,6 +116,7 @@
 
 1. Unverified mobile users are blocked from all app functionality — enforced at both API and client level.
 2. Auth and role checks are enforced at every API mutation boundary.
+3. A public-user or responder account has at most one active mobile device record; only a matching device digest can renew it, and sign-out removes it. Web administrator sessions are not affected.
 3. All database access goes through Drizzle ORM — no raw SQL.
 4. Binary assets (photos, IDs, PDFs) are stored in Supabase Storage, not in the database.
 5. Authenticated real-time data flows through Supabase Realtime. The only polling exception is a guest device refreshing its own token-authorized response state; anonymous database subscriptions are never exposed.

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { signInOnMobile } from '../../lib/mobile-auth';
 import { useRouter, Link } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -50,27 +50,24 @@ export default function SignInScreen() {
         }
       }
 
-      const { data: signInData, error } = await supabase.auth.signInWithPassword({
-        email: emailToUse,
-        password: data.password,
-      });
+      const signInData = await signInOnMobile(emailToUse, data.password);
 
-      if (error) {
-        if (error.message.includes('Email not confirmed') || error.message.includes('not verified')) {
-          setGlobalError("Your email has not been verified yet. Please check your inbox and confirm your address before logging in.");
-        } else {
-          setGlobalError(error.message);
-        }
+      if (!signInData.user) {
+        setGlobalError('Unable to start your mobile session.');
         return;
       }
 
       if (signInData.user) {
-        // Auth state change will handle routing in root layout
+        // Auth state change will handle routing in root layout.
         router.replace('/');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign in failed';
-      setGlobalError(message);
+      if (message.includes('Email not confirmed') || message.includes('not verified')) {
+          setGlobalError("Your email has not been verified yet. Please check your inbox and confirm your address before logging in.");
+      } else {
+        setGlobalError(message);
+      }
     }
   };
 

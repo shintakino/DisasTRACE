@@ -40,7 +40,7 @@ export function PACCResponderGrid({ responders = [] }: { responders?: Responder[
   };
 
   return (
-    <Card className="border-none shadow-md rounded-2xl overflow-hidden flex flex-col">
+    <Card className="flex flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
       <CardHeader className="bg-[#1E3A8A] p-4">
         <CardTitle className="text-xl font-bold text-white">Responders</CardTitle>
       </CardHeader>

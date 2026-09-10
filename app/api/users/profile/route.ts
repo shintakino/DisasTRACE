@@ -44,6 +44,12 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "User profile not found" }, { status: 404 });
     }
 
+    const attemptsNameChange = firstName !== undefined || middleName !== undefined
+      || lastName !== undefined || suffix !== undefined;
+    if (attemptsNameChange && (dbUser.role === 'public_user' || dbUser.role === 'ambulance_responder')) {
+      return NextResponse.json({ error: "Registered names cannot be changed from the mobile application." }, { status: 403 });
+    }
+
     // Check email uniqueness if email is changed
     if (email !== undefined && email.toLowerCase() !== dbUser.email.toLowerCase()) {
       const emailExists = await db.query.users.findFirst({

@@ -94,7 +94,9 @@ function resumePrompt(request: ChatbotRespondRequest, languageStyle: LanguageSty
 }
 
 function extractIncidentType(message: string): typeof CHATBOT_INCIDENT_TYPES[number] | undefined {
-  if (/\b(patient transport|minor medical|medical|ambulance|injur(?:y|ed)|sick|nahimatay)\b/i.test(message)) return 'Medical Emergency';
+  if (/\b(patient transport|transport patient|hospital transfer)\b/i.test(message)) return 'Patient Transport';
+  if (/\b(non[- ]?emergency|other request|general assistance)\b/i.test(message)) return 'Other / non-emergency request';
+  if (/\b(minor medical|medical|ambulance|injur(?:y|ed)|sick|nahimatay)\b/i.test(message)) return 'Medical Emergency';
   if (/\b(fire|sunog|nasusunog)\b/i.test(message)) return 'Fire Emergency';
   if (/\b(crash|collision|vehicular|car accident|bangga|aksidente sa sasakyan)\b/i.test(message)) return 'Vehicular Collision';
   if (/\b(structural|collapse|collapsed|building damage|gumuho|guho)\b/i.test(message)) return 'Structural Failure';
@@ -120,12 +122,14 @@ function extractCondition(message: string): typeof CHATBOT_CONDITIONS[number] | 
 
 function extractReportSlots(message: string): ChatbotResponse['slotUpdates'] {
   const incidentType = extractIncidentType(message);
-  const isNonEmergencyMedical = /\b(patient transport|minor medical|non[- ]?emergency)\b/i.test(message);
+  const isNonEmergency = incidentType === 'Patient Transport'
+    || incidentType === 'Other / non-emergency request'
+    || incidentType === 'Unknown Cause';
   const peopleInvolved = extractPeopleCount(message);
   const victimCondition = extractCondition(message);
   return {
     ...(incidentType ? { incidentType } : {}),
-    ...(incidentType ? { nature: isNonEmergencyMedical ? 'NON-EMERGENCY' as const : 'EMERGENCY' as const } : {}),
+    ...(incidentType ? { nature: isNonEmergency ? 'NON-EMERGENCY' as const : 'EMERGENCY' as const } : {}),
     ...(peopleInvolved ? { peopleInvolved } : {}),
     ...(victimCondition ? { victimCondition } : {}),
   };

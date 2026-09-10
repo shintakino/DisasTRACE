@@ -7,6 +7,8 @@ export const CHATBOT_INCIDENT_TYPES = [
   'Structural Failure',
   'Flood/Water',
   'Unknown Cause',
+  'Patient Transport',
+  'Other / non-emergency request',
 ] as const;
 
 /**
@@ -14,9 +16,12 @@ export const CHATBOT_INCIDENT_TYPES = [
  * therefore a system classification, not a reporter choice. Free-text intake
  * can still classify a patient-transport request as non-emergency in policy.
  */
-export function deriveChatbotNature(incidentType: typeof CHATBOT_INCIDENT_TYPES[number]): 'EMERGENCY' {
-  if (!CHATBOT_INCIDENT_TYPES.includes(incidentType)) return 'EMERGENCY';
-  return 'EMERGENCY';
+export function deriveChatbotNature(incidentType: typeof CHATBOT_INCIDENT_TYPES[number]): 'EMERGENCY' | 'NON-EMERGENCY' {
+  return incidentType === 'Patient Transport'
+    || incidentType === 'Other / non-emergency request'
+    || incidentType === 'Unknown Cause'
+    ? 'NON-EMERGENCY'
+    : 'EMERGENCY';
 }
 
 export const CHATBOT_CONDITIONS = [

@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CommandPageHeading } from "@/components/dashboard/command-page-heading";
 import {
   Table,
   TableBody,
@@ -154,12 +155,10 @@ export default function SupportMessagesPage() {
   return (
     <div className="flex-1 space-y-6 p-8 pt-6 bg-[#F3F4F6]">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-[#1E3A8A] font-heading">Support Messages</h2>
-          <p className="text-muted-foreground text-sm">
-            Manage feedback and general inquiries submitted by residents from the mobile app.
-          </p>
-        </div>
+        <CommandPageHeading
+          title="Support messages"
+          description="Manage feedback and general inquiries submitted by residents from the mobile app."
+        />
       </div>
 
       {/* Metric Cards */}

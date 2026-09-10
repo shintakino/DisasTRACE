@@ -33,11 +33,6 @@ export default function PersonalInfoScreen() {
   }, [user, profile]);
 
   const persistProfile = async (phoneValue?: string) => {
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Validation Error', 'First name and Last name are required.');
-      return;
-    }
-
     if (role === 'ambulance_responder' && !email.trim()) {
       Alert.alert('Validation Error', 'Email address is required.');
       return;
@@ -60,10 +55,6 @@ export default function PersonalInfoScreen() {
         method: 'PATCH',
         headers: reqHeaders,
         body: JSON.stringify({
-          firstName: firstName.trim(),
-          middleName: middleName.trim(),
-          lastName: lastName.trim(),
-          suffix: suffix.trim(),
           ...(phoneValue ? { phone: phoneValue } : {}),
           email: role === 'ambulance_responder' ? email.trim() : undefined,
         }),
@@ -88,10 +79,6 @@ export default function PersonalInfoScreen() {
   };
 
   const handleSaveChanges = async () => {
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Validation Error', 'First name and Last name are required.');
-      return;
-    }
     if (role === 'ambulance_responder' && !email.trim()) {
       Alert.alert('Validation Error', 'Email address is required.');
       return;
@@ -176,9 +163,8 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">First Name</Text>
               <TextInput 
                 value={firstName}
-                onChangeText={setFirstName}
-                editable={!loading}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
+                editable={false}
+                className="bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-slate-500 font-medium"
                 placeholder="JUAN"
                 autoCapitalize="words"
               />
@@ -188,9 +174,8 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">Middle Name (Optional)</Text>
               <TextInput 
                 value={middleName}
-                onChangeText={setMiddleName}
-                editable={!loading}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
+                editable={false}
+                className="bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-slate-500 font-medium"
                 placeholder="SANTOS"
                 autoCapitalize="words"
               />
@@ -200,9 +185,8 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">Last Name</Text>
               <TextInput 
                 value={lastName}
-                onChangeText={setLastName}
-                editable={!loading}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
+                editable={false}
+                className="bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-slate-500 font-medium"
                 placeholder="DELA CRUZ"
                 autoCapitalize="words"
               />
@@ -212,9 +196,8 @@ export default function PersonalInfoScreen() {
               <Text className="text-sm font-semibold text-slate-700 mb-2">Suffix Name (Optional)</Text>
               <TextInput 
                 value={suffix}
-                onChangeText={setSuffix}
-                editable={!loading}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium"
+                editable={false}
+                className="bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-slate-500 font-medium"
                 placeholder="JR., SR., III"
                 autoCapitalize="words"
               />

@@ -6,7 +6,7 @@ import { useLocationPermission } from '../../hooks/use-location-permission';
 import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
 import { HelpButton } from '../../components/dashboard/HelpButton';
 import { OfflineBanner } from '../../components/dashboard/OfflineBanner';
-import { HelpCircle, Shield, Check } from 'lucide-react-native';
+import { Shield, Check } from 'lucide-react-native';
 import { Location as LocationIcon, NotificationBing } from 'iconsax-react-native';
 import { useOfflineReports } from '../../hooks/use-offline-reports';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,6 +14,7 @@ import { useRouter, Tabs } from 'expo-router';
 import { ResponderHome } from '../../components/responder/ResponderHome';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { useChatbotStore } from '../../store/use-chatbot-store';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
 import { isNotificationVisibleForRole } from '../../lib/report-location';
@@ -269,10 +270,16 @@ export default function HomeScreen() {
                 return;
               }
             }
+            // The request is no longer resumable (for example, it was
+            // resolved). Clear both persisted report stores so a prior
+            // completed report cannot reopen the chatbot or tracking flow.
+            useEmergencyReportStore.getState().resetReport();
+            useChatbotStore.getState().clearReportToIdle();
           } else if (active) {
             // Clear a terminal report restored by an earlier screen so Home
             // cannot keep presenting an obsolete pending/tracking state.
             useEmergencyReportStore.getState().resetReport();
+            useChatbotStore.getState().clearReportToIdle();
           }
         } else if (role === 'ambulance_responder') {
           console.log('[HomeScreen] Checking for active dispatch in database for responder:', user.id);
@@ -654,9 +661,6 @@ export default function HomeScreen() {
                 <Text className="text-white/90 text-xs mt-0.5 leading-snug">
                   Spotted an issue in your area? Contact us so we can fix it.
                 </Text>
-              </View>
-              <View className="bg-white/10 p-2 rounded-xl border border-white/10">
-                <HelpCircle size={20} color="white" opacity={0.8} />
               </View>
             </View>
             

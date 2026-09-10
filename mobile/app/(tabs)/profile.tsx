@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Platform, StatusBar, Modal, Image, Alert, ActivityIndicator } from 'react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
+import { useLiveBarangay } from '../../hooks/use-live-barangay';
 import { supabase } from '../../lib/supabase';
 import { Edit2, Logout, User, FolderOpen, Notification, MessageQuestion, Lock1, ArrowLeft2 } from 'iconsax-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadAvatar } from '../../lib/storage';
+import { signOutFromMobile } from '../../lib/mobile-auth';
 
 export default function ProfileScreen() {
   const { user, role, profile } = useAuthStatus();
@@ -15,7 +17,6 @@ export default function ProfileScreen() {
   const isResponder = role === 'ambulance_responder';
 
   const [dbCount, setDbCount] = useState(0);
-  const [dbActiveCount, setDbActiveCount] = useState(0);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [updatingDuty, setUpdatingDuty] = useState(false);
@@ -74,16 +75,6 @@ export default function ProfileScreen() {
             setDbCount(data.length);
           }
 
-          // Fetch active (unresolved) incidents assigned to this responder
-          const { data: activeIncidents, error: incError } = await supabase
-            .from('incidents')
-            .select('id')
-            .eq('responder_id', currentUserId)
-            .neq('status', 'RESOLVED');
-
-          if (!incError && activeIncidents && isMounted) {
-            setDbActiveCount(activeIncidents.length);
-          }
         } else {
           // Fetch resident's incidents via verification requests to get accurate counts
           const { data: vRequests, error: vError } = await supabase
@@ -106,16 +97,9 @@ export default function ProfileScreen() {
             if (incError) throw incError;
 
             const totalIncidents = incidentData?.length || 0;
-            // Active = incidents that are NOT resolved (still dispatched, en route, or arrived)
-            const activeIncidents = incidentData?.filter(
-              inc => inc.status !== 'RESOLVED'
-            ).length || 0;
-
             setDbCount(totalIncidents);
-            setDbActiveCount(activeIncidents);
           } else if (isMounted) {
             setDbCount(0);
-            setDbActiveCount(0);
           }
         }
       } catch (err) {
@@ -172,8 +156,12 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
-    setLogoutVisible(false);
-    await supabase.auth.signOut();
+    try {
+      await signOutFromMobile();
+      setLogoutVisible(false);
+    } catch (error) {
+      Alert.alert('Sign out unavailable', error instanceof Error ? error.message : 'Please try again while connected to the internet.');
+    }
   };
 
   const getInitials = (name: string) => {
@@ -204,8 +192,14 @@ export default function ProfileScreen() {
   const vehicleInitials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
   const suffix = user?.id ? user.id.slice(-3).toUpperCase() : "";
   const vehicleId = `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
-  const registeredBarangay = profile?.address?.split(',')[1]?.trim();
-  const registeredLocation = formatBaliwagLocation(registeredBarangay) || profile?.address || 'Address unavailable';
+  const liveLocation = useLiveBarangay(Boolean(user));
+  const registeredLocation = liveLocation.state === 'ready'
+    ? formatBaliwagLocation(liveLocation.barangay)
+    : liveLocation.state === 'loading'
+      ? 'Finding your location…'
+      : liveLocation.state === 'outside_service_area'
+        ? 'Outside Baliwag City'
+        : 'Location unavailable';
 
   const renderPillRow = (Icon: any, title: string, subtitle: string, onPress?: () => void) => (
     <TouchableOpacity 
@@ -335,7 +329,7 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <>
-                <Text className="text-sm text-blue-200">Registered location</Text>
+                <Text className="text-sm text-blue-200">Current location</Text>
                 <Text className="text-base font-bold text-white mb-2">{registeredLocation}</Text>
                 <Text className="text-sm text-blue-200">Date Joined</Text>
                 <Text className="text-base font-bold text-white">{formatDate(user?.created_at)}</Text>
@@ -369,8 +363,8 @@ export default function ProfileScreen() {
           FolderOpen, 
           'My Reports', 
           isResponder 
-            ? `${dbCount} total · ${dbActiveCount} active`
-            : `${dbCount} total · ${dbActiveCount} active`, 
+            ? `${dbCount} reports recorded`
+            : `${dbCount} reports recorded`,
           () => router.push('/(tabs)/reports')
         )}
         

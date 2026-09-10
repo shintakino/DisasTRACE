@@ -296,7 +296,7 @@ export default function HelpPage() {
           {activeTab === "contacts-edit" && (
             <form onSubmit={handleUpdateSupport} className="space-y-6 max-w-2xl">
               <div>
-                <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Support Contacts Settings</h2>
+                <h2 className="text-2xl font-bold text-[#1E3A8A] tracking-tight">Support Contacts Settings</h2>
                 <p className="text-slate-500 text-xs mt-1">Configure emergency hotlines and support channels visible on the mobile app.</p>
               </div>
 
@@ -359,7 +359,7 @@ export default function HelpPage() {
           {activeTab === "privacy-edit" && (
             <form onSubmit={handleUpdateSupport} className="space-y-6 max-w-3xl">
               <div>
-                <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Data Privacy Settings</h2>
+                <h2 className="text-2xl font-bold text-[#1E3A8A] tracking-tight">Data Privacy Settings</h2>
                 <p className="text-slate-500 text-xs mt-1">Manage data privacy and consent terms populated inside mobile user profile cards.</p>
               </div>
 
@@ -592,7 +592,7 @@ export default function HelpPage() {
       <div className="flex-1 min-w-0 p-6 md:p-8 overflow-y-auto">
         {activeTab === "privacy" && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight border-b pb-4">Privacy Policy</h2>
+            <h2 className="border-b pb-4 text-2xl font-bold tracking-tight text-[#1E3A8A]">Privacy Policy</h2>
             <div className="text-sm text-slate-600 leading-relaxed font-mono bg-slate-50 p-6 rounded-2xl border border-slate-100 whitespace-pre-line">
               {support.privacyPolicyFull}
             </div>
@@ -601,7 +601,7 @@ export default function HelpPage() {
 
         {activeTab === "terms" && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight border-b pb-4">Terms & Conditions</h2>
+            <h2 className="border-b pb-4 text-2xl font-bold tracking-tight text-[#1E3A8A]">Terms & Conditions</h2>
             <div className="text-sm text-slate-600 leading-relaxed space-y-4">
               <p className="font-bold text-slate-800">Welcome to DisasTRACE!</p>
               <p>These terms and conditions outline the rules and regulations for the use of the DisasTRACE centralized digital emergency reporting system.</p>
@@ -614,7 +614,7 @@ export default function HelpPage() {
 
         {activeTab === "contacts" && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight border-b pb-4">Hotlines & Support Contacts</h2>
+            <h2 className="border-b pb-4 text-2xl font-bold tracking-tight text-[#1E3A8A]">Hotlines & Support Contacts</h2>
             
             <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 lg:grid-cols-3">
               <Card className="rounded-2xl border border-slate-100 shadow-sm p-5 flex min-w-0 flex-col justify-between min-h-40">
@@ -667,7 +667,7 @@ export default function HelpPage() {
 
         {activeTab === "faqs" && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight border-b pb-4">Frequently Asked Questions</h2>
+            <h2 className="border-b pb-4 text-2xl font-bold tracking-tight text-[#1E3A8A]">Frequently Asked Questions</h2>
             
             <div className="space-y-3">
               {faqs.map((faq) => (

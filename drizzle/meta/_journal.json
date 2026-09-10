@@ -92,6 +92,13 @@
       "when": 1788998400000,
       "tag": "0012_guest_phone_lifetime_report_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789084800000,
+      "tag": "0013_mobile_device_sessions",
+      "breakpoints": true
     }
   ]
 }

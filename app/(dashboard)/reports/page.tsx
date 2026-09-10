@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { CommandPageHeading } from "@/components/dashboard/command-page-heading";
 
 import { WebPreloader } from "@/components/ui/web-preloader";
 
@@ -164,14 +165,12 @@ export default function ReportsPage() {
   return (
     <div className="flex-1 space-y-6 p-8 pt-6 bg-slate-50/50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight text-slate-800 uppercase">Reports Management</h2>
-          <p className="text-slate-500 font-medium text-sm">
-            {category === "responder"
-              ? "Review and audit historical post-incident reports from ambulance responders."
-              : "Review and audit historical emergency/incident reports submitted by residents."}
-          </p>
-        </div>
+        <CommandPageHeading
+          title="Reports management"
+          description={category === "responder"
+            ? "Review and audit historical post-incident reports from ambulance responders."
+            : "Review and audit historical emergency and incident reports submitted by residents."}
+        />
         <div className="flex bg-slate-200/80 rounded-full p-1 border border-slate-300/50 shadow-sm shrink-0">
           <button
             onClick={() => {

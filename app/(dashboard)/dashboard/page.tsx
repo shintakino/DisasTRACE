@@ -182,7 +182,7 @@ export default function DashboardPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0 pb-4">
+          <div className="grid grid-cols-1 gap-6 pb-4 lg:grid-cols-2">
             <RecentReports reports={data.reports} onReportClick={handleReportClick} />
             <ResponderStatus responders={data.responders} />
           </div>
@@ -200,7 +200,7 @@ export default function DashboardPage() {
             <KpiCards data={data.kpis} />
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[450px] shrink-0">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <RecentReports reports={data.reports} onReportClick={handleReportClick} />
             <IncidentDistribution 
               data={data.distribution} 

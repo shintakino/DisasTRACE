@@ -7,6 +7,8 @@ export const CHATBOT_INCIDENT_TYPES = [
   'Structural Failure',
   'Flood/Water',
   'Unknown Cause',
+  'Patient Transport',
+  'Other / non-emergency request',
 ] as const;
 
 export const CHATBOT_CONDITIONS = [

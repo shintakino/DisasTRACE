@@ -10,6 +10,8 @@ export const IncidentTypeSchema = z.enum([
   "Structural Failure",
   "Flood/Water",
   "Unknown Cause",
+  "Patient Transport",
+  "Other / non-emergency request",
 ]);
 export type IncidentType = z.infer<typeof IncidentTypeSchema>;
 

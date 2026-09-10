@@ -11,7 +11,7 @@ export const verificationRequests = pgTable('verification_requests', {
   status: text('status', { enum: ['PENDING', 'VERIFIED', 'REJECTED', 'DUPLICATE'] }).default('PENDING').notNull(),
   parentRequestId: varchar('parent_request_id', { length: 255 }).references((): AnyPgColumn => verificationRequests.id),
   nature: text('nature', { enum: ['EMERGENCY', 'NON-EMERGENCY'] }).default('EMERGENCY').notNull(),
-  type: text('type', { enum: ['Medical Emergency', 'Vehicular Collision', 'Fire Emergency', 'Structural Failure', 'Flood/Water', 'Unknown Cause'] }).notNull(),
+  type: text('type', { enum: ['Medical Emergency', 'Vehicular Collision', 'Fire Emergency', 'Structural Failure', 'Flood/Water', 'Unknown Cause', 'Patient Transport', 'Other / non-emergency request'] }).notNull(),
   peopleInvolved: text('people_involved').default('None').notNull(),
   severity: text('severity', { enum: ['Low', 'Medium', 'High', 'Critical'] }).default('Medium').notNull(),
   locationDescription: text('location_description'),

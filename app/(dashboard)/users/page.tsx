@@ -8,6 +8,7 @@ import { BanUserDialog, CreateUserDialog, ManageUserDialog } from "@/components/
 import { UserManagementEntry, UserFilter, UserStatus, UserRole } from "@/types/users";
 import { toast } from "sonner";
 import { WebPreloader } from "@/components/ui/web-preloader";
+import { CommandPageHeading } from "@/components/dashboard/command-page-heading";
 
 export default function UsersPage() {
   const [loading, setLoading] = React.useState(true);
@@ -186,10 +187,11 @@ export default function UsersPage() {
 
   return (
     <div className="h-full w-full overflow-y-auto p-8 space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black text-[#1E3A8A] tracking-tight">USER MANAGEMENT</h1>
-        <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.2em]">Administrative Control Center</p>
-      </div>
+      <CommandPageHeading
+        eyebrow="Administrative control center"
+        title="User management"
+        description="Manage user access, verification status, and administrative roles."
+      />
 
       <UserSummaryCards data={summary} />
 

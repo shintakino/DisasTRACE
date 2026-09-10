@@ -11,6 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { signOutFromMobile } from '../../lib/mobile-auth';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -178,7 +179,7 @@ export default function ResetPasswordScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       
       // Sign out any active sessions to secure the account and trigger fresh login
-      await supabase.auth.signOut().catch(() => {});
+      await signOutFromMobile().catch(() => {});
 
       setShowSuccessModal(true);
 

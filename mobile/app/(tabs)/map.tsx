@@ -249,9 +249,7 @@ export default function MapScreen() {
       </Map>
 
       <View className="absolute bottom-0 w-full">
-        <View className="bg-white rounded-t-[32px] pt-4 pb-24 px-6 shadow-2xl shadow-indigo-900/20 border border-slate-100 flex-col">
-          {/* Handle bar for bottom sheet aesthetic */}
-          <View className="w-12 h-1 bg-slate-200 rounded-full self-center mb-5" />
+        <View className="bg-white rounded-t-[32px] pt-6 pb-8 px-6 shadow-2xl shadow-indigo-900/20 border border-slate-100 flex-col">
           
           <View className="flex-row items-center">
             {selectedHospital ? (

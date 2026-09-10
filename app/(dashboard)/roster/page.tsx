@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 
 import { WebPreloader } from "@/components/ui/web-preloader"
+import { CommandPageHeading } from "@/components/dashboard/command-page-heading"
 
 export default function RosterPage() {
   const [data, setData] = React.useState<RosterEntry[]>([])
@@ -242,8 +243,12 @@ export default function RosterPage() {
 
   return (
     <div className="h-full flex flex-col p-6 animate-in fade-in duration-500 bg-[#F3F4F6] overflow-y-auto">
-      <div className="flex justify-end mb-4">
-        <Button 
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <CommandPageHeading
+          title="Responder roster"
+          description="Maintain responder accounts, availability records, and service assignments."
+        />
+        <Button
           className="bg-[#2B4C9B] hover:bg-[#2B4C9B]/90 text-white font-medium rounded-md px-4 h-10 shadow-sm"
           onClick={() => setIsAddModalOpen(true)}
         >

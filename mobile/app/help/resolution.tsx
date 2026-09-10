@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Keyboa
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Star } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { useChatbotStore } from '../../store/use-chatbot-store';
 import { supabase } from '../../lib/supabase';
 
 export default function ResolutionScreen() {
@@ -25,6 +26,7 @@ export default function ResolutionScreen() {
   useEffect(() => {
     const onBackPress = () => {
       resetReport();
+      useChatbotStore.getState().clearReportToIdle();
       router.replace('/(tabs)');
       return true;
     };
@@ -65,7 +67,8 @@ export default function ResolutionScreen() {
     }
     
     resetReport();
-    router.replace('/(tabs)/index' as any);
+    useChatbotStore.getState().clearReportToIdle();
+    router.replace('/(tabs)');
   };
 
   return (

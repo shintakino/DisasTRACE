@@ -4,6 +4,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, Pie, PieChart, Cell } from "rechar
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -66,9 +67,12 @@ export function IncidentTrends({
   const isEmpty = totalIncidents === 0;
 
   return (
-    <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
-        <CardTitle className="text-2xl font-bold text-[#1E293B]">Incident Summary</CardTitle>
+    <Card className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 p-6 pb-3">
+        <div>
+          <CardTitle className="text-lg font-bold text-[#1E3A8A]">Incident summary</CardTitle>
+          <CardDescription>Reports recorded during the selected period</CardDescription>
+        </div>
         <Select value={filter} onValueChange={(val) => onFilterChange?.(val || "")}>
           <SelectTrigger className="w-[120px] bg-[#F8FAFC] border-[#E2E8F0] h-9 rounded-lg text-sm font-medium">
             <SelectValue placeholder="Filter">
@@ -194,9 +198,12 @@ export function IncidentDistribution({
   const isEmpty = totalValue === 0;
 
   return (
-    <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-6 pb-2">
-        <CardTitle className="text-2xl font-bold text-[#1E293B]">Incident Distribution</CardTitle>
+    <Card className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 p-6 pb-3">
+        <div>
+          <CardTitle className="text-lg font-bold text-[#1E3A8A]">Incident distribution</CardTitle>
+          <CardDescription>Breakdown by reported incident type</CardDescription>
+        </div>
         <Select value={filter} onValueChange={(val) => onFilterChange?.(val || "")}>
           <SelectTrigger className="w-[120px] bg-[#F8FAFC] border-[#E2E8F0] h-9 rounded-lg text-sm font-medium">
             <SelectValue placeholder="Filter">

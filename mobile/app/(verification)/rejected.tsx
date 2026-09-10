@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Image, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { signOutFromMobile } from '../../lib/mobile-auth';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { XCircle, AlertCircle, Camera, Upload, ChevronDown } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -17,7 +18,7 @@ export default function RejectedVerificationScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOutFromMobile();
   };
 
   const takePhoto = async () => {

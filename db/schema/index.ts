@@ -13,6 +13,7 @@ export * from './feedbacks';
 export * from './phone_verifications';
 export * from './support_messages';
 export * from './patient_care';
+export * from './mobile_device_sessions';
 
 
 

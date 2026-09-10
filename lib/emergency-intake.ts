@@ -19,6 +19,8 @@ const IncidentTypeSchema = z.enum([
   'Structural Failure',
   'Flood/Water',
   'Unknown Cause',
+  'Patient Transport',
+  'Other / non-emergency request',
 ]);
 
 const ContactNumberSchema = z.string()
@@ -121,10 +123,13 @@ function isConsistent(input: EmergencyIntake) {
 
 export async function submitEmergencyIntake(input: EmergencyIntake, actor: IntakeActor) {
   // The mobile chatbot selector contains only the existing emergency types.
-  // Keep free-text patient-transport classification as the one supported
-  // non-emergency exception, but never allow a fire, collision, flood, or
-  // structural report to be downgraded by a client-supplied toggle.
-  const normalizedInput: EmergencyIntake = input.incidentType === 'Medical Emergency'
+  // Only the explicit non-emergency categories may bypass emergency dispatch.
+  // Every emergency category is normalized server-side so a modified client
+  // cannot downgrade a fire, collision, flood, or structural failure.
+  const supportsNonEmergency = input.incidentType === 'Patient Transport'
+    || input.incidentType === 'Other / non-emergency request'
+    || input.incidentType === 'Unknown Cause';
+  const normalizedInput: EmergencyIntake = supportsNonEmergency
     ? input
     : { ...input, nature: 'EMERGENCY' };
   input = normalizedInput;

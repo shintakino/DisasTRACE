@@ -6,6 +6,7 @@ import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPi
 import { Hospital } from 'iconsax-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
+import { signOutFromMobile } from '../../lib/mobile-auth';
 import * as Haptics from 'expo-haptics';
 
 const { height, width } = Dimensions.get('window');
@@ -852,7 +853,7 @@ export default function TrackingScreen() {
             }}
             onPress={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              await supabase.auth.signOut();
+              await signOutFromMobile();
             }}
           >
             <LogOut size={14} color="#FFF" style={{ marginRight: 6 }} />

@@ -80,8 +80,8 @@ export default function MyReportsScreen() {
 
   const filteredReports = reports.filter((r) => {
     if (activeTab === 'All') return true;
-    if (activeTab === 'Active') return r.status === 'ONGOING' || r.status === 'RESPONDING' || r.status === 'PENDING' || r.status === 'VERIFIED';
-    return r.status === 'COMPLETED' || r.status === 'REJECTED' || r.status === 'DUPLICATE' || r.status === 'RESOLVED';
+    if (activeTab === 'Completed') return r.status === 'COMPLETED' || r.status === 'RESOLVED';
+    return r.status === 'REJECTED' || r.status === 'DUPLICATE';
   });
 
   // Group reports for resident view
@@ -179,7 +179,7 @@ export default function MyReportsScreen() {
         <Text className="text-2xl font-bold text-white mb-6">My Reports</Text>
         
         <View className="flex-row bg-[#0F172A]/30 rounded-2xl p-1">
-          {['All', 'Active', 'Completed'].map((tab) => {
+          {['All', 'Completed', 'Rejected'].map((tab) => {
             const isActive = activeTab === tab;
             return (
               <TouchableOpacity

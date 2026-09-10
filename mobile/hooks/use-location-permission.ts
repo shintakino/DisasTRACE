@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
 
-export function useLocationPermission() {
+export function useLocationPermission(requireBackground = false) {
   const [isLocationGateActive, setIsLocationGateActive] = useState(false);
   const [status, setStatus] = useState<Location.PermissionStatus | null>(null);
   const [servicesEnabled, setServicesEnabled] = useState(true);
@@ -27,7 +27,12 @@ export function useLocationPermission() {
         return;
       }
 
-      // 3. Check background permission status (required for "Always" as per spec)
+      if (!requireBackground) {
+        setIsLocationGateActive(false);
+        return;
+      }
+
+      // 3. Background permission is required only for responder tracking.
       const { status: backgroundStatus } = await Location.getBackgroundPermissionsAsync();
       
       if (backgroundStatus !== 'granted') {
@@ -40,7 +45,7 @@ export function useLocationPermission() {
       console.error('Error checking location permissions:', error);
       setIsLocationGateActive(true);
     }
-  }, []);
+  }, [requireBackground]);
 
   const requestPermissions = useCallback(async () => {
     try {
@@ -52,7 +57,12 @@ export function useLocationPermission() {
         return { success: false, canAskAgain };
       }
 
-      // 2. If foreground is granted, request background
+      if (!requireBackground) {
+        setIsLocationGateActive(false);
+        return { success: true, canAskAgain: true };
+      }
+
+      // 2. If foreground is granted, request background for responder tracking.
       const { status: bgStatus, canAskAgain: bgCanAskAgain } = await Location.requestBackgroundPermissionsAsync();
       
       if (bgStatus === 'granted') {
@@ -65,7 +75,7 @@ export function useLocationPermission() {
       console.error('Error requesting location permissions:', error);
       return { success: false, canAskAgain: true };
     }
-  }, []);
+  }, [requireBackground]);
 
   useEffect(() => {
     checkPermissions();

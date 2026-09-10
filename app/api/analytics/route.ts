@@ -14,6 +14,8 @@ const INCIDENT_TYPES = [
   { type: "Fire Emergency", color: "#B91C1C" },
   { type: "Flood/Water", color: "#2563EB" },
   { type: "Unknown Cause", color: "#64748B" },
+  { type: "Patient Transport", color: "#0F766E" },
+  { type: "Other / non-emergency request", color: "#7C3AED" },
 ] as const;
 
 interface TrendRow {

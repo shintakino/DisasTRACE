@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MoveRight, MapPin } from "lucide-react";
 import { RecentReport } from "@/types/dashboard";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -30,9 +30,10 @@ export function RecentReports({
   onReportClick?: (id: string) => void;
 }) {
   return (
-    <Card className="border-none shadow-md rounded-2xl h-full overflow-hidden flex flex-col">
-      <CardHeader className="p-6 pb-2">
-        <CardTitle className="text-2xl font-bold text-[#1E293B]">Recent Incident Reports</CardTitle>
+    <Card className="flex min-h-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+      <CardHeader className="p-6 pb-3">
+        <CardTitle className="text-lg font-bold text-[#1E3A8A]">Recent incident reports</CardTitle>
+        <CardDescription>Latest reports received by the command center</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 p-0 overflow-hidden">
         <ScrollArea className="h-full px-6 pb-6">

@@ -13,7 +13,9 @@ export const EmergencyReportSchema = z.object({
     "Fire Emergency",
     "Structural Failure",
     "Flood/Water",
-    "Unknown Cause"
+    "Unknown Cause",
+    "Patient Transport",
+    "Other / non-emergency request"
   ], { required_error: "Please select the type of emergency" }),
   peopleInvolved: z.union([
     z.enum(["None", "1-2 Persons", "3-5 Persons", "6+ Persons"]),

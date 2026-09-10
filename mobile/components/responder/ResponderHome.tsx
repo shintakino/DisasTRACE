@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FolderDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { signOutFromMobile } from '../../lib/mobile-auth';
 import * as Location from 'expo-location';
 import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
 import { useLiveBarangay } from '../../hooks/use-live-barangay';
@@ -1112,7 +1113,7 @@ export function ResponderHome() {
               <TouchableOpacity 
                 className="w-12 h-12 rounded-full bg-red-600 items-center justify-center border border-red-700 shadow-sm"
                 onPress={async () => {
-                  await supabase.auth.signOut();
+                  await signOutFromMobile();
                 }}
               >
                 <LogOut size={20} color="white" />

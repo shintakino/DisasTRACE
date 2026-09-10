@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { signOutFromMobile } from '../../lib/mobile-auth';
 import { Clock, ShieldAlert } from 'lucide-react-native';
 
 export default function PendingVerificationScreen() {
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOutFromMobile();
   };
 
   return (

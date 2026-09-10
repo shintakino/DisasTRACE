@@ -1,5 +1,17 @@
 # Progress Tracker
 
+## 2026-09-10 — Mobile lifecycle, triage, and device-session fixes
+
+- Added explicit `Patient Transport` and `Other / non-emergency request` intake choices. They, plus `Unknown Cause`, now route to PACC as non-emergency while all emergency categories are normalized server-side to prevent client-side downgrade.
+- Fixed the resolved-report return route and cleared both persisted report stores after terminal reports, preventing the unmatched route and repeated emergency-status screens. Report history now has All, Completed, and Rejected filters; profile names are locked after registration at both mobile UI and API boundaries.
+- Public users request foreground location only; background location remains responder-tracking-only. Profile labels use the live official boundary resolver, and the decorative map handle/extra map gap and feedback-banner question icon were removed.
+- Added migration `0013_mobile_device_sessions` and server-backed sign-in/sign-out for Public Users and Ambulance Responders. The database keeps only a SHA-256 device digest, accepts the original mobile device atomically, and returns the logout-first message to a different device. CDRRMO/PACC browser sessions are unaffected.
+
+## 2026-09-10 — CDRRMO/PACC command-heading consistency
+
+- Standardized CDRRMO and PACC command-page headings behind the Analytics visual hierarchy: blue `#1E3A8A` titles, a compact context label, and the existing muted explanatory copy. Applied it to Support Messages, Reports Management, Status & Activity Logs, User Management, Security Audit Trail, and Responder Roster; the live map's Incident Reports heading, Help & FAQs section titles, and dashboard-card titles now use the same blue treatment.
+- Added concise operational descriptions to Incident Summary, Incident Distribution, and Recent Incident Reports. Removed the fixed lower-dashboard panel heights and gave report/responder panels safe minimum heights, preventing the responder panel from overlapping or clipping at normal desktop and responsive widths.
+
 ## 2026-09-10 — Guest Mode lifetime phone report limit
 
 - Replaced the shared Manila-calendar-day Guest Mode capacity with a server-enforced lifetime report limit per normalized guest phone number. The default is three reports per phone number; `09xx` and `+639xx` forms resolve to the same quota, including legacy records.

@@ -77,11 +77,11 @@ export function ResponderStatus({ responders = [] }: { responders?: Responder[] 
   };
 
   return (
-    <Card className="border-none shadow-md rounded-2xl h-full min-h-0 overflow-hidden flex flex-col">
+    <Card className="flex min-h-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
       <CardHeader className="shrink-0 bg-[#1E3A8A] p-4">
         <CardTitle className="text-xl font-bold text-white">Responders</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 overflow-hidden p-4">
+      <CardContent className="min-h-[288px] flex-1 overflow-hidden p-4">
         <div 
           ref={containerRef}
           className={`w-full h-full overflow-hidden flex items-center ${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}

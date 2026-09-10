@@ -76,7 +76,7 @@ export function ReportsHeader({
     <div className="bg-[#1E3A8A] p-6 rounded-t-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="flex flex-col gap-1 text-left">
         <h2 className="text-xl font-bold text-white tracking-tight">
-          {category === "user" ? "USER REPORTS" : "RESPONDER REPORTS"}
+          {category === "user" ? "User Reports" : "Responder Reports"}
         </h2>
         <div className="flex items-center gap-3">
           <p className="text-blue-200 text-xs font-medium uppercase tracking-wider">

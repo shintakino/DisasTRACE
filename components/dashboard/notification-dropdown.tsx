@@ -219,7 +219,7 @@ export function NotificationDropdown() {
       >
         <div className="p-5">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-[#1E3A8A] font-bold text-sm tracking-wide">NOTIFICATIONS</h2>
+            <h2 className="text-[#1E3A8A] font-bold text-sm tracking-wide">Notifications</h2>
             {notifications.length > 0 && (
               <div className="flex gap-4">
                 <button

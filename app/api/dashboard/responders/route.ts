@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
+import { incidents } from "@/db/schema/incidents";
 import { eq, and } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { isResponderHeartbeatFresh } from "@/lib/dispatch-policy";
@@ -50,12 +51,41 @@ export async function GET() {
       ),
     });
 
+    // `ACTIVE_DISPATCH` is intentionally used for both a short-lived offer
+    // reservation and a responder who accepted an incident. Resolve the real
+    // workflow state from the incident record instead of treating both alike.
+    const activeIncidents = await db.query.incidents.findMany({
+      columns: {
+        responderId: true,
+        currentOfferResponderId: true,
+        status: true,
+      },
+    });
+    const acceptedResponderIds = new Set(
+      activeIncidents
+        .filter((incident) => incident.responderId && incident.status !== 'RESOLVED')
+        .map((incident) => incident.responderId as string),
+    );
+    const pendingOfferResponderIds = new Set(
+      activeIncidents
+        .filter((incident) => (
+          incident.status === 'DISPATCHED'
+          && incident.responderId === null
+          && incident.currentOfferResponderId
+        ))
+        .map((incident) => incident.currentOfferResponderId as string),
+    );
+
     const mapped = dbResponders.map((r) => {
       const isRecent = isResponderHeartbeatFresh(r.lastLocationUpdatedAt);
 
-      let statusMapped: 'DISPATCHED' | 'STANDBY' | 'OFF DUTY' = 'OFF DUTY';
+      let statusMapped: 'OFFER PENDING' | 'DISPATCHED' | 'STANDBY' | 'OFF DUTY' = 'OFF DUTY';
       if (r.dutyStatus === 'ACTIVE_DISPATCH') {
-        statusMapped = 'DISPATCHED';
+        statusMapped = acceptedResponderIds.has(r.id)
+          ? 'DISPATCHED'
+          : pendingOfferResponderIds.has(r.id)
+            ? 'OFFER PENDING'
+            : 'OFF DUTY';
       } else if (r.dutyStatus === 'ON_DUTY') {
         statusMapped = isRecent ? 'STANDBY' : 'OFF DUTY';
       }

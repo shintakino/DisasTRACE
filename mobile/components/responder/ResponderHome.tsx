@@ -154,6 +154,7 @@ export function ResponderHome() {
   const [routeBounds, setRouteBounds] = useState<any>(null);
   const [cameraMode, setCameraMode] = useState<'follow' | 'overview'>('follow');
   const [isCameraCentered, setIsCameraCentered] = useState(true);
+  const [reorientationTop, setReorientationTop] = useState((StatusBar.currentHeight || 24) + 72);
   const isMarkerPress = useRef(false);
   const lastDbUpdateRef = useRef<number>(0);
   const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -936,6 +937,13 @@ export function ResponderHome() {
         mapStyle="https://tiles.openfreemap.org/styles/liberty"
         logo={false}
         attribution={false}
+        // Keep the native reorientation control below the measured profile or
+        // dispatch card, never inside the header action or information area.
+        compass
+        compassPosition={{
+          top: reorientationTop,
+          right: 16,
+        }}
         onPress={() => {
           if (isMarkerPress.current) return;
           setSelectedHospital(null);
@@ -1268,7 +1276,14 @@ export function ResponderHome() {
         )}
 
         {/* Profile Card / Dispatch Badge */}
-        <View className="px-4 mt-4 pointer-events-auto">
+        <View
+          className="px-4 mt-4 pointer-events-auto"
+          onLayout={(event) => {
+            const { y, height } = event.nativeEvent.layout;
+            const nextTop = Math.ceil(y + height + 12);
+            setReorientationTop((currentTop) => currentTop === nextTop ? currentTop : nextTop);
+          }}
+        >
           {status === 'idle' && (
             <View className="flex-row items-center justify-between bg-white/95 backdrop-blur-xl rounded-3xl p-4 shadow-xl border border-slate-200/50">
               <View className="flex-row items-center flex-1 mr-3">
@@ -1307,7 +1322,10 @@ export function ResponderHome() {
                       : "text-slate-600"
                 }`}>
                   {profile?.dutyStatus === 'ACTIVE_DISPATCH'
-                    ? "Active Dispatch"
+                    // This card is rendered only while the local responder state
+                    // is idle. An active accepted incident uses the dispatch card
+                    // below, so this is necessarily a pending offer here.
+                    ? "Offer Pending"
                     : profile?.dutyStatus === 'ON_DUTY'
                       ? "On Duty"
                       : "Off Duty"}

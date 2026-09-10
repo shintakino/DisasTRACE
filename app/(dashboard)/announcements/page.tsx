@@ -380,7 +380,7 @@ export default function AnnouncementsPage() {
           {/* Smartphone Mockup Preview */}
           <Card className="border-none shadow-md rounded-3xl overflow-hidden bg-white">
             <CardHeader className="p-4 pb-2 border-b border-slate-50">
-              <CardTitle className="text-[#1A237E] font-bold text-xs flex items-center gap-1.5 uppercase tracking-wider text-slate-400">
+              <CardTitle className="text-[#1A237E] font-bold text-xs flex items-center gap-1.5 tracking-wider text-slate-400">
                 <Smartphone className="size-4 text-slate-400" />
                 Mobile Render Preview
               </CardTitle>

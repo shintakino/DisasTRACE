@@ -13,6 +13,10 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 
+const apiBaseUrl = () => (process.env.EXPO_PUBLIC_API_URL
+  || process.env.EXPO_PUBLIC_MOBILE_API_URL?.replace(/\/api$/, '')
+  || 'https://disas-trace.vercel.app').replace(/\/$/, '');
+
 export function DispatchSheet() {
   const { status, activeDispatch, acceptDispatch, completeIncident } = useResponderStore();
   const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds ?? 30;
@@ -23,6 +27,7 @@ export function DispatchSheet() {
   const [accepting, setAccepting] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(offerDurationSeconds);
+  const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
   
   // Start off-screen at the top.
   const translateY = useSharedValue(-800);
@@ -40,13 +45,48 @@ export function DispatchSheet() {
   }, [status]);
 
   useEffect(() => {
+    if (status !== 'dispatch_offered') {
+      setServerClockOffsetMs(0);
+      return;
+    }
+
+    let cancelled = false;
+    const syncServerClock = async () => {
+      const requestStartedAt = Date.now();
+      try {
+        const apiUrl = apiBaseUrl();
+        const { data: { session } } = await supabase.auth.getSession();
+        const response = await fetch(`${apiUrl}/api/dispatch-clock`, {
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        });
+        const payload = await response.json();
+        const serverNow = Date.parse(payload.now);
+        const responseReceivedAt = Date.now();
+        if (!cancelled && response.ok && Number.isFinite(serverNow)) {
+          // Use the midpoint to avoid treating network round-trip time as
+          // client clock drift.
+          setServerClockOffsetMs(serverNow - ((requestStartedAt + responseReceivedAt) / 2));
+        }
+      } catch (error) {
+        // The persisted expiry is still a safe fallback when the phone is
+        // briefly offline. Acceptance itself is always checked by the server.
+        console.log('Dispatch clock sync failed:', error);
+      }
+    };
+
+    void syncServerClock();
+    return () => { cancelled = true; };
+  }, [status, activeDispatch?.id]);
+
+  useEffect(() => {
     if (status === 'dispatch_offered') {
       const expiresAt = Number.isFinite(serverExpiry)
         ? serverExpiry
-        : Date.now() + offerDurationSeconds * 1000;
-      const remainingMilliseconds = Math.max(0, expiresAt - Date.now());
+        : Date.now() + serverClockOffsetMs + offerDurationSeconds * 1000;
+      const currentServerTime = () => Date.now() + serverClockOffsetMs;
+      const remainingMilliseconds = Math.max(0, expiresAt - currentServerTime());
       const updateCountdown = () => {
-        setRemainingSeconds(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
+        setRemainingSeconds(Math.max(0, Math.ceil((expiresAt - currentServerTime()) / 1000)));
       };
       updateCountdown();
       const countdownId = setInterval(updateCountdown, 250);
@@ -70,7 +110,7 @@ export function DispatchSheet() {
         if (useResponderStore.getState().status === 'dispatch_offered') {
           // Reject dispatch automatically if timer expires
           try {
-            const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+            const apiUrl = apiBaseUrl();
             const { data: { session } } = await supabase.auth.getSession();
             const reqHeaders: any = { 'Content-Type': 'application/json' };
             if (session?.access_token) {
@@ -89,7 +129,7 @@ export function DispatchSheet() {
           }
           completeIncident(); // Dismiss
         }
-      }, Math.max(0, expiresAt - Date.now()));
+      }, Math.max(0, expiresAt - currentServerTime()));
 
       return () => {
         clearInterval(countdownId);
@@ -101,7 +141,7 @@ export function DispatchSheet() {
       progress.value = 100;
       setRemainingSeconds(offerDurationSeconds);
     }
-  }, [status, insets.top, offerDurationSeconds, serverExpiry]);
+  }, [status, insets.top, offerDurationSeconds, serverExpiry, serverClockOffsetMs]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -239,7 +279,7 @@ export function DispatchSheet() {
                 progress.value = 100; // Cancel animation
                 setAccepting(true);
                 try {
-                  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+                  const apiUrl = apiBaseUrl();
                   const { data: { session } } = await supabase.auth.getSession();
                   const reqHeaders: any = { 'Content-Type': 'application/json' };
                   if (session?.access_token) {

@@ -16,7 +16,6 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Sms, TickCircle } from 'iconsax-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import * as Linking from 'expo-linking';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -148,7 +147,9 @@ export default function ForgotPasswordScreen() {
       setIsLoading(true);
       try {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(input, {
-          redirectTo: Linking.createURL('reset-password'),
+          // This must exactly match the Android custom scheme and Supabase Auth
+          // Redirect URL allow-list, so the email cannot fall back to localhost.
+          redirectTo: 'disastrace://reset-password',
         });
 
         if (resetError) {

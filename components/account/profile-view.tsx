@@ -262,7 +262,7 @@ export function ProfileView() {
             <p className="font-bold text-[#1E3A8A] text-sm">Welcome to DisasTRACE!</p>
             <p>These terms and conditions outline the rules and regulations for the use of the DisasTRACE centralized digital emergency reporting system.</p>
             <p>By accessing and utilizing this command portal, we assume you accept these terms and conditions in full. Do not continue to operate DisasTRACE if you do not agree to abide by all the guidelines and compliance measures stated herein.</p>
-            <h4 className="font-bold text-[#1E3A8A] uppercase tracking-wider text-[10px] mt-4">Authorized Command Use Only</h4>
+            <h4 className="font-bold text-[#1E3A8A] tracking-wider text-[10px] mt-4">Authorized Command Use Only</h4>
             <p>Access to this dashboard is strictly restricted to authenticated CDRRMO Super Administrators and PACC Dispatchers. Sharing credentials, exposing resident private findings, or downloading diagnostic data without official clearance violates public safety protocol and R.A. 10173 (Data Privacy Act).</p>
           </div>
         </TabsContent>

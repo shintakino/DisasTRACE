@@ -205,7 +205,7 @@ export function ReportDetailSheet({
                 <div className="w-full space-y-6 animate-in fade-in zoom-in-95 duration-200">
                   {/* Resident's Report */}
                   <div>
-                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Resident's Report</h3>
+                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 tracking-wider">Resident's Report</h3>
                     <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
                       <div className="space-y-4 mb-4">
                         <div className="flex justify-between items-center text-[13px]">
@@ -255,7 +255,7 @@ export function ReportDetailSheet({
 
                   {/* Resident Information */}
                   <div>
-                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Reporter Information</h3>
+                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 tracking-wider">Reporter Information</h3>
                     <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
                       <div className="space-y-4">
                         <div className="flex justify-between items-center text-[13px]">
@@ -278,7 +278,7 @@ export function ReportDetailSheet({
                   {report.status !== "RESPONDING" && (
                     <div className="animate-in slide-in-from-top-4 fade-in duration-300">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-[#1A237E]/60 font-black text-[11px] uppercase tracking-wider">
+                        <h3 className="text-[#1A237E]/60 font-black text-[11px] tracking-wider">
                           Crew's Actual Findings
                         </h3>
                         {report.status === "ONGOING" && (
@@ -288,7 +288,7 @@ export function ReportDetailSheet({
                         )}
                       </div>
                       
-                      <h4 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Nature of Call</h4>
+                      <h4 className="text-[#1A237E] font-black text-[11px] mb-3 tracking-wider">Nature of Call</h4>
                       <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
                         <div className="space-y-4">
                           <div className="flex justify-between items-center text-[13px]">
@@ -323,7 +323,7 @@ export function ReportDetailSheet({
                 <div className="w-full space-y-6 animate-in fade-in zoom-in-95 duration-200">
                   {/* Crew's Summary findings */}
                   <div>
-                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Crew Findings & Description</h3>
+                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 tracking-wider">Crew Findings & Description</h3>
                     <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
                       <p className="text-slate-600 text-xs leading-relaxed font-medium">
                         {report.crewFindings || "No findings recorded by the responding crew."}
@@ -334,7 +334,7 @@ export function ReportDetailSheet({
                   {/* Treated Patients Roster */}
                   {report.participants && report.participants.length > 0 && (
                     <div>
-                      <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Treated Patients</h3>
+                      <h3 className="text-[#1A237E] font-black text-[11px] mb-3 tracking-wider">Treated Patients</h3>
                       <div className="border border-[#E8EAF6] rounded-3xl overflow-hidden shadow-sm bg-white">
                         <table className="w-full border-collapse text-left text-xs">
                           <thead>
@@ -372,7 +372,7 @@ export function ReportDetailSheet({
                   {/* Scene Photos Grid */}
                   {report.scenePhotos && report.scenePhotos.length > 0 && (
                     <div>
-                      <h3 className="text-[#1A237E] font-black text-[11px] mb-3 uppercase tracking-wider">Clinical Crew Scene Photos</h3>
+                      <h3 className="text-[#1A237E] font-black text-[11px] mb-3 tracking-wider">Clinical Crew Scene Photos</h3>
                       <div className="grid grid-cols-2 gap-4">
                         {report.scenePhotos.map((photo, idx) => (
                           <button
@@ -460,7 +460,7 @@ export function ReportDetailSheet({
 
                         {/* Patient Profile */}
                         <div>
-                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Patient Profile</h4>
+                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 tracking-wider">Patient Profile</h4>
                           <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">Address</span><span className="font-bold text-[#1A237E]">{pcr.patientAddress || "N/A"}</span></div>
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">Contact</span><span className="font-bold text-[#1A237E]">{pcr.patientContact || "N/A"}</span></div>
@@ -471,7 +471,7 @@ export function ReportDetailSheet({
 
                         {/* Initial Assessment */}
                         <div>
-                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Initial Assessment</h4>
+                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 tracking-wider">Initial Assessment</h4>
                           <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">LOC Status</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.loc || "Alert"} (GCS: {pcr.gcsPoints || "15"} pts)</span></div>
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">Spinal Injury</span><span className="font-bold text-[#1A237E]">{pcr.initialAssessment?.spinalInjury || "No"}</span></div>
@@ -486,7 +486,7 @@ export function ReportDetailSheet({
                         {/* Vitals logs table */}
                         {pcr.vitalsLogs && pcr.vitalsLogs.length > 0 && (
                           <div>
-                            <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Vitals Log</h4>
+                            <h4 className="text-[#1A237E] font-black text-[11px] mb-2 tracking-wider">Vitals Log</h4>
                             <div className="border border-[#E8EAF6] rounded-3xl overflow-hidden shadow-sm bg-white">
                               <table className="w-full border-collapse text-left text-xs">
                                 <thead>
@@ -516,7 +516,7 @@ export function ReportDetailSheet({
 
                         {/* SAMPLE History */}
                         <div>
-                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">SAMPLE History</h4>
+                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 tracking-wider">SAMPLE History</h4>
                           <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">Allergies</span><span className="font-bold text-[#1A237E]">{pcr.sampleHistory?.allergies || "None"}</span></div>
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">Medications</span><span className="font-bold text-[#1A237E]">{pcr.sampleHistory?.medications || "None"}</span></div>
@@ -528,7 +528,7 @@ export function ReportDetailSheet({
                         {/* Pain Assessment */}
                         {pcr.painAssessment && (
                           <div>
-                            <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Pain Assessment</h4>
+                            <h4 className="text-[#1A237E] font-black text-[11px] mb-2 tracking-wider">Pain Assessment</h4>
                             <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
                               <div className="flex justify-between"><span className="text-slate-500 font-medium">Location</span><span className="font-bold text-[#1A237E]">{pcr.painAssessment.location || "N/A"}</span></div>
                               <div className="flex justify-between"><span className="text-slate-500 font-medium">Onset / Quality</span><span className="font-bold text-[#1A237E]">{pcr.painAssessment.onset || "Gradual"} / {pcr.painAssessment.quality || "Aching"}</span></div>
@@ -540,7 +540,7 @@ export function ReportDetailSheet({
 
                         {/* Narrative Report */}
                         <div>
-                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Narrative Report</h4>
+                          <h4 className="text-[#1A237E] font-black text-[11px] mb-2 tracking-wider">Narrative Report</h4>
                           <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white text-xs leading-relaxed text-slate-600 font-medium">
                             {pcr.narrativeReport || "No narrative report details provided."}
                           </div>
@@ -556,7 +556,7 @@ export function ReportDetailSheet({
 
                           return (
                             <div className="space-y-4">
-                              <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Handoff & Signatures</h4>
+                              <h4 className="text-[#1A237E] font-black text-[11px] mb-2 tracking-wider">Handoff & Signatures</h4>
                               <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-3 text-xs">
                                 <div className="flex justify-between"><span className="text-slate-500 font-medium">PCR Accomplished By</span><span className="font-bold text-[#1A237E]">{hs.accomplishedBy || "N/A"} (License: {hs.accomplishedByLicense || "N/A"})</span></div>
                                 <div className="flex justify-between"><span className="text-slate-500 font-medium">Receiving Hospital</span><span className="font-bold text-[#1A237E]">{hs.receivingHospital || defaultNa} (Arrival: {hs.arrivalTime || defaultNa})</span></div>
@@ -603,7 +603,7 @@ export function ReportDetailSheet({
                         {/* Responding Team */}
                         {pcr.respondingTeam && (
                           <div>
-                            <h4 className="text-[#1A237E] font-black text-[11px] mb-2 uppercase tracking-wider">Responding Team</h4>
+                            <h4 className="text-[#1A237E] font-black text-[11px] mb-2 tracking-wider">Responding Team</h4>
                             <div className="border border-[#E8EAF6] rounded-3xl p-4 bg-white space-y-2 text-xs">
                               <div className="flex justify-between"><span className="text-slate-500 font-medium">Team Leader</span><span className="font-bold text-[#1A237E]">{pcr.respondingTeam.teamLeader || "N/A"}</span></div>
                               <div className="flex justify-between"><span className="text-slate-500 font-medium">Team Members</span><span className="font-bold text-[#1A237E]">{pcr.respondingTeam.teamMembers || "N/A"}</span></div>
@@ -652,7 +652,7 @@ export function ReportDetailSheet({
 
                   {/* Trip Details */}
                   <div>
-                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Trip & Vehicle Details</h4>
+                    <h4 className="text-amber-800 font-black text-[11px] mb-2 tracking-wider">Trip & Vehicle Details</h4>
                     <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Driver Name</span><span className="font-bold text-slate-800">{report.driverTripTicket.driverName || "N/A"}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Date of Travel</span><span className="font-bold text-slate-800">{report.driverTripTicket.date || "N/A"}</span></div>
@@ -666,7 +666,7 @@ export function ReportDetailSheet({
                   {/* Driver Signatures */}
                   {report.driverTripTicket.signatures && (report.driverTripTicket.signatures.driverSignature || report.driverTripTicket.signatures.passengerSignature) && (
                     <div>
-                      <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Captured Signatures</h4>
+                      <h4 className="text-amber-800 font-black text-[11px] mb-2 tracking-wider">Captured Signatures</h4>
                       <div className="border border-amber-100 rounded-3xl p-4 bg-white grid grid-cols-1 md:grid-cols-2 gap-3">
                         {report.driverTripTicket.signatures.driverSignature && (
                           <div className="border border-slate-200 rounded-2xl p-2 bg-slate-50 flex flex-col items-center">
@@ -690,7 +690,7 @@ export function ReportDetailSheet({
 
                   {/* Logistics Logs */}
                   <div>
-                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Logistics Logs</h4>
+                    <h4 className="text-amber-800 font-black text-[11px] mb-2 tracking-wider">Logistics Logs</h4>
                     <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Departure Office</span><span className="font-bold text-slate-800">{report.driverTripTicket.tripLog?.departureOffice || "N/A"}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Arrival Scene</span><span className="font-bold text-slate-800">{report.driverTripTicket.tripLog?.arrivalScene || "N/A"}</span></div>
@@ -702,7 +702,7 @@ export function ReportDetailSheet({
 
                   {/* Fuel Controls */}
                   <div>
-                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Gasoline & Oil Consumed</h4>
+                    <h4 className="text-amber-800 font-black text-[11px] mb-2 tracking-wider">Gasoline & Oil Consumed</h4>
                     <div className="border border-amber-100 rounded-3xl p-4 bg-white space-y-2 text-xs">
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Balance in Tank</span><span className="font-bold text-slate-800">{report.driverTripTicket.gasolineConsumed?.balance || "0"} Liters</span></div>
                       <div className="flex justify-between"><span className="text-slate-500 font-medium">Issued stock</span><span className="font-bold text-slate-800">{report.driverTripTicket.gasolineConsumed?.issued || "0"} Liters</span></div>
@@ -714,7 +714,7 @@ export function ReportDetailSheet({
 
                   {/* Remarks */}
                   <div>
-                    <h4 className="text-amber-800 font-black text-[11px] mb-2 uppercase tracking-wider">Trip Remarks</h4>
+                    <h4 className="text-amber-800 font-black text-[11px] mb-2 tracking-wider">Trip Remarks</h4>
                     <div className="border border-amber-100 rounded-3xl p-4 bg-white text-xs leading-relaxed text-slate-600 font-medium">
                       {report.driverTripTicket.remarks || "No trip remarks logged."}
                     </div>

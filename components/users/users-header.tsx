@@ -69,7 +69,7 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
   return (
     <div className="bg-[#1E3A8A] p-6 rounded-t-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-bold text-white tracking-tight">USER ACCOUNTS</h2>
+        <h2 className="text-xl font-bold text-white tracking-tight">User Accounts</h2>
         <p className="text-blue-200 text-xs font-medium uppercase tracking-wider">System Access Management</p>
       </div>
 

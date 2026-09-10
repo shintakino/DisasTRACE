@@ -606,7 +606,9 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
   }
 }
 
-const DISPATCH_GRACE_PERIOD_MS = 4000; // 4s leeway grace period to offset network/cellular transit latency
+// The offer deadline is a server-side contract. A responder must accept before
+// this timestamp; the scheduler, not a paused mobile timer, releases it.
+const DISPATCH_GRACE_PERIOD_MS = 0;
 
 export async function checkAndCascadeExpiredOffers() {
   try {

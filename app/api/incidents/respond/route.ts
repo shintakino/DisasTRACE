@@ -3,11 +3,11 @@ import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
 import { verificationRequests } from "@/db/schema/verification_requests";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, gt, isNull } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
-import { cascadeIncident, calculateHaversineDistance, notifyPaccAndCdrrmo } from "@/lib/dispatch-engine";
-import { canResponderAcceptDispatchOffer } from "@/lib/dispatch-policy";
+import { cascadeIncident, calculateHaversineDistance, checkAndCascadeExpiredOffers, notifyPaccAndCdrrmo } from "@/lib/dispatch-engine";
+import { canCascadeDispatchOffer, canResponderAcceptDispatchOffer } from "@/lib/dispatch-policy";
 
 const RespondSchema = z.object({
   incidentId: z.string().min(1, "Incident ID is required"),
@@ -50,12 +50,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 });
     }
 
-    // Ensure the offer was actually sent to this responder
-    if (!canResponderAcceptDispatchOffer(incident, user.id)) {
+    // A responder may only act on their own current offer. REJECT remains
+    // valid after expiry so the foreground client can release immediately;
+    // ACCEPT is intentionally stricter and must beat the server deadline.
+    if (!canCascadeDispatchOffer(incident, user.id)) {
       return NextResponse.json({ error: "Conflict: This offer is no longer valid or belongs to another responder" }, { status: 409 });
     }
 
     if (action === 'ACCEPT') {
+      if (!canResponderAcceptDispatchOffer(incident, user.id)) {
+        // Trigger recovery now rather than waiting for the next scheduler tick.
+        await checkAndCascadeExpiredOffers();
+        return NextResponse.json(
+          { error: "Conflict: This offer has expired or was reassigned" },
+          { status: 409 },
+        );
+      }
       // Generate deterministic vehicle ID based on initials and unique UUID suffix (Option 1)
       const initials = dbUser.fullName
         .split(" ")
@@ -115,6 +125,7 @@ export async function POST(req: NextRequest) {
             eq(incidents.status, 'DISPATCHED'),
             eq(incidents.currentOfferResponderId, user.id),
             isNull(incidents.responderId),
+            gt(incidents.offerExpiresAt, new Date()),
           ))
           .returning();
 

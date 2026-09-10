@@ -29,6 +29,8 @@ export function PACCResponderGrid({ responders = [], className }: { responders?:
 
   const getStatusStyle = (status: string) => {
     switch (status.toUpperCase()) {
+      case 'OFFER PENDING':
+        return "bg-[#FEE2E2] text-[#B91C1C] border-[#FECACA]";
       case 'DISPATCHED':
         return "bg-[#D8DEF1] text-[#15286A] border-[#B8C2E5]";
       case 'STANDBY':

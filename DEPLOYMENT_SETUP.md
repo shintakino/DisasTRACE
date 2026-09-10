@@ -32,6 +32,14 @@ NEXT_PUBLIC_SUPABASE_URL=https://project_ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
+# Public HTTPS URL of the deployed web dashboard. This is used in web
+# password-reset emails and must never be localhost in production.
+APP_URL=https://disas-trace.vercel.app
+
+# Long random server-only value. It authorizes Supabase Cron to invoke the
+# dispatch expiry endpoint; do not expose it to the mobile app.
+DISPATCH_SCHEDULER_SECRET=replace_with_a_long_random_value
+
 # SMS Gateway (textbee.dev)
 TEXTBEE_API_KEY=your_textbee_api_key
 TEXTBEE_DEVICE_ID=your_textbee_registered_device_id
@@ -40,6 +48,29 @@ TEXTBEE_DEVICE_ID=your_textbee_registered_device_id
 # Set to 'false' for strict production behavior and SMS dispatches
 NEXT_PUBLIC_DEV_MODE=false
 ```
+
+### Dispatch-offer expiry scheduler
+
+Dispatch expiry is server-authoritative. After deploying the application and
+running the database migration, store the production endpoint and the exact
+same `DISPATCH_SCHEDULER_SECRET` value in Supabase Vault (not in the mobile app):
+
+```sql
+select vault.create_secret(
+  'https://disas-trace.vercel.app/api/dispatch-engine',
+  'dispatch_scheduler_url'
+);
+
+select vault.create_secret(
+  'replace-with-the-vercel-dispatch-scheduler-secret',
+  'dispatch_scheduler_secret'
+);
+```
+
+Migration `0016` schedules a Supabase Cron/pg_net invocation every five seconds.
+It expires unanswered offers and releases or cascades the responder even when
+both phones are locked. Check `cron.job_run_details` and `net._http_response`
+in Supabase if the scheduler needs troubleshooting.
 
 ---
 
@@ -104,6 +135,19 @@ For other developers working on the mobile application (`/mobile` directory):
    ```bash
    npm run start
    ```
+
+### Supabase Auth Redirect URLs
+
+In **Supabase Dashboard → Authentication → URL Configuration**, set the Site URL
+to `https://disas-trace.vercel.app`
+and add these Redirect URLs:
+
+- `https://disas-trace.vercel.app/reset-password`
+- `disastrace://reset-password`
+
+The first URL serves dashboard-admin password recovery. The second opens the
+Android resident/responder reset-password screen. Do not leave `localhost:3000`
+as the production Site URL.
 
 ---
 

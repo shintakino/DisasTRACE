@@ -628,6 +628,28 @@ Update this file whenever the current phase, active feature, or implementation s
 
 - None
 
+## Latest Changes
+
+- Standardized CDRRMO/PACC web page and panel headings to title case, while
+  preserving sentence-case descriptions, helper text, labels, and statuses.
+- Made dispatch-offer expiry independent of a responder phone: a Supabase
+  Cron/pg_net scheduler now invokes the protected server dispatch engine every
+  five seconds, expired offers cannot be accepted at the database boundary,
+  and the mobile countdown aligns itself to the API clock.
+- Simplified the mobile My Reports header by removing status filters; residents
+  and responders now always see their complete report history in one list.
+- Clarified responder dispatch state without weakening the server-side atomic
+  reservation: the dashboard now derives the actual workflow state from each
+  incident, so an unanswered offer appears as `OFFER PENDING` / `Offer Pending`
+  while an accepted or directly assigned incident remains `DISPATCHED` / `Active
+  Dispatch`.
+- Removed responder map-control collisions by keeping MapLibre's native
+  reorientation control and positioning it below the measured profile/dispatch
+  card, rather than overlapping header actions or responder information.
+- Made mobile password recovery use the canonical `disastrace://reset-password`
+  deep link, changed web recovery to prefer a production `APP_URL`, and documented
+  the required Supabase Auth Site URL and redirect allow-list configuration.
+
 ## Completed
 
 - **Administrative Analytics Dashboard**: Added a CDRRMO Super Admin-only `/analytics` dashboard with daily, weekly, and monthly incident trends; incident type frequency; reported, verified, pending, resolved, and resolution-time summaries; and data-derived preparedness guidance for recurring incidents and peak reporting windows. Implemented the protected `GET /api/analytics` endpoint using Drizzle queries and Asia/Manila time buckets. Reworked its aggregate and time-bucket queries to use the established dashboard query pattern after the initial route produced a server serialization error. Fixed a production 500 error caused by malformed SQL in the `avgResponseMinutes` query — `coalesce()` had a missing closing parenthesis, crashing all 7 parallel database queries via `Promise.all`. Verified with `npx tsc --noEmit`.

@@ -165,7 +165,7 @@ export default function SupportMessagesPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="shadow-sm border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Messages</CardTitle>
+            <CardTitle className="text-sm font-semibold capitalize text-slate-500 tracking-wider">Total Messages</CardTitle>
             <div className="h-9 w-9 bg-slate-100 rounded-full flex items-center justify-center">
               <Inbox className="h-5 w-5 text-slate-600" />
             </div>
@@ -178,7 +178,7 @@ export default function SupportMessagesPage() {
 
         <Card className="shadow-sm border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Unread Messages</CardTitle>
+            <CardTitle className="text-sm font-semibold capitalize text-slate-500 tracking-wider">Unread Messages</CardTitle>
             <div className="h-9 w-9 bg-amber-50 rounded-full flex items-center justify-center">
               <Mail className="h-5 w-5 text-amber-600" />
             </div>
@@ -191,7 +191,7 @@ export default function SupportMessagesPage() {
 
         <Card className="shadow-sm border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Resolved Messages</CardTitle>
+            <CardTitle className="text-sm font-semibold capitalize text-slate-500 tracking-wider">Resolved Messages</CardTitle>
             <div className="h-9 w-9 bg-emerald-50 rounded-full flex items-center justify-center">
               <CheckCircle className="h-5 w-5 text-emerald-600" />
             </div>

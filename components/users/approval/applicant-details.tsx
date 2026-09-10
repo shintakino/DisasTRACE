@@ -45,7 +45,7 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
               <div className="bg-blue-100 p-1.5 rounded text-[#1E3A8A]">
                 <CreditCard className="w-4 h-4" />
               </div>
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+              <h2 className="text-sm font-bold text-slate-900 tracking-wider">
                 Identity Verification
               </h2>
             </div>
@@ -113,7 +113,7 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
                 <div className="bg-slate-100 p-1.5 rounded text-slate-600">
                   <MapPin className="w-4 h-4" />
                 </div>
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                <h2 className="text-sm font-bold text-slate-900 tracking-wider">
                   Residential Address
                 </h2>
               </div>
@@ -129,7 +129,7 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
                 <div className="bg-slate-100 p-1.5 rounded text-slate-600">
                   <Calendar className="w-4 h-4" />
                 </div>
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                <h2 className="text-sm font-bold text-slate-900 tracking-wider">
                   Registration Timeline
                 </h2>
               </div>

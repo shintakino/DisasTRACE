@@ -36,7 +36,7 @@ export function WebPreloader({
 
         {/* Text Details */}
         <div className="space-y-2">
-          <h3 className="text-xl font-black uppercase tracking-tight text-white">{title}</h3>
+          <h3 className="text-xl font-black capitalize tracking-tight text-white">{title}</h3>
           <p className="text-xs font-medium text-blue-200/80 leading-relaxed">{subtitle}</p>
         </div>
 

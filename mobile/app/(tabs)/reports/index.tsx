@@ -9,7 +9,6 @@ import { formatBaliwagLocation } from '../../../lib/baliwag-location';
 
 export default function MyReportsScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('All');
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,12 +77,6 @@ export default function MyReportsScreen() {
     fetchReports();
   };
 
-  const filteredReports = reports.filter((r) => {
-    if (activeTab === 'All') return true;
-    if (activeTab === 'Completed') return r.status === 'COMPLETED' || r.status === 'RESOLVED';
-    return r.status === 'REJECTED' || r.status === 'DUPLICATE';
-  });
-
   // Group reports for resident view
   const today: any[] = [];
   const yesterday: any[] = [];
@@ -93,7 +86,7 @@ export default function MyReportsScreen() {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const oneDay = 24 * 60 * 60 * 1000;
 
-  filteredReports.forEach((r) => {
+  reports.forEach((r) => {
     try {
       const timestamp = r.createdAt ? Date.parse(r.createdAt) : Date.parse(r.date);
       if (!Number.isFinite(timestamp)) throw new Error('Invalid report timestamp');
@@ -176,24 +169,7 @@ export default function MyReportsScreen() {
   return (
     <View className="flex-1 bg-white">
       <View className="bg-[#1E3A8A] pt-14 pb-6 px-6" style={{ paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 20 : 60 }}>
-        <Text className="text-2xl font-bold text-white mb-6">My Reports</Text>
-        
-        <View className="flex-row bg-[#0F172A]/30 rounded-2xl p-1">
-          {['All', 'Completed', 'Rejected'].map((tab) => {
-            const isActive = activeTab === tab;
-            return (
-              <TouchableOpacity
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                className={`flex-1 py-3 items-center justify-center rounded-xl ${isActive ? 'bg-white/10' : ''}`}
-              >
-                <Text className={`text-sm font-bold ${isActive ? 'text-white' : 'text-slate-300'}`}>
-                  {tab}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <Text className="text-2xl font-bold text-white">My Reports</Text>
       </View>
 
       <ScrollView 
@@ -207,13 +183,13 @@ export default function MyReportsScreen() {
           <View className="flex-1 justify-center items-center py-20">
             <ActivityIndicator size="large" color="#1E3A8A" />
           </View>
-        ) : filteredReports.length === 0 ? (
+        ) : reports.length === 0 ? (
           <View className="flex-1 justify-center items-center py-20">
             <Text className="text-slate-400 font-bold">No reports found</Text>
           </View>
         ) : isResponder ? (
           <>
-            {filteredReports.map(renderReportCard)}
+            {reports.map(renderReportCard)}
           </>
         ) : (
           <>

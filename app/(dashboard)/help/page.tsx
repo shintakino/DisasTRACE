@@ -458,7 +458,7 @@ export default function HelpPage() {
               {/* FAQs List */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-extrabold text-sm text-slate-700 uppercase tracking-wide">Existing FAQs ({faqs.length})</h3>
+                  <h3 className="font-extrabold text-sm text-slate-700 tracking-wide">Existing FAQs ({faqs.length})</h3>
                   {faqs.length > 1 && (
                     <span className="text-[10px] text-slate-400 font-medium italic">Drag cards by the handle to reorder</span>
                   )}
@@ -606,7 +606,7 @@ export default function HelpPage() {
               <p className="font-bold text-slate-800">Welcome to DisasTRACE!</p>
               <p>These terms and conditions outline the rules and regulations for the use of the DisasTRACE centralized digital emergency reporting system.</p>
               <p>By accessing and utilizing this command portal, we assume you accept these terms and conditions in full. Do not continue to operate DisasTRACE if you do not agree to abide by all the guidelines and compliance measures stated herein.</p>
-              <h3 className="font-black text-slate-800 text-sm uppercase tracking-wider mt-6">Authorized Command Use Only</h3>
+              <h3 className="font-black text-slate-800 text-sm tracking-wider mt-6">Authorized Command Use Only</h3>
               <p>Access to this dashboard is strictly restricted to authenticated CDRRMO Super Administrators and PACC Dispatchers. Sharing credentials, exposing resident private findings, or downloading diagnostic data without official clearance violates public safety protocol and R.A. 10173 (Data Privacy Act).</p>
             </div>
           </div>

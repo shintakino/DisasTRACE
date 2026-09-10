@@ -9,6 +9,12 @@ const ForgotPasswordSchema = z.object({
   employeeId: z.string().min(1, "Employee ID is required"),
 });
 
+function getPasswordResetOrigin(request: NextRequest) {
+  // APP_URL is server-only. Do not depend on the request origin in production,
+  // where a stale localhost deployment URL would otherwise be embedded in email.
+  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -52,7 +58,7 @@ export async function POST(req: NextRequest) {
       {
         redirectTo: new URL(
           "/reset-password",
-          process.env.NEXT_PUBLIC_API_URL || req.nextUrl.origin
+          getPasswordResetOrigin(req)
         ).toString(),
       }
     );

@@ -67,7 +67,7 @@ function SummaryMetric({ label, value, detail, icon: Icon, iconClassName }: Summ
     <Card className="gap-0 border-slate-200 bg-white py-0 shadow-sm">
       <CardContent className="flex items-start justify-between p-5">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-600">{label}</p>
+          <p className="text-sm font-medium capitalize text-slate-600">{label}</p>
           <p className="mt-2 text-3xl font-bold text-[#1E3A8A]">{value}</p>
           <p className="mt-1 text-xs text-slate-500">{detail}</p>
         </div>
@@ -184,7 +184,7 @@ export function AnalyticsDashboard() {
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">CDRRMO command analytics</p>
-          <h2 className="mt-1 text-2xl font-bold text-[#1E3A8A]">Incident preparedness overview</h2>
+          <h2 className="mt-1 text-2xl font-bold text-[#1E3A8A]">Incident Preparedness Overview</h2>
           <p className="mt-1 text-sm text-slate-600">Use recurring incident patterns and response outcomes to plan staffing, equipment, and readiness actions.</p>
         </div>
         <Button
@@ -219,7 +219,7 @@ export function AnalyticsDashboard() {
         <Card className="border-slate-200 py-0 shadow-sm xl:col-span-3">
           <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
             <div>
-              <CardTitle className="text-lg font-bold text-[#1E3A8A]">Incident trend</CardTitle>
+              <CardTitle className="text-lg font-bold capitalize text-[#1E3A8A]">Incident trend</CardTitle>
               <CardDescription>Reported incident frequency over time</CardDescription>
             </div>
             <div className="flex shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Trend interval">
@@ -253,7 +253,7 @@ export function AnalyticsDashboard() {
 
         <Card className="border-slate-200 py-0 shadow-sm xl:col-span-2">
           <CardHeader className="border-b border-slate-100 px-6 py-5">
-            <CardTitle className="text-lg font-bold text-[#1E3A8A]">Most common incident types</CardTitle>
+            <CardTitle className="text-lg font-bold capitalize text-[#1E3A8A]">Most common incident types</CardTitle>
             <CardDescription>Frequency across all recorded reports</CardDescription>
           </CardHeader>
           <CardContent className="p-6">
@@ -275,7 +275,7 @@ export function AnalyticsDashboard() {
       <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-5">
         <Card className="border-slate-200 py-0 shadow-sm xl:col-span-3">
           <CardHeader className="border-b border-slate-100 px-6 py-5">
-            <CardTitle className="text-lg font-bold text-[#1E3A8A]">Preparedness brief</CardTitle>
+            <CardTitle className="text-lg font-bold capitalize text-[#1E3A8A]">Preparedness brief</CardTitle>
             <CardDescription>Recurring patterns that warrant operational attention</CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-slate-100 px-6">
@@ -295,7 +295,7 @@ export function AnalyticsDashboard() {
 
         <Card className="border-slate-200 py-0 shadow-sm xl:col-span-2">
           <CardHeader className="border-b border-slate-100 px-6 py-5">
-            <CardTitle className="text-lg font-bold text-[#1E3A8A]">Incident frequency</CardTitle>
+            <CardTitle className="text-lg font-bold capitalize text-[#1E3A8A]">Incident frequency</CardTitle>
             <CardDescription>Share of all reported incidents</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 p-6">

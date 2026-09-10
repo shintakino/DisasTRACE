@@ -126,7 +126,7 @@ export function IncidentPanel({
       <div className="flex flex-col px-6 pt-6 pb-4 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-20 gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#1E3A8A] tracking-tight">Incident reports</h1>
+            <h1 className="text-2xl font-bold capitalize text-[#1E3A8A] tracking-tight">Incident reports</h1>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Real-time Command Feed</p>
           </div>
           <Popover>

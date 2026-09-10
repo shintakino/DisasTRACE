@@ -8,6 +8,7 @@ export interface DispatchOfferState {
   status: string;
   currentOfferResponderId: string | null;
   responderId: string | null;
+  offerExpiresAt?: Date | string | null;
 }
 
 export interface ManualDispatchResponderState {
@@ -118,15 +119,23 @@ export function canClaimAutomaticDispatchTurn(queueHeadRequestId: string | null 
 export function canResponderAcceptDispatchOffer(
   incident: DispatchOfferState,
   responderId: string,
+  now = new Date(),
 ) {
   return incident.status === 'DISPATCHED'
     && incident.currentOfferResponderId === responderId
-    && incident.responderId === null;
+    && incident.responderId === null
+    && incident.offerExpiresAt !== null
+    && incident.offerExpiresAt !== undefined
+    && new Date(incident.offerExpiresAt).getTime() > now.getTime();
 }
 
 export function canCascadeDispatchOffer(
   incident: DispatchOfferState,
   responderId: string,
 ) {
-  return canResponderAcceptDispatchOffer(incident, responderId);
+  // A cascade must still be able to claim an expired offer. Expiry prevents
+  // acceptance, not safe release of the responder reservation.
+  return incident.status === 'DISPATCHED'
+    && incident.currentOfferResponderId === responderId
+    && incident.responderId === null;
 }

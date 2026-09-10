@@ -299,7 +299,7 @@ export function HospitalSettings() {
 
         {/* Hospitals List */}
         <div className="space-y-3">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Hospital Locations ({hospitals.length})</h4>
+          <h4 className="text-xs font-bold tracking-wider text-slate-500">Active Hospital Locations ({hospitals.length})</h4>
 
           {loading ? (
             <div className="flex items-center justify-center p-8 bg-slate-50 border border-slate-100 rounded-2xl">

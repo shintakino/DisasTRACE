@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db } from '@/db';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { incidents } from '@/db/schema/incidents';
-import { autoDispatchIncident } from '@/lib/dispatch-engine';
+import { retryPendingAutomaticDispatches } from '@/lib/dispatch-engine';
 import { ChatbotSubmissionIdSchema } from '@/lib/chatbot/contracts';
 import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS, isLikelyDuplicateIncident } from '@/lib/incident-deduplication';
 import { isWithinOfficialBaliwagBoundary, resolveBaliwagBarangay } from '@/lib/barangay-boundaries';
@@ -218,7 +218,10 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
 
   let incident = null;
   if (triageClassification === 'HIGH_CONFIDENCE_EMERGENCY') {
-    incident = await autoDispatchIncident(request.id, actor.residentId, input.latitude, input.longitude);
+    const nextIncident = await retryPendingAutomaticDispatches();
+    // A newly submitted report can advance an older waiting emergency. Only
+    // expose an automatic dispatch to the reporter who owns that incident.
+    incident = nextIncident?.requestId === request.id ? nextIncident : null;
   }
 
   return { request, incident, guestAccessToken, autoDispatched: Boolean(incident), replayed: false };

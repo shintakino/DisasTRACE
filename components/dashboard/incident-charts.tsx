@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select"
 import { IncidentTrend, IncidentDistribution as IncidentDistributionType } from "@/types/dashboard"
 import { ShieldCheck, BarChart2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // Unified color configuration with PRECISE hex codes provided by the user
 const chartConfig = {
@@ -55,11 +56,13 @@ const chartConfig = {
 export function IncidentTrends({ 
   data,
   filter = "this_year",
-  onFilterChange
+  onFilterChange,
+  className
 }: { 
   data: IncidentTrend[];
   filter?: string;
   onFilterChange?: (filter: string) => void;
+  className?: string;
 }) {
   const totalIncidents = data.reduce((sum, item) => {
     return sum + (item.vehicular || 0) + (item.medical || 0) + (item.structural || 0) + (item.fire || 0) + (item.water || 0) + (item.unknown || 0);
@@ -67,10 +70,10 @@ export function IncidentTrends({
   const isEmpty = totalIncidents === 0;
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+    <Card className={cn("flex min-h-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm", className)}>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 p-6 pb-3">
         <div>
-          <CardTitle className="text-lg font-bold text-[#1E3A8A]">Incident summary</CardTitle>
+          <CardTitle className="text-lg font-bold text-[#1E3A8A]">Incident Summary</CardTitle>
           <CardDescription>Reports recorded during the selected period</CardDescription>
         </div>
         <Select value={filter} onValueChange={(val) => onFilterChange?.(val || "")}>
@@ -100,7 +103,7 @@ export function IncidentTrends({
             <p className="text-[#94A3B8] text-xs mt-1">No requests have been verified or logged during this period.</p>
           </div>
         ) : (
-        <ChartContainer config={chartConfig} className="h-full w-full min-h-[220px]">
+        <ChartContainer config={chartConfig} className="h-full w-full min-h-[220px] lg:min-h-0">
           <BarChart accessibilityLayer data={data} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E2E8F0" />
             <XAxis
@@ -188,20 +191,22 @@ export function IncidentTrends({
 export function IncidentDistribution({ 
   data, 
   filter = "this_month", 
-  onFilterChange 
+  onFilterChange,
+  className
 }: { 
-  data: IncidentDistributionType[], 
+  data: IncidentDistributionType[],
   filter?: string,
-  onFilterChange?: (value: string) => void
+  onFilterChange?: (value: string) => void,
+  className?: string
 }) {
   const totalValue = data.reduce((sum, item) => sum + (item.value || 0), 0);
   const isEmpty = totalValue === 0;
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+    <Card className={cn("flex min-h-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm", className)}>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 p-6 pb-3">
         <div>
-          <CardTitle className="text-lg font-bold text-[#1E3A8A]">Incident distribution</CardTitle>
+          <CardTitle className="text-lg font-bold text-[#1E3A8A]">Incident Distribution</CardTitle>
           <CardDescription>Breakdown by reported incident type</CardDescription>
         </div>
         <Select value={filter} onValueChange={(val) => onFilterChange?.(val || "")}>
@@ -221,8 +226,8 @@ export function IncidentDistribution({
           </SelectContent>
         </Select>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-8 p-6 overflow-hidden">
-        <div className="flex flex-row flex-wrap sm:flex-col gap-3 w-full sm:w-[40%] max-h-[100px] sm:max-h-full overflow-y-auto pr-2 shrink-0">
+      <CardContent className="flex flex-1 min-h-0 flex-col items-center justify-between gap-4 overflow-hidden p-6 sm:flex-row">
+        <div className="flex w-full shrink-0 flex-row flex-wrap gap-3 overflow-y-auto pr-2 sm:w-[32%] sm:flex-col sm:max-h-full">
           {data.map((item, index) => {
             const configKey = Object.keys(chartConfig).find(
               key => chartConfig[key as keyof typeof chartConfig].label === item.name
@@ -241,7 +246,7 @@ export function IncidentDistribution({
             )
           })}
         </div>
-        <div className="relative w-full sm:w-[60%] flex justify-center items-center h-full min-h-0">
+        <div className="relative flex h-full min-h-0 w-full items-center justify-center sm:w-auto sm:flex-1">
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center text-center p-4">
             <div className="w-16 h-16 rounded-full bg-[#ECFDF5] flex items-center justify-center mb-4 border border-[#A7F3D0] animate-pulse">
@@ -251,7 +256,7 @@ export function IncidentDistribution({
             <p className="text-[#047857] text-[11px] font-medium mt-1">Area is secure. Center is standing by.</p>
           </div>
         ) : (
-          <ChartContainer config={chartConfig} className="aspect-square w-full max-h-[280px]">
+          <ChartContainer config={chartConfig} className="aspect-square w-full max-h-[280px] lg:size-full lg:aspect-auto lg:max-h-none">
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent hideLabel />} />
               <Pie
@@ -259,7 +264,7 @@ export function IncidentDistribution({
                 dataKey="value"
                 nameKey="name"
                 innerRadius={0}
-                outerRadius="80%"
+                outerRadius="92%"
                 stroke="none"
                 labelLine={false}
                 isAnimationActive={false}

@@ -308,7 +308,7 @@ export default function VerificationPage() {
             // If it needs manual dispatch and either just transitioned or was rejected/expired
             if (isPaccManual && noResponder && (!wasAlreadyManual || hadResponder)) {
               playAlertSound("critical");
-              toast.error(`MANUAL DISPATCH REQUIRED: A responder rejected the offer or the timer expired!`, {
+              toast.error(`OVERRIDE DISPATCH REQUIRED: A responder rejected the offer or the timer expired!`, {
                 duration: 10000,
                 description: "Open the request to dispatch a backup unit manually.",
               });

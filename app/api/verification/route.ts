@@ -240,8 +240,9 @@ export async function POST(req: NextRequest) {
 
     // Auto Dispatch Logic
     if (!nearbyDuplicate && (severityLevel === 'Critical' || severityLevel === 'Emergency' || requestNature === 'EMERGENCY')) {
-      const { autoDispatchIncident } = await import('@/lib/dispatch-engine');
-      const incident = await autoDispatchIncident(newRequest.id, user.id, reportLatitude, reportLongitude);
+      const { retryPendingAutomaticDispatches } = await import('@/lib/dispatch-engine');
+      const nextIncident = await retryPendingAutomaticDispatches();
+      const incident = nextIncident?.requestId === newRequest.id ? nextIncident : null;
       
       if (incident) {
         return NextResponse.json({ 

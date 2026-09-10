@@ -146,9 +146,9 @@ export function ManualDispatchModal({
               <Truck className="h-6 w-6 text-white" />
             </div>
             <div className="text-left">
-              <DialogTitle className="text-xl font-bold text-white tracking-tight">Manual Dispatch</DialogTitle>
+              <DialogTitle className="text-xl font-bold text-white tracking-tight">Override Dispatch</DialogTitle>
               <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
-                Review available drivers and assign manually.
+                Review available drivers and assign through an override.
               </DialogDescription>
             </div>
           </div>

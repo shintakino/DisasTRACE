@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Responder } from "@/types/dashboard";
 import { motion } from "motion/react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 const container = {
   hidden: { opacity: 0 },
@@ -22,7 +24,7 @@ const item = {
   show: { opacity: 1, y: 0 }
 };
 
-export function PACCResponderGrid({ responders = [] }: { responders?: Responder[] }) {
+export function PACCResponderGrid({ responders = [], className }: { responders?: Responder[]; className?: string }) {
   const router = useRouter();
 
   const getStatusStyle = (status: string) => {
@@ -40,47 +42,49 @@ export function PACCResponderGrid({ responders = [] }: { responders?: Responder[
   };
 
   return (
-    <Card className="flex flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-      <CardHeader className="bg-[#1E3A8A] p-4">
+    <Card className={cn("flex min-h-[360px] flex-col gap-0 overflow-hidden rounded-xl border border-slate-200 py-0 shadow-sm", className)}>
+      <CardHeader className="shrink-0 bg-[#1E3A8A] p-4">
         <CardTitle className="text-xl font-bold text-white">Responders</CardTitle>
       </CardHeader>
-      <CardContent className="p-6">
-        <motion.div 
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4"
-        >
-          {responders.length > 0 ? (
-            responders.map((responder) => (
-              <motion.div
-                key={responder.id}
-                variants={item}
-                whileHover={{ scale: 1.02, translateY: -2 }}
-                onClick={() => router.push('/logs')}
-                className="flex flex-col items-center justify-center p-4 rounded-3xl border border-[#F1F5F9] bg-white shadow-sm select-none cursor-pointer hover:bg-[#F8FAFC] transition-all duration-200"
-              >
-                <Avatar className="size-16 mb-4 ring-4 ring-[#F1F5F9] ring-offset-2 pointer-events-none">
-                  <AvatarFallback className="bg-[#15286A] text-white text-2xl font-bold">
-                    {responder.initials}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <span className="text-sm font-bold text-[#1E293B] text-center mb-3 truncate w-full pointer-events-none">
-                  {responder.name}
-                </span>
-                
-                <div className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest pointer-events-none border ${getStatusStyle(responder.status)}`}>
-                  {responder.status}
-                </div>
-              </motion.div>
-            ))
-          ) : (
-            <div className="col-span-full flex items-center justify-center py-12 text-[#64748B] font-medium text-sm">
-              No active responders
-            </div>
-          )}
-        </motion.div>
+      <CardContent className="flex min-h-0 flex-1 overflow-hidden p-6">
+        <ScrollArea className="h-full w-full pr-2">
+          <motion.div
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+          >
+            {responders.length > 0 ? (
+              responders.map((responder) => (
+                <motion.div
+                  key={responder.id}
+                  variants={item}
+                  whileHover={{ scale: 1.02, translateY: -2 }}
+                  onClick={() => router.push('/logs')}
+                  className="flex flex-col items-center justify-center p-4 rounded-3xl border border-[#F1F5F9] bg-white shadow-sm select-none cursor-pointer hover:bg-[#F8FAFC] transition-all duration-200"
+                >
+                  <Avatar className="size-16 mb-4 ring-4 ring-[#F1F5F9] ring-offset-2 pointer-events-none">
+                    <AvatarFallback className="bg-[#15286A] text-white text-2xl font-bold">
+                      {responder.initials}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <span className="text-sm font-bold text-[#1E293B] text-center mb-3 truncate w-full pointer-events-none">
+                    {responder.name}
+                  </span>
+
+                  <div className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest pointer-events-none border ${getStatusStyle(responder.status)}`}>
+                    {responder.status}
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="col-span-full flex items-center justify-center py-12 text-[#64748B] font-medium text-sm">
+                No active responders
+              </div>
+            )}
+          </motion.div>
+        </ScrollArea>
       </CardContent>
     </Card>
   );

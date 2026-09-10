@@ -561,7 +561,7 @@ export default function HomeScreen() {
           <View className="flex-row items-center flex-1">
             <LocationIcon size={20} color="white" variant="Bold" />
             <View className="ml-2">
-              <Text className="text-white/80 text-xs uppercase tracking-wider">Your Location</Text>
+              <Text className="text-white/80 text-xs uppercase tracking-wider">Current Location</Text>
               <Text className="text-white text-md font-bold mt-0.5" numberOfLines={1}>{currentLocationDisplay}</Text>
             </View>
           </View>

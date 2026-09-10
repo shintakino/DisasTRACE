@@ -2,6 +2,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { LogBox, TextInput } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -30,6 +31,22 @@ function InitialLayout() {
   const segments = useSegments();
   const router = useRouter();
   const [isAppReady, setIsAppReady] = useState(false);
+
+  // The app always reloads the offer from the server after a notification tap.
+  // A tap opens the normal offer sheet; it never silently accepts an emergency.
+  useEffect(() => {
+    const openDispatchOffer = (response: Notifications.NotificationResponse | null) => {
+      const data = response?.notification.request.content.data;
+      if (data?.kind === 'dispatch_offer' || data?.kind === 'active_dispatch') {
+        router.replace('/(tabs)');
+      }
+    };
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(openDispatchOffer);
+    Notifications.getLastNotificationResponseAsync().then(openDispatchOffer).catch(() => undefined);
+
+    return () => subscription.remove();
+  }, [router]);
 
   console.log('[InitialLayout] Rendered. isLoaded:', isLoaded, 'isSignedIn:', isSignedIn, 'verificationStatus:', verificationStatus);
 

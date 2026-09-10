@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema/users";
 import { eq, and } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+import { isResponderHeartbeatFresh } from "@/lib/dispatch-policy";
 
 // Helper function to extract initials from full name
 function getInitials(name: string): string {
@@ -49,18 +50,14 @@ export async function GET() {
       ),
     });
 
-    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
-
     const mapped = dbResponders.map((r) => {
-      const isDevResponder = isDevMode && r.email === "responder@disastrace.com";
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      const isRecent = r.lastLocationUpdatedAt && new Date(r.lastLocationUpdatedAt) >= fiveMinutesAgo;
+      const isRecent = isResponderHeartbeatFresh(r.lastLocationUpdatedAt);
 
       let statusMapped: 'DISPATCHED' | 'STANDBY' | 'OFF DUTY' = 'OFF DUTY';
       if (r.dutyStatus === 'ACTIVE_DISPATCH') {
         statusMapped = 'DISPATCHED';
       } else if (r.dutyStatus === 'ON_DUTY') {
-        statusMapped = (isDevResponder || isRecent) ? 'STANDBY' : 'OFF DUTY';
+        statusMapped = isRecent ? 'STANDBY' : 'OFF DUTY';
       }
 
       return {

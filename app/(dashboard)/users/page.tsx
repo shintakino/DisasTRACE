@@ -124,6 +124,18 @@ export default function UsersPage() {
     }
   };
 
+  const handleReleaseDevice = async (user: UserManagementEntry) => {
+    if (!window.confirm(`Release ${user.fullName}'s mobile device? Their current mobile app will lose access, and they can sign in on a replacement device.`)) return;
+    try {
+      const response = await fetch(`/api/users/${user.id}/mobile-device`, { method: 'DELETE' });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Unable to release mobile device.');
+      toast.success(result.message || 'Mobile device released.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to release mobile device.');
+    }
+  };
+
 
 
   const handleExport = async () => {
@@ -214,6 +226,7 @@ export default function UsersPage() {
           onBan={(user) => {
             setBanUser(user);
           }}
+          onReleaseDevice={handleReleaseDevice}
         />
       </div>
 

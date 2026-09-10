@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSignUpStore } from '../../store/useSignUpStore';
 import { ArrowLeft, UserTick } from 'iconsax-react-native';
 import { uploadGovernmentID } from '../../lib/storage';
+import { bindCurrentMobileSession } from '../../lib/mobile-auth';
 
 import Step1 from '../../components/auth/Step1';
 import Step2 from '../../components/auth/Step2';
@@ -70,6 +71,7 @@ export default function SignUpScreen() {
             full_name: `${currentData.firstName} ${currentData.middleName ? currentData.middleName + ' ' : ''}${currentData.lastName}${currentData.suffix ? ' ' + currentData.suffix : ''}`.trim(),
             role: currentData.role,
             phone: currentData.mobileNumber,
+            barangay: currentData.barangay,
             address: `${currentData.street}, ${currentData.barangay}, ${currentData.city}, ${currentData.province}`,
             id_type: currentData.idCardType,
           }
@@ -100,6 +102,7 @@ export default function SignUpScreen() {
       // RLS policies for storage might require authentication.
       if (signUpData.session) {
         setIsAutoConfirmed(true);
+        await bindCurrentMobileSession(signUpData.session.access_token);
       }
 
       if (currentData.idCardUri) {

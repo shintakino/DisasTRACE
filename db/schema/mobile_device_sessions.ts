@@ -1,4 +1,4 @@
-import { pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from './users';
 
 /**
@@ -10,6 +10,8 @@ export const mobileDeviceSessions = pgTable('mobile_device_sessions', {
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
   deviceHash: varchar('device_hash', { length: 64 }).notNull(),
+  /** The Supabase Auth session_id claim allowed to use this mobile account. */
+  activeSessionId: uuid('active_session_id').notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

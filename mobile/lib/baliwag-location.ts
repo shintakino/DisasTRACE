@@ -8,8 +8,18 @@ export type BaliwagLocation = {
   barangayPsgcCode: string;
 };
 
+function displayBarangayName(barangay: string) {
+  const value = barangay.trim();
+  // Registration values are historically uppercase, while official boundary
+  // values already carry their canonical capitalization.
+  if (value !== value.toUpperCase()) return value;
+  return value.toLocaleLowerCase('en-PH').replace(/(^|[\s-])(\p{L})/gu, (_match, prefix: string, letter: string) => (
+    `${prefix}${letter.toLocaleUpperCase('en-PH')}`
+  ));
+}
+
 export function formatBaliwagLocation(barangay: string | null | undefined) {
-  return barangay?.trim() ? `${barangay.trim()}, Baliwag City` : null;
+  return barangay?.trim() ? `${displayBarangayName(barangay)}, Baliwag City` : null;
 }
 
 export async function resolveBaliwagLocation(latitude: number, longitude: number): Promise<BaliwagLocation | null> {

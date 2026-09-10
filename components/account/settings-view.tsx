@@ -315,7 +315,7 @@ export function SettingsView() {
                   <div>
                     <h4 className="font-bold text-[#1E3A8A] text-sm">Real-time Negotiation Offer</h4>
                     <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
-                      Configure the total duration a responder unit has to review and accept a manual dispatch offer before it automatically auto-declines and gets routed back into the triage queue.
+                      Configure the total duration a responder unit has to review and accept an override dispatch offer before it automatically auto-declines and gets routed back into the triage queue.
                     </p>
                   </div>
                 </div>

@@ -542,9 +542,10 @@ export function ResponderHome() {
             Notifications.scheduleNotificationAsync({
               content: {
                 title: '🚨 EMERGENCY DISPATCH OFFER',
-                body: `New emergency request: ${typeOfEmergency} at ${locationName}. You have ${inc.dispatch_offer_duration_seconds || 30}s to accept.`,
+                body: `New emergency request: ${typeOfEmergency} at ${locationName}. Tap to open the offer; you have ${inc.dispatch_offer_duration_seconds || 30}s to accept.`,
                 sound: true,
                 priority: Notifications.AndroidNotificationPriority.MAX,
+                data: { kind: 'dispatch_offer', incidentId: inc.id },
                 android: {
                   channelId: 'emergency-alerts',
                 },
@@ -648,6 +649,7 @@ export function ResponderHome() {
                 body: `You have been dispatched to: ${typeOfEmergency} at ${locationName}. Proceed immediately!`,
                 sound: true,
                 priority: Notifications.AndroidNotificationPriority.MAX,
+                data: { kind: 'active_dispatch', incidentId: inc.id },
                 android: {
                   channelId: 'emergency-alerts',
                 },
@@ -1103,7 +1105,7 @@ export function ResponderHome() {
               <LocationIcon size={16} color="#1E3A8A" variant="Bold" />
             </View>
             <View>
-              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Your Location</Text>
+              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Current Location</Text>
               <Text className="text-slate-900 text-sm font-black tracking-tight" numberOfLines={1}>{currentLocationDisplay}</Text>
             </View>
           </View>

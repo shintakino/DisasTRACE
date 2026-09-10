@@ -34,7 +34,10 @@ export type ManualDispatchEligibility =
     message: string;
   };
 
-export const RESPONDER_HEARTBEAT_FRESHNESS_MS = 5 * 60 * 1000;
+// On-duty telemetry is sent every few seconds. A one-minute limit lets a
+// transient network interruption recover while releasing a switched-off device
+// quickly enough that it cannot remain dispatchable as standby.
+export const RESPONDER_HEARTBEAT_FRESHNESS_MS = 60 * 1000;
 
 export function isResponderHeartbeatFresh(
   lastLocationUpdatedAt: Date | string | null,
@@ -105,6 +108,11 @@ export function shouldRetryAutomaticDispatch(request: AutomaticDispatchRetryStat
   return request.status === 'PENDING'
     && request.nature === 'EMERGENCY'
     && request.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY';
+}
+
+/** Only the oldest eligible pending request may reserve an automatic unit. */
+export function canClaimAutomaticDispatchTurn(queueHeadRequestId: string | null | undefined, requestId: string) {
+  return queueHeadRequestId === requestId;
 }
 
 export function canResponderAcceptDispatchOffer(

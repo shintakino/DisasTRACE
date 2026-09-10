@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   canCascadeDispatchOffer,
+  canClaimAutomaticDispatchTurn,
   canResponderAcceptDispatchOffer,
   evaluateManualDispatchEligibility,
   isResponderHeartbeatFresh,
@@ -41,6 +42,14 @@ check('retries only pending high-confidence emergencies', () => {
     nature: 'NON-EMERGENCY',
     triageClassification: 'HIGH_CONFIDENCE_EMERGENCY',
   }), false);
+});
+
+check('only the first waiting emergency may claim an automatic responder', () => {
+  const firstRequestId = 'request-first';
+  const laterRequestId = 'request-later';
+  assert.equal(canClaimAutomaticDispatchTurn(firstRequestId, firstRequestId), true);
+  assert.equal(canClaimAutomaticDispatchTurn(firstRequestId, laterRequestId), false);
+  assert.equal(canClaimAutomaticDispatchTurn(null, firstRequestId), false);
 });
 
 check('accepts only the responder who owns an unassigned dispatch offer', () => {
@@ -98,7 +107,7 @@ check('manual dispatch requires a fresh approved standby responder', () => {
     status: 'ACTIVE',
     verificationStatus: 'APPROVED',
     dutyStatus: 'ON_DUTY',
-    lastLocationUpdatedAt: new Date('2026-09-07T09:58:00.000Z'),
+    lastLocationUpdatedAt: new Date('2026-09-07T09:59:30.000Z'),
   };
 
   assert.equal(isResponderHeartbeatFresh(eligibleResponder.lastLocationUpdatedAt, now), true);
@@ -114,7 +123,7 @@ check('manual dispatch requires a fresh approved standby responder', () => {
     incident: null,
     responder: {
       ...eligibleResponder,
-      lastLocationUpdatedAt: new Date('2026-09-07T09:54:59.000Z'),
+      lastLocationUpdatedAt: new Date('2026-09-07T09:58:59.000Z'),
     },
     now,
   }), {

@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
-import { mobileDeviceSessions, users } from '@/db/schema';
+import { auditLogs, mobileDeviceSessions } from '@/db/schema';
 import { createClient } from '@/lib/supabase-server';
+import { getBearerToken, getMobileSessionState, getSupabaseSessionId } from '@/lib/mobile-session';
 
 export const runtime = 'nodejs';
 
 const MobileSignOutSchema = z.object({ deviceId: z.string().trim().min(8).max(256) }).strict();
-const mobileRoles = new Set(['public_user', 'ambulance_responder']);
-
 export async function POST(request: Request) {
   try {
     const parsed = MobileSignOutSchema.safeParse(await request.json());
@@ -20,13 +19,27 @@ export async function POST(request: Request) {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const dbUser = await db.query.users.findFirst({ where: eq(users.id, user.id) });
-    if (!dbUser || !mobileRoles.has(dbUser.role)) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    const accessToken = getBearerToken(request);
+    if (!accessToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const state = await getMobileSessionState(user.id, accessToken);
+    if (!state.exists || !state.mobile) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    const sessionId = getSupabaseSessionId(accessToken);
+    if (!sessionId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    await db.delete(mobileDeviceSessions).where(and(
+    const deleted = await db.delete(mobileDeviceSessions).where(and(
       eq(mobileDeviceSessions.userId, user.id),
       eq(mobileDeviceSessions.deviceHash, createHash('sha256').update(parsed.data.deviceId).digest('hex')),
-    ));
+      eq(mobileDeviceSessions.activeSessionId, sessionId),
+    )).returning({ userId: mobileDeviceSessions.userId });
+    if (deleted.length) {
+      await db.insert(auditLogs).values({
+        id: randomUUID(), userId: user.id, action: 'MOBILE_SESSION_ENDED', entityType: 'MOBILE_SESSION', entityId: user.id,
+      });
+    }
+    // Revoke the refresh token at the Auth boundary too. RLS/proxy already
+    // deny this JWT once the binding is removed, even before it expires.
+    const { error: revokeError } = await supabase.auth.admin.signOut(accessToken, 'local');
+    if (revokeError) console.warn('Supabase local session revocation failed after binding removal:', revokeError);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Mobile sign-out failed:', error);

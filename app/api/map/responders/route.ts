@@ -6,6 +6,7 @@ import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { isResponderHeartbeatFresh } from "@/lib/dispatch-policy";
 
 export async function GET() {
   if (!(await isAdmin())) {
@@ -41,11 +42,8 @@ export async function GET() {
         .map((incident) => [incident.responderId as string, incident])
     );
 
-    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-
     const mapped = dbResponders.map((r, i) => {
-      const isRecent = isDevMode || (r.lastLocationUpdatedAt && new Date(r.lastLocationUpdatedAt) >= fiveMinutesAgo);
+      const isRecent = isResponderHeartbeatFresh(r.lastLocationUpdatedAt);
 
       let mappedStatus: "AVAILABLE" | "DISPATCHED" | "OFF_DUTY" = "OFF_DUTY";
       if (r.dutyStatus === "ACTIVE_DISPATCH") {

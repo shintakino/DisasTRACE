@@ -1,10 +1,49 @@
 # Progress Tracker
 
+## 2026-09-11 — Responder card header and dispatch terminology polish
+
+- Removed the shared Card component's default vertical padding and inter-section gap from both CDRRMO and PACC responder cards, so their blue Responders header reaches the card's top edge without a white strip.
+- Corrected the dashboard heading to `Responder Roster` and renamed the operator-facing Manual Dispatch copy to `Override Dispatch`; the existing guarded dispatch workflow and API behavior remain unchanged.
+- Set the CDRRMO Recent Incident Reports panel to the same stable 264px height as the responder panel. Its list remains independently scrollable, keeping dashboard rows compact regardless of report count.
+- Strengthened the shared scrollbar thumb from the near-white border color to a visible slate thumb with a darker hover state, so scrollable dashboard lists do not appear transparent on white cards.
+- Reworked the CDRRMO dashboard's four operational cards into one responsive grid. At desktop width it fills the remaining dashboard viewport as two equal-height rows, so all four cards are visible without page scrolling; charts scale to their available card space and report/responder content remains internally navigable. Phones and tablets retain their readable stacked/two-column layout with a shared 360px minimum card height.
+- Applied the same viewport-fitting desktop composition to PACC. The responder roster scrolls internally when its responder cards exceed the available panel space, preventing it from extending the page.
+- Refined PACC's desktop order so Incident Distribution is the left card and Recent Reports the right card in row one, with the responder roster spanning row two. The pie chart now drops its desktop fixed-size cap and uses Recharts' responsive container to resize with its card.
+- Corrected the distribution panel's legend/chart width math: fixed 40% + 60% columns plus a gap caused horizontal overflow and constrained the pie. The legend now has a compact fixed share while the chart flexes into remaining space, and the pie uses a 92% radius of that responsive area.
+
+## 2026-09-11 — Dashboard responder layout correction
+
+- CDRRMO's Recent Reports and Responders cards now align to the top of their shared responsive grid, so a long report list cannot stretch the responder card. The responder roster retains a compact, stable minimum height.
+- PACC's full responder roster now appears directly below the KPI cards and before the reports/incident-distribution pair, keeping it visible in the primary dashboard viewport instead of unnecessarily pushing it below two tall cards.
+
+## 2026-09-11 — Shared command notification, presence, and export reliability
+
+- Corrected the detailed incident PDF dispatch-description line spacing by converting the intended millimetre line height to jsPDF's dimensionless factor, preventing multi-line dispatch details from overlapping.
+- CDRRMO and PACC responder cards and the shared responder map now use the same one-minute server heartbeat rule, with no development-account standby bypass. The same freshness requirement applies to manual and automatic dispatch eligibility, including timeout cascading.
+- Dashboard notification rows now mark read and open their linked incident on the shared map (or the relevant users/reports page). Responder dispatch alerts include incident context and tapping an Android local alert returns to the server-backed offer screen. This works while Android keeps the app process alive; a killed-app guarantee remains intentionally outside the current in-app-only notification scope.
+
+## 2026-09-10 — FIFO dispatch offers and expired-report recovery
+
+- Automatic emergency dispatch now admits only the oldest confirmed pending emergency to reserve a responder; an active offer protects that first report until its acceptance timer expires. When the offer expires with no alternate responder, the original report remains visibly unassigned for PACC reassignment and the released responder can receive the next queued report.
+- The resident chatbot response-status screen now clears the stale incident state when an offer is deleted/recycled or its request becomes pending, returning the reporter to the appropriate waiting screen instead of leaving `Responders are on the way` on screen.
+
+## 2026-09-10 — Registered profile location and current-location labels
+
+- The mobile profile now displays the barangay selected during registration as `Barangay Name, Baliwag City`; it no longer depends on GPS availability. New registrations persist that barangay explicitly, and migration `0015_backfill_registered_barangays` safely fills blank legacy values only where the second segment of the saved address exactly matches an official Baliwag barangay.
+- Resident and responder dashboard map headers now say `Current Location`. They continue to use the live official-boundary resolver, so the shown location remains current rather than the registered address.
+
+## 2026-09-10 — Enforced mobile one-device session security
+
+- Replaced the earlier app-only device check with a server-enforced session binding for Public User and Ambulance Responder accounts. The active device record now stores only a SHA-256 device digest plus the Supabase JWT `session_id`; legacy device-only records are intentionally invalidated during migration so an updated app must sign in once.
+- Added a database `has_valid_application_session()` gate and RLS policies across every application table, so an old or modified mobile client calling Supabase directly cannot read, write, or receive new realtime records unless its JWT session matches the active binding. The Next.js proxy applies the same check to all bearer-token API calls. CDRRMO/PACC cookie-based dashboard sessions are excluded from this mobile-only rule.
+- Successful mobile sign-in revokes the account's other Supabase sessions, normal sign-out removes only the matching session binding, and the mobile app checks the binding at launch then clears an invalid/released local credential. New registrations bind their automatically-created session before document upload.
+- Added the CDRRMO User Management “Release Mobile Device” control. It removes the mobile binding, audits the recovery action, and lets a resident/responder sign in on a replacement device without disrupting web administrators.
+
 ## 2026-09-10 — Mobile lifecycle, triage, and device-session fixes
 
 - Added explicit `Patient Transport` and `Other / non-emergency request` intake choices. They, plus `Unknown Cause`, now route to PACC as non-emergency while all emergency categories are normalized server-side to prevent client-side downgrade.
 - Fixed the resolved-report return route and cleared both persisted report stores after terminal reports, preventing the unmatched route and repeated emergency-status screens. Report history now has All, Completed, and Rejected filters; profile names are locked after registration at both mobile UI and API boundaries.
-- Public users request foreground location only; background location remains responder-tracking-only. Profile labels use the live official boundary resolver, and the decorative map handle/extra map gap and feedback-banner question icon were removed.
+- Public users request foreground location only; background location remains responder-tracking-only. Dashboard labels use the live official boundary resolver, while profile labels use the saved registration barangay; the decorative map handle/extra map gap and feedback-banner question icon were removed.
 - Added migration `0013_mobile_device_sessions` and server-backed sign-in/sign-out for Public Users and Ambulance Responders. The database keeps only a SHA-256 device digest, accepts the original mobile device atomically, and returns the logout-first message to a different device. CDRRMO/PACC browser sessions are unaffected.
 
 ## 2026-09-10 — CDRRMO/PACC command-heading consistency

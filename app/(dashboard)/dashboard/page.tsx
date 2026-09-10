@@ -164,27 +164,26 @@ export default function DashboardPage() {
   if (role?.toLowerCase() === 'cdrrmo_super_admin') {
     return (
       <>
-        <div className="h-full overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:scrollbar-default">
+        <div className="h-full min-h-0 overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:flex lg:flex-col lg:gap-4 lg:space-y-0 lg:overflow-hidden lg:scrollbar-default">
           <div className="shrink-0">
             <KpiCards data={data.kpis} />
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[400px] shrink-0">
+          <div className="grid grid-cols-1 gap-6 pb-4 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:grid-rows-2 lg:gap-4 lg:pb-0">
             <IncidentTrends 
               data={data.trends} 
               filter={trendFilter}
               onFilterChange={setTrendFilter}
+              className="lg:h-full lg:min-h-0"
             />
             <IncidentDistribution 
               data={data.distribution} 
               filter={distFilter}
               onFilterChange={setDistFilter}
+              className="lg:h-full lg:min-h-0"
             />
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 pb-4 lg:grid-cols-2">
-            <RecentReports reports={data.reports} onReportClick={handleReportClick} />
-            <ResponderStatus responders={data.responders} />
+            <RecentReports className="lg:h-full lg:min-h-0" reports={data.reports} onReportClick={handleReportClick} />
+            <ResponderStatus className="lg:h-full lg:min-h-0" responders={data.responders} />
           </div>
         </div>
       </>
@@ -195,22 +194,20 @@ export default function DashboardPage() {
   if (role?.toLowerCase() === 'pacc_admin') {
     return (
       <>
-        <div className="h-full overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:scrollbar-default">
+        <div className="h-full min-h-0 overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:flex lg:flex-col lg:gap-4 lg:space-y-0 lg:overflow-hidden lg:scrollbar-default">
           <div className="shrink-0">
             <KpiCards data={data.kpis} />
           </div>
-          
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <RecentReports reports={data.reports} onReportClick={handleReportClick} />
+
+          <div className="grid grid-cols-1 gap-6 pb-4 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:grid-rows-2 lg:gap-4 lg:pb-0">
             <IncidentDistribution 
               data={data.distribution} 
               filter={distFilter}
               onFilterChange={setDistFilter}
+              className="lg:h-full lg:min-h-0"
             />
-          </div>
-
-          <div className="w-full pb-4 shrink-0">
-            <PACCResponderGrid responders={data.responders} />
+            <RecentReports className="lg:h-full lg:min-h-0" reports={data.reports} onReportClick={handleReportClick} />
+            <PACCResponderGrid className="md:col-span-2 lg:h-full lg:min-h-0" responders={data.responders} />
           </div>
         </div>
       </>

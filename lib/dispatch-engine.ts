@@ -4,8 +4,9 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
-import { eq, and, or, sql, isNull, gte } from "drizzle-orm";
+import { asc, eq, and, or, sql, isNull, gte } from "drizzle-orm";
 import {
+  canClaimAutomaticDispatchTurn,
   canCascadeDispatchOffer,
   RESPONDER_HEARTBEAT_FRESHNESS_MS,
   shouldRetryAutomaticDispatch,
@@ -114,7 +115,8 @@ export async function autoDispatchIncident(
           eq(users.role, "ambulance_responder"),
           eq(users.status, "ACTIVE"),
           eq(users.verificationStatus, "APPROVED"),
-          eq(users.dutyStatus, "ON_DUTY")
+          eq(users.dutyStatus, "ON_DUTY"),
+          gte(users.lastLocationUpdatedAt, responderFreshAfter),
         ),
       });
     } else {
@@ -202,6 +204,25 @@ export async function autoDispatchIncident(
     //    UPDATE ... WHERE dutyStatus = 'ON_DUTY' — only one concurrent transaction
     //    can succeed per responder row.
     const result = await db.transaction(async (tx) => {
+      // Automatic dispatch is first-in, first-out. An older confirmed emergency
+      // keeps its turn while its responder offer is live; a later request may
+      // not claim an available unit merely because its API call won a race.
+      const [queueHead] = await tx
+        .select({ id: verificationRequests.id })
+        .from(verificationRequests)
+        .where(and(
+          eq(verificationRequests.status, 'PENDING'),
+          eq(verificationRequests.nature, 'EMERGENCY'),
+          eq(verificationRequests.triageClassification, 'HIGH_CONFIDENCE_EMERGENCY'),
+        ))
+        .orderBy(asc(verificationRequests.createdAt), asc(verificationRequests.id))
+        .limit(1)
+        .for('update');
+
+      if (!canClaimAutomaticDispatchTurn(queueHead?.id, requestId)) {
+        return null;
+      }
+
       // Serialize dispatch against reporter cancellation and concurrent retry.
       // Both paths lock the same verification row before inspecting incidents.
       const [lockedRequest] = await tx
@@ -231,9 +252,7 @@ export async function autoDispatchIncident(
           eq(users.verificationStatus, "APPROVED"),
           eq(users.dutyStatus, "ON_DUTY"),
         ];
-        if (!isDevMode) {
-          reservationConditions.push(gte(users.lastLocationUpdatedAt, responderFreshAfter));
-        }
+        reservationConditions.push(gte(users.lastLocationUpdatedAt, responderFreshAfter));
 
         const reserved = await tx.update(users)
           .set({ dutyStatus: "ACTIVE_DISPATCH" })
@@ -308,15 +327,7 @@ export async function retryPendingAutomaticDispatches() {
         eq(verificationRequests.nature, 'EMERGENCY'),
         eq(verificationRequests.triageClassification, 'HIGH_CONFIDENCE_EMERGENCY'),
       ),
-      orderBy: (request, { asc }) => [
-        sql`CASE ${request.severity}
-          WHEN 'Critical' THEN 0
-          WHEN 'High' THEN 1
-          WHEN 'Medium' THEN 2
-          ELSE 3
-        END`,
-        asc(request.createdAt),
-      ],
+      orderBy: (request, { asc }) => [asc(request.createdAt), asc(request.id)],
       limit: 10,
     });
 
@@ -423,6 +434,10 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         },
       });
 
+      // The timed-out manual offer no longer owns this responder. Let the
+      // oldest automatic emergency waiting in the queue use the released unit.
+      await retryPendingAutomaticDispatches();
+
       return;
     }
 
@@ -445,7 +460,8 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         where: and(
           eq(users.role, "ambulance_responder"),
           eq(users.status, "ACTIVE"),
-          eq(users.dutyStatus, "ON_DUTY")
+          eq(users.dutyStatus, "ON_DUTY"),
+          gte(users.lastLocationUpdatedAt, new Date(Date.now() - RESPONDER_HEARTBEAT_FRESHNESS_MS)),
         ),
       });
     } else {
@@ -470,7 +486,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
             eq(users.role, "ambulance_responder"),
             eq(users.status, "ACTIVE"),
             eq(users.dutyStatus, "ON_DUTY"),
-            sql`${users.lastLocationUpdatedAt} >= NOW() - INTERVAL '15 minutes'`,
+            gte(users.lastLocationUpdatedAt, new Date(Date.now() - RESPONDER_HEARTBEAT_FRESHNESS_MS)),
             sql`ST_DWithin(
               ${users.locationGeom}::geography,
               ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography,
@@ -572,19 +588,18 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
           .where(eq(verificationRequests.id, incident.requestId));
       }
     } else {
-      // No more responders left in range: Revert immediately back to PENDING triage!
-      console.log(`Cascade exhausted: No remaining available responders within 2km for incident ${incident.id}. Reverting verification request to PENDING immediately.`);
-      
-      // 1. Delete the incident
-      await db.delete(incidents).where(eq(incidents.id, incident.id));
-
-      // 2. Revert request status back to PENDING so it re-enters the PACC triage queue
-      await db.update(verificationRequests)
-        .set({
-          status: "PENDING",
-          updatedAt: new Date()
-        })
-        .where(eq(verificationRequests.id, incident.requestId));
+      // The only available responder timed out and there is no alternate unit.
+      // Keep this report as an unassigned PACC item instead of returning it to
+      // automatic FIFO. That lets the next waiting report receive the released
+      // responder, while PACC can explicitly reassign this report if needed.
+      console.log(`Cascade exhausted: no alternate responder for incident ${incident.id}. Escalating it to PACC and advancing the automatic queue.`);
+      await notifyPaccAndCdrrmo({
+        title: 'Automatic Dispatch Re-assignment Required',
+        body: `No alternate responder accepted Request #${request.requestId || request.id}. PACC reassignment is required.`,
+        type: 'dispatch_reassignment_required',
+        metadata: { incidentId: incident.id, requestId: incident.requestId },
+      });
+      await retryPendingAutomaticDispatches();
     }
   } catch (error) {
     console.error("Error in cascadeIncident:", error);

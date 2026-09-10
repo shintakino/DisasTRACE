@@ -91,9 +91,16 @@ export const useChatbotStore = create<ChatbotStore>()(
         activeReport,
         editTarget: null,
       }),
-      updateActiveReport: (updates) => set((state) => ({
-        activeReport: state.activeReport ? { ...state.activeReport, ...updates } : null,
-      })),
+      updateActiveReport: (updates) => set((state) => {
+        if (!state.activeReport) return state;
+        const activeReport = { ...state.activeReport, ...updates };
+        return {
+          activeReport,
+          lifecycle: updates.hasIncident === undefined
+            ? state.lifecycle
+            : activeReport.hasIncident ? 'ACTIVE_RESPONSE' : 'SUBMITTED_PENDING',
+        };
+      }),
       markActiveResponse: () => set({ lifecycle: 'ACTIVE_RESPONSE' }),
       discardDraft: () => set((state) => ({
         ...createInitialChatbotState(state.reporterMode, state.ownerId),

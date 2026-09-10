@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Responder } from "@/types/dashboard";
 import { motion, useMotionValue, animate } from "motion/react";
+import { cn } from "@/lib/utils";
 
 const container = {
   hidden: { opacity: 0 },
@@ -21,7 +22,7 @@ const item = {
   show: { opacity: 1, x: 0 }
 };
 
-export function ResponderStatus({ responders = [] }: { responders?: Responder[] }) {
+export function ResponderStatus({ responders = [], className }: { responders?: Responder[]; className?: string }) {
   const [constraints, setConstraints] = React.useState({ left: 0, right: 0 });
   const containerRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -77,11 +78,11 @@ export function ResponderStatus({ responders = [] }: { responders?: Responder[] 
   };
 
   return (
-    <Card className="flex min-h-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+    <Card className={cn("flex min-h-[360px] flex-col gap-0 overflow-hidden rounded-xl border border-slate-200 py-0 shadow-sm", className)}>
       <CardHeader className="shrink-0 bg-[#1E3A8A] p-4">
         <CardTitle className="text-xl font-bold text-white">Responders</CardTitle>
       </CardHeader>
-      <CardContent className="min-h-[288px] flex-1 overflow-hidden p-4">
+      <CardContent className="flex min-h-0 flex-1 overflow-hidden p-4">
         <div 
           ref={containerRef}
           className={`w-full h-full overflow-hidden flex items-center ${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}

@@ -23,6 +23,7 @@ create policy "Allow self-upload" on storage.objects
     bucket_id = 'user-ids' 
     and (storage.foldername(name))[1] = 'ids'
     and auth.uid()::text = (storage.foldername(name))[2]
+    and public.has_valid_application_session()
   );
 
 drop policy if exists "Allow self-view" on storage.objects;
@@ -31,11 +32,13 @@ create policy "Allow self-view" on storage.objects
     bucket_id = 'user-ids'
     and (storage.foldername(name))[1] = 'ids'
     and auth.uid()::text = (storage.foldername(name))[2]
+    and public.has_valid_application_session()
   );
 
 drop policy if exists "Allow Super Admin view all" on storage.objects;
 create policy "Allow Super Admin view all" on storage.objects
   for select using (
     bucket_id = 'user-ids'
+    and public.has_valid_application_session()
     and auth.jwt() -> 'app_metadata' ->> 'role' = 'cdrrmo_super_admin'
   );

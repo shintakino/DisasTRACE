@@ -6,6 +6,7 @@ import { RecentReport } from "@/types/dashboard";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from "motion/react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const container = {
   hidden: { opacity: 0 },
@@ -24,15 +25,17 @@ const item = {
 
 export function RecentReports({ 
   reports,
-  onReportClick
+  onReportClick,
+  className
 }: { 
   reports: RecentReport[];
   onReportClick?: (id: string) => void;
+  className?: string;
 }) {
   return (
-    <Card className="flex min-h-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+    <Card className={cn("flex min-h-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 shadow-sm", className)}>
       <CardHeader className="p-6 pb-3">
-        <CardTitle className="text-lg font-bold text-[#1E3A8A]">Recent incident reports</CardTitle>
+        <CardTitle className="text-lg font-bold text-[#1E3A8A]">Recent Incident Reports</CardTitle>
         <CardDescription>Latest reports received by the command center</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 p-0 overflow-hidden">

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Platform, StatusBar, Modal, Image, Alert, ActivityIndicator } from 'react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
-import { useLiveBarangay } from '../../hooks/use-live-barangay';
 import { supabase } from '../../lib/supabase';
 import { Edit2, Logout, User, FolderOpen, Notification, MessageQuestion, Lock1, ArrowLeft2 } from 'iconsax-react-native';
 import { useRouter } from 'expo-router';
@@ -192,14 +191,7 @@ export default function ProfileScreen() {
   const vehicleInitials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
   const suffix = user?.id ? user.id.slice(-3).toUpperCase() : "";
   const vehicleId = `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
-  const liveLocation = useLiveBarangay(Boolean(user));
-  const registeredLocation = liveLocation.state === 'ready'
-    ? formatBaliwagLocation(liveLocation.barangay)
-    : liveLocation.state === 'loading'
-      ? 'Finding your location…'
-      : liveLocation.state === 'outside_service_area'
-        ? 'Outside Baliwag City'
-        : 'Location unavailable';
+  const registeredLocation = formatBaliwagLocation(profile?.barangay) || 'Location unavailable';
 
   const renderPillRow = (Icon: any, title: string, subtitle: string, onPress?: () => void) => (
     <TouchableOpacity 
@@ -329,7 +321,7 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <>
-                <Text className="text-sm text-blue-200">Current location</Text>
+                <Text className="text-sm text-blue-200">Registered location</Text>
                 <Text className="text-base font-bold text-white mb-2">{registeredLocation}</Text>
                 <Text className="text-sm text-blue-200">Date Joined</Text>
                 <Text className="text-base font-bold text-white">{formatDate(user?.created_at)}</Text>

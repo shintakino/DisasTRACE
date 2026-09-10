@@ -245,7 +245,7 @@ export default function RosterPage() {
     <div className="h-full flex flex-col p-6 animate-in fade-in duration-500 bg-[#F3F4F6] overflow-y-auto">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <CommandPageHeading
-          title="Responder roster"
+          title="Responder Roster"
           description="Maintain responder accounts, availability records, and service assignments."
         />
         <Button

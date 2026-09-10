@@ -9,8 +9,15 @@ import {
 } from "@/components/ui/popover";
 import { createClientBrowser } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
+import { useRouter } from "next/navigation";
 
-type Notification = {
+interface NotificationMetadata {
+  incidentId?: string;
+  requestId?: string;
+  reportId?: string;
+}
+
+interface Notification {
   id: string;
   userId: string;
   type: string;
@@ -18,8 +25,8 @@ type Notification = {
   body: string;
   unread: boolean;
   createdAt: string;
-  metadata?: any;
-};
+  metadata?: NotificationMetadata;
+}
 
 function normalizeNotification(raw: any): Notification {
   return {
@@ -30,12 +37,15 @@ function normalizeNotification(raw: any): Notification {
     body: raw.body,
     unread: raw.unread ?? false,
     createdAt: raw.createdAt ?? raw.created_at ?? "",
-    metadata: raw.metadata,
+    metadata: typeof raw.metadata === "object" && raw.metadata !== null
+      ? raw.metadata as NotificationMetadata
+      : undefined,
   };
 }
 
 export function NotificationDropdown() {
   const { user } = useAuth();
+  const router = useRouter();
   const supabase = createClientBrowser();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -151,6 +161,24 @@ export function NotificationDropdown() {
     }
   };
 
+  const getNotificationDestination = (notification: Notification) => {
+    const incidentId = notification.metadata?.incidentId;
+    if (incidentId) return `/map?select=${encodeURIComponent(incidentId)}`;
+    if (notification.type === "registration_pending") return "/users";
+    if (notification.metadata?.reportId) return "/reports";
+    return null;
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.unread) void handleMarkAsRead(notification.id);
+
+    const destination = getNotificationDestination(notification);
+    if (destination) {
+      setIsOpen(false);
+      router.push(destination);
+    }
+  };
+
   // Determine unread count to show on the bell icon
   const unreadCount = notifications.filter((n) => n.unread).length;
   const hasUnread = unreadCount > 0;
@@ -238,7 +266,16 @@ export function NotificationDropdown() {
               filteredNotifications.map((notification) => (
                 <div
                   key={notification.id}
-                  onClick={() => notification.unread && handleMarkAsRead(notification.id)}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleNotificationClick(notification)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleNotificationClick(notification);
+                    }
+                  }}
+                  aria-label={`Open notification: ${notification.title}`}
                   className={`group flex gap-4 p-3 rounded-xl transition-all cursor-pointer ${
                     notification.unread ? "bg-blue-50/40 hover:bg-blue-50" : "hover:bg-slate-50"
                   }`}

@@ -420,6 +420,10 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
       .split(/\r?\n/)
       .flatMap((line) => doc.splitTextToSize(line || " ", pageWidth - 36));
     const descriptionLineHeight = 4.8;
+    // jsPDF receives a unitless factor, while this A4 document is laid out in
+    // millimetres and the font size is points. Convert the intended physical
+    // line height so wrapped dispatch details cannot overlap.
+    const descriptionLineHeightFactor = (descriptionLineHeight * doc.internal.scaleFactor) / doc.getFontSize();
     const sec2BoxHeight = Math.max(16, residentDescLines.length * descriptionLineHeight + 8);
 
     doc.setFillColor(255, 255, 255);
@@ -428,7 +432,7 @@ export async function exportSingleIncidentReportPDF(report: DetailedIncidentRepo
     doc.setTextColor(55, 65, 81); // Gray-700
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(residentDescLines, 18, sec2TitleY + 10, { lineHeightFactor: descriptionLineHeight / 9 });
+    doc.text(residentDescLines, 18, sec2TitleY + 10, { lineHeightFactor: descriptionLineHeightFactor });
 
     // --- Section 3: Responder Clinical Findings & Notes ---
     let sec3TitleY = sec2TitleY + 4 + sec2BoxHeight + 8;

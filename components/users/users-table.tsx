@@ -8,7 +8,7 @@ import {
   useReactTable,
   getPaginationRowModel,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, UserMinus, Ban, Trash2, ShieldAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, UserMinus, Ban, Trash2, ShieldAlert, Smartphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +27,7 @@ interface UsersTableProps {
   data: UserManagementEntry[];
   onManageStatus: (user: UserManagementEntry) => void;
   onBan: (user: UserManagementEntry) => void;
+  onReleaseDevice: (user: UserManagementEntry) => void;
 }
 
 const StatusBadge = ({ status }: { status: UserStatus }) => {
@@ -55,7 +56,7 @@ const RoleLabel = ({ role }: { role: UserRole }) => {
   return <span className="text-xs font-semibold text-slate-600">{labels[role]}</span>;
 };
 
-export function UsersTable({ data, onManageStatus, onBan }: UsersTableProps) {
+export function UsersTable({ data, onManageStatus, onBan, onReleaseDevice }: UsersTableProps) {
   const [rowSelection, setRowSelection] = React.useState({});
 
   const columns: ColumnDef<UserManagementEntry>[] = [
@@ -133,6 +134,17 @@ export function UsersTable({ data, onManageStatus, onBan }: UsersTableProps) {
           >
             <Ban className="h-4 w-4" />
           </Button>
+          {(row.original.role === 'public_user' || row.original.role === 'ambulance_responder') && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onReleaseDevice(row.original)}
+              className="h-8 w-8 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+              title="Release Mobile Device"
+            >
+              <Smartphone className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       ),
     },

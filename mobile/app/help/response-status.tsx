@@ -32,6 +32,25 @@ export default function EmergencyResponseStatusScreen() {
   const [loading, setLoading] = useState(true);
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
 
+  const returnToWaiting = () => {
+    setIncident(null);
+    useEmergencyReportStore.getState().setDetails({
+      incidentId: undefined,
+      responderFullName: undefined,
+    });
+    if (report.chatbotOrigin) {
+      useChatbotStore.getState().updateActiveReport({
+        status: 'PENDING',
+        responseStatus: 'PACC is securing the nearest available responder.',
+        incidentId: undefined,
+        hasIncident: false,
+      });
+      router.replace('/help/chatbot-pending' as never);
+      return;
+    }
+    router.replace('/help/pending' as never);
+  };
+
   useEffect(() => {
     if (report.chatbotOrigin && incident?.status === 'RESOLVED') {
       useChatbotStore.getState().clearReportToIdle();
@@ -51,6 +70,7 @@ export default function EmergencyResponseStatusScreen() {
           if (mounted && response.ok) {
             setIncident(result.data.incident);
             setAgencies(result.data.coordinationAgencies || []);
+            if (!result.data.incident) returnToWaiting();
           }
         } else {
           const [{ data: incidentData }, { data: requestData }] = await Promise.all([
@@ -58,7 +78,7 @@ export default function EmergencyResponseStatusScreen() {
             supabase.from('verification_requests').select('coordination_agencies').eq('id', requestId).maybeSingle(),
           ]);
           const data = incidentData;
-          if (mounted && data) setIncident({ status: data.status, responderId: data.responder_id });
+          if (mounted) setIncident(data ? { status: data.status, responderId: data.responder_id } : null);
           if (mounted && requestData) setAgencies(requestData.coordination_agencies || []);
         }
       } finally {
@@ -74,11 +94,16 @@ export default function EmergencyResponseStatusScreen() {
       };
     }
     const channel = supabase.channel(`response-status-${requestId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'incidents', filter: `request_id=eq.${requestId}` }, (payload) => {
+      if (payload.eventType === 'DELETE') {
+        returnToWaiting();
+        return;
+      }
       const record = payload.new as { status?: IncidentStatus['status']; responder_id?: string | null };
       if (record.status) setIncident({ status: record.status, responderId: record.responder_id ?? null });
     }).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'verification_requests', filter: `id=eq.${requestId}` }, (payload) => {
-      const record = payload.new as { coordination_agencies?: string[] };
+      const record = payload.new as { coordination_agencies?: string[]; status?: string };
       setAgencies(record.coordination_agencies || []);
+      if (record.status === 'PENDING') returnToWaiting();
     }).subscribe();
     return () => { mounted = false; supabase.removeChannel(channel); };
   }, [isGuest, report.guestAccessToken, report.id]);

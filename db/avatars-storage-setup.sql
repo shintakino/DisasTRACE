@@ -28,6 +28,7 @@ create policy "Allow self avatar upload" on storage.objects
   for insert with check (
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = auth.uid()::text
+    and public.has_valid_application_session()
   );
 
 -- RLS Policy: Authenticated users can update/overwrite their own files
@@ -35,6 +36,7 @@ create policy "Allow self avatar update" on storage.objects
   for update using (
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = auth.uid()::text
+    and public.has_valid_application_session()
   );
 
 -- RLS Policy: Authenticated users can delete their own files
@@ -42,4 +44,5 @@ create policy "Allow self avatar delete" on storage.objects
   for delete using (
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = auth.uid()::text
+    and public.has_valid_application_session()
   );

@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 
 const OFFLINE_REPORTS_KEY = 'disas_trace_offline_reports';
+const DRAFT_REMINDER_NOTIFICATION_KEY = 'disas_trace_draft_reminder_notification_id';
 
 export function useOfflineReports() {
   const { 
@@ -58,14 +59,41 @@ export function useOfflineReports() {
     // Initial reminder upon connection return if drafts exist
     sendDraftReminderNotification();
 
-    // 5-minute recurring timer (300,000 milliseconds)
-    const FIVE_MINUTES_MS = 5 * 60 * 1000;
-    const intervalId = setInterval(() => {
-      sendDraftReminderNotification();
-    }, FIVE_MINUTES_MS);
-
-    return () => clearInterval(intervalId);
+    return undefined;
   }, [isOnline, drafts.length]);
+
+  // Native notifications continue after React is paused or Android later stops
+  // the process. This is separate from the foreground immediate reminder above.
+  useEffect(() => {
+    let cancelled = false;
+    const syncDraftReminder = async () => {
+      const existingId = await SecureStore.getItemAsync(DRAFT_REMINDER_NOTIFICATION_KEY);
+      if (drafts.length === 0) {
+        if (existingId) await Notifications.cancelScheduledNotificationAsync(existingId).catch(() => undefined);
+        await SecureStore.deleteItemAsync(DRAFT_REMINDER_NOTIFICATION_KEY);
+        return;
+      }
+      if (existingId || cancelled) return;
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Pending Incident Draft Reminder',
+          body: 'You have an unsent incident report draft. Open DisasTRACE to review and submit it.',
+          data: { kind: 'draft_reminder' },
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          android: { channelId: 'emergency-alerts' },
+        } as Notifications.NotificationContentInput,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 5 * 60,
+          repeats: true,
+        },
+      });
+      if (!cancelled) await SecureStore.setItemAsync(DRAFT_REMINDER_NOTIFICATION_KEY, id);
+    };
+    syncDraftReminder().catch((error) => console.error('[DraftReminder] Unable to schedule reminder:', error));
+    return () => { cancelled = true; };
+  }, [drafts.length]);
 
   // Trigger background sync when device transitions to online
   useEffect(() => {

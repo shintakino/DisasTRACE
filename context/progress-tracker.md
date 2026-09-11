@@ -630,6 +630,11 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Added responder background alert delivery through Expo Push/FCM. Push tokens
+  are restricted to the account's active mobile session, are removed on sign
+  out or provider invalidation, and are sent only after an offer commits.
+  Native repeating draft reminders replace the foreground JavaScript interval
+  when a responder has unsent drafts.
 - Registered dispatch-offer expiry scheduler migration `0016` in Drizzle's
   migration journal so automated deployments and `scripts/migrate.ts` execute
   its pg_cron/pg_net setup rather than silently skipping the SQL file.

@@ -69,8 +69,8 @@
 
 ## Notifications
 
-- In-app only — no push notification infrastructure.
 - Notification records are stored in the database and delivered via Supabase Realtime.
+- Responder dispatch offers may additionally use Expo Push Notifications/FCM. Register tokens only through an authenticated, active responder mobile session; never expose provider credentials or use a push receipt as dispatch acceptance.
 - All notification types use a consistent schema (type, title, body, read status, timestamp, recipient).
 
 ## API Routes

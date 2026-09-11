@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
-import { auditLogs, mobileDeviceSessions } from '@/db/schema';
+import { auditLogs, mobileDeviceSessions, mobilePushTokens } from '@/db/schema';
 import { createClient } from '@/lib/supabase-server';
 import { getBearerToken, getMobileSessionState, getSupabaseSessionId } from '@/lib/mobile-session';
 
@@ -32,6 +32,10 @@ export async function POST(request: Request) {
       eq(mobileDeviceSessions.activeSessionId, sessionId),
     )).returning({ userId: mobileDeviceSessions.userId });
     if (deleted.length) {
+      await db.delete(mobilePushTokens).where(and(
+        eq(mobilePushTokens.userId, user.id),
+        eq(mobilePushTokens.sessionId, sessionId),
+      ));
       await db.insert(auditLogs).values({
         id: randomUUID(), userId: user.id, action: 'MOBILE_SESSION_ENDED', entityType: 'MOBILE_SESSION', entityId: user.id,
       });

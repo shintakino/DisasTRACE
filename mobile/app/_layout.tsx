@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStatus } from '../hooks/use-auth-status';
+import { registerResponderPushNotifications, subscribeToPushTokenChanges } from '../lib/push-notifications';
 import "../global.css";
 
 // Ignore known React Native third-party warnings
@@ -27,7 +28,7 @@ TextInputWithDefaults.defaultProps = {
 SplashScreen.preventAutoHideAsync();
 
 function InitialLayout() {
-  const { isLoaded, isSignedIn, verificationStatus } = useAuthStatus();
+  const { isLoaded, isSignedIn, verificationStatus, role } = useAuthStatus();
   const segments = useSegments();
   const router = useRouter();
   const [isAppReady, setIsAppReady] = useState(false);
@@ -47,6 +48,15 @@ function InitialLayout() {
 
     return () => subscription.remove();
   }, [router]);
+
+  useEffect(() => {
+    if (!isSignedIn || verificationStatus !== 'approved' || role !== 'ambulance_responder') return;
+    registerResponderPushNotifications().catch((error) => {
+      console.warn('[Push] Responder push setup was not completed.', error);
+    });
+    const subscription = subscribeToPushTokenChanges();
+    return () => subscription.remove();
+  }, [isSignedIn, role, verificationStatus]);
 
   console.log('[InitialLayout] Rendered. isLoaded:', isLoaded, 'isSignedIn:', isSignedIn, 'verificationStatus:', verificationStatus);
 

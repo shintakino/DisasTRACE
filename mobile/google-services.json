@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "557493866256",
+    "project_id": "disastrace",
+    "storage_bucket": "disastrace.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:557493866256:android:91d0ef456b99a465021f95",
+        "android_client_info": {
+          "package_name": "com.shintakino.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAu0tA8lnEmjDHmQsQ5HOlIFBcIMsfj6ew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

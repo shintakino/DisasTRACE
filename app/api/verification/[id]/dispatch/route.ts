@@ -7,6 +7,7 @@ import { systemSettings } from '@/db/schema/system_settings';
 import { users } from '@/db/schema/users';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { notifyPaccAndCdrrmo } from '@/lib/dispatch-engine';
+import { sendDispatchOfferPush } from '@/lib/push-notifications';
 import {
   evaluateManualDispatchEligibility,
   RESPONDER_HEARTBEAT_FRESHNESS_MS,
@@ -216,6 +217,12 @@ export async function POST(
     } catch (notificationError) {
       console.error('Manual dispatch committed but admin notification failed:', notificationError);
     }
+
+    await sendDispatchOfferPush({
+      responderId: result.responder.id,
+      incidentId: result.incident.id,
+      offerExpiresAt: result.incident.offerExpiresAt,
+    });
 
     return NextResponse.json({
       success: true,

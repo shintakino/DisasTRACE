@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
-import { auditLogs, mobileDeviceSessions, users } from '@/db/schema';
+import { auditLogs, mobileDeviceSessions, mobilePushTokens, users } from '@/db/schema';
 import { getUserRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase-server';
 
@@ -42,6 +42,7 @@ export async function DELETE(
       .returning({ userId: mobileDeviceSessions.userId });
 
     if (released.length) {
+      await db.delete(mobilePushTokens).where(eq(mobilePushTokens.userId, target.id));
       await db.insert(auditLogs).values({
         id: crypto.randomUUID(),
         userId: user.id,

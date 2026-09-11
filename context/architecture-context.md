@@ -102,8 +102,9 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 
 ## Notification Model
 
-- **In-app notifications only** — no push notifications, no external services.
-- Notifications are stored in the database and delivered via Supabase Realtime subscriptions.
+- Notifications are stored in the database and delivered via Supabase Realtime subscriptions while the app is active.
+- Responder dispatch offers additionally use Expo Push Notifications delivered through FCM, so Android can alert an approved responder while the app is backgrounded or stopped. Expo push tokens are bound to the account's one active mobile session and removed on sign-out or provider invalidation. Push delivery is advisory: the server remains the authority for offer ownership and expiry.
+- Responder draft reminders are scheduled natively on the device when a draft exists and cancelled after submission, so they do not rely on a running JavaScript timer.
 - Notification types: report verification updates, dispatch alerts, incident resolutions, account verification results, pending registration alerts (for admins).
 - Both all/unread filtering is supported in the notification panel.
 - While the responder process is running, a dispatch offer also raises a maximum-priority Android local notification with sound and vibration. Tapping it returns to the server-backed offer screen, which retains explicit responder confirmation. Guaranteed delivery after Android has killed the app requires a future push-notification service.
@@ -123,4 +124,4 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 5. Authenticated real-time data flows through Supabase Realtime. The only polling exception is a guest device refreshing its own token-authorized response state; anonymous database subscriptions are never exposed.
 6. The REST API is the single source of truth — the mobile app and web dashboard are both consumers.
 7. All mapping uses OpenFreeMap + MapLibre — no paid map services.
-8. Notifications are in-app only — no external notification infrastructure.
+8. Responder dispatch push tokens are stored only for the matching active mobile session; external push delivery never changes dispatch authority or bypasses API expiry checks.

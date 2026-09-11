@@ -4,6 +4,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
+import { sendDispatchOfferPush } from "@/lib/push-notifications";
 import { asc, eq, and, or, sql, isNull, gte } from "drizzle-orm";
 import {
   canClaimAutomaticDispatchTurn,
@@ -307,6 +308,14 @@ export async function autoDispatchIncident(
       return null;
     });
 
+    if (result?.currentOfferResponderId) {
+      await sendDispatchOfferPush({
+        responderId: result.currentOfferResponderId,
+        incidentId: result.id,
+        offerExpiresAt: result.offerExpiresAt,
+      });
+    }
+
     return result;
   } catch (error) {
     console.error("Error in autoDispatchIncident:", error);
@@ -537,6 +546,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
       // Iterate through candidates and atomically reserve the first available one
       const nextOfferDuration = incident.dispatchOfferDurationSeconds || 30;
       let cascaded = false;
+      let pushTarget: { responderId: string; incidentId: string; offerExpiresAt: Date | null } | null = null;
 
       for (const nextItem of sortedResponders) {
         const nextResponder = nextItem.responder;
@@ -565,19 +575,29 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         // Successfully reserved — update incident with new offer
         const nextOfferExpiresAt = new Date(Date.now() + nextOfferDuration * 1000);
 
-        await db.update(incidents)
+        const [updatedOffer] = await db.update(incidents)
           .set({
             currentOfferResponderId: nextResponder.id,
             offerExpiresAt: nextOfferExpiresAt,
             skippedResponderIds: updatedSkipped,
             etaMinutes: Math.max(2, Math.round(nextItem.distanceKm * 5)),
           })
-          .where(eq(incidents.id, incident.id));
+          .where(eq(incidents.id, incident.id))
+          .returning({ id: incidents.id, offerExpiresAt: incidents.offerExpiresAt });
 
         console.log(`[Cascade] Successfully transmitted offer to responder ${nextResponder.fullName}.`);
         cascaded = true;
+        if (updatedOffer) {
+          pushTarget = {
+            responderId: nextResponder.id,
+            incidentId: updatedOffer.id,
+            offerExpiresAt: updatedOffer.offerExpiresAt,
+          };
+        }
         break;
       }
+
+      if (pushTarget) await sendDispatchOfferPush(pushTarget);
 
       if (!cascaded) {
         // All candidates in range were already reserved by concurrent dispatches

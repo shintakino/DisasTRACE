@@ -4,7 +4,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
-import { auditLogs, mobileDeviceSessions, users } from '@/db/schema';
+import { auditLogs, mobileDeviceSessions, mobilePushTokens, users } from '@/db/schema';
 import { getSupabaseSessionId, MOBILE_ROLES } from '@/lib/mobile-session';
 
 export const runtime = 'nodejs';
@@ -90,6 +90,10 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ code: 'MOBILE_DEVICE_ALREADY_ACTIVE', error: alreadyActiveMessage }, { status: 409 });
     }
+
+    await db.update(mobilePushTokens)
+      .set({ sessionId, updatedAt: now })
+      .where(eq(mobilePushTokens.userId, dbUser.id));
 
     try {
       // A fresh successful mobile sign-in makes every other Supabase session

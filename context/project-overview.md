@@ -91,7 +91,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 
 ### Notifications
 
-- In-app notifications only — no push notifications or external notification services.
+- In-app notifications for general updates, plus Expo Push Notifications/FCM for responder dispatch offers when Android is backgrounded or stopped. Draft reminders are scheduled locally on the responder device.
 - Covers: report verifications, dispatch alerts, resolved incidents, pending registrations.
 
 ## Scope

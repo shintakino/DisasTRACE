@@ -630,6 +630,9 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Registered dispatch-offer expiry scheduler migration `0016` in Drizzle's
+  migration journal so automated deployments and `scripts/migrate.ts` execute
+  its pg_cron/pg_net setup rather than silently skipping the SQL file.
 - Standardized CDRRMO/PACC web page and panel headings to title case, while
   preserving sentence-case descriptions, helper text, labels, and statuses.
 - Made dispatch-offer expiry independent of a responder phone: a Supabase

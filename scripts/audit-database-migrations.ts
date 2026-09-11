@@ -49,6 +49,7 @@ const expectedTables = [
   'support_settings',
   'phone_verifications',
   'support_messages',
+  'guest_device_report_quotas',
 ];
 
 const expectedColumns = [
@@ -60,6 +61,7 @@ const expectedColumns = [
   ['users', 'responder_type'],
   ['verification_requests', 'reporter_type'],
   ['verification_requests', 'guest_access_token'],
+  ['verification_requests', 'guest_device_hash'],
   ['verification_requests', 'triage_classification'],
   ['verification_requests', 'coordination_agencies'],
   ['verification_requests', 'photo_latitude'],
@@ -111,6 +113,7 @@ async function audit() {
       'users_location_geom_gist_idx',
       'users_location_geom_geog_gist_idx',
       'verification_requests_guest_access_token_unique',
+      'verification_requests_guest_device_hash_idx',
       'verification_requests_barangay_idx',
     ];
     const indexes = await sql<{ indexname: string }[]>`

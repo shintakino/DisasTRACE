@@ -77,6 +77,8 @@ export interface DraftForm {
   lastSaved: string; // e.g. "2 mins ago"
   formData: any; // mock form data payload
   incidentDetails?: DispatchDetails; // Cache full incident context for draft recovery
+  /** True only after the responder explicitly presses Save as Draft. */
+  explicitlySaved?: boolean;
 }
 
 interface ResponderState {
@@ -126,7 +128,7 @@ interface ResponderState {
   completeIncident: () => void;
   
   // Forms & Drafts Actions
-  saveDraft: (incident: DispatchDetails, formData: any) => void;
+  saveDraft: (incident: DispatchDetails, formData: any, explicitlySaved?: boolean) => void;
   removeDraft: (draftId: string) => void;
   openFormForIncident: (incident: DispatchDetails) => void;
 
@@ -458,15 +460,20 @@ export const useResponderStore = create<ResponderState>((set) => ({
     lastSubmittedSummary: null
   }),
 
-  saveDraft: (incident, formData) => set((state) => {
+  saveDraft: (incident, formData, explicitlySaved = false) => set((state) => {
     const existingDraftIndex = state.drafts.findIndex(d => d.incidentId === incident.id);
+    const existingDraft = existingDraftIndex >= 0 ? state.drafts[existingDraftIndex] : undefined;
     const newDraft: DraftForm = {
-      id: existingDraftIndex >= 0 ? state.drafts[existingDraftIndex].id : `df-${Date.now()}`,
+      id: existingDraft?.id || `df-${Date.now()}`,
       incidentId: incident.id,
       incidentType: incident.typeOfEmergency || incident.type,
-      lastSaved: 'Unsent - Auto-save active',
+      lastSaved: explicitlySaved || existingDraft?.explicitlySaved
+        ? 'Saved as draft'
+        : 'Unsent - Auto-save active',
       formData,
-      incidentDetails: incident
+      incidentDetails: incident,
+      // An automatic recovery save must never undo an intentional draft save.
+      explicitlySaved: explicitlySaved || existingDraft?.explicitlySaved || false,
     };
 
     let newDrafts: DraftForm[] = [];

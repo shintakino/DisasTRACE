@@ -49,7 +49,9 @@ export default function DashboardLayout({
     // Synthesize alert warnings using standard Web Audio API (cross-browser compatible)
     const playAlert = (priority: IncidentAlertPriority) => {
       try {
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const AudioContextClass = window.AudioContext || (window as typeof window & {
+          webkitAudioContext?: typeof AudioContext;
+        }).webkitAudioContext;
         if (!AudioContextClass) return;
         const ctx = new AudioContextClass();
 
@@ -93,6 +95,13 @@ export default function DashboardLayout({
           console.log("[GlobalTriageAlert] New request received:", payload.new);
           const newRequest = payload.new;
           if (newRequest.status !== 'PENDING') return;
+
+          const isAutomaticEmergency = newRequest.nature === 'EMERGENCY'
+            && newRequest.triage_classification === 'HIGH_CONFIDENCE_EMERGENCY';
+          // Automatic emergencies reserve and notify the nearest responder
+          // first. PACC receives an explicit reassignment notification only
+          // when that automatic path cannot assign a unit.
+          if (isAutomaticEmergency) return;
 
           const isEmergency = newRequest.nature === "EMERGENCY";
           const reqNum = newRequest.request_id || newRequest.requestId || "REQ-NEW";
@@ -155,12 +164,10 @@ export default function DashboardLayout({
           const oldInc = payload.old;
           if (!newInc || !oldInc) return;
 
-          const isPaccManual = newInc.dispatch_method === "PACC_MANUAL" || newInc.dispatchMethod === "PACC_MANUAL";
           const noResponder = !newInc.responder_id && !newInc.current_offer_responder_id && !newInc.responderId && !newInc.currentOfferResponderId;
-          const wasAlreadyManual = oldInc.dispatch_method === "PACC_MANUAL" || oldInc.dispatchMethod === "PACC_MANUAL";
           const hadResponder = oldInc.responder_id || oldInc.current_offer_responder_id || oldInc.responderId || oldInc.currentOfferResponderId;
           
-          if (isPaccManual && noResponder && (!wasAlreadyManual || hadResponder)) {
+          if (newInc.status === 'DISPATCHED' && noResponder && hadResponder) {
             playAlert('critical');
             toast.error(`🚨 PACC MANUAL DISPATCH REQUIRED!`, {
               duration: 12000,

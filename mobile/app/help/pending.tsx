@@ -20,8 +20,71 @@ export default function PendingScreen() {
   const [isAccepted, setIsAccepted] = useState(false); // Simulate acceptance
   const [isSecuringResponder, setIsSecuringResponder] = useState(false);
   const incidentChannelRef = useRef<any>(null);
+  const hasRoutedToResponseStatus = useRef(false);
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
   const homeRoute = isGuest ? '/' : '/(tabs)/index';
+
+  // Reconcile through the server every few seconds. Realtime subscriptions are
+  // useful for immediacy but Android may suspend them while the app is in the
+  // background, exactly when a responder accepts a PACC override offer.
+  useEffect(() => {
+    const requestId = report.id;
+    if (!requestId) return;
+    let active = true;
+    const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+
+    const refreshDispatchState = async () => {
+      try {
+        const params = new URLSearchParams({ requestId });
+        const headers: Record<string, string> = {};
+        if (isGuest && report.guestAccessToken) {
+          params.set('accessToken', report.guestAccessToken);
+        } else {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.access_token) return;
+          headers.Authorization = `Bearer ${session.access_token}`;
+        }
+
+        const response = await fetch(`${apiUrl}/emergency-intake/status?${params.toString()}`, { headers });
+        const result = response.ok ? await response.json() : null;
+        if (!active || !result?.data) return;
+
+        const incident = result.data.incident as { id: string; responderId?: string | null; responder_id?: string | null } | null;
+        if (incident) {
+          useEmergencyReportStore.getState().setDetails({
+            incidentId: incident.id,
+            trackingRequestId: result.data.trackingRequestId,
+            responderFullName: result.data.responder?.fullName,
+          });
+          // An incident can be awaiting PACC re-assignment after a responder
+          // times out. It is no longer an upload/verification state, so never
+          // leave the reporter on this unbounded securing animation.
+          if (result.data.status === 'VERIFIED' && !hasRoutedToResponseStatus.current) {
+            hasRoutedToResponseStatus.current = true;
+            router.replace('/help/response-status' as never);
+            return;
+          }
+        }
+
+        const responderId = incident?.responderId ?? incident?.responder_id ?? null;
+        if (responderId) {
+          setIsSecuringResponder(false);
+          setIsAccepted(true);
+        } else if (result.data.status === 'VERIFIED') {
+          setIsSecuringResponder(true);
+        }
+      } catch (error) {
+        console.error('[PendingScreen] Server dispatch reconciliation failed:', error);
+      }
+    };
+
+    void refreshDispatchState();
+    const interval = setInterval(() => void refreshDispatchState(), 3_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isGuest, report.guestAccessToken, report.id]);
 
   // Lock gestures and navigation
   useEffect(() => {

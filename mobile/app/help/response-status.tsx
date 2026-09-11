@@ -11,13 +11,18 @@ interface IncidentStatus {
   responderId: string | null;
 }
 
+type DispatchRecoveryState = 'PACC_REASSIGNMENT_REQUIRED' | null;
+
 function coordinationText(agencies: string[]) {
   if (agencies.length === 0) return null;
   return `Coordinating with ${agencies.length === 1 ? agencies[0] : `${agencies.slice(0, -1).join(', ')} and ${agencies.at(-1)}`}`;
 }
 
-function messageFor(incident: IncidentStatus | null, agencies: string[]) {
+function messageFor(incident: IncidentStatus | null, agencies: string[], recoveryState: DispatchRecoveryState) {
   const coordination = coordinationText(agencies);
+  if (recoveryState === 'PACC_REASSIGNMENT_REQUIRED') {
+    return `${coordination ? `${coordination}. ` : ''}PACC is arranging another available responder.`;
+  }
   if (incident?.status === 'ARRIVED') return 'Responders have arrived at your location.';
   if (incident?.status === 'RESOLVED') return 'Response coordination has been completed.';
   if (incident?.status === 'EN_ROUTE' || incident?.responderId) return `${coordination ? `${coordination}. ` : ''}Responders are on the way.`;
@@ -29,6 +34,7 @@ export default function EmergencyResponseStatusScreen() {
   const report = useEmergencyReportStore((state) => state.report);
   const [incident, setIncident] = useState<IncidentStatus | null>(null);
   const [agencies, setAgencies] = useState<string[]>([]);
+  const [recoveryState, setRecoveryState] = useState<DispatchRecoveryState>(null);
   const [loading, setLoading] = useState(true);
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
 
@@ -63,61 +69,60 @@ export default function EmergencyResponseStatusScreen() {
     const requestId = report.id;
     const load = async () => {
       try {
+        const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+        const query = new URLSearchParams({ requestId });
+        const headers: Record<string, string> = {};
         if (isGuest && report.guestAccessToken) {
-          const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
-          const response = await fetch(`${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(requestId)}&accessToken=${encodeURIComponent(report.guestAccessToken)}`);
-          const result = await response.json();
-          if (mounted && response.ok) {
-            setIncident(result.data.incident);
-            setAgencies(result.data.coordinationAgencies || []);
-            useEmergencyReportStore.getState().setDetails({
-              incidentId: result.data.incident?.id,
-              trackingRequestId: result.data.trackingRequestId,
-            });
-            if (!result.data.incident) returnToWaiting();
-          }
+          query.set('accessToken', report.guestAccessToken);
         } else {
-          const [{ data: incidentData }, { data: requestData }] = await Promise.all([
-            supabase.from('incidents').select('status, responder_id').eq('request_id', requestId).maybeSingle(),
-            supabase.from('verification_requests').select('coordination_agencies').eq('id', requestId).maybeSingle(),
-          ]);
-          const data = incidentData;
-          if (mounted) setIncident(data ? { status: data.status, responderId: data.responder_id } : null);
-          if (mounted && requestData) setAgencies(requestData.coordination_agencies || []);
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.access_token) return;
+          headers.Authorization = `Bearer ${session.access_token}`;
         }
+
+        // Use the scoped server status endpoint for both reporter types. It
+        // remains reliable when mobile realtime is suspended during a PACC
+        // coordination update or a responder accepts from a push notification.
+        const response = await fetch(`${apiUrl}/emergency-intake/status?${query.toString()}`, { headers });
+        const result = await response.json().catch(() => null);
+        if (!mounted || !response.ok || !result?.data) return;
+
+        const remoteIncident = result.data.incident as { id: string; status: IncidentStatus['status']; responderId?: string | null; responder_id?: string | null } | null;
+        const nextIncident = remoteIncident ? {
+          status: remoteIncident.status,
+          responderId: remoteIncident.responderId ?? remoteIncident.responder_id ?? null,
+        } : null;
+
+        setIncident(nextIncident);
+        setAgencies(result.data.coordinationAgencies || []);
+        setRecoveryState(result.data.requiresPaccReassignment ? 'PACC_REASSIGNMENT_REQUIRED' : null);
+        useEmergencyReportStore.getState().setDetails({
+          incidentId: remoteIncident?.id,
+          trackingRequestId: result.data.trackingRequestId,
+          responderFullName: result.data.responder?.fullName,
+        });
+
+        if (!remoteIncident && result.data.status === 'PENDING') returnToWaiting();
+      } catch (error) {
+        console.error('[ResponseStatus] Failed to refresh response status:', error);
       } finally {
         if (mounted) setLoading(false);
       }
     };
     void load();
-    if (isGuest) {
-      const interval = setInterval(() => void load(), 3000);
-      return () => {
-        mounted = false;
-        clearInterval(interval);
-      };
-    }
-    const channel = supabase.channel(`response-status-${requestId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'incidents', filter: `request_id=eq.${requestId}` }, (payload) => {
-      if (payload.eventType === 'DELETE') {
-        returnToWaiting();
-        return;
-      }
-      const record = payload.new as { status?: IncidentStatus['status']; responder_id?: string | null };
-      if (record.status) setIncident({ status: record.status, responderId: record.responder_id ?? null });
-    }).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'verification_requests', filter: `id=eq.${requestId}` }, (payload) => {
-      const record = payload.new as { coordination_agencies?: string[]; status?: string };
-      setAgencies(record.coordination_agencies || []);
-      if (record.status === 'PENDING') returnToWaiting();
-    }).subscribe();
-    return () => { mounted = false; supabase.removeChannel(channel); };
+    const interval = setInterval(() => void load(), 3_000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, [isGuest, report.guestAccessToken, report.id]);
 
-  const message = useMemo(() => messageFor(incident, agencies), [agencies, incident]);
+  const message = useMemo(() => messageFor(incident, agencies, recoveryState), [agencies, incident, recoveryState]);
   return <View style={styles.page}>
     <View style={styles.hero}><Radio color="#FFF" size={34} /><Text style={styles.eyebrow}>EMERGENCY RESPONSE STATUS</Text><Text style={styles.title}>{loading ? 'Checking your response status…' : message}</Text><Text style={styles.caseId}>{report.requestId || 'Emergency report received'}</Text></View>
     <View style={styles.card}>
       <StatusStep icon={<CheckCircle2 color="#16A34A" size={21} />} title="Report received" subtitle="Your incident details and location were recorded." active />
-      <StatusStep icon={<Clock3 color={agencies.length > 0 ? '#16A34A' : '#F97316'} size={21} />} title="Response coordination" subtitle={coordinationText(agencies) || 'PACC is coordinating the appropriate response.'} active={agencies.length > 0} />
+      <StatusStep icon={<Clock3 color={agencies.length > 0 || recoveryState ? '#16A34A' : '#F97316'} size={21} />} title="Response coordination" subtitle={recoveryState ? 'PACC is selecting another available responder after the previous offer expired.' : coordinationText(agencies) || 'PACC is coordinating the appropriate response.'} active={agencies.length > 0 || Boolean(recoveryState)} />
       <StatusStep icon={<MapPinned color={incident?.responderId ? '#16A34A' : '#94A3B8'} size={21} />} title="Responder movement" subtitle={incident?.responderId ? 'Responders are on the way. Please remain available for further instructions.' : 'This updates when a responder is assigned.'} active={Boolean(incident?.responderId)} />
     </View>
     <TouchableOpacity style={styles.mapButton} onPress={() => router.replace('/help/tracking' as any)} disabled={!incident?.responderId}><Text style={styles.mapButtonText}>{incident?.responderId ? 'Open live ambulance map' : 'Waiting for responder assignment'}</Text></TouchableOpacity>

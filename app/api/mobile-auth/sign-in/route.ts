@@ -65,6 +65,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'This account is not permitted to use the mobile application.' }, { status: 403 });
     }
 
+    if (dbUser.status === 'SUSPENDED' || dbUser.status === 'DEACTIVATED') {
+      await revokeSession(data.session.access_token, 'local').catch(() => undefined);
+      return NextResponse.json({
+        code: 'MOBILE_ACCOUNT_BANNED',
+        error: 'Your account has been banned. Please contact PACC if you believe this is an error.',
+      }, { status: 403 });
+    }
+
     const sessionId = getSupabaseSessionId(data.session.access_token);
     if (!sessionId) {
       await revokeSession(data.session.access_token, 'local').catch(() => undefined);

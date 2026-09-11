@@ -43,24 +43,37 @@ export async function signInOnMobile(email: string, password: string) {
 }
 
 export async function signOutFromMobile() {
-  let serverError: Error | null = null;
   const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    try {
-      const response = await fetch(`${apiBaseUrl()}/api/mobile-auth/sign-out`, {
+  const releasePromise = session?.access_token
+    ? (async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl()}/api/mobile-auth/sign-out`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ deviceId: getMobileDeviceId() }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) serverError = new Error(payload.error || 'Unable to complete sign out.');
-    } catch (error) {
-      serverError = error instanceof Error ? error : new Error('Unable to complete sign out.');
-    }
-  }
-  // Clearing the local credential is always safe, including when this device
-  // was already released by an administrator or replaced by a newer login.
+        if (!response.ok) {
+          console.warn('[Mobile auth] Device-session release was not accepted:', payload.error);
+        }
+      } catch (error) {
+        // Local logout must remain available during a poor/offline connection.
+        // If the release cannot reach the server, the user is still signed out
+        // locally; a server-side binding cannot be released without a network.
+        console.warn('[Mobile auth] Device-session release could not be sent:', error);
+      }
+    })()
+    : Promise.resolve();
+
+  // Clear the credential straight away. This is the user-visible logout and
+  // must not wait for an Auth-admin/network round trip.
   const { error } = await supabase.auth.signOut({ scope: 'local' });
   if (error) throw error;
-  if (serverError) throw serverError;
+
+  // Give a healthy connection a short chance to release the one-device
+  // binding, without allowing a stalled server request to make logout slow.
+  await Promise.race([
+    releasePromise,
+    new Promise<void>((resolve) => setTimeout(resolve, 1200)),
+  ]);
 }

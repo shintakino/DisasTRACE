@@ -179,7 +179,9 @@ export function IncidentReportForm() {
 
   const handleSaveDraft = () => {
     if (activeDispatch) {
-      saveDraft(activeDispatch, { natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, location: dispatchLocation, tripTicketData });
+      // This is distinct from the background recovery save. The home map can
+      // safely stop prompting once the responder deliberately saved the form.
+      saveDraft(activeDispatch, { natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, location: dispatchLocation, tripTicketData }, true);
       setStatus('idle');
     }
   };
@@ -299,13 +301,15 @@ export function IncidentReportForm() {
 
 
   return (
+    <>
     <Modal
       visible={status === 'report_filling'}
-      animationType="slide"
-      presentationStyle="formSheet"
+      animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
+      presentationStyle={Platform.OS === 'ios' ? 'formSheet' : undefined}
+      hardwareAccelerated
       onRequestClose={() => setStatus('to_hospital')}
     >
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SafeAreaView className="flex-1 bg-[#16203A]">
         {/* Header */}
         <View className="px-4 py-4 flex-row items-center border-b border-blue-800/50">
@@ -582,6 +586,7 @@ export function IncidentReportForm() {
 
       </SafeAreaView>
       </KeyboardAvoidingView>
+    </Modal>
       
       {/* Report Submitted Modal */}
       <ReportSubmittedModal />
@@ -604,7 +609,7 @@ export function IncidentReportForm() {
           onSave={setTripTicketData}
         />
       )}
-    </Modal>
+    </>
   );
 }
 

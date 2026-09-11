@@ -1,16 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image, ActivityIndicator } from 'react-native';
+import { Alert, View, Text, TouchableOpacity, ScrollView, StatusBar, Image, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStatus } from '../../hooks/use-auth-status';
-import { useLocationPermission } from '../../hooks/use-location-permission';
-import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
 import { HelpButton } from '../../components/dashboard/HelpButton';
 import { OfflineBanner } from '../../components/dashboard/OfflineBanner';
 import { Shield, Check } from 'lucide-react-native';
 import { Location as LocationIcon, NotificationBing } from 'iconsax-react-native';
 import { useOfflineReports } from '../../hooks/use-offline-reports';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, Tabs } from 'expo-router';
+import { useLocalSearchParams, useRouter, Tabs } from 'expo-router';
 import { ResponderHome } from '../../components/responder/ResponderHome';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
@@ -47,13 +45,77 @@ function formatIncidentTimestamp(value: string): string {
   });
 }
 
+const apiBaseUrl = () => (process.env.EXPO_PUBLIC_API_URL
+  || process.env.EXPO_PUBLIC_MOBILE_API_URL?.replace(/\/api$/, '')
+  || 'https://disas-trace.vercel.app').replace(/\/$/, '');
+
 export default function HomeScreen() {
   const router = useRouter();
+  const { dispatchOfferId } = useLocalSearchParams<{ dispatchOfferId?: string | string[] }>();
   const { profile, verificationStatus, role, user, isLoaded } = useAuthStatus();
   const { isOnline } = useOfflineReports();
   const insets = useSafeAreaInsets();
   const [isCheckingIncident, setIsCheckingIncident] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const notificationOfferId = Array.isArray(dispatchOfferId) ? dispatchOfferId[0] : dispatchOfferId;
+
+  // Notification taps must hydrate from the database, not merely navigate to
+  // Home. This is required when Android suspended the realtime channel while
+  // PACC created a manual dispatch offer.
+  useEffect(() => {
+    if (!notificationOfferId || !isLoaded || role !== 'ambulance_responder' || !user?.id) return;
+    let active = true;
+
+    const hydrateOffer = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const response = await fetch(`${apiBaseUrl()}/api/incidents/offer?incidentId=${encodeURIComponent(notificationOfferId)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await response.json().catch(() => null);
+      if (!active || !response.ok || !result?.data) {
+        if (active && response.status === 409) {
+          // The notification may have been delivered before the server expiry
+          // ran. Make the result explicit instead of silently returning Home.
+          router.replace('/(tabs)');
+          Alert.alert(
+            'Dispatch offer expired',
+            'This offer is no longer available. It was released or reassigned by the dispatch system.',
+          );
+        }
+        return;
+      }
+
+      const offer = result.data;
+      const initials = offer.reporterName.split(' ').map((name: string) => name[0]).join('').slice(0, 2).toUpperCase() || 'R';
+      useResponderStore.setState({
+        status: 'dispatch_offered',
+        activeDispatch: {
+          id: offer.id,
+          type: offer.type || 'Emergency',
+          locationName: offer.locationName,
+          distance: 'Distance pending',
+          natureOfCall: offer.natureOfCall || 'EMERGENCY',
+          peopleInvolved: offer.peopleInvolved,
+          eta: offer.etaMinutes ? `~${offer.etaMinutes} min` : 'Calculating',
+          reporterName: offer.reporterName,
+          reporterInitials: initials,
+          reporterPhone: offer.reporterPhone || undefined,
+          timestamp: formatIncidentTimestamp(offer.createdAt),
+          coordinates: { latitude: Number(offer.latitude), longitude: Number(offer.longitude) },
+          typeOfEmergency: offer.type || 'Emergency',
+          dispatchOfferDurationSeconds: offer.dispatchOfferDurationSeconds || 30,
+          offerExpiresAt: offer.offerExpiresAt || undefined,
+          assignedAmbulance: offer.assignedAmbulance || 'AMB-001',
+          attachmentUrl: offer.attachmentUrl || undefined,
+        },
+      });
+      router.replace('/(tabs)');
+    };
+
+    void hydrateOffer();
+    return () => { active = false; };
+  }, [isLoaded, notificationOfferId, role, router, user?.id]);
 
   // Configure notifications channel
   useEffect(() => {
@@ -490,7 +552,6 @@ export default function HomeScreen() {
     };
   }, [isLoaded, role, user]);
 
-  const { isLocationGateActive, requestPermissions } = useLocationPermission();
   const liveLocation = useLiveBarangay(role === 'public_user' && isLoaded);
 
   const getInitials = (name: string) => {
@@ -674,11 +735,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Location Gate Overlay */}
-      <LocationPermissionDrawer 
-        isVisible={isLocationGateActive} 
-        onRequestPermission={requestPermissions}
-      />
     </LinearGradient>
   );
 }

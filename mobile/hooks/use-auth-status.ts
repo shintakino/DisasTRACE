@@ -7,12 +7,13 @@ import { verifyMobileSession } from '../lib/mobile-auth';
 
 const VerificationStatusSchema = z.enum(['pending', 'approved', 'rejected']);
 type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
+type MobileVerificationStatus = VerificationStatus | 'loading' | 'banned' | 'unauthorized_platform';
 
 export function useAuthStatus() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | 'loading' | 'unauthorized_platform'>('loading');
+  const [verificationStatus, setVerificationStatus] = useState<MobileVerificationStatus>('loading');
   const [role, setRole] = useState<string | null>(null);
   const [profile, setProfile] = useState<{ fullName: string; address: string; barangay?: string; phone?: string; dutyStatus?: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -48,16 +49,21 @@ export function useAuthStatus() {
       const status = dbUser.verification_status;
       const accountStanding = dbUser.status;
 
+      // Publish the resolved role before applying the platform gate. The
+      // unauthorized screen uses this value to distinguish a web-only admin
+      // from a mobile account still completing its verification refresh.
+      setRole(role);
+
       // Platform Restriction: Deny Web Admins on Mobile
       if (role === 'cdrrmo_super_admin' || role === 'pacc_admin') {
         setVerificationStatus('unauthorized_platform');
         return;
       }
-
-      setRole(role);
       
       if (accountStanding === 'SUSPENDED' || accountStanding === 'DEACTIVATED') {
-        setVerificationStatus('rejected');
+        // Residents need an explicit account-ban prompt, not the document
+        // verification rejection flow (which incorrectly offered resubmission).
+        setVerificationStatus(role === 'public_user' ? 'banned' : 'rejected');
         return;
       }
 
@@ -191,6 +197,7 @@ export function useAuthStatus() {
           console.log('Real-time profile update received:', payload.new);
           const newStatus = payload.new.verification_status;
           const newRole = payload.new.role;
+          const newAccountStanding = payload.new.status;
 
           // Platform Restriction: Deny Web Admins on Mobile
           if (newRole === 'cdrrmo_super_admin' || newRole === 'pacc_admin') {
@@ -200,6 +207,11 @@ export function useAuthStatus() {
 
           if (newRole) {
             setRole(newRole);
+          }
+
+          if (newAccountStanding === 'SUSPENDED' || newAccountStanding === 'DEACTIVATED') {
+            setVerificationStatus(newRole === 'public_user' ? 'banned' : 'rejected');
+            return;
           }
 
           if (newStatus) {

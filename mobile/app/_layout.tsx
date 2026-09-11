@@ -38,7 +38,12 @@ function InitialLayout() {
   useEffect(() => {
     const openDispatchOffer = (response: Notifications.NotificationResponse | null) => {
       const data = response?.notification.request.content.data;
-      if (data?.kind === 'dispatch_offer' || data?.kind === 'active_dispatch') {
+      if (data?.kind === 'dispatch_offer' && typeof data.incidentId === 'string') {
+        // A notification may be tapped after the app was backgrounded, when
+        // the realtime subscription is no longer alive. Pass the server offer
+        // ID through the route so Home hydrates the exact still-valid offer.
+        router.replace({ pathname: '/(tabs)', params: { dispatchOfferId: data.incidentId } });
+      } else if (data?.kind === 'active_dispatch') {
         router.replace('/(tabs)');
       }
     };
@@ -100,6 +105,12 @@ function InitialLayout() {
       } else if (verificationStatus === 'rejected') {
         if (!inVerificationGroup || rawSegments[1] !== 'rejected') {
           router.replace('/(verification)/rejected');
+        }
+      } else if (verificationStatus === 'banned') {
+        if (!inVerificationGroup || rawSegments[1] !== 'banned') {
+          // Expo's generated route union is refreshed by the next app build;
+          // retain the explicit group route during this source-only check.
+          router.replace('/(verification)/banned' as never);
         }
       } else if (verificationStatus === 'unauthorized_platform') {
         if (!inVerificationGroup || rawSegments[1] !== 'unauthorized') {

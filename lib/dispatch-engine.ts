@@ -4,7 +4,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
-import { sendDispatchOfferPush } from "@/lib/push-notifications";
+import { sendDispatchOfferExpiredPush, sendDispatchOfferPush } from "@/lib/push-notifications";
 import { asc, eq, and, or, sql, isNull, gte } from "drizzle-orm";
 import {
   canClaimAutomaticDispatchTurn,
@@ -413,6 +413,14 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
       console.log(`[Cascade] Offer ${incidentId} changed before cascade could claim it.`);
       return;
     }
+
+    // The old responder is no longer allowed to accept this incident. A push
+    // makes that visible even if the app is backgrounded when the server's
+    // deadline, rather than the local timer, releases the offer.
+    await sendDispatchOfferExpiredPush({
+      responderId: timedOutResponderId,
+      incidentId: incident.id,
+    });
 
     // The cascade owns the old offer now, so the responder can receive another.
     await db.update(users)

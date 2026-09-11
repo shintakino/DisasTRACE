@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, ActivityIndicator, Vibration, Image, Modal, Alert, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, useWindowDimensions, ActivityIndicator, Vibration, Image, Modal, Alert, ScrollView } from 'react-native';
 import { MapPin, Camera, Maximize2, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -22,15 +22,81 @@ export function DispatchSheet() {
   const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds ?? 30;
   const serverExpiry = activeDispatch?.offerExpiresAt ? Date.parse(activeDispatch.offerExpiresAt) : NaN;
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = Dimensions.get('window');
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const progress = useSharedValue(100);
   const [accepting, setAccepting] = useState(false);
+  const acceptingRef = useRef(false);
+  const expiryHandledRef = useRef(false);
+  const mountedRef = useRef(true);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(offerDurationSeconds);
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
   
   // Start off-screen at the top.
-  const translateY = useSharedValue(-800);
+  const translateY = useSharedValue(-screenHeight);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
+
+  const releaseExpiredOffer = useCallback(async (incidentId: string) => {
+    const currentDispatch = useResponderStore.getState().activeDispatch;
+    if (
+      !currentDispatch
+      || currentDispatch.id !== incidentId
+      || expiryHandledRef.current
+      || acceptingRef.current
+      || useResponderStore.getState().status !== 'dispatch_offered'
+    ) {
+      return;
+    }
+
+    expiryHandledRef.current = true;
+    try {
+      const apiUrl = apiBaseUrl();
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+
+      const response = await fetch(`${apiUrl}/api/incidents/respond`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ incidentId, action: 'REJECT' }),
+      });
+
+      // A 409 means the server has already accepted, expired, or reassigned
+      // this offer. In every case this phone must release its stale offer UI.
+      if (response.ok || response.status === 409) {
+        if (
+          useResponderStore.getState().status === 'dispatch_offered'
+          && useResponderStore.getState().activeDispatch?.id === incidentId
+        ) {
+          Alert.alert(
+            'Dispatch offer expired',
+            'This offer was released. PACC can assign another available responder if needed.',
+          );
+          completeIncident();
+        }
+        return;
+      }
+
+      throw new Error(`Offer expiry release failed with ${response.status}`);
+    } catch (error) {
+      // Do not clear local state unless the server confirmed that this offer is
+      // no longer ours. Retrying is safer than falsely showing standby while a
+      // live offer remains assigned to this responder.
+      expiryHandledRef.current = false;
+      console.error('Failed to release expired dispatch offer:', error);
+      setTimeout(() => {
+        if (mountedRef.current) void releaseExpiredOffer(incidentId);
+      }, 3_000);
+    }
+  }, [completeIncident]);
+
+  useEffect(() => {
+    acceptingRef.current = false;
+    expiryHandledRef.current = false;
+  }, [activeDispatch?.id]);
 
   // Trigger continuous vibration when an emergency alert is offered
   useEffect(() => {
@@ -95,7 +161,7 @@ export function DispatchSheet() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
       // Animate in from the top
-      translateY.value = withSpring(insets.top + 16, {
+      translateY.value = withSpring(insets.top + 12, {
         damping: 18,
         stiffness: 120,
         mass: 1
@@ -106,29 +172,11 @@ export function DispatchSheet() {
       progress.value = withTiming(0, { duration: remainingMilliseconds, easing: Easing.linear });
 
       // Auto-dismiss timeout
-      const timeoutId = setTimeout(async () => {
-        if (useResponderStore.getState().status === 'dispatch_offered') {
-          // Reject dispatch automatically if timer expires
-          try {
-            const apiUrl = apiBaseUrl();
-            const { data: { session } } = await supabase.auth.getSession();
-            const reqHeaders: any = { 'Content-Type': 'application/json' };
-            if (session?.access_token) {
-              reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
-            }
-            await fetch(`${apiUrl}/api/incidents/respond`, {
-              method: 'POST',
-              headers: reqHeaders,
-              body: JSON.stringify({
-                incidentId: activeDispatch?.id,
-                action: 'REJECT'
-              })
-            });
-          } catch (e) {
-            console.log('Auto-reject failed:', e);
-          }
-          completeIncident(); // Dismiss
-        }
+      const timeoutId = setTimeout(() => {
+        // Never send a competing REJECT while the responder has already
+        // pressed Accept. The server's conditional accept update is the final
+        // authority for the deadline.
+        if (!acceptingRef.current && activeDispatch?.id) void releaseExpiredOffer(activeDispatch.id);
       }, Math.max(0, expiresAt - currentServerTime()));
 
       return () => {
@@ -137,11 +185,23 @@ export function DispatchSheet() {
       };
     } else {
       // Animate out back to the top
-      translateY.value = withTiming(-800, { duration: 300, easing: Easing.out(Easing.cubic) });
+      translateY.value = withTiming(-screenHeight - insets.bottom, { duration: 300, easing: Easing.out(Easing.cubic) });
       progress.value = 100;
       setRemainingSeconds(offerDurationSeconds);
     }
-  }, [status, insets.top, offerDurationSeconds, serverExpiry, serverClockOffsetMs]);
+  }, [
+    status,
+    activeDispatch?.id,
+    insets.top,
+    insets.bottom,
+    screenHeight,
+    offerDurationSeconds,
+    serverExpiry,
+    serverClockOffsetMs,
+    releaseExpiredOffer,
+    progress,
+    translateY,
+  ]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -160,8 +220,8 @@ export function DispatchSheet() {
   return (
     <>
       <Animated.View 
-        className="absolute top-0 left-0 right-0 z-50 px-4"
-        style={animatedStyle}
+        className="absolute top-0 z-50 px-4"
+        style={[animatedStyle, { width: '100%', maxWidth: 560, alignSelf: 'center' }]}
         pointerEvents={pointerEvents}
       >
         <View
@@ -171,11 +231,12 @@ export function DispatchSheet() {
             // content scrolls while the accept action remains reachable.
             maxHeight: Math.max(0, screenHeight - insets.top - insets.bottom - 32),
             overflow: 'hidden',
+            width: Math.max(0, Math.min(screenWidth - 32, 560)),
           }}
         >
           <ScrollView
             showsVerticalScrollIndicator={false}
-            style={{ flexShrink: 1 }}
+            style={{ flexGrow: 0, flexShrink: 1 }}
             contentContainerStyle={{ paddingBottom: 8 }}
             nestedScrollEnabled
           >
@@ -195,19 +256,19 @@ export function DispatchSheet() {
           </View>
 
           {/* Incident Details */}
-          <Text className="text-2xl tracking-tight font-black text-[#0F172A] mb-1">
+          <Text className="text-2xl tracking-tight font-black text-[#0F172A] mb-1" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
             {activeDispatch?.type || 'Emergency'}
           </Text>
           <View className="flex-row items-center mb-4">
             <MapPin size={14} color="#0F172A" strokeWidth={3} />
-            <Text className="text-[#334155] text-xs ml-1.5 font-bold tracking-wide">
+            <Text className="text-[#334155] text-xs ml-1.5 font-bold tracking-wide flex-1" numberOfLines={2}>
               {activeDispatch?.locationName || 'Location unavailable'} · {activeDispatch?.distance || 'Distance pending'}
             </Text>
           </View>
 
           {/* Metrics Grid */}
           <View className="flex-row space-x-3 mb-4">
-            <View className="flex-1 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center">
+            <View className="flex-1 min-w-0 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center">
               <Text
                 className="text-[#991B1B] font-black text-[12px] uppercase tracking-tight"
                 numberOfLines={1}
@@ -218,12 +279,12 @@ export function DispatchSheet() {
               </Text>
               <Text className="text-[#64748B] text-[8px] font-bold mt-1 uppercase tracking-[0.15em]">NATURE OF CALL</Text>
             </View>
-            <View className="flex-1 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center relative overflow-hidden">
+            <View className="flex-1 min-w-0 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center relative overflow-hidden">
               <View className="absolute bg-[#F1F5F9] w-10 h-10 rounded-full -top-2 opacity-80" />
               <Text className="text-[#334155] font-black text-lg z-10">{activeDispatch?.peopleInvolved || '1'}</Text>
               <Text className="text-[#475569] text-[8px] font-bold mt-0.5 uppercase tracking-[0.15em] z-10">PERSONS</Text>
             </View>
-            <View className="flex-1 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center">
+            <View className="flex-1 min-w-0 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center">
               <Text className="text-[#1E3A8A] font-black text-lg tracking-tight">{activeDispatch?.eta ?? 'Calculating'}</Text>
               <Text className="text-[#64748B] text-[8px] font-bold mt-0.5 uppercase tracking-[0.15em]">ETA</Text>
             </View>
@@ -231,16 +292,16 @@ export function DispatchSheet() {
 
           {/* Reporter Info */}
           <View className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-[20px] p-3.5 flex-row items-center justify-between mb-4">
-            <View className="flex-row items-center">
+            <View className="flex-row items-center flex-1 min-w-0 mr-2">
               <View className="w-10 h-10 rounded-full bg-[#1E3A8A] items-center justify-center shadow-sm">
                 <Text className="text-white font-bold text-[14px]">{activeDispatch?.reporterInitials || 'R'}</Text>
               </View>
-              <View className="ml-3">
-                <Text className="text-[#0F172A] font-black text-[13px]">{activeDispatch?.reporterName || 'Resident'}</Text>
-                <Text className="text-[#64748B] text-[9px] mt-0.5 font-bold uppercase tracking-[0.05em]">{activeDispatch?.reporterPhone || (activeDispatch?.attachmentUrl ? 'Live photo attached' : 'No photo attached')}</Text>
+              <View className="ml-3 flex-1 min-w-0">
+                <Text className="text-[#0F172A] font-black text-[13px]" numberOfLines={1}>{activeDispatch?.reporterName || 'Resident'}</Text>
+                <Text className="text-[#64748B] text-[9px] mt-0.5 font-bold uppercase tracking-[0.05em]" numberOfLines={1}>{activeDispatch?.reporterPhone || (activeDispatch?.attachmentUrl ? 'Live photo attached' : 'No photo attached')}</Text>
               </View>
             </View>
-            <Text className="text-[#475569] text-[10px] font-semibold tracking-wide">{activeDispatch?.timestamp || ''}</Text>
+            <Text className="text-[#475569] text-[10px] font-semibold tracking-wide" numberOfLines={1}>{activeDispatch?.timestamp || ''}</Text>
           </View>
 
           {/* Captured Resident Photo Preview */}
@@ -273,10 +334,11 @@ export function DispatchSheet() {
           <View className="flex-row">
             <TouchableOpacity 
               className="bg-[#1E3A8A] rounded-[20px] py-4 items-center shadow-lg shadow-[#1E3A8A]/30 active:bg-blue-900 flex-1 flex-row justify-center"
-              disabled={accepting}
+              disabled={accepting || remainingSeconds <= 0}
               onPress={async () => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 progress.value = 100; // Cancel animation
+                acceptingRef.current = true;
                 setAccepting(true);
                 try {
                   const apiUrl = apiBaseUrl();
@@ -297,6 +359,12 @@ export function DispatchSheet() {
                   const res = await response.json();
                   if (res.success) {
                     acceptDispatch();
+                  } else if (response.status === 409) {
+                    Alert.alert(
+                      'Dispatch offer expired',
+                      'The offer was no longer available, so it has been released for reassignment.',
+                    );
+                    completeIncident();
                   } else {
                     Alert.alert(
                       "Dispatch not accepted",
@@ -310,14 +378,20 @@ export function DispatchSheet() {
                     "The server could not confirm this dispatch. Check your connection and try again.",
                   );
                 } finally {
+                  acceptingRef.current = false;
                   setAccepting(false);
+                  if (Date.now() + serverClockOffsetMs >= serverExpiry) {
+                    if (activeDispatch?.id) void releaseExpiredOffer(activeDispatch.id);
+                  }
                 }
               }}
             >
               {accepting ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
-                <Text className="text-white font-bold text-[16px] tracking-wide">Accept Dispatch</Text>
+                <Text className="text-white font-bold text-[16px] tracking-wide">
+                  {remainingSeconds > 0 ? 'Accept Dispatch' : 'Offer expired'}
+                </Text>
               )}
             </TouchableOpacity>
           </View>

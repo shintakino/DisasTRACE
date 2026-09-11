@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, Switch, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Check, Calendar, PenTool } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -298,7 +298,13 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
   const TRAUMA_AREAS = ['Head', 'Neck', 'Chest', 'Abdomen', 'Pelvis', 'Back', 'L-Arm', 'R-Arm', 'L-Leg', 'R-Leg'];
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="overFullScreen">
+    <Modal
+      visible={visible}
+      animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
+      hardwareAccelerated
+      onRequestClose={onClose}
+    >
       <SafeAreaView className="flex-1 bg-[#16203A]">
         {/* Header */}
         <View className="px-4 py-4 flex-row items-center justify-between border-b border-blue-800/50">

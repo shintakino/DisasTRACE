@@ -1291,4 +1291,162 @@ trailer
 >>
 startxref
 29182
+%%EOF1 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R 5 0 R 7 0 R 9 0 R 28 0 R ]
+/Count 5
+>>
+endobj
+27 0 obj
+<< /Length 2635 >>
+stream
+0.567 w
+0.12 0.23 0.54 rg
+0 841.89 595.28 -62.36 re
+f
+0.94 0.27 0.27 rg
+0 779.53 595.28 -4.25 re
+f
+BT
+/F2 11 Tf
+1 g
+39.69 810.71 Td
+(CDRRMO BALIWAG CITY | DISASTRACE FEATURE UPDATE) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.23 0.54 rg
+39.69 758 Td
+(2026 ANSWERED FEATURE UPDATE) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 735.00 Td
+(Q: Can Guest Mode be abused by changing the phone number?) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 716.00 Td
+(A: The server now applies the configurable lifetime allowance to both normalized phone and Android device digest.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 697.00 Td
+(The raw device identifier is not stored. A same-device phone change cannot reset the normal app quota.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 678.00 Td
+(Q: Are fake numbers blocked?) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 659.00 Td
+(A: Obvious repeated, repeated-block, and complete ascending or descending sequences are rejected client-side and server-side.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 640.00 Td
+(Q: Can a responder receive an offer while the app is backgrounded?) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 621.00 Td
+(A: Expo Push/FCM delivers the offer and expiry notification; the server remains the authority.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 602.00 Td
+(Q: What happens when the acceptance timer expires?) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 583.00 Td
+(A: The cron scheduler releases the offer, notifies the original responder, and routes the incident for reassignment or PACC action.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 564.00 Td
+(Q: Can two reports race for one responder?) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 545.00 Td
+(A: FIFO queue selection and atomic responder reservation ensure the earliest eligible emergency wins.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 526.00 Td
+(Q: What happens after a responder accepts?) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 507.00 Td
+(A: The reporter status API exposes the assigned responder and tracking remains available for registered and guest users.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 488.00 Td
+(Q: What security remains to be added?) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 469.00 Td
+(A: Device IDs are an abuse signal, not hardware attestation. Add Google Play Integrity for modified-client resistance.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 450.00 Td
+(Q: What must be verified before release?) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 431.00 Td
+(A: Run migrations and schema audit, verify cron executions, test background push on a release APK, and test stale-offer rejection.) Tj
+ET
+endstream
+endobj
+28 0 obj
+<<
+/Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.28 841.89]
+/Contents 27 0 R
+>>
+endobj
+xref
+1 1
+0000029880 00000 n 
+27 2
+0000029963 00000 n 
+0000032650 00000 n 
+trailer
+<<
+/Size 29
+/Root 26 0 R
+/Info 25 0 R
+/ID [ <ADA687D187489105E4C7B44826D4B86A> <ADA687D187489105E4C7B44826D4B86A> ]
+/Prev 29182
+>>
+startxref
+32762
 %%EOF

@@ -54,12 +54,13 @@ export function VerificationQueue({
   filter,
   onFilterChange,
 }: VerificationQueueProps) {
-  // Helper to determine if a request needs manual PACC dispatch (PACC_MANUAL status and no assigned responder)
+  // A released automatic offer is just as actionable as a PACC-created one.
+  // The server permits one manual override only when no responder owns it.
   const needsManualDispatch = (r: VerificationRequest) => {
-    return (
+    return r.requiresPaccReassignment === true || (
       r.status === "VERIFIED" &&
       r.incident &&
-      r.incident.dispatchMethod === "PACC_MANUAL" &&
+      r.incident.status === "DISPATCHED" &&
       !r.incident.responderId &&
       !r.incident.currentOfferResponderId
     );

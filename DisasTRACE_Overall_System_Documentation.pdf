@@ -1033,4 +1033,162 @@ trailer
 >>
 startxref
 25737
+%%EOF1 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R 5 0 R 7 0 R 26 0 R ]
+/Count 4
+>>
+endobj
+25 0 obj
+<< /Length 2856 >>
+stream
+0.567 w
+0.12 0.23 0.54 rg
+0 841.89 595.28 -62.36 re
+f
+0.94 0.27 0.27 rg
+0 779.53 595.28 -4.25 re
+f
+BT
+/F2 11 Tf
+1 g
+39.69 810.71 Td
+(CDRRMO BALIWAG CITY | DISASTRACE FEATURE UPDATE) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.23 0.54 rg
+39.69 758 Td
+(2026 FEATURE AND OPERATIONS UPDATE) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 735.00 Td
+(Guest Mode now enforces a lifetime allowance by normalized phone and Android device digest.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 716.00 Td
+(Raw Android identifiers are never stored; the server persists only a SHA-256 digest.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 697.00 Td
+(Obvious repeated and sequential phone numbers are rejected at the mobile and API boundaries.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 678.00 Td
+(A safety notice appears before guest phone submission and explains GPS and protected device recording.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 659.00 Td
+(Guest status uses a scoped access token and remains available without a Supabase account session.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 640.00 Td
+(Automatic emergency dispatch is FIFO: the oldest confirmed emergency gets the available unit first.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 621.00 Td
+(Offer expiry is server-authoritative through Supabase Cron and pg_net every five seconds.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 602.00 Td
+(Accept is an atomic database operation and succeeds only before the server deadline.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 583.00 Td
+(Expired or declined offers are released, notify the responder, and remain actionable for PACC reassignment.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 564.00 Td
+(PACC manual dispatch uses fresh responder heartbeat, approved status, and atomic reservation checks.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 545.00 Td
+(Expo Push and FCM alert responders while the app is backgrounded or locked.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 526.00 Td
+(Push tokens are bound to the active mobile session and removed on sign-out or provider invalidation.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 507.00 Td
+(Native repeating reminders notify responders about unsent drafts without relying on a JavaScript timer.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 488.00 Td
+(Public users and responders are restricted to one active mobile device session.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 469.00 Td
+(Registered and guest tracking reconcile through scoped status APIs and canonical parent incidents.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 450.00 Td
+(Dashboard cards, charts, headings, and PACC/CDRRMO layouts are responsive and use consistent title case.) Tj
+ET
+BT
+/F1 8.5 Tf
+0.12 0.16 0.22 rg
+45.35 431.00 Td
+(Deployment note: Play Integrity is still recommended for stronger resistance to rooted or modified clients.) Tj
+ET
+endstream
+endobj
+26 0 obj
+<<
+/Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.28 841.89]
+/Contents 25 0 R
+>>
+endobj
+xref
+1 1
+0000026395 00000 n 
+25 2
+0000026472 00000 n 
+0000029380 00000 n 
+trailer
+<<
+/Size 27
+/Root 24 0 R
+/Info 23 0 R
+/ID [ <50A41E2C89C437D343C7485FBA049CEC> <50A41E2C89C437D343C7485FBA049CEC> ]
+/Prev 25737
+>>
+startxref
+29492
 %%EOF

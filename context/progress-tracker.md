@@ -1,11 +1,19 @@
 # Progress Tracker
 
+## 2026-09-11 - Mobile navigation, responder forms, and dispatch layout reliability
+
+- Fixed the mobile entry-route race that could briefly send an approved public user or responder to the Web Access Only screen before their verification result completed. Only resolved CDRRMO/PACC roles now see that screen; a mobile account landing there through a stale route is returned to its tabs without being signed out.
+- Made the emergency-resolution exit idempotent and clear terminal report state before replacing the response route with the tab navigator, preventing duplicate return/back actions from leaving a dead route on Android.
+- Removed the nested native modal hierarchy between the responder incident form and the Patient Care/Driver Trip Ticket forms. Android now relies on its configured native keyboard resize rather than competing `KeyboardAvoidingView` height changes; responder form modals use stable Android presentation settings and hardware acceleration.
+- Reworked the responder dispatch offer overlay to use live window dimensions and safe areas, bounded internal scrolling, responsive card width, and text truncation/shrink rules. Long incident/report details and small or resized Android screens can no longer force the Accept Dispatch action off-screen or break the metric layout.
+
 ## 2026-09-11 - Typed chatbot emergency classification feed
 
 - Added `chat-bot-addtional-data-feed.md` as a documented chatbot triage source and retained its supplied Filipino/English examples under explicit runtime safeguards.
 - Added reviewed deterministic signal rules for high-risk medical, fire, vehicular, structural, flood/water, patient-transport, and routine non-emergency wording. The chatbot can now propose a permitted incident type and emergency nature from richer typed reports, with critical wording taking precedence over routine wording.
 - Raw training-style examples remain local documentation and are not sent to DeepSeek or mobile clients. Existing API validation and PACC/server triage remain the final authority; the chatbot never dispatches solely from this classification.
 - Extended the server-only DeepSeek gateway to recognize unfamiliar privacy-safe incident descriptions in English, Filipino, and Taglish. Its strict schema accepts only allowlisted type/nature pairs at high confidence and returns the ordinary confirmation-first report flow; uncertain or sensitive messages retain the guided fallback.
+- Added the common Filipino spelling variant `tyan` so `Masakit ang tyan ko` is classified locally as an Other / non-emergency request even when the AI service is unavailable.
 
 ## 2026-09-11 — Responder card header and dispatch terminology polish
 
@@ -637,6 +645,71 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Updated `DEPLOYMENT_SETUP.md`, `DisasTRACE_Overall_System_Documentation.pdf`,
+  and `FOR-DEV-ANSWERED.pdf` with the current migration sequence, Supabase
+  Cron/pg_net setup, Expo Push/FCM deployment requirements, one-device mobile
+  sessions, guest device-hash quotas and synthetic-number rejection, dispatch
+  expiry/reassignment behavior, tracking recovery, and the remaining Play
+  Integrity hardening recommendation.
+- Hardened Guest Chatbot abuse controls without storing raw Android IDs. Each
+  new guest report now reserves the existing configurable lifetime allowance
+  against both its normalized mobile number and a SHA-256 digest of the
+  Android app-scoped device identifier. Changing phone numbers on the same
+  device therefore cannot reset the quota; same-submission retries from the
+  same phone and device remain free. Guest phone input rejects obvious fake
+  patterns (for example `09123456789`, `09999999999`, and repeated three-digit
+  blocks) at both client and API boundaries. The chatbot now presents a clear
+  GPS/device-record and false-report safety notice directly above the guest
+  phone-number submission control. The mechanism is a deterrent, not rooted
+  device attestation; the existing Play Integrity follow-up remains the path
+  to stronger modified-client resistance.
+- Closed the missed-dispatch recovery gap for Public User, PACC, and the
+  scheduler fallback. A timed-out responder offer that cannot cascade is now
+  explicitly represented as `PACC reassignment required`: it remains a PACC
+  action item and is clearly labelled in the queue. The reporter status API
+  safely cascades that report's own expired offer before responding as a
+  scoped fallback when the scheduled job has not yet run. Public reporters
+  leave the temporary verification animation once the incident exists and see
+  that PACC is selecting another responder; live ambulance tracking remains
+  unavailable until a responder actually accepts.
+- Refined responder form-draft behavior during an active dispatch. Background
+  recovery drafts continue to persist safely, while an intentional `Save as
+  Draft` is recorded separately. Once deliberately saved, the matching active
+  incident no longer shows the map's unsent-draft banner or `Fill Report`
+  shortcut; the complete draft remains available from the Forms tab for later
+  review and submission.
+- Made mobile sign-out responsive for Public Users and Responders. The app now
+  clears the local session immediately and releases the secure one-device
+  server binding in parallel, waiting at most 1.2 seconds for a healthy
+  connection instead of blocking on a slow network/Admin Auth call.
+- Added a clear public-user account-ban flow. Suspended or deactivated public
+  accounts are prevented from establishing a mobile device session, display an
+  explicit Account Banned screen if the status changes while signed in, and
+  are never sent into the document-verification resubmission screen.
+- Enforced a non-dismissible foreground-location gate for both Public User and
+  Responder mobile roles across every tab. Denied permission or disabled device
+  location now explains that DisasTRACE cannot be used without location access,
+  directs the user to grant `While using the app`, and rechecks automatically
+  when the user returns from Settings. Responder background tracking remains a
+  separate on-duty capability rather than forcing `Always` permission for all
+  mobile users.
+- Corrected emergency dispatch ordering and offer-expiry recovery. PACC now
+  retries the automatic FIFO dispatcher before reading its queue and suppresses
+  transient high-confidence emergency insert alerts, allowing the nearest
+  responder to receive the offer first. An automatic offer exhausted without a
+  responder is now actionable as a PACC manual override. The responder client
+  no longer sends an expiry rejection while an Accept request is in flight;
+  it clears only after server confirmation and receives an explicit foreground
+  or push notification when a server-authoritative offer expires.
+- Fixed manual-override recovery for backgrounded responders and coordinated
+  public reports. A tapped dispatch-offer notification now supplies its exact
+  incident ID to the mobile Home screen, which hydrates the still-valid offer
+  from a responder-authorized API before rendering Accept; a tapped stale
+  notification explicitly explains that the offer expired or was reassigned.
+  Public pending and
+  response-status screens reconcile the scoped server status every three
+  seconds, so an accepted responder assignment enables ambulance tracking even
+  when a realtime subscription was paused during PACC coordination.
 - Fixed the resident/guest ambulance-map loop after an assigned response. The
   mobile tracking store now retains the canonical parent request ID for merged
   duplicates. Guest tracking no longer queries protected Supabase incident

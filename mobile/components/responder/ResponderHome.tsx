@@ -1154,8 +1154,11 @@ export function ResponderHome() {
           </View>
         </View>
 
-        {/* Pending Draft Warning Banner Prompt */}
-        {isOnline && drafts.length > 0 && (
+        {/* A manually saved draft remains available on Forms, but should not
+            cover the active dispatch map or invite duplicate form entry. */}
+        {isOnline && drafts.length > 0 && !(
+          activeDispatch && drafts.some((draft) => draft.incidentId === activeDispatch.id && draft.explicitlySaved)
+        ) && (
           <TouchableOpacity
             onPress={() => router.push('/(tabs)/forms')}
             activeOpacity={0.9}
@@ -1351,7 +1354,9 @@ export function ResponderHome() {
           )}
         </View>
 
-        {status === 'to_hospital' && (
+        {status === 'to_hospital' && !drafts.some(
+          (draft) => draft.incidentId === activeDispatch?.id && draft.explicitlySaved,
+        ) && (
           <View className="absolute top-[50%] right-6 z-50 pointer-events-auto">
             <TouchableOpacity 
               onPress={() => useResponderStore.getState().startReport()}

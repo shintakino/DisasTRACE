@@ -51,5 +51,6 @@ export const VerificationRequestSchema = z.object({
   receivedAt: z.string(), // ISO timestamp
   resident: ResidentInfoSchema,
   incident: VerificationIncidentSchema,
+  requiresPaccReassignment: z.boolean().optional(),
 });
 export type VerificationRequest = z.infer<typeof VerificationRequestSchema>;

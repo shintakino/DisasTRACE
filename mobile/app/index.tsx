@@ -41,7 +41,7 @@ export default function EntryScreen() {
             router.replace('/(verification)/pending');
           } else if (verificationStatus === 'rejected') {
             router.replace('/(verification)/rejected');
-          } else {
+          } else if (verificationStatus === 'unauthorized_platform') {
             router.replace('/(verification)/unauthorized');
           }
         }
@@ -77,7 +77,7 @@ export default function EntryScreen() {
             router.replace('/(verification)/pending');
           } else if (verificationStatus === 'rejected') {
             router.replace('/(verification)/rejected');
-          } else {
+          } else if (verificationStatus === 'unauthorized_platform') {
             router.replace('/(verification)/unauthorized');
           }
         }, 1600);

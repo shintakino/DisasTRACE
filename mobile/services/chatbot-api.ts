@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
+import { getMobileDeviceId } from '../lib/mobile-device';
 import {
   ChatbotResponseSchema,
   ChatbotStatusResponseSchema,
@@ -94,11 +95,15 @@ export async function submitChatbotReport(input: {
   draft: Required<Pick<ChatbotDraft, 'imageUrl' | 'incidentType' | 'nature' | 'latitude' | 'longitude' | 'peopleInvolved' | 'victimCondition'>> & ChatbotDraft;
 }): Promise<IntakeResult> {
   const authorization = await getAuthorizationHeader(input.reporterMode);
+  const guestDevicePayload = input.reporterMode === 'guest'
+    ? { deviceId: getMobileDeviceId() }
+    : {};
   const response = await fetch(`${API_URL}/emergency-intake/${input.reporterMode === 'guest' ? 'guest' : 'registered'}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authorization },
     body: JSON.stringify({
       ...(input.reporterMode === 'guest' ? { contactNumber: input.draft.contactNumber } : {}),
+      ...guestDevicePayload,
       incidentType: input.draft.incidentType,
       peopleInvolved: input.draft.peopleInvolved,
       victimCondition: input.draft.victimCondition,

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, BackHandler } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, BackHandler, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Star } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
@@ -13,6 +13,7 @@ export default function ResolutionScreen() {
   
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
+  const isLeavingRef = useRef(false);
 
   const formatDuration = (seconds?: number) => {
     if (seconds === undefined || seconds === null) return '12 Minutes'; // Fallback
@@ -22,12 +23,21 @@ export default function ResolutionScreen() {
     if (secs === 0) return `${mins} Minute${mins > 1 ? 's' : ''}`;
     return `${mins} Min${mins > 1 ? 's' : ''} ${secs} Sec${secs > 1 ? 's' : ''}`;
   };
+
+  const returnToHome = useCallback(() => {
+    if (isLeavingRef.current) return;
+    isLeavingRef.current = true;
+    Keyboard.dismiss();
+    resetReport();
+    useChatbotStore.getState().clearReportToIdle();
+    // Replace the terminal response route with the tab navigator. This avoids
+    // leaving a dead resolution route behind Android back navigation.
+    router.replace('/(tabs)');
+  }, [resetReport, router]);
  
   useEffect(() => {
     const onBackPress = () => {
-      resetReport();
-      useChatbotStore.getState().clearReportToIdle();
-      router.replace('/(tabs)');
+      returnToHome();
       return true;
     };
 
@@ -36,9 +46,10 @@ export default function ResolutionScreen() {
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [returnToHome]);
 
   const handleReturnHome = () => {
+    if (isLeavingRef.current) return;
     // Only submit feedback if a rating star was selected (rating > 0)
     if (rating > 0) {
       (async () => {
@@ -66,9 +77,7 @@ export default function ResolutionScreen() {
       })();
     }
     
-    resetReport();
-    useChatbotStore.getState().clearReportToIdle();
-    router.replace('/(tabs)');
+    returnToHome();
   };
 
   return (
@@ -144,7 +153,7 @@ export default function ResolutionScreen() {
         </View>
 
         {/* Action Button */}
-        <TouchableOpacity style={styles.returnButton} onPress={handleReturnHome} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.returnButton} onPress={handleReturnHome} activeOpacity={0.8} disabled={isLeavingRef.current}>
           <Text style={styles.returnButtonText}>RETURN TO HOME</Text>
         </TouchableOpacity>
 

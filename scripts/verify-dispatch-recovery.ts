@@ -5,6 +5,7 @@ import {
   canResponderAcceptDispatchOffer,
   evaluateManualDispatchEligibility,
   isResponderHeartbeatFresh,
+  requiresPaccReassignment,
   shouldRetryAutomaticDispatch,
 } from '../lib/dispatch-policy';
 
@@ -54,29 +55,41 @@ check('only the first waiting emergency may claim an automatic responder', () =>
 
 check('accepts only the responder who owns an unassigned dispatch offer', () => {
   const responderId = 'responder-1';
+  const now = new Date('2026-09-11T10:00:00.000Z');
   assert.equal(canResponderAcceptDispatchOffer({
     status: 'DISPATCHED',
     currentOfferResponderId: responderId,
     responderId: null,
-  }, responderId), true);
+    offerExpiresAt: new Date('2026-09-11T10:00:05.000Z'),
+  }, responderId, now), true);
+
+  assert.equal(canResponderAcceptDispatchOffer({
+    status: 'DISPATCHED',
+    currentOfferResponderId: responderId,
+    responderId: null,
+    offerExpiresAt: new Date('2026-09-11T10:00:00.000Z'),
+  }, responderId, now), false);
 
   assert.equal(canResponderAcceptDispatchOffer({
     status: 'DISPATCHED',
     currentOfferResponderId: 'responder-2',
     responderId: null,
-  }, responderId), false);
+    offerExpiresAt: new Date('2026-09-11T10:00:05.000Z'),
+  }, responderId, now), false);
 
   assert.equal(canResponderAcceptDispatchOffer({
     status: 'EN_ROUTE',
     currentOfferResponderId: responderId,
     responderId: null,
-  }, responderId), false);
+    offerExpiresAt: new Date('2026-09-11T10:00:05.000Z'),
+  }, responderId, now), false);
 
   assert.equal(canResponderAcceptDispatchOffer({
     status: 'DISPATCHED',
     currentOfferResponderId: responderId,
     responderId: 'responder-2',
-  }, responderId), false);
+    offerExpiresAt: new Date('2026-09-11T10:00:05.000Z'),
+  }, responderId, now), false);
 });
 
 check('cascades only the still-current unassigned offer', () => {
@@ -98,6 +111,26 @@ check('cascades only the still-current unassigned offer', () => {
     currentOfferResponderId: 'responder-2',
     responderId: null,
   }, responderId), false);
+});
+
+check('an exhausted offer remains a PACC reassignment item', () => {
+  assert.equal(requiresPaccReassignment({
+    status: 'DISPATCHED',
+    currentOfferResponderId: null,
+    responderId: null,
+  }), true);
+
+  assert.equal(requiresPaccReassignment({
+    status: 'DISPATCHED',
+    currentOfferResponderId: 'responder-1',
+    responderId: null,
+  }), false);
+
+  assert.equal(requiresPaccReassignment({
+    status: 'EN_ROUTE',
+    currentOfferResponderId: null,
+    responderId: 'responder-1',
+  }), false);
 });
 
 check('manual dispatch requires a fresh approved standby responder', () => {
@@ -183,6 +216,19 @@ check('manual dispatch rejects stale report state and active offers', () => {
     message: 'This report already has an active dispatch offer. Refresh the verification queue.',
   });
 
+  assert.deepEqual(evaluateManualDispatchEligibility({
+    requestStatus: 'VERIFIED',
+    incident: {
+      status: 'DISPATCHED',
+      currentOfferResponderId: null,
+      responderId: null,
+    },
+    responder,
+    now,
+  }), { allowed: true });
+
+  // An automatic offer that expired without an alternate is intentionally
+  // overrideable by PACC once it has no responder owner.
   assert.deepEqual(evaluateManualDispatchEligibility({
     requestStatus: 'VERIFIED',
     incident: {

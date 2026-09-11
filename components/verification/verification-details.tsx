@@ -25,13 +25,15 @@ export function VerificationDetails({ request, onOverrideClassification, onUpdat
     )
   }
 
-  const isPendingDispatch = request.status === "VERIFIED" && 
+  const isPendingDispatch = request.requiresPaccReassignment === true || (
+    request.status === "VERIFIED" &&
     request.incident && 
-    request.incident.dispatchMethod === "PACC_MANUAL" &&
+    request.incident.status === "DISPATCHED" &&
     !request.incident.responderId &&
-    !request.incident.currentOfferResponderId;
+    !request.incident.currentOfferResponderId
+  );
 
-  const displayStatus = isPendingDispatch ? "PENDING PACC DISPATCH" : request.status;
+  const displayStatus = isPendingDispatch ? "PACC REASSIGNMENT REQUIRED" : request.status;
   const classification = request.triageClassification || "UNCERTAIN_INCOMPLETE";
   const triageReasons = request.triageReasons?.length
     ? request.triageReasons

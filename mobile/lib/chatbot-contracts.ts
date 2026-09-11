@@ -156,7 +156,22 @@ export function parseExactPeopleInput(value: string): number | null {
 }
 
 export function isValidGuestPhone(value: string | undefined): boolean {
-  return /^(?:\+63|0)9\d{9}$/.test((value ?? '').replace(/[\s()-]/g, ''));
+  const compact = (value ?? '').replace(/[\s()-]/g, '');
+  if (!/^(?:\+63|0)9\d{9}$/.test(compact)) return false;
+  return !isObviouslySyntheticGuestPhone(compact);
+}
+
+/** Mirrors the server's guest-only synthetic-number screen for immediate UX. */
+export function isObviouslySyntheticGuestPhone(value: string | undefined): boolean {
+  const compact = (value ?? '').replace(/[\s()-]/g, '');
+  const normalized = compact.startsWith('+63') ? `0${compact.slice(3)}` : compact;
+  if (!/^09\d{9}$/.test(normalized)) return false;
+  const subscriberDigits = normalized.slice(2);
+  if (/^(\d)\1{8}$/.test(subscriberDigits) || /^(\d{3})\1{2}$/.test(subscriberDigits)) return true;
+  const step = Number(subscriberDigits[1]) - Number(subscriberDigits[0]);
+  return (step === 1 || step === -1) && [...subscriberDigits].every((digit, index) =>
+    index === 0 || Number(digit) - Number(subscriberDigits[index - 1]) === step,
+  );
 }
 
 export function isWithinBaliwag(latitude: number, longitude: number): boolean {

@@ -15,6 +15,7 @@ export * from './support_messages';
 export * from './patient_care';
 export * from './mobile_device_sessions';
 export * from './mobile_push_tokens';
+export * from './guest_device_report_quotas';
 
 
 

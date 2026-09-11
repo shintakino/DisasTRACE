@@ -38,6 +38,7 @@ import {
   deriveChatbotNature,
   deriveMobileIntakePhase,
   getNextMissingSlot,
+  isObviouslySyntheticGuestPhone,
   isReportProgressVisible,
   isValidGuestPhone,
   isWithinBaliwag,
@@ -436,9 +437,11 @@ export default function EmergencyChatbotScreen() {
     autoComplete?: TextInputProps['autoComplete'];
     importantForAutofill?: TextInputProps['importantForAutofill'];
     textContentType?: TextInputProps['textContentType'];
+    notice?: React.ReactNode;
     onSubmit: (value: string) => void;
   }) => (
     <View style={styles.formBlock}>
+      {input.notice}
       <TextInput
         value={fieldValue}
         onChangeText={setFieldValue}
@@ -493,7 +496,7 @@ export default function EmergencyChatbotScreen() {
             <Camera color="#FFF" size={18} />
             <Text style={styles.primaryText}>{draft.photoUri ? 'Retake photo evidence' : 'Take photo evidence'}</Text>
           </TouchableOpacity>
-          {draft.photoUri ? <Image source={{ uri: draft.photoUri }} style={styles.preview} /> : null}
+          {draft.photoUri ? <Image source={{ uri: draft.photoUri }} style={styles.preview} alt="Selected photo evidence" /> : null}
           {draft.photoUri ? (
             <TouchableOpacity
               accessibilityRole="button"
@@ -523,7 +526,18 @@ export default function EmergencyChatbotScreen() {
         autoComplete: 'tel',
         importantForAutofill: 'noExcludeDescendants',
         textContentType: 'telephoneNumber',
+        notice: (
+          <View style={styles.guestSafetyNotice}>
+            <Text style={styles.guestSafetyNoticeText}>
+              For your safety, your exact GPS location and a protected device identifier are recorded with this report. False reports may be punishable under applicable law. Please enter an active mobile number so responders can contact you.
+            </Text>
+          </View>
+        ),
         onSubmit: (contactNumber) => {
+          if (isObviouslySyntheticGuestPhone(contactNumber)) {
+            addMessage('bot', 'Please enter an active mobile number. Repeating or sequential numbers are not accepted.');
+            return;
+          }
           if (!isValidGuestPhone(contactNumber)) {
             addMessage('bot', 'Please enter a valid Philippine mobile number, such as 09171234567.');
             return;
@@ -745,6 +759,8 @@ const styles = StyleSheet.create({
   fieldInput: { minHeight: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, backgroundColor: '#FFF', color: '#0F172A', paddingHorizontal: 14, fontSize: 14 },
   help: { color: '#64748B', fontSize: 12, lineHeight: 18 },
   warning: { color: '#9A3412', backgroundColor: '#FFF7ED', borderRadius: 8, padding: 10, fontSize: 12, lineHeight: 18 },
+  guestSafetyNotice: { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 10, padding: 12 },
+  guestSafetyNoticeText: { color: '#78350F', fontSize: 12, lineHeight: 18, fontWeight: '600' },
   countHint: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 10, padding: 14 },
   countTitle: { color: NAVY, fontWeight: '800', marginBottom: 4 },
   reviewCard: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#DCE5F1', borderRadius: 12, padding: 15, gap: 2 },

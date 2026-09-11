@@ -34,7 +34,7 @@ const expectedTables = [
   'audit_logs', 'incidents', 'users', 'reports', 'status_logs',
   'verification_requests', 'notifications', 'faqs', 'feedbacks',
   'hospitals', 'system_settings', 'support_settings',
-  'phone_verifications', 'support_messages',
+  'phone_verifications', 'support_messages', 'guest_device_report_quotas',
 ];
 
 const expectedColumns = [
@@ -46,6 +46,7 @@ const expectedColumns = [
   ['users', 'responder_type'],
   ['verification_requests', 'reporter_type'],
   ['verification_requests', 'guest_access_token'],
+  ['verification_requests', 'guest_device_hash'],
   ['verification_requests', 'triage_classification'],
   ['verification_requests', 'coordination_agencies'],
   ['incidents', 'dispatch_offer_duration_seconds'],
@@ -86,6 +87,7 @@ async function repair() {
         'users_location_geom_gist_idx',
         'users_location_geom_geog_gist_idx',
         'verification_requests_guest_access_token_unique',
+        'verification_requests_guest_device_hash_idx',
       ].filter((index) => !indexSet.has(index));
 
       const triggers = await tx<{ trigger_name: string }[]>`

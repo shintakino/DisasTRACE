@@ -49,7 +49,7 @@ export default function VerificationPage() {
     return (
       r.status === "VERIFIED" &&
       r.incident &&
-      r.incident.dispatchMethod === "PACC_MANUAL" &&
+      r.incident.status === "DISPATCHED" &&
       !r.incident.responderId &&
       !r.incident.currentOfferResponderId
     );
@@ -238,6 +238,13 @@ export default function VerificationPage() {
           
           if (payload.eventType === "INSERT") {
             const newRequest = payload.new;
+            const isAutomaticEmergency = newRequest.nature === 'EMERGENCY'
+              && newRequest.triage_classification === 'HIGH_CONFIDENCE_EMERGENCY';
+            // The server attempts automatic emergency dispatch before PACC
+            // triage. Do not interrupt PACC or preselect this transient queue
+            // row; fetchRequestsSilent above will show it only if no responder
+            // can receive the offer.
+            if (isAutomaticEmergency) return;
             const isEmergency = newRequest.nature === "EMERGENCY";
             const reqNum = newRequest.request_id || newRequest.requestId || "REQ-NEW";
             const reqType = newRequest.type || "Unknown Emergency";
@@ -300,13 +307,12 @@ export default function VerificationPage() {
             const oldInc = payload.old;
             const newInc = payload.new;
             
-            const isPaccManual = newInc.dispatch_method === "PACC_MANUAL" || newInc.dispatchMethod === "PACC_MANUAL";
             const noResponder = !newInc.responder_id && !newInc.current_offer_responder_id && !newInc.responderId && !newInc.currentOfferResponderId;
-            const wasAlreadyManual = oldInc.dispatch_method === "PACC_MANUAL" || oldInc.dispatchMethod === "PACC_MANUAL";
             const hadResponder = oldInc.responder_id || oldInc.current_offer_responder_id || oldInc.responderId || oldInc.currentOfferResponderId;
             
-            // If it needs manual dispatch and either just transitioned or was rejected/expired
-            if (isPaccManual && noResponder && (!wasAlreadyManual || hadResponder)) {
+            // An exhausted automatic offer is also safe to override. It must
+            // not be hidden just because it started as AUTO_1KM.
+            if (newInc.status === 'DISPATCHED' && noResponder && hadResponder) {
               playAlertSound("critical");
               toast.error(`OVERRIDE DISPATCH REQUIRED: A responder rejected the offer or the timer expired!`, {
                 duration: 10000,

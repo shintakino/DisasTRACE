@@ -88,6 +88,11 @@ check('classifies reviewed routine Filipino phrases as non-emergency requests', 
   const response = deterministicChatbotResponse({ message: 'Nilalagnat siya at kailangan ng routine checkup', mode: 'IDLE', reporterMode: 'guest', draft: {} });
   assert.deepEqual(response.slotUpdates, { incidentType: 'Other / non-emergency request', nature: 'NON-EMERGENCY' });
 });
+check('recognizes the common Filipino tyan spelling as a non-emergency request', () => {
+  const response = deterministicChatbotResponse({ message: 'Masakit ang tyan ko', mode: 'IDLE', reporterMode: 'guest', draft: {} });
+  assert.deepEqual(response.slotUpdates, { incidentType: 'Other / non-emergency request', nature: 'NON-EMERGENCY' });
+  assert.equal(response.action, 'START_REPORT');
+});
 check('classifies a supplied swallowing complaint as a non-emergency request', () => {
   const response = deterministicChatbotResponse({ message: 'Nahihirapan siyang lunukin', mode: 'IDLE', reporterMode: 'guest', draft: {} });
   assert.deepEqual(response.slotUpdates, { incidentType: 'Other / non-emergency request', nature: 'NON-EMERGENCY' });

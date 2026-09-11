@@ -11,6 +11,16 @@ export interface DispatchOfferState {
   offerExpiresAt?: Date | string | null;
 }
 
+/** A released offer needs a human PACC reassignment, not a fresh client retry. */
+export function requiresPaccReassignment(incident: DispatchOfferState | null | undefined) {
+  return Boolean(
+    incident
+    && incident.status === 'DISPATCHED'
+    && incident.responderId === null
+    && incident.currentOfferResponderId === null,
+  );
+}
+
 export interface ManualDispatchResponderState {
   role: string;
   status: string;

@@ -5,11 +5,12 @@ import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
 import { createClient } from "@/lib/supabase-server";
 import { and, count, desc, eq, gte, inArray } from "drizzle-orm";
-import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides, healOrphanedActiveDispatches } from "@/lib/dispatch-engine";
+import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides, healOrphanedActiveDispatches, retryPendingAutomaticDispatches } from "@/lib/dispatch-engine";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS, isLikelyDuplicateIncident } from "@/lib/incident-deduplication";
 import { resolveBaliwagBarangay } from "@/lib/barangay-boundaries";
 import { systemSettings } from "@/db/schema/system_settings";
+import { requiresPaccReassignment } from "@/lib/dispatch-policy";
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +18,6 @@ export async function GET(req: NextRequest) {
     await checkAndCascadeExpiredOffers();
     await checkAndRecycleManualOverrides();
     await healOrphanedActiveDispatches();
-
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -26,6 +26,12 @@ export async function GET(req: NextRequest) {
     if (role !== "pacc_admin") {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    // A high-confidence emergency is offered to a responder before it becomes
+    // PACC work. Re-run the bounded FIFO dispatcher before reading the queue so
+    // a realtime INSERT cannot briefly surface an emergency for manual triage
+    // while its automatic offer is still being created.
+    await retryPendingAutomaticDispatches();
 
     // Fetch from database
     const requests = await db.query.verificationRequests.findMany({
@@ -100,6 +106,7 @@ export async function GET(req: NextRequest) {
       }
 
       const imageUrlStr = r.imageUrl || undefined;
+      const needsPaccReassignment = requiresPaccReassignment(incident);
 
       return {
         id: r.id,
@@ -133,7 +140,10 @@ export async function GET(req: NextRequest) {
           responderId: incident.responderId,
           currentOfferResponderId: incident.currentOfferResponderId,
           dispatchMethod: incident.dispatchMethod
-        } : null
+        } : null,
+        // Keep an exhausted automatic offer in the action queue. It is not a
+        // completed verification: PACC must choose the next available unit.
+        requiresPaccReassignment: needsPaccReassignment,
       };
     });
 

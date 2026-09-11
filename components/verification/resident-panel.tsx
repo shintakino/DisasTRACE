@@ -32,12 +32,13 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
     .map((n) => n[0])
     .join("")
 
-  const needsManualDispatch =
+  const needsManualDispatch = request.requiresPaccReassignment === true || (
     request.status === "VERIFIED" &&
     request.incident &&
-    request.incident.dispatchMethod === "PACC_MANUAL" &&
+    request.incident.status === "DISPATCHED" &&
     !request.incident.responderId &&
-    !request.incident.currentOfferResponderId;
+    !request.incident.currentOfferResponderId
+  );
 
   const canMergeDuplicate =
     request.status === "PENDING" &&

@@ -229,8 +229,14 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="overFullScreen" onRequestClose={onClose}>
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <Modal
+      visible={visible}
+      animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
+      hardwareAccelerated
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SafeAreaView className="flex-1 bg-[#16203A]">
         {/* Header */}
         <View className="px-4 py-4 flex-row items-center justify-between border-b border-blue-800/50">

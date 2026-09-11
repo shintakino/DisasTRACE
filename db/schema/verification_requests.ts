@@ -7,6 +7,9 @@ export const verificationRequests = pgTable('verification_requests', {
   residentId: varchar('resident_id', { length: 255 }).references(() => users.id),
   reporterType: text('reporter_type', { enum: ['REGISTERED', 'GUEST'] }).default('REGISTERED').notNull(),
   contactNumber: varchar('contact_number', { length: 32 }),
+  // Guest-mode abuse control. This is a SHA-256 digest of the Android
+  // app-scoped identifier; raw device identifiers are never persisted.
+  guestDeviceHash: varchar('guest_device_hash', { length: 64 }),
   guestAccessToken: varchar('guest_access_token', { length: 128 }).unique(),
   status: text('status', { enum: ['PENDING', 'VERIFIED', 'REJECTED', 'DUPLICATE'] }).default('PENDING').notNull(),
   parentRequestId: varchar('parent_request_id', { length: 255 }).references((): AnyPgColumn => verificationRequests.id),

@@ -10,7 +10,7 @@ import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS,
 import { isWithinOfficialBaliwagBoundary, resolveBaliwagBarangay } from '@/lib/barangay-boundaries';
 import { systemSettings } from '@/db/schema/system_settings';
 import { distanceBetweenCoordinatesMeters } from '@/lib/location-integrity';
-import { normalizePhilippineMobileNumber, samePhilippineMobileNumber } from '@/lib/phone-number';
+import { isObviouslySyntheticPhilippineMobileNumber, normalizePhilippineMobileNumber, samePhilippineMobileNumber } from '@/lib/phone-number';
 
 const IncidentTypeSchema = z.enum([
   'Medical Emergency',
@@ -29,6 +29,14 @@ const ContactNumberSchema = z.string()
     .refine((value) => /^09\d{9}$/.test(value), {
       message: 'Use a valid Philippine mobile number, such as 09171234567 or +639171234567.',
     });
+
+export const GuestDeviceIdSchema = z.string().trim().min(8).max(256)
+  .regex(/^[A-Za-z0-9._:-]+$/, 'This device could not be identified. Please update the app and try again.');
+
+const GuestContactNumberSchema = ContactNumberSchema.refine(
+  (value) => !isObviouslySyntheticPhilippineMobileNumber(value),
+  { message: 'Use an active Philippine mobile number. Repeating or sequential numbers are not accepted.' },
+);
 
 const IntakeDetailsSchema = z.object({
   incidentType: IncidentTypeSchema,
@@ -50,7 +58,7 @@ const IntakeDetailsSchema = z.object({
 // Guest reporters must provide a landmark because GPS is the only location
 // context available to responders without an account profile.
 export const EmergencyIntakeSchema = IntakeDetailsSchema.extend({
-  contactNumber: ContactNumberSchema,
+  contactNumber: GuestContactNumberSchema,
   landmarks: z.string().trim().min(5).max(600),
 }).refine(({ photoLatitude, photoLongitude }) => (photoLatitude === undefined) === (photoLongitude === undefined), {
   message: 'Photo GPS coordinates must include both latitude and longitude.',
@@ -90,6 +98,7 @@ export type TriageClassification = 'HIGH_CONFIDENCE_EMERGENCY' | 'HIGH_CONFIDENC
 interface IntakeActor {
   residentId: string | null;
   reporterType: 'REGISTERED' | 'GUEST';
+  guestDeviceHash?: string;
 }
 
 async function loadChatbotReplay(input: EmergencyIntake, actor: IntakeActor) {
@@ -100,7 +109,9 @@ async function loadChatbotReplay(input: EmergencyIntake, actor: IntakeActor) {
   if (!existing) return null;
   const belongsToActor = actor.reporterType === 'REGISTERED'
     ? existing.reporterType === 'REGISTERED' && existing.residentId === actor.residentId
-    : existing.reporterType === 'GUEST' && samePhilippineMobileNumber(existing.contactNumber, input.contactNumber);
+    : existing.reporterType === 'GUEST'
+      && samePhilippineMobileNumber(existing.contactNumber, input.contactNumber)
+      && Boolean(actor.guestDeviceHash && existing.guestDeviceHash === actor.guestDeviceHash);
   if (!belongsToActor) throw new Error('This chatbot submission ID is already in use.');
   const incident = await db.query.incidents.findFirst({ where: eq(incidents.requestId, existing.id) });
   return {
@@ -191,6 +202,7 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
       residentId: actor.residentId,
       reporterType: actor.reporterType,
       contactNumber: input.contactNumber,
+      guestDeviceHash: actor.reporterType === 'GUEST' ? actor.guestDeviceHash ?? null : null,
       guestAccessToken,
       status: 'PENDING',
       nature: input.nature,

@@ -5,6 +5,8 @@ import { verificationRequests } from '@/db/schema/verification_requests';
 import { incidents } from '@/db/schema/incidents';
 import { users } from '@/db/schema/users';
 import { createClient } from '@/lib/supabase-server';
+import { cascadeIncident } from '@/lib/dispatch-engine';
+import { requiresPaccReassignment } from '@/lib/dispatch-policy';
 
 export async function GET(request: NextRequest) {
   const requestId = request.nextUrl.searchParams.get('requestId');
@@ -27,7 +29,23 @@ export async function GET(request: NextRequest) {
   if (!report) return NextResponse.json({ data: null, error: 'Report not found.', message: 'Report not found.' }, { status: 404 });
 
   const trackingRequestId = report.status === 'DUPLICATE' && report.parentRequestId ? report.parentRequestId : report.id;
-  const incident = await db.query.incidents.findFirst({ where: eq(incidents.requestId, trackingRequestId) });
+  let incident = await db.query.incidents.findFirst({ where: eq(incidents.requestId, trackingRequestId) });
+
+  // The scheduler is the normal expiry mechanism, but a reporter's status
+  // refresh is a safe, scoped fallback. It heals only this report's expired
+  // current offer rather than scanning every dispatch on each mobile poll.
+  if (
+    incident?.status === 'DISPATCHED'
+    && incident.currentOfferResponderId
+    && !incident.responderId
+    && incident.offerExpiresAt
+    && incident.offerExpiresAt.getTime() <= Date.now()
+  ) {
+    await cascadeIncident(incident.id, incident.currentOfferResponderId);
+    incident = await db.query.incidents.findFirst({ where: eq(incidents.requestId, trackingRequestId) });
+  }
+
+  const needsPaccReassignment = requiresPaccReassignment(incident);
   const responder = incident?.responderId
     ? await db.query.users.findFirst({
       where: eq(users.id, incident.responderId),
@@ -42,6 +60,8 @@ export async function GET(request: NextRequest) {
     ? 'PACC has closed this report. Contact PACC if you still need assistance.'
     : report.status === 'DUPLICATE' && !incident
       ? 'PACC linked this report to another report of the same event and is reviewing the primary response.'
+      : needsPaccReassignment
+        ? `${coordinationText ? `${coordinationText} ` : ''}PACC is arranging another available responder. Please remain available for updates.`
       : incident?.status === 'RESOLVED'
         ? 'Response coordination for this incident has been completed.'
         : incident?.status === 'ARRIVED'
@@ -63,6 +83,7 @@ export async function GET(request: NextRequest) {
       responder,
       trackingRequestId,
       isMergedDuplicate: trackingRequestId !== report.id,
+      requiresPaccReassignment: needsPaccReassignment,
     },
     error: null,
     message: null,

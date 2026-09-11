@@ -4,12 +4,15 @@ import { Home2, FolderOpen, Map, User, CalendarAdd } from 'iconsax-react-native'
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocationPermission } from '../../hooks/use-location-permission';
+import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
 
 export default function TabLayout() {
   const router = useRouter();
-  const { user, role } = useAuthStatus();
+  const { role } = useAuthStatus();
   const responderStatus = useResponderStore((state) => state.status);
   const insets = useSafeAreaInsets();
+  const { isLocationGateActive, requestPermissions, servicesEnabled } = useLocationPermission();
 
   const isResponder = role === 'ambulance_responder';
 
@@ -18,10 +21,11 @@ export default function TabLayout() {
       console.log(`[TabLayout] Responder status updated to: ${responderStatus}. Redirecting to home tab to show incident sheet.`);
       router.replace('/(tabs)');
     }
-  }, [responderStatus, isResponder]);
+  }, [responderStatus, isResponder, router]);
 
   return (
-    <Tabs screenOptions={{
+    <>
+      <Tabs screenOptions={{
       tabBarActiveTintColor: '#FFFFFF',
       tabBarInactiveTintColor: '#94A3B8',
       tabBarStyle: {
@@ -82,6 +86,12 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => <User size={24} color={color} variant={focused ? 'Bold' : 'Linear'} />,
         }}
       />
-    </Tabs>
+      </Tabs>
+      <LocationPermissionDrawer
+        isVisible={Boolean(role) && isLocationGateActive}
+        onRequestPermission={requestPermissions}
+        servicesEnabled={servicesEnabled}
+      />
+    </>
   );
 }

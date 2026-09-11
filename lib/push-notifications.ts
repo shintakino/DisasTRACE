@@ -18,8 +18,15 @@ interface DispatchPushInput {
   offerExpiresAt: Date | null;
 }
 
-/** Push delivery is advisory; offer ownership and expiry remain server-authoritative. */
-export async function sendDispatchOfferPush({ responderId, incidentId, offerExpiresAt }: DispatchPushInput) {
+interface DispatchOfferExpiredPushInput {
+  responderId: string;
+  incidentId: string;
+}
+
+async function sendResponderPush(
+  responderId: string,
+  payload: Record<string, unknown>,
+) {
   const device = await db.query.mobilePushTokens.findFirst({
     where: eq(mobilePushTokens.userId, responderId),
     columns: { pushToken: true, sessionId: true },
@@ -34,10 +41,6 @@ export async function sendDispatchOfferPush({ responderId, incidentId, offerExpi
   });
   if (!activeSession) return;
 
-  const secondsRemaining = offerExpiresAt
-    ? Math.max(1, Math.ceil((offerExpiresAt.getTime() - Date.now()) / 1000))
-    : 30;
-
   try {
     const response = await fetch(EXPO_PUSH_ENDPOINT, {
       method: 'POST',
@@ -46,27 +49,47 @@ export async function sendDispatchOfferPush({ responderId, incidentId, offerExpi
         'Accept-Encoding': 'gzip, deflate',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify([{
-        to: device.pushToken,
-        title: 'Emergency Dispatch Offer',
-        body: 'An emergency dispatch offer is waiting. Open DisasTRACE immediately.',
-        sound: 'default',
-        priority: 'high',
-        channelId: 'emergency-alerts',
-        ttl: secondsRemaining,
-        data: { kind: 'dispatch_offer', incidentId },
-      }]),
+      body: JSON.stringify([{ to: device.pushToken, ...payload }]),
       signal: AbortSignal.timeout(5_000),
     });
-    const payload = ExpoPushResponseSchema.safeParse(await response.json().catch(() => null));
-    if (!response.ok || !payload.success) {
-      console.error('[Push] Expo rejected a dispatch notification.', { responderId, incidentId, status: response.status });
+    const parsed = ExpoPushResponseSchema.safeParse(await response.json().catch(() => null));
+    if (!response.ok || !parsed.success) {
+      console.error('[Push] Expo rejected a responder notification.', { responderId, status: response.status });
       return;
     }
-    if (payload.data.data[0]?.details?.error === 'DeviceNotRegistered') {
+    if (parsed.data.data[0]?.details?.error === 'DeviceNotRegistered') {
       await db.delete(mobilePushTokens).where(eq(mobilePushTokens.pushToken, device.pushToken));
     }
   } catch (error) {
-    console.error('[Push] Dispatch notification delivery failed.', { responderId, incidentId, error });
+    console.error('[Push] Responder notification delivery failed.', { responderId, error });
   }
+}
+
+/** Push delivery is advisory; offer ownership and expiry remain server-authoritative. */
+export async function sendDispatchOfferPush({ responderId, incidentId, offerExpiresAt }: DispatchPushInput) {
+  const secondsRemaining = offerExpiresAt
+    ? Math.max(1, Math.ceil((offerExpiresAt.getTime() - Date.now()) / 1000))
+    : 30;
+  await sendResponderPush(responderId, {
+    title: 'Emergency Dispatch Offer',
+    body: 'An emergency dispatch offer is waiting. Open DisasTRACE immediately.',
+    sound: 'default',
+    priority: 'high',
+    channelId: 'emergency-alerts',
+    ttl: secondsRemaining,
+    data: { kind: 'dispatch_offer', incidentId },
+  });
+}
+
+/** Tell the original responder that a server-authoritative offer expired. */
+export async function sendDispatchOfferExpiredPush({ responderId, incidentId }: DispatchOfferExpiredPushInput) {
+  await sendResponderPush(responderId, {
+    title: 'Dispatch offer expired',
+    body: 'This offer was released. PACC can reassign it to another available responder.',
+    sound: 'default',
+    priority: 'high',
+    channelId: 'emergency-alerts',
+    ttl: 60,
+    data: { kind: 'dispatch_offer_expired', incidentId },
+  });
 }

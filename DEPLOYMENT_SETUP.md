@@ -1,59 +1,87 @@
-# DisasTRACE - Fresh Deployment & Initial Setup Guide
+# DisasTRACE - Fresh Deployment and Initial Setup Guide
 
-This guide is designed for developers who want to deploy a fresh instance of **DisasTRACE** with a clean database (schema-only, zero mock incidents, zero telemetry noise, and pre-seeded default settings/admin accounts).
+This guide deploys a clean DisasTRACE instance with the database schema,
+security policies, storage, realtime, scheduler, default settings, and mobile
+build configuration required by the CDRRMO and PACC workflows.
 
----
+## Prerequisites
 
-## 📋 Prerequisites
+Prepare the following before starting:
 
-Ensure you have the following accounts and tools ready:
-1. **Node.js** (v18 or higher) & **npm** (v10 or higher).
-2. **PostgreSQL Database** with **PostGIS** extension (e.g., Supabase PostgreSQL project).
-3. **Supabase Project** (providing Auth, Database, Storage, and Realtime).
-4. **Textbee.dev Account** (for sending OTP verification SMS codes in production).
+1. Node.js 20 or newer and npm 10 or newer.
+2. A Supabase project with PostgreSQL, PostGIS, Auth, Storage, Realtime,
+   Vault, pg_cron, and pg_net available.
+3. A TextBee account and connected gateway device for production OTP SMS.
+4. A Vercel project for the Next.js API/dashboard.
+5. An Expo/EAS project and the Android Firebase configuration file used by
+   `mobile/app.json` (`mobile/google-services.json`).
 
----
+## 1. Configure the server environment
 
-## ⚙️ Step 1: Environment Variables Configuration
-
-Create a file named `.env.local` in the root directory and copy-paste the template below, replacing placeholders with your official keys:
+Create `.env.local` in the repository root. Set the same values in the Vercel
+project environment settings for the deployed server:
 
 ```ini
-# Next Auth / Clerk
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-in
-
-# Database Connection (Postgres Pooler port 6543)
-DATABASE_URL="postgresql://postgres.project_ref:db_password@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres"
-
-# Supabase Configurations
+# Supabase and PostgreSQL
+DATABASE_URL="postgresql://postgres.project_ref:db_password@POOLER_HOST:6543/postgres"
 NEXT_PUBLIC_SUPABASE_URL=https://project_ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# Public HTTPS URL of the deployed web dashboard. This is used in web
-# password-reset emails and must never be localhost in production.
+# Public dashboard URL used by password-recovery emails
 APP_URL=https://disas-trace.vercel.app
 
-# Long random server-only value. It authorizes Supabase Cron to invoke the
-# dispatch expiry endpoint; do not expose it to the mobile app.
-DISPATCH_SCHEDULER_SECRET=replace_with_a_long_random_value
+# Server-only scheduler credential. Never expose this to the mobile app.
+DISPATCH_SCHEDULER_SECRET=generate_a_long_random_secret
 
-# SMS Gateway (textbee.dev)
+# Production SMS OTP gateway
 TEXTBEE_API_KEY=your_textbee_api_key
-TEXTBEE_DEVICE_ID=your_textbee_registered_device_id
+TEXTBEE_DEVICE_ID=your_textbee_device_id
 
-# Developer / Simulation Mode Toggle
-# Set to 'false' for strict production behavior and SMS dispatches
+# Optional chatbot provider key, when chatbot AI is enabled
+DEEPSEEK_API_KEY=your_deepseek_api_key
+
+# Must be false in production. True enables deterministic development behavior.
 NEXT_PUBLIC_DEV_MODE=false
 ```
 
-### Dispatch-offer expiry scheduler
+Do not add `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, TextBee secrets, or the
+scheduler secret to a public repository or any `EXPO_PUBLIC_*` variable.
 
-Dispatch expiry is server-authoritative. After deploying the application and
-running the database migration, store the production endpoint and the exact
-same `DISPATCH_SCHEDULER_SECRET` value in Supabase Vault (not in the mobile app):
+## 2. Apply migrations and initialize the database
+
+From the repository root:
+
+```bash
+npm install
+npx tsx scripts/migrate.ts
+npx tsx scripts/audit-database-migrations.ts
+npm run db:setup
+```
+
+`0016_dispatch_offer_expiry_scheduler.sql` enables the server-authoritative
+five-second offer-expiry scheduler. `0017_mobile_push_notifications.sql`
+creates session-bound Expo push-token storage. `0018_guest_device_report_limit.sql`
+adds the hashed Android device quota used by Guest Mode.
+
+The audit must report zero unapplied canonical migrations, missing tables,
+missing columns, missing indexes, or missing triggers. Run `npm run db:setup`
+only against an intentionally fresh/development database because the seed
+steps create developer accounts and default records.
+
+## 3. Configure the dispatch-expiry scheduler
+
+Generate a secret locally, then put it in both Vercel and Supabase Vault:
+
+```powershell
+$bytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+Set that exact output as `DISPATCH_SCHEDULER_SECRET` in Vercel. After the
+deployment is live, run the following in the Supabase SQL editor, replacing
+the URL and secret with the real values:
 
 ```sql
 select vault.create_secret(
@@ -62,109 +90,116 @@ select vault.create_secret(
 );
 
 select vault.create_secret(
-  'replace-with-the-vercel-dispatch-scheduler-secret',
+  'THE_EXACT_VERCEL_DISPATCH_SCHEDULER_SECRET',
   'dispatch_scheduler_secret'
 );
 ```
 
-Migration `0016` schedules a Supabase Cron/pg_net invocation every five seconds.
-It expires unanswered offers and releases or cascades the responder even when
-both phones are locked. Check `cron.job_run_details` and `net._http_response`
-in Supabase if the scheduler needs troubleshooting.
+Verify the job and its recent executions:
 
----
+```sql
+select jobid, jobname, schedule, active
+from cron.job
+where jobname = 'dispatch-offer-expiry';
 
-## 🚀 Step 2: Running the Automated Setup Script
-
-We have written an orchestration script that automates the setup sequence in a single command. It will execute the following steps in order:
-1. Re-run migrations to initialize clean table structures.
-2. Establish custom database triggers, procedures, and notifications.
-3. Configure PostGIS spatial dimensions and GiST location indexes.
-4. Provision public storage buckets (such as `avatars`) and configure Storage RLS policies.
-5. Enable Supabase Realtime replication on active tables.
-6. Enforce global Row-Level Security (RLS) policies.
-7. Seed default FAQs, Emergency Hotlines, support contact numbers, and Baliwag City hospital lists.
-8. Seed the four essential developer test accounts (`admin@disastrace.com`, `pacc@disastrace.com`, `responder@disastrace.com`, and `user@disastrace.com`).
-
-To trigger the automated orchestrator, run the following command in the root folder:
-
-```bash
-npm run db:setup
+select *
+from cron.job_run_details
+order by start_time desc
+limit 20;
 ```
 
-### Script Execution Logs:
-Upon starting, you will see clean output showing the execution status of each module:
-```bash
-====================================================
-        DisasTRACE Fresh Deployment Setup           
-====================================================
+The scheduler is the authority for an unanswered offer. The mobile countdown
+is only a display; a responder can accept only while the server-side deadline
+is still valid.
 
-🚀 Running: tsx scripts/migrate.ts...
-✅ Completed: migrate.ts
+## 4. Configure the mobile app and push notifications
 
-🚀 Running: tsx scripts/setup-db-functions.ts...
-✅ Completed: setup-db-functions.ts
+Create `mobile/.env` for local development:
 
-...
-
-====================================================
-🎉 Fresh Database Setup Completed Successfully!    
-   All tables initialized with zero dynamic records.
-====================================================
+```ini
+EXPO_PUBLIC_API_URL=http://YOUR_DEVELOPMENT_HOST:3000
+EXPO_PUBLIC_MOBILE_API_URL=http://YOUR_DEVELOPMENT_HOST:3000/api
+EXPO_PUBLIC_SUPABASE_URL=https://project_ref.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+EXPO_PUBLIC_DEV_MODE=false
 ```
 
----
+For preview and production, update `mobile/eas.json` with the deployed API and
+Supabase values. Keep `mobile/google-services.json` present and matched to the
+Android package in `mobile/app.json`. Push notifications use Expo Push/FCM;
+the server binds each token to the account's active mobile session and removes
+it on sign-out or provider invalidation. No Firebase Admin service-account key
+is required by this implementation.
 
-## 📱 Step 3: Mobile App Configuration
+Install and run locally:
 
-For other developers working on the mobile application (`/mobile` directory):
+```bash
+cd mobile
+npm install
+npm run start
+```
 
-1. **Install Dependencies**:
-   ```bash
-   cd mobile
-   npm install
-   ```
-2. **Environment Variables**:
-   Create a `.env` file inside the `mobile/` directory:
-   ```ini
-   EXPO_PUBLIC_SUPABASE_URL=https://project_ref.supabase.co
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   EXPO_PUBLIC_DEV_MODE=false
-   ```
-3. **Launch Mobile Development Server**:
-   ```bash
-   npm run start
-   ```
+Build an Android preview or production artifact with EAS:
 
-### Supabase Auth Redirect URLs
+```bash
+npx eas build --platform android --profile preview
+npx eas build --platform android --profile production
+```
 
-In **Supabase Dashboard → Authentication → URL Configuration**, set the Site URL
-to `https://disas-trace.vercel.app`
-and add these Redirect URLs:
+Test a physical Android device for background dispatch notifications, vibration,
+notification-tap hydration, location permission, and the one-active-device
+sign-in rule. Expo Go is not a substitute for testing push notifications or
+Android background services in a release build.
 
+## 5. Configure Supabase Auth redirects
+
+In Supabase Dashboard > Authentication > URL Configuration:
+
+- Site URL: `https://disas-trace.vercel.app`
 - `https://disas-trace.vercel.app/reset-password`
 - `disastrace://reset-password`
 
-The first URL serves dashboard-admin password recovery. The second opens the
-Android resident/responder reset-password screen. Do not leave `localhost:3000`
-as the production Site URL.
+The web URL serves dashboard recovery; the custom scheme opens the Android
+resident/responder reset-password screen. Do not leave localhost as the
+production Site URL.
 
----
+## 6. Guest Mode and abuse controls
 
-## 🧹 Step 4: Deleting or Resetting (For Dev Environments Only)
+Guest reports require a valid Philippine mobile number and an Android
+app-scoped device identifier. The server stores only a SHA-256 device digest,
+never the raw identifier. The configurable `guest_reports_per_phone_limit`
+applies independently to the normalized phone number and device digest, so
+changing the phone number does not reset the same installed device's allowance.
+Obvious repeated or sequential numbers such as `09123456789` and
+`09999999999` are rejected at both the mobile and API boundaries. The chatbot
+shows the GPS/device-record and false-report safety notice immediately before
+phone submission.
 
-If you are working in a local development environment and need to completely drop all schemas, delete auth caches, purge all storage file assets, and re-run all migrations from scratch, use the reset command:
+This is an abuse-control signal, not hardware attestation. For stronger
+resistance to modified/rooted clients, add server-verified Google Play
+Integrity tokens bound to the report request before production launch.
 
-> [!WARNING]
-> This command drops all custom database schemas/tables, deletes all authenticated Supabase users, and **recursively purges all uploaded assets inside the `avatars`, `user-ids`, and `reports` Storage buckets**. Do not run this on production databases.
+## 7. Fresh development reset (never production)
+
+The reset command drops custom schemas, deletes authenticated users, purges
+development storage assets, and reruns setup. It is destructive and cannot be
+undone:
 
 ```bash
 npm run db:reset
 ```
 
----
+## Security and release checklist
 
-## 🛡️ Security Checklists
-
-1. **Storage Buckets**: The automated script configures buckets for `user-ids` and `avatars`. Ensure that the `user-ids` bucket remains **private** so that government ID uploads are never exposed directly to the public web.
-2. **Supabase service_role key**: Ensure that `SUPABASE_SERVICE_ROLE_KEY` is **never** added to public repositories, and is only loaded on secure hosting environments like Vercel dashboard.
+- Keep `user-ids` private; government ID files must not be public.
+- Keep service-role, database, TextBee, AI, and scheduler secrets server-only.
+- Set `NEXT_PUBLIC_DEV_MODE=false` before a production build.
+- Confirm `npm run db:setup` was not run against production unless a clean seed
+  was explicitly intended.
+- Confirm the cron job is active and `cron.job_run_details` shows successful
+  executions.
+- Verify background push delivery with the app closed/locked.
+- Verify an expired offer returns to PACC and cannot be accepted from a stale
+  notification.
+- Verify guest quota, rejected-report recovery, tracking, and the one-device
+  mobile session rule with a release build.

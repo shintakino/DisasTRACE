@@ -5,9 +5,14 @@ import { MapPin, ChevronRight, Check } from 'lucide-react-native';
 interface LocationPermissionDrawerProps {
   isVisible: boolean;
   onRequestPermission?: () => Promise<{ success: boolean; canAskAgain: boolean }>;
+  servicesEnabled?: boolean;
 }
 
-export function LocationPermissionDrawer({ isVisible, onRequestPermission }: LocationPermissionDrawerProps) {
+export function LocationPermissionDrawer({
+  isVisible,
+  onRequestPermission,
+  servicesEnabled = true,
+}: LocationPermissionDrawerProps) {
   const [canAskAgain, setCanAskAgain] = React.useState(true);
 
   const handleAction = async () => {
@@ -26,6 +31,7 @@ export function LocationPermissionDrawer({ isVisible, onRequestPermission }: Loc
       transparent
       visible={isVisible}
       animationType="slide"
+      onRequestClose={() => undefined}
     >
       <View className="flex-1 bg-black/40 justify-end">
         <View className="bg-white rounded-t-[40px] p-8 h-[95%]">
@@ -35,10 +41,10 @@ export function LocationPermissionDrawer({ isVisible, onRequestPermission }: Loc
               <MapPin size={40} color="#1E3A8A" fill="#1E3A8A" />
             </View>
             <Text className="text-3xl font-black text-[#1E3A8A] text-center px-4">
-              Set Location to 'Always'
+              Location access required
             </Text>
             <Text className="text-slate-500 text-base text-center mt-4 px-6 leading-relaxed">
-              DisasTRACE needs 'Always' location access to provide accurate emergency response and real-time assistance.
+              You cannot use DisasTRACE without allowing location access. It is used to send reports to the correct responders and show accurate emergency information.
             </Text>
           </View>
 
@@ -50,7 +56,9 @@ export function LocationPermissionDrawer({ isVisible, onRequestPermission }: Loc
                   <View className="bg-blue-100 p-2 rounded-lg mr-3">
                     <MapPin size={20} color="#1E3A8A" />
                   </View>
-                  <Text className="text-slate-700 font-semibold text-base">In Settings, select Location</Text>
+                  <Text className="text-slate-700 font-semibold text-base">
+                    {servicesEnabled ? 'Allow location for DisasTRACE' : 'Turn on device location services'}
+                  </Text>
                 </View>
                 <ChevronRight size={20} color="#94A3B8" />
               </View>
@@ -59,7 +67,7 @@ export function LocationPermissionDrawer({ isVisible, onRequestPermission }: Loc
             <View>
               <Text className="text-slate-400 font-bold text-xs uppercase tracking-widest mb-3">Step 2</Text>
               <View className="border border-slate-100 rounded-2xl p-5 flex-row items-center justify-between bg-slate-50">
-                <Text className="text-slate-700 font-semibold text-base ml-1">Change access to 'Always'</Text>
+                <Text className="text-slate-700 font-semibold text-base ml-1">Choose “While using the app”</Text>
                 <Check size={20} color="#3B82F6" strokeWidth={3} />
               </View>
             </View>

@@ -9,7 +9,7 @@
 - AI provider: DeepSeek API
 - Model identifier: `deepseek-v4-flash`
 - Design references: `context/design-image/chatBot/1chatbot.png` through `6chatbot.png`
-- Conversation references: `chatbotContext.md` and `chat-bot-scenes.md`
+- Conversation references: `chatbotContext.md`, `chat-bot-scenes.md`, and the reviewed triage examples in `chat-bot-addtional-data-feed.md`
 
 No application code, database migration, or runtime configuration is changed by this specification.
 
@@ -39,10 +39,16 @@ The supplied references contain requirements that conflict with the current impl
 
 1. System invariants in `context/architecture-context.md`, `context/code-standards.md`, and the current database/API contracts.
 2. The explicit requirements in this feature request and this reconciled feature specification.
-3. Approved knowledge and conversation behavior from `chatbotContext.md` and `chat-bot-scenes.md`.
+3. Approved knowledge and conversation behavior from `chatbotContext.md`, `chat-bot-scenes.md`, and reviewed entries from `chat-bot-addtional-data-feed.md`.
 4. Layout and interaction inspiration from `context/design-image/chatBot/`.
 
 Visual references are inspiration, not data or behavior contracts. Text in a reference image, such as a red palette, a people-count range, a non-Baliwag map, a mock report number, or an estimated response time, must not be copied when it conflicts with this specification.
+
+### 3.1 Additional typed-report triage feed
+
+`chat-bot-addtional-data-feed.md` contains Filipino, English, and Taglish examples supplied for initial typed-report classification. A reviewed, compact subset is represented as deterministic signal rules at runtime; the full raw feed is never sent to DeepSeek or a mobile client. These examples may prefill an existing incident type and propose `EMERGENCY` or `NON-EMERGENCY` in the report review, but they do not diagnose, dispatch, create categories, or override server validation. Critical signals take precedence when one message contains conflicting routine and critical wording. Final triage and routing remain owned by the existing server/PACC workflow.
+
+For an unfamiliar but privacy-safe report description, the server-only DeepSeek classifier may make the same constrained proposal in English, Filipino, or Taglish. Its response is accepted only at high confidence, only when it contains an allowlisted incident type with that type's policy-matching nature, and only after the mobile user confirms starting a report. Any missing, conflicting, low-confidence, or sensitive/location-bearing message falls back to the guided selector; it is never guessed or dispatched by the model.
 
 ## 4. Reconciled Decisions
 

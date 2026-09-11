@@ -6,6 +6,7 @@ import {
   parseExactPeopleCount,
 } from '@/lib/chatbot/contracts';
 import { findKnowledge, getKnowledgeAnswer } from '@/lib/chatbot/knowledge';
+import { classifyReportedIncident, type TriageClassification } from '@/lib/chatbot/triage-signals';
 
 type LanguageStyle = 'en' | 'fil' | 'taglish';
 type Slot = NonNullable<ChatbotRespondRequest['draft']['pendingSlot']>;
@@ -94,14 +95,7 @@ function resumePrompt(request: ChatbotRespondRequest, languageStyle: LanguageSty
 }
 
 function extractIncidentType(message: string): typeof CHATBOT_INCIDENT_TYPES[number] | undefined {
-  if (/\b(patient transport|transport patient|hospital transfer)\b/i.test(message)) return 'Patient Transport';
-  if (/\b(non[- ]?emergency|other request|general assistance)\b/i.test(message)) return 'Other / non-emergency request';
-  if (/\b(minor medical|medical|ambulance|injur(?:y|ed)|sick|nahimatay)\b/i.test(message)) return 'Medical Emergency';
-  if (/\b(fire|sunog|nasusunog)\b/i.test(message)) return 'Fire Emergency';
-  if (/\b(crash|collision|vehicular|car accident|bangga|aksidente sa sasakyan)\b/i.test(message)) return 'Vehicular Collision';
-  if (/\b(structural|collapse|collapsed|building damage|gumuho|guho)\b/i.test(message)) return 'Structural Failure';
-  if (/\b(flood|flooding|baha|water rescue)\b/i.test(message)) return 'Flood/Water';
-  return undefined;
+  return classifyReportedIncident(message)?.incidentType;
 }
 
 function extractPeopleCount(message: string): number | undefined {
@@ -121,15 +115,13 @@ function extractCondition(message: string): typeof CHATBOT_CONDITIONS[number] | 
 }
 
 function extractReportSlots(message: string): ChatbotResponse['slotUpdates'] {
-  const incidentType = extractIncidentType(message);
-  const isNonEmergency = incidentType === 'Patient Transport'
-    || incidentType === 'Other / non-emergency request'
-    || incidentType === 'Unknown Cause';
+  const classification = classifyReportedIncident(message);
+  const incidentType = classification?.incidentType ?? extractIncidentType(message);
   const peopleInvolved = extractPeopleCount(message);
   const victimCondition = extractCondition(message);
   return {
     ...(incidentType ? { incidentType } : {}),
-    ...(incidentType ? { nature: isNonEmergency ? 'NON-EMERGENCY' as const : 'EMERGENCY' as const } : {}),
+    ...(classification ? { nature: classification.nature } : {}),
     ...(peopleInvolved ? { peopleInvolved } : {}),
     ...(victimCondition ? { victimCondition } : {}),
   };
@@ -254,6 +246,32 @@ export function deterministicChatbotResponse(request: ChatbotRespondRequest): Ch
     action: 'FALLBACK',
     nextSlot: pendingSlot,
     resumePending: Boolean(pendingSlot),
+  };
+}
+
+/**
+ * Builds a normal guided-report response from a validated server-side AI
+ * suggestion. The mobile app still asks the user to confirm before a draft is
+ * created, and the intake API/PACC remain responsible for final triage.
+ */
+export function classifiedReportResponse(
+  request: ChatbotRespondRequest,
+  classification: TriageClassification,
+  languageStyle: LanguageStyle,
+): ChatbotResponse {
+  const defaults = baseResponse(languageStyle);
+  const copy = RESPONSE_COPY[languageStyle];
+  const pendingSlot = request.draft.pendingSlot;
+  const isIdle = request.mode === 'IDLE';
+  return {
+    ...defaults,
+    reply: isIdle ? copy.startCaptured : copy.slotsRecorded,
+    replyKey: 'provider-report-classification',
+    action: isIdle ? 'START_REPORT' : 'FILL_SLOTS',
+    slotUpdates: classification,
+    nextSlot: isIdle ? 'evidence' : pendingSlot,
+    shouldStartDraft: isIdle,
+    resumePending: !isIdle && Boolean(pendingSlot),
   };
 }
 

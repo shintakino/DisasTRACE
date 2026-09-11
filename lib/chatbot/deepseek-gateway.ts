@@ -1,11 +1,24 @@
 import { z } from 'zod';
+import { CHATBOT_INCIDENT_TYPES } from '@/lib/chatbot/contracts';
 
 export const ProviderSuggestionSchema = z.object({
-  action: z.enum(['ANSWER_CONTEXT', 'FALLBACK']),
+  action: z.enum(['ANSWER_CONTEXT', 'CLASSIFY_REPORT', 'FALLBACK']),
   knowledgeId: z.string().max(80).nullable(),
+  incidentType: z.enum(CHATBOT_INCIDENT_TYPES).nullable(),
+  nature: z.enum(['EMERGENCY', 'NON-EMERGENCY']).nullable(),
   languageStyle: z.enum(['en', 'fil', 'taglish']),
   confidence: z.number().min(0).max(1),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.action === 'ANSWER_CONTEXT' && !value.knowledgeId) {
+    context.addIssue({ code: 'custom', message: 'ANSWER_CONTEXT requires a knowledge ID.' });
+  }
+  if (value.action === 'CLASSIFY_REPORT' && (!value.incidentType || !value.nature || value.knowledgeId)) {
+    context.addIssue({ code: 'custom', message: 'CLASSIFY_REPORT requires only an incident type and nature.' });
+  }
+  if (value.action === 'FALLBACK' && (value.knowledgeId || value.incidentType || value.nature)) {
+    context.addIssue({ code: 'custom', message: 'FALLBACK cannot include a suggestion.' });
+  }
+});
 
 export interface DeepSeekUsage {
   promptTokens: number;
@@ -32,8 +45,8 @@ interface DeepSeekBody {
 }
 
 const SYSTEM_PROMPT = `Return JSON only with this exact schema:
-{"action":"ANSWER_CONTEXT"|"FALLBACK","knowledgeId":string|null,"languageStyle":"en"|"fil"|"taglish","confidence":number}
-Select only one supplied candidate ID. Use FALLBACK with a null ID if none fits. Do not answer the question, infer report fields, include personal data, or invent an ID.`;
+{"action":"ANSWER_CONTEXT"|"CLASSIFY_REPORT"|"FALLBACK","knowledgeId":string|null,"incidentType":"Medical Emergency"|"Vehicular Collision"|"Fire Emergency"|"Structural Failure"|"Flood/Water"|"Unknown Cause"|"Patient Transport"|"Other / non-emergency request"|null,"nature":"EMERGENCY"|"NON-EMERGENCY"|null,"languageStyle":"en"|"fil"|"taglish","confidence":number}
+For an approved knowledge question, select only one supplied candidate ID and use ANSWER_CONTEXT. For a user message that describes an incident or request for help but does not fit a candidate, use CLASSIFY_REPORT only when the meaning is clear and choose only an existing incident type and its matching nature. Use FALLBACK with all nullable fields null if uncertain. Do not answer the question, diagnose, infer people counts or conditions, include personal data, or invent an ID.`;
 
 const EMPTY_USAGE: DeepSeekUsage = { promptTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0, outputTokens: 0 };
 

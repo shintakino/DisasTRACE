@@ -6,9 +6,10 @@ import { users } from '@/db/schema/users';
 import { ChatbotRespondRequestSchema, ChatbotResponseSchema } from '@/lib/chatbot/contracts';
 import { getDeepSeekSuggestion } from '@/lib/chatbot/deepseek';
 import { getKnowledgeAnswer, KNOWLEDGE_CATALOG } from '@/lib/chatbot/knowledge';
-import { deterministicChatbotResponse, chatbotSlotPrompt } from '@/lib/chatbot/policy';
+import { classifiedReportResponse, deterministicChatbotResponse, chatbotSlotPrompt } from '@/lib/chatbot/policy';
 import { prepareProviderMessage } from '@/lib/chatbot/privacy';
 import { checkChatbotRateLimit } from '@/lib/chatbot/rate-limit';
+import { validateSuggestedClassification } from '@/lib/chatbot/triage-signals';
 import { createClient } from '@/lib/supabase-server';
 
 function errorResponse(error: string, status: number, retryAfterSeconds?: number) {
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     let response = deterministicChatbotResponse(parsed.data);
     let resultClass = response.replyKey === 'out-of-context' ? 'fallback' : 'deterministic';
     let providerMetadata = { outcome: 'not_called', latencyMs: 0, usage: { promptTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0, outputTokens: 0 } };
-    const providerMessage = response.replyKey === 'out-of-context' && /\?|\b(what|how|why|who|ano|paano|bakit|sino)\b/i.test(parsed.data.message)
+    const providerMessage = response.replyKey === 'out-of-context' && parsed.data.mode !== 'SUBMITTED_PENDING'
       ? prepareProviderMessage(parsed.data.message)
       : null;
 
@@ -71,6 +72,12 @@ export async function POST(request: NextRequest) {
           resumePending: Boolean(resume),
         };
         resultClass = 'model_match';
+      } else if (suggestion?.action === 'CLASSIFY_REPORT' && suggestion.confidence >= 0.86 && suggestion.incidentType && suggestion.nature) {
+        const classification = validateSuggestedClassification({ incidentType: suggestion.incidentType, nature: suggestion.nature });
+        if (classification) {
+          response = classifiedReportResponse(parsed.data, classification, suggestion.languageStyle);
+          resultClass = 'model_triage';
+        }
       } else if (providerResult.outcome !== 'matched' && providerResult.outcome !== 'disabled') {
         response = { ...response, providerFallback: true };
         resultClass = providerResult.outcome;

@@ -7,7 +7,8 @@ import {
   parseExactPeopleCount,
 } from '../lib/chatbot/contracts';
 import { KNOWLEDGE_CATALOG } from '../lib/chatbot/knowledge';
-import { deterministicChatbotResponse } from '../lib/chatbot/policy';
+import { classifiedReportResponse, deterministicChatbotResponse } from '../lib/chatbot/policy';
+import { validateSuggestedClassification } from '../lib/chatbot/triage-signals';
 import { prepareProviderMessage } from '../lib/chatbot/privacy';
 import { canCancelChatbotReport, isUnresolvedReportStatus } from '../lib/chatbot/lifecycle';
 import { checkChatbotRateLimit } from '../lib/chatbot/rate-limit';
@@ -36,7 +37,7 @@ check('echoes the normalized exact count before advancing', () => {
 check('rejects ranges, decimals, zero, and values above 999', () => {
   for (const input of ['2-5', 'more than 10', '1.5', '0', '1000']) assert.equal(parseExactPeopleCount(input), null);
 });
-check('keeps the six existing incident types', () => assert.deepEqual(CHATBOT_INCIDENT_TYPES, ['Medical Emergency', 'Vehicular Collision', 'Fire Emergency', 'Structural Failure', 'Flood/Water', 'Unknown Cause']));
+check('keeps the approved incident types', () => assert.deepEqual(CHATBOT_INCIDENT_TYPES, ['Medical Emergency', 'Vehicular Collision', 'Fire Emergency', 'Structural Failure', 'Flood/Water', 'Unknown Cause', 'Patient Transport', 'Other / non-emergency request']));
 check('accepts UUID submission IDs and rejects arbitrary primary keys', () => {
   assert.equal(ChatbotSubmissionIdSchema.safeParse('f2df78f4-c5a4-48a7-92c5-2ef7288ce104').success, true);
   assert.equal(ChatbotSubmissionIdSchema.safeParse('attacker-selected-id').success, false);
@@ -72,8 +73,42 @@ check('extracts multiple safe fields from one report message', () => {
 });
 check('maps patient transport to an existing non-emergency medical type', () => {
   const response = deterministicChatbotResponse({ message: 'Patient transport please', mode: 'DRAFT', reporterMode: 'guest', draft: { pendingSlot: 'incidentType' } });
-  assert.equal(response.slotUpdates.incidentType, 'Medical Emergency');
+  assert.equal(response.slotUpdates.incidentType, 'Patient Transport');
   assert.equal(response.slotUpdates.nature, 'NON-EMERGENCY');
+});
+check('classifies a supplied Filipino hospital-transport request as non-emergency', () => {
+  const response = deterministicChatbotResponse({ message: 'May pasyenteng kailangang dalhin sa ospital', mode: 'IDLE', reporterMode: 'guest', draft: {} });
+  assert.deepEqual(response.slotUpdates, { incidentType: 'Patient Transport', nature: 'NON-EMERGENCY' });
+});
+check('classifies reviewed Filipino critical medical phrases as emergencies', () => {
+  const response = deterministicChatbotResponse({ message: 'Nahihirapan huminga at nawalan ng malay', mode: 'IDLE', reporterMode: 'guest', draft: {} });
+  assert.deepEqual(response.slotUpdates, { incidentType: 'Medical Emergency', nature: 'EMERGENCY' });
+});
+check('classifies reviewed routine Filipino phrases as non-emergency requests', () => {
+  const response = deterministicChatbotResponse({ message: 'Nilalagnat siya at kailangan ng routine checkup', mode: 'IDLE', reporterMode: 'guest', draft: {} });
+  assert.deepEqual(response.slotUpdates, { incidentType: 'Other / non-emergency request', nature: 'NON-EMERGENCY' });
+});
+check('classifies a supplied swallowing complaint as a non-emergency request', () => {
+  const response = deterministicChatbotResponse({ message: 'Nahihirapan siyang lunukin', mode: 'IDLE', reporterMode: 'guest', draft: {} });
+  assert.deepEqual(response.slotUpdates, { incidentType: 'Other / non-emergency request', nature: 'NON-EMERGENCY' });
+});
+check('prioritizes critical context over a routine transport phrase', () => {
+  const response = deterministicChatbotResponse({ message: 'Kailangan ng transport, pero hindi siya makahinga', mode: 'IDLE', reporterMode: 'guest', draft: {} });
+  assert.deepEqual(response.slotUpdates, { incidentType: 'Medical Emergency', nature: 'EMERGENCY' });
+});
+check('accepts only a policy-matching AI classification', () => {
+  assert.deepEqual(validateSuggestedClassification({ incidentType: 'Medical Emergency', nature: 'EMERGENCY' }), { incidentType: 'Medical Emergency', nature: 'EMERGENCY' });
+  assert.equal(validateSuggestedClassification({ incidentType: 'Fire Emergency', nature: 'NON-EMERGENCY' }), undefined);
+});
+check('turns a validated AI classification into a confirmation-first report response', () => {
+  const response = classifiedReportResponse(
+    { message: 'unfamiliar incident wording', mode: 'IDLE', reporterMode: 'guest', draft: {} },
+    { incidentType: 'Medical Emergency', nature: 'EMERGENCY' },
+    'taglish',
+  );
+  assert.equal(response.action, 'START_REPORT');
+  assert.equal(response.shouldStartDraft, true);
+  assert.deepEqual(response.slotUpdates, { incidentType: 'Medical Emergency', nature: 'EMERGENCY' });
 });
 check('validates every deterministic response against the public schema', () => {
   const response = deterministicChatbotResponse({ message: 'random trivia', mode: 'IDLE', reporterMode: 'guest', draft: {} });

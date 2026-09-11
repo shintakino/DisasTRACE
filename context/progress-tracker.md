@@ -1,5 +1,12 @@
 # Progress Tracker
 
+## 2026-09-11 - Typed chatbot emergency classification feed
+
+- Added `chat-bot-addtional-data-feed.md` as a documented chatbot triage source and retained its supplied Filipino/English examples under explicit runtime safeguards.
+- Added reviewed deterministic signal rules for high-risk medical, fire, vehicular, structural, flood/water, patient-transport, and routine non-emergency wording. The chatbot can now propose a permitted incident type and emergency nature from richer typed reports, with critical wording taking precedence over routine wording.
+- Raw training-style examples remain local documentation and are not sent to DeepSeek or mobile clients. Existing API validation and PACC/server triage remain the final authority; the chatbot never dispatches solely from this classification.
+- Extended the server-only DeepSeek gateway to recognize unfamiliar privacy-safe incident descriptions in English, Filipino, and Taglish. Its strict schema accepts only allowlisted type/nature pairs at high confidence and returns the ordinary confirmation-first report flow; uncertain or sensitive messages retain the guided fallback.
+
 ## 2026-09-11 — Responder card header and dispatch terminology polish
 
 - Removed the shared Card component's default vertical padding and inter-section gap from both CDRRMO and PACC responder cards, so their blue Responders header reaches the card's top edge without a white strip.

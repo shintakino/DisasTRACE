@@ -38,13 +38,35 @@ await check('accepts only a strict structured result and records usage', async (
   const result = await runDeepSeekGateway(input, {
     apiKey: 'test-only',
     fetchImpl: async () => jsonResponse(200, {
-      choices: [{ message: { content: JSON.stringify({ action: 'ANSWER_CONTEXT', knowledgeId: 'about-disastrace', languageStyle: 'en', confidence: 0.95 }) } }],
+      choices: [{ message: { content: JSON.stringify({ action: 'ANSWER_CONTEXT', knowledgeId: 'about-disastrace', incidentType: null, nature: null, languageStyle: 'en', confidence: 0.95 }) } }],
       usage: { prompt_tokens: 10, prompt_cache_hit_tokens: 8, prompt_cache_miss_tokens: 2, completion_tokens: 4 },
     }),
   });
   assert.equal(result.outcome, 'matched');
   assert.equal(result.suggestion?.knowledgeId, 'about-disastrace');
   assert.deepEqual(result.usage, { promptTokens: 10, cacheHitTokens: 8, cacheMissTokens: 2, outputTokens: 4 });
+});
+
+await check('accepts only a complete approved report classification', async () => {
+  const result = await runDeepSeekGateway(input, {
+    apiKey: 'test-only',
+    fetchImpl: async () => jsonResponse(200, {
+      choices: [{ message: { content: JSON.stringify({ action: 'CLASSIFY_REPORT', knowledgeId: null, incidentType: 'Medical Emergency', nature: 'EMERGENCY', languageStyle: 'taglish', confidence: 0.9 }) } }],
+    }),
+  });
+  assert.equal(result.outcome, 'matched');
+  assert.equal(result.suggestion?.incidentType, 'Medical Emergency');
+});
+
+await check('rejects a malformed report classification', async () => {
+  const result = await runDeepSeekGateway(input, {
+    apiKey: 'test-only',
+    fetchImpl: async () => jsonResponse(200, {
+      choices: [{ message: { content: JSON.stringify({ action: 'CLASSIFY_REPORT', knowledgeId: null, incidentType: 'Medical Emergency', nature: null, languageStyle: 'en', confidence: 0.9 }) } }],
+    }),
+  });
+  assert.equal(result.outcome, 'malformed');
+  assert.equal(result.suggestion, null);
 });
 
 for (const scenario of [

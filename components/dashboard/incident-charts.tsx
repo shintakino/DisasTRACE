@@ -256,7 +256,10 @@ export function IncidentDistribution({
             <p className="text-[#047857] text-[11px] font-medium mt-1">Area is secure. Center is standing by.</p>
           </div>
         ) : (
-          <ChartContainer config={chartConfig} className="aspect-square w-full max-h-[280px] lg:size-full lg:aspect-auto lg:max-h-none">
+          <ChartContainer
+            config={chartConfig}
+            className="aspect-square w-full max-h-[280px] sm:h-full sm:w-auto sm:max-h-none sm:max-w-full"
+          >
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent hideLabel />} />
               <Pie

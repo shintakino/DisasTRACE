@@ -630,6 +630,12 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Stabilized CDRRMO/PACC web-session renewal by sharing one browser Supabase
+  client across React renders and refreshing the existing session when an idle
+  dashboard tab becomes visible again. Dashboard chart cards now retain their
+  readable two-row minimum on desktop; short viewports scroll the dashboard
+  instead of compressing the cards, and the incident-distribution pie remains
+  square and fills the available card height.
 - Added responder background alert delivery through Expo Push/FCM. Push tokens
   are restricted to the account's active mobile session, are removed on sign
   out or provider invalidation, and are sent only after an offer commits.

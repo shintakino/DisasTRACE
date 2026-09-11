@@ -10,7 +10,7 @@ import { Mail, Clock, Gauge } from "lucide-react";
 import { toast } from "sonner";
 import { createClientBrowser } from "@/lib/supabase";
 import { HospitalSettings } from "./hospital-settings";
-import { DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT, MAX_GUEST_REPORTS_PER_PHONE_LIMIT } from "@/lib/guest-report-limit";
+import { DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT, MAX_GUEST_REPORTS_PER_PHONE_LIMIT } from "@/lib/guest-report-limit-constants";
 
 
 export function SettingsView() {

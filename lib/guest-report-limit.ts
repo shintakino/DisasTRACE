@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto';
+import {
+  DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT,
+  MAX_GUEST_REPORTS_PER_PHONE_LIMIT,
+} from './guest-report-limit-constants';
 
-export const DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT = 3;
-export const MAX_GUEST_REPORTS_PER_PHONE_LIMIT = 100;
+export {
+  DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT,
+  MAX_GUEST_REPORTS_PER_PHONE_LIMIT,
+};
 
 export function hasReachedGuestReportLimit(submittedReports: number, limit: number) {
   return submittedReports >= limit;

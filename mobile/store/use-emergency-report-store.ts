@@ -6,6 +6,7 @@ export const EmergencyReportSchema = z.object({
   id: z.string().optional(), // Server-generated Request ID
   requestId: z.string().optional(), // Human-readable Request ID (e.g., REQ-2026-XXXX)
   incidentId: z.string().optional(), // Server-generated Incident ID
+  trackingRequestId: z.string().optional(), // Canonical request ID when this report is merged as a duplicate
   photoUri: z.string().min(1, "Photo URI is invalid").optional(),
   incidentType: z.enum([
     "Medical Emergency",

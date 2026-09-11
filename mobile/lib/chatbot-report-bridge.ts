@@ -19,6 +19,7 @@ export function syncChatbotReportToEmergencyStore(input: {
       id: activeReport.id,
       requestId: activeReport.displayId,
       incidentId: activeReport.incidentId,
+      trackingRequestId: activeReport.trackingRequestId,
       photoUri: draft.photoUri,
       incidentType: draft.incidentType,
       peopleInvolved: `${draft.peopleInvolved} Persons`,

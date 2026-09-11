@@ -630,6 +630,14 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Fixed the resident/guest ambulance-map loop after an assigned response. The
+  mobile tracking store now retains the canonical parent request ID for merged
+  duplicates. Guest tracking no longer queries protected Supabase incident
+  tables or subscribes to their database changes; it refreshes only the
+  token-scoped status endpoint for the assigned responder's coordinates,
+  `ARRIVED`, and `RESOLVED` state. Registered duplicate tracking uses the
+  canonical parent request for its incident lifecycle and telemetry channels,
+  so an active response is never sent back to the Pending upload animation.
 - Stabilized CDRRMO/PACC web-session renewal by sharing one browser Supabase
   client across React renders and refreshing the existing session when an idle
   dashboard tab becomes visible again. Dashboard chart cards now retain their

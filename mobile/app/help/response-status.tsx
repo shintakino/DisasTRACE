@@ -70,6 +70,10 @@ export default function EmergencyResponseStatusScreen() {
           if (mounted && response.ok) {
             setIncident(result.data.incident);
             setAgencies(result.data.coordinationAgencies || []);
+            useEmergencyReportStore.getState().setDetails({
+              incidentId: result.data.incident?.id,
+              trackingRequestId: result.data.trackingRequestId,
+            });
             if (!result.data.incident) returnToWaiting();
           }
         } else {

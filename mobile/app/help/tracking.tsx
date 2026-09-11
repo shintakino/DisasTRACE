@@ -18,6 +18,7 @@ export default function TrackingScreen() {
   const navigation = useNavigation();
   const report = useEmergencyReportStore((state) => state.report);
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
+  const trackingRequestId = report.trackingRequestId || report.id;
 
   // Lock gestures and navigation
   useEffect(() => {
@@ -160,10 +161,12 @@ export default function TrackingScreen() {
     setDrawerExpanded(nextExpand);
   };
 
-  // 1. Mount/focus sync: Fetch the current active incident for this request to ensure store is perfectly in sync
+  // Registered reporters can read their own incident directly. Guests must use
+  // the scoped status endpoint below because their access token is not a
+  // Supabase database session.
   useEffect(() => {
-    const requestId = report.id;
-    if (!requestId) return;
+    const requestId = trackingRequestId;
+    if (!requestId || isGuest) return;
 
     let active = true;
 
@@ -245,38 +248,70 @@ export default function TrackingScreen() {
     return () => {
       active = false;
     };
-  }, [report.id]);
+  }, [isGuest, trackingRequestId]);
 
-  // Guest reporters receive only this report's safe tracking data through the
-  // access-token endpoint, then join the same telemetry channel as residents.
+  // Guest tracking is refreshed through the report-scoped endpoint. This also
+  // supplies the parent incident for a merged duplicate and keeps arrival state
+  // current without exposing direct database access to the guest.
   useEffect(() => {
-    if (report.reporterMode !== 'guest' || !report.id || !report.guestAccessToken) return;
+    if (!isGuest || !report.id || !report.guestAccessToken) return;
     let active = true;
     const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
-    void fetch(`${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(report.id)}&accessToken=${encodeURIComponent(report.guestAccessToken)}`)
-      .then((response) => response.ok ? response.json() : null)
-      .then((result) => {
-        if (!active || !result?.data?.incident) return;
-        const incident = result.data.incident as { id: string; status: string; responderId: string | null };
-        useEmergencyReportStore.setState((state) => ({ report: { ...state.report, incidentId: incident.id } }));
-        if (incident.status === 'ARRIVED') setIsArrived(true);
-        const responder = result.data.responder as { id: string; fullName: string; lastLatitude: number | null; lastLongitude: number | null } | null;
-        if (responder) {
-          updateAssignedResponder({ id: responder.id, full_name: responder.fullName, last_latitude: responder.lastLatitude, last_longitude: responder.lastLongitude });
-          setIsFindingAmbulance(false);
-          if (responder.lastLatitude !== null && responder.lastLongitude !== null) {
-            setAmbulanceLocation({ latitude: responder.lastLatitude, longitude: responder.lastLongitude });
-          }
+
+    const syncGuestTracking = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(report.id!)}&accessToken=${encodeURIComponent(report.guestAccessToken!)}`);
+        const result = response.ok ? await response.json() : null;
+        if (!active || !result?.data) return;
+
+        const incident = result.data.incident as { id: string; status: string; responderId: string | null } | null;
+        useEmergencyReportStore.setState((state) => ({
+          report: {
+            ...state.report,
+            incidentId: incident?.id,
+            trackingRequestId: result.data.trackingRequestId,
+          },
+        }));
+
+        if (!incident) {
+          setIsFindingAmbulance(true);
+          return;
         }
-      })
-      .catch((error) => console.error('[TrackingScreen] Guest tracking initialization failed:', error));
-    return () => { active = false; };
-  }, [report.guestAccessToken, report.id, report.reporterMode]);
+        if (incident.status === 'RESOLVED') {
+          handleResolutionRedirect();
+          return;
+        }
+
+        setIsArrived(incident.status === 'ARRIVED');
+        const responder = result.data.responder as { id: string; fullName: string; lastLatitude: number | null; lastLongitude: number | null } | null;
+        if (!responder) {
+          updateAssignedResponder(null);
+          setIsFindingAmbulance(true);
+          return;
+        }
+
+        updateAssignedResponder({ id: responder.id, full_name: responder.fullName, last_latitude: responder.lastLatitude, last_longitude: responder.lastLongitude });
+        setIsFindingAmbulance(false);
+        if (responder.lastLatitude !== null && responder.lastLongitude !== null) {
+          setAmbulanceLocation({ latitude: responder.lastLatitude, longitude: responder.lastLongitude });
+        }
+      } catch (error) {
+        console.error('[TrackingScreen] Guest tracking refresh failed:', error);
+      }
+    };
+
+    void syncGuestTracking();
+    const interval = setInterval(() => void syncGuestTracking(), 3_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isGuest, report.guestAccessToken, report.id]);
 
   // 2. Request-level Incident Lifecycle Listener (Tracks inserts, updates, and deletes)
   useEffect(() => {
-    const requestId = report.id;
-    if (!requestId) return;
+    const requestId = trackingRequestId;
+    if (!requestId || isGuest) return;
 
     console.log('[TrackingScreen] Subscribing to incident lifecycle updates for request:', requestId);
 
@@ -360,12 +395,12 @@ export default function TrackingScreen() {
     return () => {
       supabase.removeChannel(dbChannel);
     };
-  }, [report.id]);
+  }, [isGuest, trackingRequestId]);
 
   // 2.1. Request-level Rejection Listener (Ensures active tracking closes instantly if PACC rejects)
   useEffect(() => {
     const requestId = report.id;
-    if (!requestId) return;
+    if (!requestId || isGuest) return;
 
     console.log('[TrackingScreen] Subscribing to request rejection events for ID:', requestId);
 
@@ -438,7 +473,7 @@ export default function TrackingScreen() {
   // 3. Incident-specific high-frequency telemetry broadcasts receiver
   useEffect(() => {
     const incidentId = report.incidentId;
-    if (!incidentId) return;
+    if (!incidentId || isGuest) return;
 
     console.log('[TrackingScreen] Subscribing to coordinate telemetry channel for incident:', incidentId);
 
@@ -514,7 +549,7 @@ export default function TrackingScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [report.incidentId]);
+  }, [isGuest, report.incidentId]);
 
   // Natural elapsed time incrementer - runs continuously during active tracking
   useEffect(() => {

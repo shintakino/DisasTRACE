@@ -386,7 +386,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (incident.responderId !== user.id) {
-      return NextResponse.json({ error: "You are not assigned to this incident." }, { status: 403 });
+      return NextResponse.json({
+        error: "This response is no longer assigned to you. It may have been reassigned to another responder.",
+        code: 'INCIDENT_REASSIGNED',
+      }, { status: 403 });
     }
 
     // Generate unique Report ID

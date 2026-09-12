@@ -244,11 +244,23 @@ export const useResponderStore = create<ResponderState>((set) => ({
       let dbSuccess = false;
       if (isOnline) {
         try {
-          const { error } = await supabase
-            .from('incidents')
-            .update({ status: 'ARRIVED' })
-            .eq('id', activeDispatch.id);
-          if (error) throw error;
+          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+          const { data: { session } } = await supabase.auth.getSession();
+          const response = await fetch(`${apiUrl}/api/incidents/status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+            },
+            body: JSON.stringify({ incidentId: activeDispatch.id, status: 'ARRIVED' }),
+          });
+          const result = await response.json();
+          if (result?.code === 'INCIDENT_REASSIGNED') {
+            alert(result.error);
+            useResponderStore.getState().completeIncident();
+            return;
+          }
+          if (!response.ok) throw new Error(result?.error || `HTTP ${response.status}`);
           dbSuccess = true;
           console.log('[useResponderStore] Successfully updated status to ARRIVED in DB.');
         } catch (e) {
@@ -283,7 +295,6 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
   startReport: async () => {
     const activeDispatch = useResponderStore.getState().activeDispatch;
-    const resolvedAt = new Date().toISOString();
     if (activeDispatch) {
       let isOnline = false;
       try {
@@ -292,29 +303,26 @@ export const useResponderStore = create<ResponderState>((set) => ({
         isOnline = false;
       }
 
-      let dbSuccess = false;
       if (isOnline) {
         try {
-          const { error } = await supabase
-            .from('incidents')
-            .update({ status: 'RESOLVED', resolved_at: resolvedAt })
-            .eq('id', activeDispatch.id);
-          if (error) throw error;
-          dbSuccess = true;
-          console.log('[useResponderStore] Successfully updated status to RESOLVED in DB (on-scene resolution).');
+          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+          const { data: { session } } = await supabase.auth.getSession();
+          const response = await fetch(
+            `${apiUrl}/api/incidents/status?incidentId=${encodeURIComponent(activeDispatch.id)}`,
+            { headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {} },
+          );
+          const result = await response.json();
+          if (result?.code === 'INCIDENT_REASSIGNED') {
+            alert(result.error);
+            useResponderStore.getState().completeIncident();
+            return;
+          }
+          if (!response.ok) throw new Error(result?.error || `HTTP ${response.status}`);
         } catch (e) {
-          console.error('[useResponderStore] Failed to update incident status to RESOLVED (treating as offline):', e);
+          // A network failure must not discard a legitimate offline form draft.
+          // Final resolution remains server-authoritative when POST /api/reports succeeds.
+          console.error('[useResponderStore] Could not verify incident ownership before opening the report form:', e);
         }
-      }
-
-      if (!isOnline || !dbSuccess) {
-        console.log('[useResponderStore] StartReport offline path triggered. Queuing STATE_CHANGE.');
-        await useResponderStore.getState().enqueueAction({
-          type: 'STATE_CHANGE',
-          endpoint: '/api/incidents/status',
-          method: 'POST',
-          payload: { incidentId: activeDispatch.id, status: 'RESOLVED', resolvedAt }
-        });
       }
     }
     set({
@@ -398,6 +406,11 @@ export const useResponderStore = create<ResponderState>((set) => ({
         }));
       } else {
         console.error('Failed to submit report:', res.error);
+        if (res.code === 'INCIDENT_REASSIGNED') {
+          alert(res.error);
+          useResponderStore.getState().completeIncident();
+          return;
+        }
         alert(res.error || 'Failed to submit report.');
         set({ isSubmittingReport: false });
       }

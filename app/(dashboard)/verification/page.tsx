@@ -630,8 +630,8 @@ export default function VerificationPage() {
           setIsMergeModalOpen(false)
           setMergeReqId(null)
         }}
-        requestId={mergeReqId}
-        activeVerifiedRequests={requests.filter((r) => r.status === "VERIFIED")}
+        request={requests.find((request) => request.id === mergeReqId) ?? null}
+        activeRequests={requests}
         onConfirm={async (parentRequestId) => {
           if (mergeReqId) {
             await handleMerge(mergeReqId, parentRequestId)

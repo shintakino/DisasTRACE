@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
+import { canAttemptDispatchAcceptance } from '../../lib/dispatch-offer-window';
 
 const apiBaseUrl = () => (process.env.EXPO_PUBLIC_API_URL
   || process.env.EXPO_PUBLIC_MOBILE_API_URL?.replace(/\/api$/, '')
@@ -30,6 +31,7 @@ export function DispatchSheet() {
   const mountedRef = useRef(true);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(offerDurationSeconds);
+  const [acceptanceWindowOpen, setAcceptanceWindowOpen] = useState(false);
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
   
   // Start off-screen at the top.
@@ -152,7 +154,9 @@ export function DispatchSheet() {
       const currentServerTime = () => Date.now() + serverClockOffsetMs;
       const remainingMilliseconds = Math.max(0, expiresAt - currentServerTime());
       const updateCountdown = () => {
-        setRemainingSeconds(Math.max(0, Math.ceil((expiresAt - currentServerTime()) / 1000)));
+        const remainingMs = Math.max(0, expiresAt - currentServerTime());
+        setRemainingSeconds(Math.ceil(remainingMs / 1000));
+        setAcceptanceWindowOpen(canAttemptDispatchAcceptance(expiresAt, currentServerTime()));
       };
       updateCountdown();
       const countdownId = setInterval(updateCountdown, 250);
@@ -188,6 +192,7 @@ export function DispatchSheet() {
       translateY.value = withTiming(-screenHeight - insets.bottom, { duration: 300, easing: Easing.out(Easing.cubic) });
       progress.value = 100;
       setRemainingSeconds(offerDurationSeconds);
+      setAcceptanceWindowOpen(false);
     }
   }, [
     status,
@@ -248,9 +253,17 @@ export function DispatchSheet() {
               <View className="w-4 h-4 border-2 border-[#1E3A8A] border-t-transparent rounded-full mr-3 animate-spin" />
               <View>
               <Text className="text-[#1E3A8A] font-black text-[16px] mb-0.5">
-                {remainingSeconds > 0 ? `${remainingSeconds}s remaining` : 'Offer expired'}
+                {remainingSeconds <= 0
+                  ? 'Offer expired'
+                  : acceptanceWindowOpen
+                    ? `${remainingSeconds}s remaining`
+                    : 'Acceptance window closed'}
               </Text>
-              <Text className="text-[#475569] text-[11px] font-medium">Auto-dismissed and passed to the next available unit</Text>
+              <Text className="text-[#475569] text-[11px] font-medium">
+                {acceptanceWindowOpen
+                  ? 'Accept now while the offer is still available'
+                  : 'Offer is being released for the next available unit'}
+              </Text>
               </View>
             </View>
           </View>
@@ -334,8 +347,15 @@ export function DispatchSheet() {
           <View className="flex-row">
             <TouchableOpacity 
               className="bg-[#1E3A8A] rounded-[20px] py-4 items-center shadow-lg shadow-[#1E3A8A]/30 active:bg-blue-900 flex-1 flex-row justify-center"
-              disabled={accepting || remainingSeconds <= 0}
+              disabled={accepting || !acceptanceWindowOpen}
               onPress={async () => {
+                const currentServerTime = Date.now() + serverClockOffsetMs;
+                if (
+                  !acceptanceWindowOpen
+                  || (Number.isFinite(serverExpiry) && !canAttemptDispatchAcceptance(serverExpiry, currentServerTime))
+                ) {
+                  return;
+                }
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 progress.value = 100; // Cancel animation
                 acceptingRef.current = true;
@@ -390,7 +410,7 @@ export function DispatchSheet() {
                 <ActivityIndicator color="white" size="small" />
               ) : (
                 <Text className="text-white font-bold text-[16px] tracking-wide">
-                  {remainingSeconds > 0 ? 'Accept Dispatch' : 'Offer expired'}
+                  {acceptanceWindowOpen ? 'Accept Dispatch' : 'Offer closing'}
                 </Text>
               )}
             </TouchableOpacity>

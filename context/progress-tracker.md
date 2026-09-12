@@ -1,5 +1,17 @@
 # Progress Tracker
 
+## 2026-09-12 - Dispatch acceptance race and suspicious-duplicate merge repair
+
+- Moved responder offer ownership commit ahead of ETA calculation and made post-accept ETA/notification work non-fatal for the acceptance response. The server still atomically enforces the actual offer deadline; a valid last-moment acceptance no longer loses time to optional work.
+- Added a mobile three-second server-clock safety window. The responder app now closes the Accept control before the exact deadline instead of displaying an accept action that is likely to arrive after it.
+- Expanded PACC duplicate merging to permit a compatible active pending or verified emergency report as the primary report, including suspicious reports. Server-side row locking and validation prevent self-merges, unrelated incident types, closed/resolved parents, and merging a report that already owns an incident.
+
+## 2026-09-12 - Reassignment-safe responder completion repair
+
+- Added a server-authoritative responder incident-status route. Arrival and report-form ownership checks now require the authenticated responder to match the incident's committed `responderId`; a timed-out or cascaded offer cannot mutate the incident.
+- Stopped the mobile report form from resolving an incident before a valid report is submitted. Resolution remains the report API's server-side outcome, preventing public users from reaching rating for an unassigned or incomplete response.
+- Added mobile reconciliation for a stale responder offer and an explicit reassignment response at report submission, so the first responder is returned to the dashboard when a duplicate/cascaded request moves to another responder. Public tracking continues to receive the second responder through the existing three-second authorized status refresh.
+
 ## 2026-09-12 - Web command-map live telemetry repair
 
 - Corrected the web command map's responder telemetry subscription to use the same incident-scoped channel name published by responder devices. PACC and CDRRMO map markers now receive immediate foreground GPS broadcasts, while the existing database Realtime subscription remains the recovery path.

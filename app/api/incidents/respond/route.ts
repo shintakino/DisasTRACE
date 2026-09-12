@@ -76,40 +76,9 @@ export async function POST(req: NextRequest) {
       const suffix = dbUser.id.slice(-3).toUpperCase();
       const vehicleId = `AMB-${initials || "001"}-${suffix}`;
 
-      // Recalculate ETA immediately after dispatch acceptance using responder's actual current location and incident coordinates
-      const request = await db.query.verificationRequests.findFirst({
-        where: eq(verificationRequests.id, incident.requestId),
-      });
-
-      let recalculatedEta = incident.etaMinutes;
-      if (request) {
-        let resLat = dbUser.lastLatitude !== null ? Number(dbUser.lastLatitude) : 14.9516;
-        let resLng = dbUser.lastLongitude !== null ? Number(dbUser.lastLongitude) : 120.9011;
-        
-        const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
-        let reqLat = request.latitude;
-        let reqLng = request.longitude;
-
-        if (isDevMode) {
-          if (reqLat < 14.90 || reqLat > 15.05 || reqLng < 120.80 || reqLng > 121.00) {
-            reqLat = 14.945;
-            reqLng = 120.895;
-          }
-          // Deterministic offset to keep coordinates close but separate and sorted
-          const offsetIndex = dbUser.email.includes("responder")
-            ? (Number(dbUser.email.replace(/[^0-9]/g, '')) || 1)
-            : (dbUser.id.charCodeAt(0) % 5 + 1);
-          resLat = reqLat + 0.0015 * offsetIndex;
-          resLng = reqLng + 0.0015 * offsetIndex;
-        }
-
-        const distanceKm = calculateHaversineDistance(reqLat, reqLng, resLat, resLng);
-        recalculatedEta = Math.max(2, Math.round(distanceKm * 5));
-      }
-
-      // Accept and assign in one transaction. The conditional update is the
-      // final authority because an offer can expire or cascade after the first
-      // read but before the responder taps Accept.
+      // Claim the offer before the optional ETA calculation. The conditional
+      // update remains the authority for expiry, but no database work unrelated
+      // to ownership can consume the last seconds of a valid offer.
       const updatedIncident = await db.transaction(async (tx) => {
         const [accepted] = await tx.update(incidents)
           .set({
@@ -118,7 +87,6 @@ export async function POST(req: NextRequest) {
             currentOfferResponderId: null,
             offerExpiresAt: null,
             assignedAmbulance: vehicleId,
-            etaMinutes: recalculatedEta,
           })
           .where(and(
             eq(incidents.id, incidentId),
@@ -149,25 +117,74 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 3. Notify PACC and CDRRMO of acceptance
+      // ETA is useful but must never turn a successfully committed acceptance
+      // into an apparent client failure. Recalculate it after ownership is
+      // safely committed, and only while this responder still owns the trip.
+      let request: typeof verificationRequests.$inferSelect | undefined;
+      let responseIncident = updatedIncident;
+      try {
+        request = await db.query.verificationRequests.findFirst({
+          where: eq(verificationRequests.id, incident.requestId),
+        });
+
+        if (request) {
+          let resLat = dbUser.lastLatitude !== null ? Number(dbUser.lastLatitude) : 14.9516;
+          let resLng = dbUser.lastLongitude !== null ? Number(dbUser.lastLongitude) : 120.9011;
+          const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+          let reqLat = request.latitude;
+          let reqLng = request.longitude;
+
+          if (isDevMode) {
+            if (reqLat < 14.90 || reqLat > 15.05 || reqLng < 120.80 || reqLng > 121.00) {
+              reqLat = 14.945;
+              reqLng = 120.895;
+            }
+            const offsetIndex = dbUser.email.includes("responder")
+              ? (Number(dbUser.email.replace(/[^0-9]/g, '')) || 1)
+              : (dbUser.id.charCodeAt(0) % 5 + 1);
+            resLat = reqLat + 0.0015 * offsetIndex;
+            resLng = reqLng + 0.0015 * offsetIndex;
+          }
+
+          const recalculatedEta = Math.max(2, Math.round(calculateHaversineDistance(reqLat, reqLng, resLat, resLng) * 5));
+          const [incidentWithEta] = await db.update(incidents)
+            .set({ etaMinutes: recalculatedEta })
+            .where(and(
+              eq(incidents.id, incidentId),
+              eq(incidents.responderId, user.id),
+              eq(incidents.status, 'EN_ROUTE'),
+            ))
+            .returning();
+          responseIncident = incidentWithEta ?? responseIncident;
+        }
+      } catch (error) {
+        console.error('Dispatch accepted, but ETA recalculation failed:', error);
+      }
+
+      // Notification delivery is advisory. A transient notification failure
+      // must not make a committed acceptance look unsuccessful to the responder.
       const reqNum = request?.requestId || request?.id || incident.requestId;
       const isManual = incident.dispatchMethod === "PACC_MANUAL";
-      await notifyPaccAndCdrrmo({
-        title: isManual ? "Manual Dispatch Accepted" : "Dispatch Accepted",
-        body: `Responder ${dbUser.fullName} ACCEPTED the dispatch offer for Request #${reqNum}.`,
-        type: isManual ? "manual_dispatch_accepted" : "dispatch_accepted",
-        metadata: {
-          incidentId,
-          requestId: incident.requestId,
-          responderId: dbUser.id,
-          responderName: dbUser.fullName,
-          dispatchMethod: incident.dispatchMethod,
-        },
-      });
+      try {
+        await notifyPaccAndCdrrmo({
+          title: isManual ? "Manual Dispatch Accepted" : "Dispatch Accepted",
+          body: `Responder ${dbUser.fullName} ACCEPTED the dispatch offer for Request #${reqNum}.`,
+          type: isManual ? "manual_dispatch_accepted" : "dispatch_accepted",
+          metadata: {
+            incidentId,
+            requestId: incident.requestId,
+            responderId: dbUser.id,
+            responderName: dbUser.fullName,
+            dispatchMethod: incident.dispatchMethod,
+          },
+        });
+      } catch (error) {
+        console.error('Dispatch accepted, but acceptance notification failed:', error);
+      }
 
       return NextResponse.json({
         success: true,
-        incident: updatedIncident,
+        incident: responseIncident,
         message: "Dispatch offer accepted.",
       });
     } else {

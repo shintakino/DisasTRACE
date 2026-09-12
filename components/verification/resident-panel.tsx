@@ -42,7 +42,8 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
 
   const canMergeDuplicate =
     request.status === "PENDING" &&
-    request.nature === "EMERGENCY";
+    request.nature === "EMERGENCY" &&
+    !request.incident;
 
   return (
     <div className="w-80 shrink-0 border-l bg-white p-4 flex flex-col gap-6">

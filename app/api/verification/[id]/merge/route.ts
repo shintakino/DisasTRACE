@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
+import { incidents } from "@/db/schema/incidents";
+import { canBeDuplicateMergeParent, canBeMergedAsDuplicate } from "@/lib/verification-merge-policy";
 
 const MergeRequestSchema = z.object({
   parentRequestId: z.string().min(1),
@@ -24,6 +26,9 @@ export async function POST(
       );
     }
     const { parentRequestId } = payload.data;
+    if (parentRequestId === id) {
+      return NextResponse.json({ error: "A report cannot be merged into itself." }, { status: 400 });
+    }
 
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -45,38 +50,53 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
     }
 
-    // Validate that target request exists
-    const targetRequest = await db.query.verificationRequests.findFirst({
-      where: eq(verificationRequests.id, id),
+    // Lock both rows in a deterministic order. This keeps a PACC merge from
+    // racing an acceptance/automatic-dispatch transaction for the same report.
+    const mergeResult = await db.transaction(async (tx) => {
+      const lockedRequests = await tx.select()
+        .from(verificationRequests)
+        .where(inArray(verificationRequests.id, [id, parentRequestId]))
+        .orderBy(asc(verificationRequests.id))
+        .for('update');
+      const targetRequest = lockedRequests.find((request) => request.id === id);
+      const parentRequest = lockedRequests.find((request) => request.id === parentRequestId);
+
+      if (!targetRequest || !parentRequest) {
+        return { status: 404, error: 'The selected report no longer exists.' };
+      }
+
+      const [targetIncident] = await tx.select({ id: incidents.id, status: incidents.status })
+        .from(incidents)
+        .where(eq(incidents.requestId, targetRequest.id))
+        .limit(1);
+      const [parentIncident] = await tx.select({ id: incidents.id, status: incidents.status })
+        .from(incidents)
+        .where(eq(incidents.requestId, parentRequest.id))
+        .limit(1);
+
+      if (!canBeMergedAsDuplicate({ ...targetRequest, incident: targetIncident ?? null })) {
+        return { status: 409, error: 'Only an unassigned pending emergency report can be merged as a duplicate.' };
+      }
+      if (!canBeDuplicateMergeParent({ ...parentRequest, incident: parentIncident ?? null }, targetRequest)) {
+        return { status: 409, error: 'Choose an active emergency report of the same type as the primary report.' };
+      }
+
+      const [merged] = await tx.update(verificationRequests)
+        .set({ status: 'DUPLICATE', parentRequestId, updatedAt: new Date() })
+        .where(and(
+          eq(verificationRequests.id, id),
+          eq(verificationRequests.status, 'PENDING'),
+          isNull(verificationRequests.parentRequestId),
+        ))
+        .returning({ id: verificationRequests.id });
+      return merged
+        ? { status: 200 as const }
+        : { status: 409, error: 'This report changed while it was being merged. Refresh the queue and try again.' };
     });
 
-    if (!targetRequest) {
-      return NextResponse.json(
-        { error: "Target verification request not found" },
-        { status: 404 }
-      );
+    if (mergeResult.status !== 200) {
+      return NextResponse.json({ error: mergeResult.error }, { status: mergeResult.status });
     }
-
-    // Validate that parent request exists
-    const parentRequest = await db.query.verificationRequests.findFirst({
-      where: eq(verificationRequests.id, parentRequestId),
-    });
-
-    if (!parentRequest) {
-      return NextResponse.json(
-        { error: "Parent verification request not found" },
-        { status: 404 }
-      );
-    }
-
-    // Update the verification request
-    await db.update(verificationRequests)
-      .set({
-        status: "DUPLICATE",
-        parentRequestId,
-        updatedAt: new Date(),
-      })
-      .where(eq(verificationRequests.id, id));
 
     return NextResponse.json({
       success: true,

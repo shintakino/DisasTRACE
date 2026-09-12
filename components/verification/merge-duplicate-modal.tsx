@@ -7,12 +7,13 @@ import { VerificationRequest } from "@/types/verification"
 import { GitMerge, MapPin, Calendar, Check, Loader2, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
+import { canBeDuplicateMergeParent } from "@/lib/verification-merge-policy"
 
 interface MergeDuplicateModalProps {
   isOpen: boolean
   onClose: () => void
-  requestId: string | null
-  activeVerifiedRequests: VerificationRequest[]
+  request: VerificationRequest | null
+  activeRequests: VerificationRequest[]
   onConfirm: (parentRequestId: string) => Promise<void>
   isProcessing: boolean
 }
@@ -20,8 +21,8 @@ interface MergeDuplicateModalProps {
 export function MergeDuplicateModal({
   isOpen,
   onClose,
-  requestId,
-  activeVerifiedRequests,
+  request,
+  activeRequests,
   onConfirm,
   isProcessing,
 }: MergeDuplicateModalProps) {
@@ -38,10 +39,11 @@ export function MergeDuplicateModal({
     onClose()
   }
 
-  // Filter out the current request itself and list active verified reports
-  const selectableRequests = activeVerifiedRequests.filter(
-    (req) => req.id !== requestId && req.status === "VERIFIED"
-  )
+  // Pending suspicious reports are valid primary reports. PACC will review
+  // one consolidated report instead of receiving a parallel duplicate queue.
+  const selectableRequests = request
+    ? activeRequests.filter((candidate) => canBeDuplicateMergeParent(candidate, request))
+    : [];
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -55,21 +57,21 @@ export function MergeDuplicateModal({
             <div className="text-left">
               <DialogTitle className="text-xl font-bold text-white tracking-tight">Merge Duplicate Incident</DialogTitle>
               <DialogDescription className="text-blue-100 text-xs font-medium mt-1">
-                Select the primary verified report that this pending incident is a duplicate of.
+                Select the primary active report that this pending incident is a duplicate of.
               </DialogDescription>
             </div>
           </div>
         </div>
 
         <div className="p-6 bg-slate-50/30 flex-1 overflow-y-auto space-y-4 flex flex-col">
-          {/* Scrollable list of verified reports */}
+          {/* Scrollable list of compatible active reports */}
           <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-3 min-h-[200px]">
             {selectableRequests.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center py-12 text-slate-400 italic text-center gap-2">
                 <AlertCircle className="w-10 h-10 opacity-20 text-amber-500" />
-                <span className="text-xs font-semibold text-slate-500">No verified incidents available</span>
+                <span className="text-xs font-semibold text-slate-500">No compatible active reports available</span>
                 <span className="text-[11px] text-slate-400 max-w-[280px]">
-                  There are no other active verified incidents at this moment to merge this report into.
+                  There are no other active reports of this incident type available to merge into.
                 </span>
               </div>
             ) : (

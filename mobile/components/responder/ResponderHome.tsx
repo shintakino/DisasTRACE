@@ -43,6 +43,12 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
   return R * c;
 }
 
+interface ActiveDispatchOwnership {
+  status?: string;
+  responder_id?: string | null;
+  current_offer_responder_id?: string | null;
+}
+
 export function ResponderHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -666,6 +672,55 @@ export function ResponderHome() {
       supabase.removeChannel(channel);
     };
   }, [profile, role, status, user?.id]);
+
+  // A timed-out offer may be cascaded to another responder while this device is
+  // backgrounded. Reconcile the local screen with the server before a stale
+  // offer can be progressed into arrival or report completion.
+  useEffect(() => {
+    if (!user?.id || !activeDispatch?.id || status === 'idle') return;
+
+    let mounted = true;
+    const incidentId = activeDispatch.id;
+    const clearReassignedDispatch = (incident: ActiveDispatchOwnership) => {
+      const stillOwned = incident?.responder_id === user.id
+        || (
+          incident?.status === 'DISPATCHED'
+          && !incident?.responder_id
+          && incident?.current_offer_responder_id === user.id
+        );
+      if (!stillOwned && mounted && useResponderStore.getState().activeDispatch?.id === incidentId) {
+        useResponderStore.getState().completeIncident();
+        Alert.alert(
+          'Dispatch reassigned',
+          'This response is no longer assigned to you. Your active dispatch has been cleared.',
+        );
+      }
+    };
+
+    const reconcile = async () => {
+      const { data: incident, error } = await supabase
+        .from('incidents')
+        .select('id, status, responder_id, current_offer_responder_id')
+        .eq('id', incidentId)
+        .maybeSingle();
+      if (!error && incident) clearReassignedDispatch(incident);
+    };
+
+    void reconcile();
+    const channel = supabase
+      .channel(`active-dispatch-${incidentId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'incidents', filter: `id=eq.${incidentId}` },
+        (payload) => clearReassignedDispatch(payload.new),
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [activeDispatch?.id, status, user?.id]);
 
   useEffect(() => {
     const fetchHospitals = async () => {

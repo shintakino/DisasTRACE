@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, BackHandler, Keyboard } from 'react-native';
+import { Alert, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, BackHandler, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Star } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
@@ -13,6 +13,7 @@ export default function ResolutionScreen() {
   
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isLeavingRef = useRef(false);
 
   const formatDuration = (seconds?: number) => {
@@ -48,36 +49,51 @@ export default function ResolutionScreen() {
     };
   }, [returnToHome]);
 
-  const handleReturnHome = () => {
-    if (isLeavingRef.current) return;
-    // Only submit feedback if a rating star was selected (rating > 0)
-    if (rating > 0) {
-      (async () => {
-        try {
-          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-          const { data: { session } } = await supabase.auth.getSession();
-          const reqHeaders: any = { 'Content-Type': 'application/json' };
-          if (session?.access_token) {
-            reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
-          }
-     
-          await fetch(`${apiUrl}/api/incidents/feedback`, {
-            method: 'POST',
-            headers: reqHeaders,
-            body: JSON.stringify({
-              incidentId: report.incidentId || undefined,
-              requestId: report.id || undefined,
-              rating,
-              feedback: feedback || undefined,
-            })
-          });
-        } catch (err) {
-          console.log('Feedback background submission failed:', err);
-        }
-      })();
+  const handleReturnHome = async () => {
+    if (isLeavingRef.current || isSubmitting) return;
+    if (rating === 0) {
+      returnToHome();
+      return;
     }
-    
-    returnToHome();
+
+    setIsSubmitting(true);
+    try {
+      const apiUrl = (
+        process.env.EXPO_PUBLIC_API_URL
+        || process.env.EXPO_PUBLIC_MOBILE_API_URL?.replace(/\/api$/, '')
+        || 'https://disas-trace.vercel.app'
+      ).replace(/\/$/, '');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Your session expired.');
+
+      const response = await fetch(`${apiUrl}/api/incidents/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          incidentId: report.incidentId || undefined,
+          requestId: report.id || undefined,
+          rating,
+          feedback: feedback || undefined,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Feedback could not be submitted.');
+      }
+
+      returnToHome();
+    } catch (error) {
+      console.error('[ResolutionScreen] Feedback submission failed:', error);
+      Alert.alert(
+        'Rating not submitted',
+        'Please check your connection and try again. Your rating is still on this screen.',
+      );
+    } finally {
+      if (!isLeavingRef.current) setIsSubmitting(false);
+    }
   };
 
   return (
@@ -153,8 +169,8 @@ export default function ResolutionScreen() {
         </View>
 
         {/* Action Button */}
-        <TouchableOpacity style={styles.returnButton} onPress={handleReturnHome} activeOpacity={0.8} disabled={isLeavingRef.current}>
-          <Text style={styles.returnButtonText}>RETURN TO HOME</Text>
+        <TouchableOpacity style={styles.returnButton} onPress={handleReturnHome} activeOpacity={0.8} disabled={isLeavingRef.current || isSubmitting}>
+          <Text style={styles.returnButtonText}>{isSubmitting ? 'SUBMITTING RATING...' : 'RETURN TO HOME'}</Text>
         </TouchableOpacity>
 
       </ScrollView>

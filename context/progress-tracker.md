@@ -1,5 +1,27 @@
 # Progress Tracker
 
+## 2026-09-12 - Web command-map live telemetry repair
+
+- Corrected the web command map's responder telemetry subscription to use the same incident-scoped channel name published by responder devices. PACC and CDRRMO map markers now receive immediate foreground GPS broadcasts, while the existing database Realtime subscription remains the recovery path.
+
+## 2026-09-12 — Public tracking and resolution-rating reliability repair
+
+- Added a three-second, authenticated report-status refresh to the signed-in public tracking screen. Supabase Broadcast still provides immediate foreground marker updates; the server refresh now recovers live ambulance position while a responder is backgrounded or a broadcast is missed.
+- Persisted active ambulance transport state and the selected hospital from authenticated responder GPS heartbeats, then included that destination in the authorized public tracking-status response so fallback tracking continues to route to the hospital.
+- Made the terminal `RESOLVED` transition idempotent so concurrent tracking listeners cannot issue competing Android navigation requests.
+- Changed rating submission to await and validate the feedback API response before clearing report state and returning home. Submission failures now leave the rating form available with a clear retry message.
+
+## 2026-09-12 - Restored deployable PACC reassignment queue
+
+- Diagnosed why the live PACC Verification page showed zero action requests despite three production reports requiring reassignment. The current commit's Vercel deployment failed, so production continued serving the older queue implementation.
+- Fixed the Vercel build failure by moving browser-safe Guest Mode limit constants out of `lib/guest-report-limit.ts`. The interactive account settings component now imports the constants-only module and no longer pulls Node's `node:crypto` hashing helper into the browser bundle.
+
+## 2026-09-11 - Rebuilt current system and developer documentation
+
+- Recreated `DisasTRACE_Overall_System_Documentation.pdf` as a complete current-state system reference covering guest emergency intake, deterministic/AI-assisted triage boundaries, FIFO dispatch and expiry recovery, multi-ambulance tracking, responder PCR/DTT forms and signatures, offline drafts, one-device sessions, location integrity, analytics, notifications, exports, and deployment requirements.
+- Recreated `FOR-DEV-ANSWERED.pdf` as a complete developer handoff documenting architecture decisions, authentication and authorization contracts, guest quotas, dispatch concurrency rules, location/tracking boundaries, offline/report contracts, realtime behavior, migration/deployment requirements, verification commands, and the remaining Play Integrity follow-up.
+- Added `scripts/generate-project-docs.mjs` as the maintainable source used to regenerate both PDFs instead of appending updates to stale binary documents.
+
 ## 2026-09-11 - Mobile navigation, responder forms, and dispatch layout reliability
 
 - Fixed the mobile entry-route race that could briefly send an approved public user or responder to the Web Access Only screen before their verification result completed. Only resolved CDRRMO/PACC roles now see that screen; a mobile account landing there through a stale route is returned to its tabs without being signed out.

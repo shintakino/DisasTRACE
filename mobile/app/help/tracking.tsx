@@ -56,6 +56,7 @@ export default function TrackingScreen() {
   const [hospitalDistance, setHospitalDistance] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0); // Natural elapsed time starting from 0
   const elapsedRef = useRef(0);
+  const hasRedirectedToResolutionRef = useRef(false);
   const [isArrived, setIsArrived] = useState(false);
   const [hasDismissedArrivedModal, setHasDismissedArrivedModal] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0); // Starts at 0% and climbs dynamically
@@ -88,6 +89,12 @@ export default function TrackingScreen() {
   };
 
   const handleResolutionRedirect = () => {
+    // Resolution can be observed through the initial lookup, the incident
+    // lifecycle subscription, and the telemetry lookup at nearly the same
+    // time. Android navigation must only receive one terminal transition.
+    if (hasRedirectedToResolutionRef.current) return;
+    hasRedirectedToResolutionRef.current = true;
+
     const currentResponder = assignedResponderRef.current;
     const vehicleId = currentResponder?.full_name 
       ? `AMB-${currentResponder.full_name.trim().split(/\s+/).map((n: string) => n ? n[0] : '').join("").toUpperCase().slice(0, 3)}${currentResponder.id ? `-${currentResponder.id.slice(-3).toUpperCase()}` : ""}` 
@@ -250,6 +257,94 @@ export default function TrackingScreen() {
     };
   }, [isGuest, trackingRequestId]);
 
+  // Realtime broadcast makes foreground marker movement smooth, but it is
+  // ephemeral. A responder can continue updating the server-side GPS cache
+  // while their app is backgrounded, so every signed-in reporter also refreshes
+  // the authorized report-status endpoint as a recovery channel.
+  useEffect(() => {
+    if (isGuest || !report.id) return;
+
+    let active = true;
+    const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'https://disas-trace.vercel.app/api';
+
+    const syncRegisteredTracking = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+
+        const response = await fetch(
+          `${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(report.id!)}`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } },
+        );
+        const result = response.ok ? await response.json() : null;
+        if (!active || !result?.data) return;
+
+        const incident = result.data.incident as { id: string; status: string } | null;
+        useEmergencyReportStore.setState((state) => ({
+          report: {
+            ...state.report,
+            incidentId: incident?.id,
+            trackingRequestId: result.data.trackingRequestId,
+          },
+        }));
+
+        if (!incident) {
+          updateAssignedResponder(null);
+          setIsFindingAmbulance(true);
+          return;
+        }
+        if (incident.status === 'RESOLVED') {
+          handleResolutionRedirect();
+          return;
+        }
+
+        setIsArrived(incident.status === 'ARRIVED');
+        const responder = result.data.responder as {
+          id: string;
+          fullName: string;
+          lastLatitude: number | null;
+          lastLongitude: number | null;
+        } | null;
+        const transport = result.data.transport as {
+          status: 'NONE' | 'TO_HOSPITAL';
+          hospital: { id: string; name: string; coordinates: { latitude: number; longitude: number } } | null;
+        } | null;
+        if (transport?.status === 'TO_HOSPITAL') {
+          setLiveResponderStatus('to_hospital');
+          if (transport.hospital) setLiveTargetHospital(transport.hospital);
+        }
+        if (!responder) {
+          updateAssignedResponder(null);
+          setIsFindingAmbulance(true);
+          return;
+        }
+
+        updateAssignedResponder({
+          id: responder.id,
+          full_name: responder.fullName,
+          last_latitude: responder.lastLatitude,
+          last_longitude: responder.lastLongitude,
+        });
+        setIsFindingAmbulance(false);
+        if (responder.lastLatitude !== null && responder.lastLongitude !== null) {
+          setAmbulanceLocation({
+            latitude: responder.lastLatitude,
+            longitude: responder.lastLongitude,
+          });
+        }
+      } catch (error) {
+        console.error('[TrackingScreen] Registered tracking refresh failed:', error);
+      }
+    };
+
+    void syncRegisteredTracking();
+    const interval = setInterval(() => void syncRegisteredTracking(), 3_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isGuest, report.id]);
+
   // Guest tracking is refreshed through the report-scoped endpoint. This also
   // supplies the parent incident for a merged duplicate and keeps arrival state
   // current without exposing direct database access to the guest.
@@ -284,6 +379,14 @@ export default function TrackingScreen() {
 
         setIsArrived(incident.status === 'ARRIVED');
         const responder = result.data.responder as { id: string; fullName: string; lastLatitude: number | null; lastLongitude: number | null } | null;
+        const transport = result.data.transport as {
+          status: 'NONE' | 'TO_HOSPITAL';
+          hospital: { id: string; name: string; coordinates: { latitude: number; longitude: number } } | null;
+        } | null;
+        if (transport?.status === 'TO_HOSPITAL') {
+          setLiveResponderStatus('to_hospital');
+          if (transport.hospital) setLiveTargetHospital(transport.hospital);
+        }
         if (!responder) {
           updateAssignedResponder(null);
           setIsFindingAmbulance(true);

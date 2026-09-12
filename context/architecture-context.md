@@ -91,7 +91,7 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
   - Ambulance GPS position updates → Public User tracking screen and admin map.
   - Responder status changes → Admin status monitoring panels.
   - Notification delivery → In-app notification panels.
-- Channels are scoped by role and incident context to minimize unnecessary data transfer. Guest response-state synchronization uses the restricted report-status API with the per-report token rather than exposing a direct anonymous Realtime subscription.
+- Channels are scoped by role and incident context to minimize unnecessary data transfer. Realtime Broadcast remains the low-latency foreground path for ambulance marker movement, while public tracking also refreshes the authorized report-status API every three seconds as a recovery path when either Android app is backgrounded or a broadcast is missed. During patient transport, the responder heartbeat persists the active transport state and selected hospital on the incident; the same authorized status response supplies that destination to the public map. Guests use that endpoint with their per-report token rather than exposing a direct anonymous Realtime subscription.
 
 ## Mapping Model
 
@@ -121,7 +121,7 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 3. A public-user or responder account has at most one active mobile device record; only a matching device digest can renew it, and sign-out removes it. Web administrator sessions are not affected.
 3. All database access goes through Drizzle ORM — no raw SQL.
 4. Binary assets (photos, IDs, PDFs) are stored in Supabase Storage, not in the database.
-5. Authenticated real-time data flows through Supabase Realtime. The only polling exception is a guest device refreshing its own token-authorized response state; anonymous database subscriptions are never exposed.
+5. Authenticated real-time data flows through Supabase Realtime. Public tracking additionally refreshes its authorized report-status endpoint as a bounded recovery path for missed/backgrounded telemetry; anonymous database subscriptions are never exposed.
 6. The REST API is the single source of truth — the mobile app and web dashboard are both consumers.
 7. All mapping uses OpenFreeMap + MapLibre — no paid map services.
 8. Responder dispatch push tokens are stored only for the matching active mobile session; external push delivery never changes dispatch authority or bypasses API expiry checks.

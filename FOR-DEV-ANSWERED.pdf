@@ -10,316 +10,219 @@
 endobj
 4 0 obj
 <<
-/Length 7659
+/Length 6480
 >>
 stream
 0.5670000000000001 w
 0 G
 0.12 0.23 0.54 rg
-0. 841.8899999999999864 595.2799999999999727 -62.3622047244094517 re
+0. 841.8899999999999864 595.2755905511811534 -53.8582677165354369 re
 f
-0.94 0.27 0.27 rg
-0. 779.5277952755905062 595.2799999999999727 -4.2519685039370083 re
+0.86 0.15 0.15 rg
+0. 788.0317322834645211 595.2755905511811534 -3.9685039370078741 re
 f
 BT
-/F2 11 Tf
-12.6499999999999986 TL
-1. g
-39.6850393700787407 810.7088976377953031 Td
-(CDRRMO BALIWAG CITY | DISASTRACE SYSTEM) Tj
-ET
-BT
-/F1 9 Tf
+/F2 9 Tf
 10.3499999999999996 TL
 1. g
-39.6850393700787407 793.7010236220472734 Td
-(TECHNICAL DOCUMENTATION & DEVELOPER DEFENSE Q&A \(FOR-DEV\)) Tj
+42.5196850393700814 807.8742519685039269 Td
+(CDRRMO BALIWAG CITY | DISASTRACE) Tj
 ET
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-1. g
-371.3429921259841535 793.7010236220472734 Td
-(CONFIDENTIAL / TECHNICAL SPECIFICATIONS) Tj
-ET
-0.95 0.96 0.96 rg
-39.6850393700787407 756.8506299212598378 515.9099212598424629 -56.6929133858267775 re
-f
-0.82 0.84 0.86 RG
-39.6850393700787407 756.8506299212598378 515.9099212598424629 -56.6929133858267775 re
-S
-BT
-/F2 14 Tf
-16.0999999999999979 TL
+/F2 25 Tf
+28.7499999999999964 TL
 0.118 0.227 0.541 rg
-51.0236220472441033 734.1734645669291695 Td
-(DISASTRACE: DEVELOPER & TECHNICAL DEFENSE Q&A) Tj
+45.354330708661422 722.8348818897637784 Td
+(FOR DEV - ANSWERED) Tj
 ET
 BT
-/F1 9 Tf
-10.3499999999999996 TL
+/F1 12 Tf
+13.7999999999999989 TL
 0.294 0.333 0.388 rg
-51.0236220472441033 714.3309448818897636 Td
-(Complete answers to Conceptual Framework, Non-functional Specs, Architecture, and Security.) Tj
+45.354330708661422 688.819133858267719 Td
+(Implementation decisions, contracts, deployment requirements, and known follow-ups) Tj
 ET
-0.12 0.23 0.54 rg
-39.6850393700787407 683.1498425196849666 515.9099212598424629 -19.8425196850393704 re
-f
-BT
-/F2 10 Tf
-11.5 TL
-1. g
-48.1889763779527627 668.9766141732283131 Td
-(1. CONCEPTUAL FRAMEWORK) Tj
-ET
-BT
-/F2 9.5 Tf
-10.9249999999999989 TL
-0.122 0.161 0.216 rg
-45.354330708661422 654.8033858267716596 Td
-(1. Ano po yung mga ginamit na software or software requirements?) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 636.3781889763779418 Td
-(• Web Front-End Framework: Next.js \(React 19, App Router\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 621.6380314960629221 Td
-(• Mobile Front-End Framework: React Native with Expo \(SDK 52, Expo Router\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 606.8978740157480161 Td
-(• Styling Engine: Tailwind CSS v4 \(Web\) & NativeWind / Tailwind CSS \(Mobile\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 592.1577165354329964 Td
-(• Programming Language: TypeScript \(100% strict type safety\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 577.4175590551180903 Td
-(• Backend Runtime / API: Next.js API Routes \(Node.js Serverless runtime\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 562.6774015748030706 Td
-(• Database & BaaS Platform: Supabase \(PostgreSQL with PostGIS spatial extension\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 547.9372440944880509 Td
-(• Database ORM: Drizzle ORM \(type-safe SQL builder\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 533.1970866141731449 Td
-(• Mapping & Map Tile Engine: MapLibre GL \(@maplibre/maplibre-react-native for Mobile, OpenFreeMap / Leaflet for Web\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 518.4569291338582389 Td
-(• PDF Export Engine: jsPDF & jsPDF-AutoTable with HTML5 Canvas vector-to-PNG renderer) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 503.7167716535431623 Td
-(• Real-time Engine: Supabase Realtime \(WebSockets & Postgres CDC Channels\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 488.9766141732281994 Td
-(• UI Components & Icons: Shadcn UI, Radix UI, Lucide React, Lucide React Native, Iconsax) Tj
-ET
-0.12 0.23 0.54 rg
-39.6850393700787407 451.5592913385825682 515.9099212598424629 -19.8425196850393704 re
-f
-BT
-/F2 10 Tf
-11.5 TL
-1. g
-48.1889763779527627 437.3860629921258578 Td
-(2. NON-FUNCTIONAL REQUIREMENTS \(PORTABILITY\)) Tj
-ET
-BT
-/F2 9.5 Tf
-10.9249999999999989 TL
-0.122 0.161 0.216 rg
-45.354330708661422 423.2128346456692043 Td
-(1. Saan po portable/compatible na operating system ang mobile front-end ng system/app? Yung web-based) Tj
-T* (naman po, saang search engine \(web browser\) naman po siya masesearch/maaaccess?) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 392.0317322834644642 Td
-(• Mobile App Compatibility \(Operating Systems\):) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 377.2915748031495013 Td
-(   - Android: Android 8.0 \(Oreo / API Level 26\) at mas mataas \(Android 9, 10, 11, 12, 13, 14, 15\).) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 362.5514173228345953 Td
-(   - iOS: iOS 14.0 at mas mataas \(iPhone 8 at mga bagong modelo\).) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 347.8112598425196893 Td
-(• Web Dashboard Compatibility \(Web Browsers\):) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 333.0711023622047264 Td
-(   - Ang web dashboard ay compatible sa lahat ng modern web browsers na sumusuporta sa HTML5, ES6+, WebSockets, at) Tj
-T* (WebGL:) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 306.42543307086612 Td
-(     * Google Chrome \(v90+\)) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 291.685275590551214 Td
-(     * Microsoft Edge \(Chromium-based v90+\)) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 276.945118110236308 Td
-(     * Mozilla Firefox \(v88+\)) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 262.204960629921402 Td
-(     * Brave Browser / Opera) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 247.4648031496063822 Td
-(     * Apple Safari \(v14+\)) Tj
-ET
-0.12 0.23 0.54 rg
-39.6850393700787407 210.047480314960751 515.9099212598424629 -19.8425196850393704 re
-f
-BT
-/F2 10 Tf
-11.5 TL
-1. g
-48.1889763779527627 195.8742519685040406 Td
-(3. TECHNICAL FEASIBILITY) Tj
-ET
-BT
-/F2 9.5 Tf
-10.9249999999999989 TL
-0.122 0.161 0.216 rg
-45.354330708661422 181.7010236220473871 Td
-(1. Saan po nadevelop yung system or ano pong ginamit na platform or IDE? Pati po yung database na ginamit.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 163.2758267716536693 Td
-(• Development Platform / IDE: Visual Studio Code \(VS Code\) / Antigravity IDE) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 148.5356692913387633 Td
-(• Version Control & Repository: Git & GitHub) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 133.7955118110238573 Td
-(• Deployment / Cloud Platforms:) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 119.0553543307089512 Td
-(   - Web Application & API Backend: Vercel Cloud Platform) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 104.3151968503939315 Td
-(   - Database & Authentication Services: Supabase Cloud \(Managed Infrastructure\)) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 89.5750393700790255 Td
-(   - Mobile Build Engine: Expo Application Services \(EAS Build / Android APK\)) Tj
-ET
-39.6850393700787407 34.0157480314960665 m
-555.5949606299211609 34.0157480314960665 l
+0.86 0.15 0.15 RG
+2.8346456692913389 w
+45.354330708661422 653.3293700787401121 m
+204.0944881889764133 653.3293700787401121 l
 S
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-0.612 0.639 0.686 rg
-39.6850393700787407 19.8425196850394059 Td
-(CDRRMO Baliwag City - DisasTRACE Technical Documentation & Developer Defense Q&A) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.294 0.333 0.388 rg
+45.354330708661422 624.9829133858268051 Td
+(Prepared 11 September 2026. This document describes the current implemented repository state and should be) Tj
+T* (regenerated when material behavior changes.) Tj
 ET
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-0.612 0.639 0.686 rg
-498.9020472440944332 19.8425196850394059 Td
-(Page 1 of 4) Tj
+/F2 16 Tf
+18.3999999999999986 TL
+0.118 0.227 0.541 rg
+42.5196850393700814 577.530944881889809 Td
+(1. Purpose and Reading Order) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 554.853779527559027 Td
+(This is the developer handoff for the current DisasTRACE implementation. It answers the recurring architecture and) Tj
+T* (behavior questions that affect future changes. Read it with context/project-overview.md, context/architecture-context.md,) Tj
+T* (context/code-standards.md, context/ai-workflow-rules.md, and context/progress-tracker.md.) Tj
+ET
+0.94 0.96 1. rg
+51.0236220472441033 523.360866141732231 m
+544.2519685039370643 523.360866141732231 l
+547.383031652584009 523.360866141732231 549.9212598425197029 520.8226379517966507 549.9212598425197029 517.6915748031494786 c
+549.9212598425197029 470.069527559055075 l
+549.9212598425197029 466.9384644104080735 546.7901966938727583 464.4002362204724363 544.2519685039370643 464.4002362204724363 c
+51.0236220472441033 464.4002362204724363 l
+47.8925588985970805 464.4002362204724363 45.354330708661422 467.531299369119381 45.354330708661422 470.069527559055075 c
+45.354330708661422 517.6915748031494786 l
+45.354330708661422 520.8226379517966507 48.4853938573084378 523.360866141732231 51.0236220472441033 523.360866141732231 c
+h
+f
+BT
+/F2 9 Tf
+10.3499999999999996 TL
+0.118 0.227 0.541 rg
+59.5275590551181182 506.3529921259842581 Td
+(Change rule) Tj
+ET
+BT
+/F1 8.8 Tf
+10.1199999999999992 TL
+0.122 0.161 0.216 rg
+59.5275590551181182 492.1797637795275477 Td
+(When a feature changes a state machine, security boundary, public API, migration, or deployment prerequisite, update) Tj
+T* (the relevant context file and regenerate these PDFs in the same change.) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.118 0.227 0.541 rg
+42.5196850393700814 457.8918897637795453 Td
+(2. Answered Architecture Decisions) Tj
+ET
+BT
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 435.2147244094488201 Td
+(Why REST plus Realtime?) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 418.2068503937007904 Td
+(REST route handlers own validation, authorization, transactional state changes, file handling, and server-only) Tj
+T* (integrations. Supabase Realtime distributes committed changes to authenticated clients. This avoids treating a client) Tj
+T* (event or a websocket message as authoritative.) Tj
+ET
+BT
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 375.375354330708717 Td
+(Why PostgreSQL and Drizzle?) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 358.3674803149606873 Td
+(Incidents, verification requests, dispatch offers, responders, reports, quotas, and audit events have relational constraints) Tj
+T* (and concurrency requirements. Drizzle provides typed access and migration ownership; application code must not use) Tj
+T* (raw SQL for ordinary data access.) Tj
+ET
+BT
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 315.5359842519684435 Td
+(Why official barangay polygons?) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 298.5281102362204138 Td
+(A reporter-entered address or free-text landmark is not a reliable service-area authority. GPS is checked against the) Tj
+T* (official 27-polygon Baliwag boundary set; the derived barangay is the display and assignment label while the captured) Tj
+T* (coordinates remain the dispatch truth.) Tj
+ET
+BT
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 255.6966141732283404 Td
+(Why token-scoped guest status?) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 238.6887401574803107 Td
+(Guests have no Supabase session. Giving them anonymous database Realtime or Storage writes would widen the) Tj
+T* (attack surface. A random per-report access token and a narrow polling endpoint provide status without exposing) Tj
+T* (protected tables.) Tj
+ET
+BT
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 195.8572440944881237 Td
+(Why hashes for device controls?) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 178.849370078740094 Td
+(The device identifier is needed for one-device sessions and guest abuse resistance, but storing the raw Android identifier) Tj
+T* (is unnecessary. SHA-256 digests support matching and quotas while reducing retained identifying data. This is an) Tj
+T* (abuse-control signal, not hardware attestation.) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.118 0.227 0.541 rg
+42.5196850393700814 136.0178740157479069 Td
+(3. Authentication and Authorization Contract) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 113.3407086614171249 Td
+(- Roles: public_user, ambulance_responder, pacc_admin, cdrrmo_super_admin.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 97.5517322834643892 Td
+(- Roles are stored in public.users and synchronized into auth.users raw_app_meta_data by database trigger.) Tj
+ET
+0.8 0.84 0.88 RG
+42.5196850393700814 34.0159842519683977 m
+552.7559055118110791 34.0159842519683977 l
+S
+BT
+/F1 7.5 Tf
+8.625 TL
+0.294 0.333 0.388 rg
+42.5196850393700814 17.0081102362203183 Td
+(DisasTRACE | 11 September 2026) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.294 0.333 0.388 rg
+529.2059055118110109 17.0081102362203183 Td
+(Page 1) Tj
 ET
 endstream
 endobj
@@ -333,308 +236,230 @@ endobj
 endobj
 6 0 obj
 <<
-/Length 7746
+/Length 6833
 >>
 stream
-0.5670000000000001 w
-0.82 0.84 0.86 RG
+2.8346456692913389 w
+0.8 0.84 0.88 RG
 0.12 0.23 0.54 rg
-0. 841.8899999999999864 595.2799999999999727 -62.3622047244094517 re
+0. 841.8899999999999864 595.2755905511811534 -53.8582677165354369 re
 f
-0.94 0.27 0.27 rg
-0. 779.5277952755905062 595.2799999999999727 -4.2519685039370083 re
+0.86 0.15 0.15 rg
+0. 788.0317322834645211 595.2755905511811534 -3.9685039370078741 re
 f
 BT
-/F2 11 Tf
-12.6499999999999986 TL
-1. g
-39.6850393700787407 810.7088976377953031 Td
-(CDRRMO BALIWAG CITY | DISASTRACE SYSTEM) Tj
-ET
-BT
-/F1 9 Tf
+/F2 9 Tf
 10.3499999999999996 TL
 1. g
-39.6850393700787407 793.7010236220472734 Td
-(TECHNICAL DOCUMENTATION & DEVELOPER DEFENSE Q&A \(FOR-DEV\)) Tj
+42.5196850393700814 807.8742519685039269 Td
+(CDRRMO BALIWAG CITY | DISASTRACE) Tj
 ET
 BT
-/F1 8 Tf
-9.1999999999999993 TL
+/F2 9 Tf
+10.3499999999999996 TL
 1. g
-371.3429921259841535 793.7010236220472734 Td
-(CONFIDENTIAL / TECHNICAL SPECIFICATIONS) Tj
+56.6929133858267775 756.8506299212598378 Td
+(- Mobile users require verification_status=approved before any app functionality; only cdrrmo_super_admin can) Tj
+T* (approve or reject.) Tj
 ET
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-1. g
-51.0236220472441033 756.8506299212598378 Td
-(• Database Management System: Supabase PostgreSQL na may kasamang PostGIS extension para sa geospatial) Tj
-T* (functions \(tulad ng ST_DWithin para sa 1km responder radius proximity search at ST_SetSRID para sa GPS coordinate) Tj
-T* (mapping\).) Tj
-ET
-0.12 0.23 0.54 rg
-39.6850393700787407 695.6222834645668627 515.9099212598424629 -19.8425196850393704 re
-f
-BT
-/F2 10 Tf
-11.5 TL
-1. g
-48.1889763779527627 681.4490551181102092 Td
-(4. COMPATIBILITY CHECKING) Tj
-ET
-BT
-/F2 9.5 Tf
+/F1 9.5 Tf
 10.9249999999999989 TL
 0.122 0.161 0.216 rg
-45.354330708661422 667.2758267716535556 Td
-(1. Device Platform, 2. Software Versions, 3. CPU/Storage \(Ano po yung certain units na compatible?\):) Tj
+56.6929133858267775 728.6742519685038815 Td
+(- The proxy, API route handlers, and database RLS all enforce the boundary. Never rely on a mobile client gate) Tj
+T* (alone.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 648.8506299212598378 Td
-(A. Resident & Responder Mobile App Specs:) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 634.1104724409448181 Td
-(   • Device Platform: Android Smartphone o Apple iPhone) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 619.3703149606299121 Td
-(   • Minimum Software Version: Android 8.0 \(Oreo\) o iOS 14.0) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 604.6301574803148924 Td
-(   • Recommended Software Version: Android 11+ o iOS 16+) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 589.8899999999999864 Td
-(   • Minimum CPU: Quad-Core 1.5 GHz Processor) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 575.1498425196849666 Td
-(   • Recommended CPU: Octa-Core 2.0 GHz Processor o mas mabilis) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 560.4096850393700606 Td
-(   • Minimum RAM: 2 GB RAM \(3 GB+ recommended\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 545.6695275590550409 Td
-(   • Storage Space: 100 MB na libreng storage space para sa app at offline draft caching \(disas_trace_drafts.json\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 530.9293700787400212 Td
-(   • Hardware Sensors Required: GPS / Location Sensor, Internet Connectivity \(Wi-Fi o 3G/4G/5G Cellular Data\), Camera) Tj
-T* (\(para sa incident photo evidence\)) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 504.2837007874014716 Td
-() Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 489.5435433070865088 Td
-(B. PACC Dispatcher & CDRRMO Admin Web Dashboard Specs:) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 474.8033858267715459 Td
-(   • Device Platform: Desktop Computer, Laptop, o Workstation Tablet) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 460.063228346456583 Td
-(   • Operating System: Windows 10/11, macOS 11+, Linux \(Ubuntu/Debian\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 445.323070866141677 Td
-(   • Recommended Web Browser: Google Chrome, Microsoft Edge, o Brave \(Latest Version\)) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 430.5829133858267141 Td
-(   • Minimum Hardware: Dual-Core 2.0 GHz CPU, 4 GB RAM, Full HD Display \(1920x1080 resolution\)) Tj
-ET
-0.12 0.23 0.54 rg
-39.6850393700787407 393.1655905511810829 515.9099212598424629 -19.8425196850393704 re
-f
-BT
-/F2 10 Tf
-11.5 TL
-1. g
-48.1889763779527627 378.9923622047243725 Td
-(5. TRACKING) Tj
-ET
-BT
-/F2 9.5 Tf
+/F1 9.5 Tf
 10.9249999999999989 TL
 0.122 0.161 0.216 rg
-45.354330708661422 364.819133858267719 Td
-(1. Google Maps API po ba yung ginamit sa system for tracking?) Tj
+56.6929133858267775 700.4978740157480388 Td
+(- A mobile account has one active mobile_device_sessions row containing a device digest and JWT session_id.) Tj
+T* (Browser dashboard sessions do not participate in this binding.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 346.3939370078740012 Td
-(• Sagot: Hindi po Google Maps API. Ang system ay gumagamit ng OpenFreeMap / MapLibre GL kasama ang) Tj
-T* (OpenStreetMap \(OSM\) tiles at Expo Location Services.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 319.7482677165354517 Td
-(• Bakit ito ang ginamit?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 305.0081102362204319 Td
-(   1. Zero Cost / No Paywall: Hindi kailangan magbayad ng mahal na API billing katulad sa Google Maps API.) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 290.2679527559055259 Td
-(   2. High-Performance Map Rendering: Gumagamit ng vector tiles at WebGL/Native rendering sa mobile) Tj
-T* (\(@maplibre/maplibre-react-native\).) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 263.6222834645669764 Td
-(   3. Real-time Live Telemetry: Ang GPS location tracking ay tumatakbo gamit ang Expo Location \(watchPositionAsync\) at) Tj
-T* (isino-broadcast sa PACC Dashboard sa pamanamagitan ng Supabase Realtime WebSockets at PostGIS spatial indexing) Tj
-T* (\(locationGeom\).) Tj
-ET
-0.12 0.23 0.54 rg
-39.6850393700787407 202.3939370078740296 515.9099212598424629 -19.8425196850393704 re
-f
-BT
-/F2 10 Tf
-11.5 TL
-1. g
-48.1889763779527627 188.2207086614173477 Td
-(6. ECONOMIC FEASIBILITY) Tj
-ET
-BT
-/F2 9.5 Tf
+/F1 9.5 Tf
 10.9249999999999989 TL
 0.122 0.161 0.216 rg
-45.354330708661422 174.0474803149606942 Td
-(1. Baka po may masama po kayo sa expenses na nagastos.) Tj
+56.6929133858267775 672.3214960629920824 Td
+(- Suspended/deactivated residents are blocked at sign-in and receive an explicit Account Banned state if status) Tj
+T* (changes during a session.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 155.6222834645669764 Td
-(• Web Hosting & API Deployment \(Vercel\): P0.00 / free \(Free Tier during dev\)) Tj
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 644.1451181102362398 Td
+(Important session behavior) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 140.8821259842519567 Td
-(• Database, Auth & Realtime \(Supabase Cloud\): P0.00 / free \(Free Tier up to 500MB DB & 50k MAU\)) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 627.1372440944882101 Td
+(Successful mobile sign-in revokes other Supabase sessions and atomically binds the current one. Sign-out clears local) Tj
+T* (credentials immediately and attempts matching server release with a short timeout. A replacement device requires) Tj
+T* (administrator release or the logout-first flow.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
+/F2 16 Tf
+18.3999999999999986 TL
 0.118 0.227 0.541 rg
-51.0236220472441033 126.1419685039370506 Td
-(• Map Tiles & Geocoding \(OpenFreeMap / OSM\): P0.00 / free \(Open-source alternative to Google Maps\)) Tj
+42.5196850393700814 584.305748031496023 Td
+(4. Intake, AI, and Triage Contract) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 111.4018110236221446 Td
-(• Mobile App Build / Testing \(Expo CLI / EAS\): P0.00 / free) Tj
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 561.6285826771653547 Td
+(Validated fields) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 96.6616535433072386 Td
-(• Development Tools & IDE \(VS Code / Antigravity IDE\): P0.00 / free) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 544.6207086614173249 Td
+(Guest and resident chatbot flows require callback/contact routing, automatic in-boundary GPS, nearby) Tj
+T* (landmark/reference, incident details, exact affected-person count, condition, and evidence. Registered users use the) Tj
+T* (verified phone on the account; the client cannot substitute an arbitrary number.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 81.9214960629923326 Td
-(• Domain Name \(Optional\): ~P600.00 - P800.00 / taon) Tj
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 501.7892125984251948 Td
+(Classification contract) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 67.1813385826773128 Td
-(• KABUOANG GASTOS \(DEV PHASE\): P0.00 \(Zero-cost open-source stack\)) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 484.781338582677165 Td
+(The allowed triage reasons are HIGH_CONFIDENCE_EMERGENCY, HIGH_CONFIDENCE_NON_EMERGENCY,) Tj
+T* (UNCERTAIN_INCOMPLETE, and SUSPICIOUS_POSSIBLE_PRANK. Client hints are normalized server-side. Patient) Tj
+T* (Transport, Other / non-emergency request, and Unknown Cause are non-emergency; remaining categories are not) Tj
+T* (allowed to downgrade emergency handling.) Tj
 ET
-39.6850393700787407 34.0157480314960665 m
-555.5949606299211609 34.0157480314960665 l
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 429.562440944881871 Td
+(The server-only DeepSeek gateway and local typed signal rules improve guided intake but never bypass confirmation,) Tj
+T* (API validation, PACC review, or the dispatch engine. Raw training examples stay local and are not sent to the model or) Tj
+T* (mobile clients.) Tj
+ET
+BT
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 386.7309448818897408 Td
+(Guest quota contract) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 369.7230708661417111 Td
+(The configurable lifetime limit applies to both normalized Philippine phone and app-scoped device digest. Same) Tj
+T* (phone/device retries for the same submission are idempotent. New reports return 429 when either quota is exhausted.) Tj
+T* (Obvious synthetic numbers are rejected at client and API boundaries.) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.118 0.227 0.541 rg
+42.5196850393700814 326.8915748031495241 Td
+(5. Dispatch State and Concurrency Contract) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 304.2144094488188557 Td
+(Automatic dispatch is FIFO over confirmed pending emergencies. Eligibility requires active, approved, on-duty responder) Tj
+T* (status and a trusted location heartbeat no older than one minute. The scheduler runs every five seconds through) Tj
+T* (Supabase Cron/pg_net and is the authority for expiry, with API reconciliation as a recovery path.) Tj
+ET
+BT
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 261.3829133858266687 Td
+(Race prevention) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 244.375039370078639 Td
+(- Automatic dispatch, Override Dispatch, PACC rejection, expiry cascading, and acceptance re-read state inside a) Tj
+T* (transaction and lock the verification-request row.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 216.1986614173226826 Td
+(- Responder reservation is atomic; an offer cannot be accepted after expiry at the database boundary.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 200.4096850393699469 Td
+(- Expiry/reassignment first claims the still-current offer, so it cannot win over an in-flight acceptance.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 184.6207086614172113 Td
+(- An exhausted offer becomes PACC reassignment required rather than silently disappearing.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 168.8317322834644756 Td
+(- A public or guest status read can reconcile its own expired offer before returning state when the scheduler has not) Tj
+T* (yet run.) Tj
+ET
+BT
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 140.6553543307086329 Td
+(Client rule) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 123.6474803149606032 Td
+(Do not infer dispatch ownership from a notification, countdown, or cached state. Hydrate the exact offer/incident from an) Tj
+T* (authorized API and treat server state as final. Push and local notifications are advisory and must not mutate workflow) Tj
+T* (state.) Tj
+ET
+0.8 0.84 0.88 RG
+42.5196850393700814 34.0159842519683977 m
+552.7559055118110791 34.0159842519683977 l
 S
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-0.612 0.639 0.686 rg
-39.6850393700787407 19.8425196850394059 Td
-(CDRRMO Baliwag City - DisasTRACE Technical Documentation & Developer Defense Q&A) Tj
+/F1 7.5 Tf
+8.625 TL
+0.294 0.333 0.388 rg
+42.5196850393700814 17.0081102362203183 Td
+(DisasTRACE | 11 September 2026) Tj
 ET
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-0.612 0.639 0.686 rg
-498.9020472440944332 19.8425196850394059 Td
-(Page 2 of 4) Tj
+/F1 7.5 Tf
+8.625 TL
+0.294 0.333 0.388 rg
+529.2059055118110109 17.0081102362203183 Td
+(Page 2) Tj
 ET
 endstream
 endobj
@@ -648,301 +473,266 @@ endobj
 endobj
 8 0 obj
 <<
-/Length 8048
+/Length 8038
 >>
 stream
-0.5670000000000001 w
-0.82 0.84 0.86 RG
+2.8346456692913389 w
+0.8 0.84 0.88 RG
 0.12 0.23 0.54 rg
-0. 841.8899999999999864 595.2799999999999727 -62.3622047244094517 re
+0. 841.8899999999999864 595.2755905511811534 -53.8582677165354369 re
 f
-0.94 0.27 0.27 rg
-0. 779.5277952755905062 595.2799999999999727 -4.2519685039370083 re
+0.86 0.15 0.15 rg
+0. 788.0317322834645211 595.2755905511811534 -3.9685039370078741 re
 f
 BT
-/F2 11 Tf
-12.6499999999999986 TL
-1. g
-39.6850393700787407 810.7088976377953031 Td
-(CDRRMO BALIWAG CITY | DISASTRACE SYSTEM) Tj
-ET
-BT
-/F1 9 Tf
+/F2 9 Tf
 10.3499999999999996 TL
 1. g
-39.6850393700787407 793.7010236220472734 Td
-(TECHNICAL DOCUMENTATION & DEVELOPER DEFENSE Q&A \(FOR-DEV\)) Tj
+42.5196850393700814 807.8742519685039269 Td
+(CDRRMO BALIWAG CITY | DISASTRACE) Tj
 ET
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-1. g
-371.3429921259841535 793.7010236220472734 Td
-(CONFIDENTIAL / TECHNICAL SPECIFICATIONS) Tj
+/F2 16 Tf
+18.3999999999999986 TL
+0.118 0.227 0.541 rg
+42.5196850393700814 756.8506299212598378 Td
+(6. Location, Mapping, and Tracking Contract) Tj
 ET
-0.12 0.23 0.54 rg
-39.6850393700787407 756.8506299212598378 515.9099212598424629 -19.8425196850393704 re
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 734.1734645669291695 Td
+(- Foreground location is a non-dismissible prerequisite for every resident and responder tab. Returning from Settings) Tj
+T* (triggers a permission recheck.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 705.9970866141732131 Td
+(- Mock provider locations are rejected before report or telemetry use. Implausible responder movement keeps the) Tj
+T* (last trusted position and writes a rate-limited audit record.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 677.8207086614172567 Td
+(- Report GPS is authoritative. EXIF GPS from evidence is optional metadata; a material mismatch routes the report) Tj
+T* (to PACC review.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 649.6443307086614141 Td
+(- Map labels use GPS-derived Barangay Name, Baliwag City. Landmarks are never shown as the incident location.) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 633.8553543307086784 Td
+(- Web maps subscribe to active incident telemetry and render concurrent route caches. Guest maps use only the) Tj
+T* (scoped status endpoint.) Tj
+ET
+1. 0.97 0.93 rg
+51.0236220472441033 617.0175590551181131 m
+544.2519685039370643 617.0175590551181131 l
+547.383031652584009 617.0175590551181131 549.9212598425197029 614.4793308651824191 549.9212598425197029 611.3482677165354744 c
+549.9212598425197029 563.7262204724409003 l
+549.9212598425197029 560.5951573237939556 546.7901966938727583 558.0569291338582616 544.2519685039370643 558.0569291338582616 c
+51.0236220472441033 558.0569291338582616 l
+47.8925588985970805 558.0569291338582616 45.354330708661422 561.18799228250532 45.354330708661422 563.7262204724409003 c
+45.354330708661422 611.3482677165354744 l
+45.354330708661422 614.4793308651824191 48.4853938573084378 617.0175590551181131 51.0236220472441033 617.0175590551181131 c
+h
 f
 BT
-/F2 10 Tf
-11.5 TL
-1. g
-48.1889763779527627 742.6774015748030706 Td
-(7. CYBERSECURITY & SYSTEM SECURITY) Tj
+/F2 9 Tf
+10.3499999999999996 TL
+0.118 0.227 0.541 rg
+59.5275590551181182 600.0096850393700834 Td
+(Remaining security follow-up) Tj
 ET
 BT
-/F2 9.5 Tf
+/F1 8.8 Tf
+10.1199999999999992 TL
+0.122 0.161 0.216 rg
+59.5275590551181182 585.8364566929133161 Td
+(Implement Google Play Integrity with request-bound tokens and server verification after release signing and Play) Tj
+T* (Console/Cloud configuration. Do not replace this with a client-only boolean.) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.118 0.227 0.541 rg
+42.5196850393700814 551.5485826771653137 Td
+(7. Responder Reports and Offline Contract) Tj
+ET
+BT
+/F1 9.5 Tf
 10.9249999999999989 TL
 0.122 0.161 0.216 rg
-45.354330708661422 728.5041732283464171 Td
-([Authentication & Authorization]) Tj
+45.354330708661422 528.8714173228346453 Td
+(/api/reports accepts incident-linked responder documentation, including patient_care_reports and driver_trip_tickets. The) Tj
+T* (mobile responder store must serialize both objects and signatures in online and offline payloads. A deliberate Save as) Tj
+T* (Draft is distinct from a crash/background recovery draft and should update the active incident UI accordingly.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 710.0789763779526993 Td
-(• How are user passwords stored? \(e.g., hashed using bcrypt or Argon2\):) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 695.3388188976377933 Td
-(   - Ang mga password ay hindi kailanman nakasulat nang plain text. Ang authentication ay pinamamahalaan ng Supabase Auth na) Tj
-T* (gumagamit ng malakas na Argon2id \(o bcrypt sa pamamagitan ng PostgreSQL pgcrypto at Supabase GoTrue engine\) na may) Tj
-T* (kasamang cryptographic salt.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 656.7876377952754865 Td
-(• Does the system implement Role-Based Access Control \(RBAC\)?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 642.0474803149605805 Td
-(   - Oo. Mayroong apat \(4\) na malinaw na antas ng role: pacc_admin \(PACC Dispatchers\), cdrrmo_admin \(CDRRMO Executives\),) Tj
-T* (ambulance_responder \(Emergency Crew\), at resident / user \(General Public\).) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 615.4018110236219172 Td
-(• Can users only access features based on their assigned role?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 600.6616535433070112 Td
-(   - Oo. Ipinapatupad ito sa Front-end Navigation Guards \(useAuthStatus\) at Back-end Server Guards \(/api routes\) na) Tj
-T* (nagso-validate ng session Bearer token.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 574.015984251968348 Td
-(• Is there a session timeout for inactive users?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 559.2758267716533283 Td
-(   - Oo. Ang Supabase Auth JWT access tokens ay may awtomatikong expiry \(1 hour\). Pagkatapos nito, nangangailangan ito ng) Tj
-T* (valid refresh token.) Tj
-ET
-BT
-/F2 9.5 Tf
+/F1 9.5 Tf
 10.9249999999999989 TL
 0.122 0.161 0.216 rg
-45.354330708661422 521.2915748031493877 Td
-([Database Security]) Tj
+45.354330708661422 486.0399212598425152 Td
+(Signature paths are stored as serialized SVG path data, rendered with react-native-svg on mobile and SVG on web, then) Tj
+T* (rasterized for jsPDF embedding. PDF layout must calculate multiline heights dynamically; fixed offsets have previously) Tj
+T* (caused overlapping dispatch, address, and narrative text.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 502.8663779527557267 Td
-(• How do we prevent SQL Injection attacks?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 488.1262204724407638 Td
-(   - Ang system ay 100% protektado laban sa SQL Injection dahil hindi ito gumagamit ng unescaped string concatenation sa mga) Tj
-T* (database query.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 461.4805511811021574 Td
-(• Are prepared statements or parameterized queries used?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 446.7403937007872514 Td
-(   - Oo. Lahat ng database queries ay dumadaan sa Drizzle ORM at Supabase Client SDK, na naggagarantiyang gumamit ng) Tj
-T* (parameterized queries / prepared statements.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 420.094724409448645 Td
-(• Is database access limited only to authorized users or services?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 405.354566929133739 Td
-(   - Oo. Ang database ay protektado ng Row Level Security \(RLS\) sa Supabase PostgreSQL. Ang database connection string ay) Tj
-T* (nakakubli sa server-side environment variables.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 378.7088976377951326 Td
-(• Are regular database backups implemented?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 363.9687401574801697 Td
-(   - Oo. Ang Supabase Cloud backend ay may awtomatikong Daily Database Backups at WAL \(Write-Ahead Logging\) Point-In-Time) Tj
-T* (Recovery \(PITR\).) Tj
-ET
-BT
-/F2 9.5 Tf
+/F1 9.5 Tf
 10.9249999999999989 TL
 0.122 0.161 0.216 rg
-45.354330708661422 325.9844881889762291 Td
-([Incident Reporting Security]) Tj
+45.354330708661422 443.208425196850385 Td
+(Native scheduled notifications, not a JavaScript timer, drive the five-minute reminder while unsent drafts exist and) Tj
+T* (connectivity is available. Submission cancels the reminder.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
+/F2 16 Tf
+18.3999999999999986 TL
 0.118 0.227 0.541 rg
-51.0236220472441033 307.5592913385825113 Td
-(• How do we prevent fake or spam incident reports?) Tj
+42.5196850393700814 412.7643307086613618 Td
+(8. Realtime and Notification Contract) Tj
 ET
 BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 292.8191338582676053 Td
-(   - Required Live GPS Location, mandatory camera photo evidence, at authenticated user account validation.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 278.0789763779526993 Td
-(• Is there a verification process before dispatching responders?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 263.3388188976377933 Td
-(   - Oo. Lahat ng emergency request ay dumadaan muna sa PACC Verification Queue \(VERIFICATION_PENDING\) bago i-verify) Tj
-T* (\(VERIFIED\) at irelihi ang responder.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 236.69314960629913 Td
-(• Are all incident reports logged for auditing?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 221.952992125984224 Td
-(   - Oo. Lahat ng aksyon \(mula SOS report, PACC verification, dispatch offer, acceptance, decline, telemetry logs, hanggang PCR at) Tj
-T* (Trip Ticket\) ay awtomatikong naitatala sa audit tables.) Tj
-ET
-BT
-/F2 9.5 Tf
+/F1 9.5 Tf
 10.9249999999999989 TL
 0.122 0.161 0.216 rg
-45.354330708661422 183.9687401574802834 Td
-([Availability & Disaster Recovery]) Tj
+45.354330708661422 390.0871653543306365 Td
+(Authenticated Realtime covers incidents, offers, telemetry, statuses, notifications, and coordination updates. Guest) Tj
+T* (status does not subscribe anonymously; it polls every three seconds. Notification rows support all/unread filtering and) Tj
+T* (linked navigation. Responder offers use foreground/local Android alerts plus Expo Push/FCM when backgrounded; push) Tj
+T* (tokens are tied to the active mobile session and removed on sign-out or provider invalidation.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
+/F2 16 Tf
+18.3999999999999986 TL
 0.118 0.227 0.541 rg
-51.0236220472441033 165.5435433070865656 Td
-(• What happens if the server goes down?) Tj
+42.5196850393700814 334.8682677165353994 Td
+(9. Migrations and Deployment Checklist) Tj
 ET
 BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 150.8033858267716596 Td
-(   - Serverless Resilience sa Vercel at Supabase Cloud. Kapag nagkaroon ng outage, ang mobile app ay may Offline Caching &) Tj
-T* (Queue System \(use-offline-reports.ts\).) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 312.1911023622046741 Td
+(- Run the full Drizzle journal in order; ensure dispatch-offer expiry migration 0016 is registered in the migration) Tj
+T* (journal.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 124.1577165354329964 Td
-(• Is there a backup and recovery plan?) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 284.0147244094488315 Td
+(- Apply database functions, RLS/RBAC, realtime publication setup, logging triggers, spatial/barangay boundary) Tj
+T* (setup, and storage policies.) Tj
 ET
 BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 109.4175590551180903 Td
-(   - Oo. Ang natapos na PCR at Trip Ticket ay nase-save sa local storage ng cellphone \(disas_trace_drafts.json\) habang offline, at) Tj
-T* (may 5-Minute Recurring System Reminder na nag-aalerto sa responder kapag nagkaroon uli ng internet connection.) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 255.8383464566928751 Td
+(- Configure Supabase Cron/pg_net to call the protected expiry engine every five seconds with its server secret.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 82.7718897637795408 Td
-(• How often are backups performed?) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 240.0493700787401394 Td
+(- Configure textbee.dev, Expo Push/FCM, Supabase Auth redirect URLs, disastrace://reset-password, and) Tj
+T* (production APP_URL.) Tj
 ET
 BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 68.0317322834646347 Td
-(   - Automated daily full database snapshots at continuous Write-Ahead Logging \(WAL\) replication.) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 211.8729921259842968 Td
+(- Initialize system settings, guest limit, deduplication radius, hospitals, and official barangay data.) Tj
 ET
-39.6850393700787407 34.0157480314960665 m
-555.5949606299211609 34.0157480314960665 l
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 196.0840157480315611 Td
+(- Verify one-device session behavior, guest phone/device quotas, location integrity, dispatch recovery, chatbot) Tj
+T* (contract, and Baliwag barangay resolution using the repository scripts before release.) Tj
+ET
+BT
+/F2 11.5 Tf
+13.2249999999999996 TL
+0.145 0.388 0.922 rg
+45.354330708661422 167.9076377952756047 Td
+(Useful verification commands) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 150.899763779527575 Td
+(- npx tsc --noEmit) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 135.1107874015748394 Td
+(- npx tsx scripts/verify-chatbot-contract.ts) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 119.3218110236221037 Td
+(- npx tsx scripts/verify-dispatch-recovery.ts) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 103.532834645669368 Td
+(- npx tsx scripts/verify-guest-phone-limit.ts) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 87.7438582677166323 Td
+(- npx tsx scripts/verify-location-integrity.ts) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+56.6929133858267775 71.9548818897638967 Td
+(- npx tsx scripts/verify-baliwag-barangays.ts) Tj
+ET
+0.8 0.84 0.88 RG
+42.5196850393700814 34.0159842519683977 m
+552.7559055118110791 34.0159842519683977 l
 S
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-0.612 0.639 0.686 rg
-39.6850393700787407 19.8425196850394059 Td
-(CDRRMO Baliwag City - DisasTRACE Technical Documentation & Developer Defense Q&A) Tj
+/F1 7.5 Tf
+8.625 TL
+0.294 0.333 0.388 rg
+42.5196850393700814 17.0081102362203183 Td
+(DisasTRACE | 11 September 2026) Tj
 ET
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-0.612 0.639 0.686 rg
-498.9020472440944332 19.8425196850394059 Td
-(Page 3 of 4) Tj
+/F1 7.5 Tf
+8.625 TL
+0.294 0.333 0.388 rg
+529.2059055118110109 17.0081102362203183 Td
+(Page 3) Tj
 ET
 endstream
 endobj
@@ -956,119 +746,74 @@ endobj
 endobj
 10 0 obj
 <<
-/Length 2673
+/Length 1849
 >>
 stream
-0.5670000000000001 w
-0.82 0.84 0.86 RG
+2.8346456692913389 w
+0.8 0.84 0.88 RG
 0.12 0.23 0.54 rg
-0. 841.8899999999999864 595.2799999999999727 -62.3622047244094517 re
+0. 841.8899999999999864 595.2755905511811534 -53.8582677165354369 re
 f
-0.94 0.27 0.27 rg
-0. 779.5277952755905062 595.2799999999999727 -4.2519685039370083 re
+0.86 0.15 0.15 rg
+0. 788.0317322834645211 595.2755905511811534 -3.9685039370078741 re
 f
 BT
-/F2 11 Tf
-12.6499999999999986 TL
-1. g
-39.6850393700787407 810.7088976377953031 Td
-(CDRRMO BALIWAG CITY | DISASTRACE SYSTEM) Tj
-ET
-BT
-/F1 9 Tf
+/F2 9 Tf
 10.3499999999999996 TL
 1. g
-39.6850393700787407 793.7010236220472734 Td
-(TECHNICAL DOCUMENTATION & DEVELOPER DEFENSE Q&A \(FOR-DEV\)) Tj
+42.5196850393700814 807.8742519685039269 Td
+(CDRRMO BALIWAG CITY | DISASTRACE) Tj
 ET
 BT
-/F1 8 Tf
-9.1999999999999993 TL
+/F2 9 Tf
+10.3499999999999996 TL
 1. g
-371.3429921259841535 793.7010236220472734 Td
-(CONFIDENTIAL / TECHNICAL SPECIFICATIONS) Tj
+56.6929133858267775 756.8506299212598378 Td
+(- npx tsx scripts/audit-database-migrations.ts) Tj
 ET
 BT
-/F2 9.5 Tf
+/F2 16 Tf
+18.3999999999999986 TL
+0.118 0.227 0.541 rg
+42.5196850393700814 741.0616535433071022 Td
+(10. Resolved Questions and Non-Goals) Tj
+ET
+BT
+/F1 9.5 Tf
 10.9249999999999989 TL
 0.122 0.161 0.216 rg
-45.354330708661422 756.8506299212598378 Td
-([General Security Practices]) Tj
+45.354330708661422 718.3844881889763201 Td
+(Resolved: PACC is triage/dispatch only; CDRRMO Super Admin owns approvals. Guest intake is accountless and) Tj
+T* (scoped. Automatic dispatch is FIFO and recoverable. Multi-ambulance tracking is supported. PCR/DTT signatures and) Tj
+T* (offline drafts are supported. Official polygons, server-side deduplication, one-device sessions, and quota hashes are) Tj
+T* (authoritative.) Tj
 ET
 BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 738.42543307086612 Td
-(• How are software updates managed?) Tj
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.122 0.161 0.216 rg
+45.354330708661422 663.1655905511811397 Td
+(Non-goals: iOS, billing, predictive emergency detection, fully automated fire/flood/police response, employee) Tj
+T* (performance monitoring, and guaranteed push delivery after Android has killed the app. Play Integrity remains a planned) Tj
+T* (hardening step, not a claimed current capability.) Tj
 ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 723.6852755905511003 Td
-(   - Git version control at CI/CD deployment pipelines sa Vercel.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 708.9451181102361943 Td
-(• Are security patches applied regularly?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 694.2049606299211746 Td
-(   - Oo. Regular na ina-update ang packages at sinusuri gamit ang npm audit.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 679.4648031496062686 Td
-(• Has the system been tested for vulnerabilities?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 664.7246456692912489 Td
-(   - Oo. Na-test ang system laban sa SQL Injection & XSS \(Zod & Drizzle ORM\), Unauthorized Route Access \(RBAC\), at Offline) Tj
-T* (Data Integrity.) Tj
-ET
-BT
-/F2 8.5 Tf
-9.7749999999999986 TL
-0.118 0.227 0.541 rg
-51.0236220472441033 638.0789763779526993 Td
-(• What cybersecurity standards or best practices are followed?) Tj
-ET
-BT
-/F1 8.5 Tf
-9.7749999999999986 TL
-0.216 0.255 0.318 rg
-51.0236220472441033 623.3388188976376796 Td
-(   - OWASP Top 10 Security Guidelines, HTTPS / TLS 1.3 Encryption, REST API Bearer Token Authentication \(JWT\), at) Tj
-T* (Environment Variables Secrecy.) Tj
-ET
-39.6850393700787407 34.0157480314960665 m
-555.5949606299211609 34.0157480314960665 l
+0.8 0.84 0.88 RG
+42.5196850393700814 34.0159842519683977 m
+552.7559055118110791 34.0159842519683977 l
 S
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-0.612 0.639 0.686 rg
-39.6850393700787407 19.8425196850394059 Td
-(CDRRMO Baliwag City - DisasTRACE Technical Documentation & Developer Defense Q&A) Tj
+/F1 7.5 Tf
+8.625 TL
+0.294 0.333 0.388 rg
+42.5196850393700814 17.0081102362203183 Td
+(DisasTRACE | 11 September 2026) Tj
 ET
 BT
-/F1 8 Tf
-9.1999999999999993 TL
-0.612 0.639 0.686 rg
-498.9020472440944332 19.8425196850394059 Td
-(Page 4 of 4) Tj
+/F1 7.5 Tf
+8.625 TL
+0.294 0.333 0.388 rg
+529.2059055118110109 17.0081102362203183 Td
+(Page 4) Tj
 ET
 endstream
 endobj
@@ -1242,7 +987,11 @@ endobj
 25 0 obj
 <<
 /Producer (jsPDF 4.2.1)
-/CreationDate (D:20260726234351+08'00')
+/Title (FOR DEV - ANSWERED)
+/Subject (Implementation decisions, contracts, deployment requirements, and known follow-ups)
+/Author (DisasTRACE)
+/Creator (DisasTRACE documentation generator)
+/CreationDate (D:20260911223435+08'00')
 >>
 endobj
 26 0 obj
@@ -1256,197 +1005,39 @@ endobj
 xref
 0 27
 0000000000 65535 f 
-0000026899 00000 n 
-0000028739 00000 n 
+0000023973 00000 n 
+0000025813 00000 n 
 0000000015 00000 n 
 0000000152 00000 n 
-0000007863 00000 n 
-0000008000 00000 n 
-0000015798 00000 n 
-0000015935 00000 n 
-0000024035 00000 n 
-0000024173 00000 n 
-0000026974 00000 n 
-0000027100 00000 n 
-0000027231 00000 n 
-0000027365 00000 n 
-0000027503 00000 n 
-0000027627 00000 n 
-0000027756 00000 n 
-0000027888 00000 n 
-0000028024 00000 n 
-0000028152 00000 n 
-0000028279 00000 n 
-0000028408 00000 n 
-0000028541 00000 n 
-0000028643 00000 n 
-0000028992 00000 n 
-0000029078 00000 n 
+0000006684 00000 n 
+0000006821 00000 n 
+0000013706 00000 n 
+0000013843 00000 n 
+0000021933 00000 n 
+0000022071 00000 n 
+0000024048 00000 n 
+0000024174 00000 n 
+0000024305 00000 n 
+0000024439 00000 n 
+0000024577 00000 n 
+0000024701 00000 n 
+0000024830 00000 n 
+0000024962 00000 n 
+0000025098 00000 n 
+0000025226 00000 n 
+0000025353 00000 n 
+0000025482 00000 n 
+0000025615 00000 n 
+0000025717 00000 n 
+0000026066 00000 n 
+0000026341 00000 n 
 trailer
 <<
 /Size 27
 /Root 26 0 R
 /Info 25 0 R
-/ID [ <ADA687D187489105E4C7B44826D4B86A> <ADA687D187489105E4C7B44826D4B86A> ]
+/ID [ <704639507F768A1068EA8AF08D0284FC> <704639507F768A1068EA8AF08D0284FC> ]
 >>
 startxref
-29182
-%%EOF1 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R 5 0 R 7 0 R 9 0 R 28 0 R ]
-/Count 5
->>
-endobj
-27 0 obj
-<< /Length 2635 >>
-stream
-0.567 w
-0.12 0.23 0.54 rg
-0 841.89 595.28 -62.36 re
-f
-0.94 0.27 0.27 rg
-0 779.53 595.28 -4.25 re
-f
-BT
-/F2 11 Tf
-1 g
-39.69 810.71 Td
-(CDRRMO BALIWAG CITY | DISASTRACE FEATURE UPDATE) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.23 0.54 rg
-39.69 758 Td
-(2026 ANSWERED FEATURE UPDATE) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 735.00 Td
-(Q: Can Guest Mode be abused by changing the phone number?) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 716.00 Td
-(A: The server now applies the configurable lifetime allowance to both normalized phone and Android device digest.) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 697.00 Td
-(The raw device identifier is not stored. A same-device phone change cannot reset the normal app quota.) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 678.00 Td
-(Q: Are fake numbers blocked?) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 659.00 Td
-(A: Obvious repeated, repeated-block, and complete ascending or descending sequences are rejected client-side and server-side.) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 640.00 Td
-(Q: Can a responder receive an offer while the app is backgrounded?) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 621.00 Td
-(A: Expo Push/FCM delivers the offer and expiry notification; the server remains the authority.) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 602.00 Td
-(Q: What happens when the acceptance timer expires?) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 583.00 Td
-(A: The cron scheduler releases the offer, notifies the original responder, and routes the incident for reassignment or PACC action.) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 564.00 Td
-(Q: Can two reports race for one responder?) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 545.00 Td
-(A: FIFO queue selection and atomic responder reservation ensure the earliest eligible emergency wins.) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 526.00 Td
-(Q: What happens after a responder accepts?) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 507.00 Td
-(A: The reporter status API exposes the assigned responder and tracking remains available for registered and guest users.) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 488.00 Td
-(Q: What security remains to be added?) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 469.00 Td
-(A: Device IDs are an abuse signal, not hardware attestation. Add Google Play Integrity for modified-client resistance.) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 450.00 Td
-(Q: What must be verified before release?) Tj
-ET
-BT
-/F1 8.5 Tf
-0.12 0.16 0.22 rg
-45.35 431.00 Td
-(A: Run migrations and schema audit, verify cron executions, test background push on a release APK, and test stale-offer rejection.) Tj
-ET
-endstream
-endobj
-28 0 obj
-<<
-/Type /Page
-/Parent 1 0 R
-/Resources 2 0 R
-/MediaBox [0 0 595.28 841.89]
-/Contents 27 0 R
->>
-endobj
-xref
-1 1
-0000029880 00000 n 
-27 2
-0000029963 00000 n 
-0000032650 00000 n 
-trailer
-<<
-/Size 29
-/Root 26 0 R
-/Info 25 0 R
-/ID [ <ADA687D187489105E4C7B44826D4B86A> <ADA687D187489105E4C7B44826D4B86A> ]
-/Prev 29182
->>
-startxref
-32762
+26445
 %%EOF

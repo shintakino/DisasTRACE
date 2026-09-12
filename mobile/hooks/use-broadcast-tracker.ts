@@ -74,6 +74,7 @@ export function useBroadcastTracker(
 ) {
   const lastDbUpdateRef = useRef<number>(0);
   const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const lastTransportContextRef = useRef<string | null>(null);
 
   const statusRef = useRef(responderStatus);
   const targetHospitalRef = useRef(targetHospital);
@@ -253,6 +254,9 @@ export function useBroadcastTracker(
           const now = Date.now();
           const lastUpdate = lastDbUpdateRef.current;
           const lastLoc = lastDbLocationRef.current;
+          const transportContext = statusRef.current === 'to_hospital'
+            ? `to_hospital:${targetHospitalRef.current?.id || ''}`
+            : null;
           
           let shouldUpdateDb = false;
           if (!lastLoc || lastUpdate === 0) {
@@ -265,7 +269,7 @@ export function useBroadcastTracker(
               lat,
               lng
             );
-            if (secondsElapsed >= 30 || distanceMoved >= 50) {
+            if (secondsElapsed >= 30 || distanceMoved >= 50 || transportContext !== lastTransportContextRef.current) {
               shouldUpdateDb = true;
             }
           }
@@ -273,6 +277,7 @@ export function useBroadcastTracker(
           if (shouldUpdateDb) {
             lastDbUpdateRef.current = now;
             lastDbLocationRef.current = { latitude: lat, longitude: lng };
+            lastTransportContextRef.current = transportContext;
 
             const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
             const { data: { session } } = await supabase.auth.getSession();
@@ -295,7 +300,12 @@ export function useBroadcastTracker(
                   type: 'TELEMETRY_SYNC',
                   endpoint: '/api/responder/location',
                   method: 'POST',
-                  payload: { latitude: lat, longitude: lng }
+                  payload: {
+                    latitude: lat,
+                    longitude: lng,
+                    responderStatus: statusRef.current,
+                    targetHospitalId: targetHospitalRef.current?.id ?? null,
+                  }
                 });
                 return;
               }
@@ -306,7 +316,9 @@ export function useBroadcastTracker(
                   headers: reqHeaders,
                   body: JSON.stringify({
                     latitude: lat,
-                    longitude: lng
+                    longitude: lng,
+                    responderStatus: statusRef.current,
+                    targetHospitalId: targetHospitalRef.current?.id ?? null,
                   })
                 });
                 if (!response.ok) {
@@ -318,7 +330,12 @@ export function useBroadcastTracker(
                   type: 'TELEMETRY_SYNC',
                   endpoint: '/api/responder/location',
                   method: 'POST',
-                  payload: { latitude: lat, longitude: lng }
+                  payload: {
+                    latitude: lat,
+                    longitude: lng,
+                    responderStatus: statusRef.current,
+                    targetHospitalId: targetHospitalRef.current?.id ?? null,
+                  }
                 });
               }
             };
@@ -365,6 +382,9 @@ export function useBroadcastTracker(
 
           lastDbUpdateRef.current = Date.now();
           lastDbLocationRef.current = { latitude: lat, longitude: lng };
+          lastTransportContextRef.current = responderStatus === 'to_hospital'
+            ? `to_hospital:${targetHospital?.id || ''}`
+            : null;
 
           const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
           const { data: { session } } = await supabase.auth.getSession();
@@ -387,7 +407,12 @@ export function useBroadcastTracker(
                 type: 'TELEMETRY_SYNC',
                 endpoint: '/api/responder/location',
                 method: 'POST',
-                payload: { latitude: lat, longitude: lng }
+                payload: {
+                  latitude: lat,
+                  longitude: lng,
+                  responderStatus,
+                  targetHospitalId: targetHospital?.id ?? null,
+                }
               });
               return;
             }
@@ -398,7 +423,9 @@ export function useBroadcastTracker(
                 headers: reqHeaders,
                 body: JSON.stringify({
                   latitude: lat,
-                  longitude: lng
+                  longitude: lng,
+                  responderStatus,
+                  targetHospitalId: targetHospital?.id ?? null,
                 })
               });
               if (!response.ok) {
@@ -410,7 +437,12 @@ export function useBroadcastTracker(
                 type: 'TELEMETRY_SYNC',
                 endpoint: '/api/responder/location',
                 method: 'POST',
-                payload: { latitude: lat, longitude: lng }
+                payload: {
+                  latitude: lat,
+                  longitude: lng,
+                  responderStatus,
+                  targetHospitalId: targetHospital?.id ?? null,
+                }
               });
             }
           };

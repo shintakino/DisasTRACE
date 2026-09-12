@@ -1,6 +1,7 @@
 import { pgTable, text, varchar, timestamp, integer, uuid } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { verificationRequests } from './verification_requests';
+import { hospitals } from './hospitals';
 
 export const incidents = pgTable('incidents', {
   id: varchar('id', { length: 255 }).primaryKey(), // Server-generated UUID
@@ -9,6 +10,9 @@ export const incidents = pgTable('incidents', {
   status: text('status', { enum: ['DISPATCHED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED'] }).default('DISPATCHED').notNull(),
   assignedAmbulance: varchar('assigned_ambulance', { length: 50 }),
   etaMinutes: integer('eta_minutes'),
+  transportStatus: text('transport_status', { enum: ['NONE', 'TO_HOSPITAL'] }).default('NONE').notNull(),
+  transportHospitalId: varchar('transport_hospital_id', { length: 50 }).references(() => hospitals.id),
+  transportStartedAt: timestamp('transport_started_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   

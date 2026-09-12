@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
+import { incidents } from "@/db/schema/incidents";
+import { hospitals } from "@/db/schema/hospitals";
 import { auditLogs } from "@/db/schema/audit_logs";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
@@ -13,6 +15,8 @@ const LocationSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   isMockedLocation: z.boolean().optional().default(false),
+  responderStatus: z.enum(['en_route', 'on_scene', 'to_hospital', 'report_filling']).optional(),
+  targetHospitalId: z.string().min(1).max(50).optional().nullable(),
 });
 
 async function recordLocationIntegrityEvent(input: {
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid parameters", details: result.error.format() }, { status: 400 });
     }
 
-    const { latitude, longitude, isMockedLocation } = result.data;
+    const { latitude, longitude, isMockedLocation, responderStatus, targetHospitalId } = result.data;
 
     if (isMockedLocation) {
       await recordLocationIntegrityEvent({
@@ -115,6 +119,33 @@ export async function POST(req: NextRequest) {
         locationGeom: sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)`,
       })
       .where(eq(users.id, user.id));
+
+    // A transport destination must survive responder/public app backgrounding.
+    // Location heartbeats are the authenticated responder channel already used
+    // during the trip, so persist only the active responder's transport context.
+    if (responderStatus === 'to_hospital') {
+      const activeIncident = await db.query.incidents.findFirst({
+        where: and(eq(incidents.responderId, user.id), sql`${incidents.status} <> 'RESOLVED'`),
+      });
+      if (activeIncident) {
+        let hospitalId: string | null = null;
+        if (targetHospitalId) {
+          const hospital = await db.query.hospitals.findFirst({
+            where: eq(hospitals.id, targetHospitalId),
+            columns: { id: true },
+          });
+          if (hospital) hospitalId = hospital.id;
+        }
+
+        await db.update(incidents)
+          .set({
+            transportStatus: 'TO_HOSPITAL',
+            ...(hospitalId ? { transportHospitalId: hospitalId } : {}),
+            transportStartedAt: activeIncident.transportStartedAt ?? observedAt,
+          })
+          .where(eq(incidents.id, activeIncident.id));
+      }
+    }
 
     if (dbUser.dutyStatus === 'ON_DUTY') {
       await retryPendingAutomaticDispatches();

@@ -113,7 +113,7 @@ export function useMapData() {
     const supabase = createClientBrowser();
     const channels = activeDispatchKey.split(":").map((incidentId) => (
       supabase
-        .channel(`map-telemetry-${incidentId}`)
+        .channel(`telemetry:${incidentId}`)
         .on("broadcast", { event: "telemetry" }, ({ payload }) => {
           const telemetry = TelemetryPayloadSchema.safeParse(payload);
           if (!telemetry.success) return;

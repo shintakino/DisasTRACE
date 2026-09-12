@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { incidents } from '@/db/schema/incidents';
 import { users } from '@/db/schema/users';
+import { hospitals } from '@/db/schema/hospitals';
 import { createClient } from '@/lib/supabase-server';
 import { cascadeIncident } from '@/lib/dispatch-engine';
 import { requiresPaccReassignment } from '@/lib/dispatch-policy';
@@ -52,6 +53,12 @@ export async function GET(request: NextRequest) {
       columns: { id: true, fullName: true, lastLatitude: true, lastLongitude: true },
     })
     : null;
+  const transportHospital = incident?.transportHospitalId
+    ? await db.query.hospitals.findFirst({
+      where: eq(hospitals.id, incident.transportHospitalId),
+      columns: { id: true, name: true, lat: true, lng: true },
+    })
+    : null;
   const agencies = report.coordinationAgencies;
   const coordinationText = agencies.length > 0
     ? `Coordinating with ${agencies.length === 1 ? agencies[0] : `${agencies.slice(0, -1).join(', ')} and ${agencies.at(-1)}`}.`
@@ -64,6 +71,8 @@ export async function GET(request: NextRequest) {
         ? `${coordinationText ? `${coordinationText} ` : ''}PACC is arranging another available responder. Please remain available for updates.`
       : incident?.status === 'RESOLVED'
         ? 'Response coordination for this incident has been completed.'
+        : incident?.transportStatus === 'TO_HOSPITAL'
+          ? `${coordinationText ? `${coordinationText} ` : ''}Responder is transporting the patient to the selected hospital.`
         : incident?.status === 'ARRIVED'
           ? 'Responders have arrived at your location.'
           : incident?.status === 'EN_ROUTE' || incident?.responderId
@@ -81,6 +90,16 @@ export async function GET(request: NextRequest) {
       responseStatus,
       incident,
       responder,
+      transport: {
+        status: incident?.transportStatus ?? 'NONE',
+        hospital: transportHospital
+          ? {
+            id: transportHospital.id,
+            name: transportHospital.name,
+            coordinates: { latitude: transportHospital.lat, longitude: transportHospital.lng },
+          }
+          : null,
+      },
       trackingRequestId,
       isMergedDuplicate: trackingRequestId !== report.id,
       requiresPaccReassignment: needsPaccReassignment,

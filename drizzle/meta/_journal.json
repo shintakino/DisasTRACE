@@ -57,8 +57,8 @@
       "when": 1782119451864,
       "tag": "0007_furry_riptide",
       "breakpoints": true
-    }
-    ,{
+    },
+    {
       "idx": 8,
       "version": "7",
       "when": 1786464000000,
@@ -133,6 +133,13 @@
       "version": "7",
       "when": 1789516800000,
       "tag": "0018_guest_device_report_limit",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789603200000,
+      "tag": "0019_persist_transport_destination",
       "breakpoints": true
     }
   ]

@@ -5,9 +5,8 @@ import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
 import { sendDispatchOfferExpiredPush, sendDispatchOfferPush } from "@/lib/push-notifications";
-import { asc, eq, and, or, sql, isNull, gte } from "drizzle-orm";
+import { asc, eq, and, or, sql, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import {
-  canClaimAutomaticDispatchTurn,
   canCascadeDispatchOffer,
   RESPONDER_HEARTBEAT_FRESHNESS_MS,
   shouldRetryAutomaticDispatch,
@@ -205,25 +204,6 @@ export async function autoDispatchIncident(
     //    UPDATE ... WHERE dutyStatus = 'ON_DUTY' — only one concurrent transaction
     //    can succeed per responder row.
     const result = await db.transaction(async (tx) => {
-      // Automatic dispatch is first-in, first-out. An older confirmed emergency
-      // keeps its turn while its responder offer is live; a later request may
-      // not claim an available unit merely because its API call won a race.
-      const [queueHead] = await tx
-        .select({ id: verificationRequests.id })
-        .from(verificationRequests)
-        .where(and(
-          eq(verificationRequests.status, 'PENDING'),
-          eq(verificationRequests.nature, 'EMERGENCY'),
-          eq(verificationRequests.triageClassification, 'HIGH_CONFIDENCE_EMERGENCY'),
-        ))
-        .orderBy(asc(verificationRequests.createdAt), asc(verificationRequests.id))
-        .limit(1)
-        .for('update');
-
-      if (!canClaimAutomaticDispatchTurn(queueHead?.id, requestId)) {
-        return null;
-      }
-
       // Serialize dispatch against reporter cancellation and concurrent retry.
       // Both paths lock the same verification row before inspecting incidents.
       const [lockedRequest] = await tx
@@ -336,7 +316,16 @@ export async function retryPendingAutomaticDispatches() {
         eq(verificationRequests.nature, 'EMERGENCY'),
         eq(verificationRequests.triageClassification, 'HIGH_CONFIDENCE_EMERGENCY'),
       ),
-      orderBy: (request, { asc }) => [asc(request.createdAt), asc(request.id)],
+      orderBy: (request, { asc }) => [
+        sql`CASE ${request.severity}
+          WHEN 'Critical' THEN 4
+          WHEN 'High' THEN 3
+          WHEN 'Medium' THEN 2
+          ELSE 1
+        END DESC`,
+        asc(request.createdAt),
+        asc(request.id),
+      ],
       limit: 10,
     });
 
@@ -417,10 +406,10 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
     // The old responder is no longer allowed to accept this incident. A push
     // makes that visible even if the app is backgrounded when the server's
     // deadline, rather than the local timer, releases the offer.
-    await sendDispatchOfferExpiredPush({
+    void sendDispatchOfferExpiredPush({
       responderId: timedOutResponderId,
       incidentId: incident.id,
-    });
+    }).catch((error) => console.error('[Cascade] Failed to send expired-offer push:', error));
 
     // The cascade owns the old offer now, so the responder can receive another.
     await db.update(users)
@@ -477,6 +466,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         where: and(
           eq(users.role, "ambulance_responder"),
           eq(users.status, "ACTIVE"),
+          eq(users.verificationStatus, "APPROVED"),
           eq(users.dutyStatus, "ON_DUTY"),
           gte(users.lastLocationUpdatedAt, new Date(Date.now() - RESPONDER_HEARTBEAT_FRESHNESS_MS)),
         ),
@@ -502,6 +492,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
           and(
             eq(users.role, "ambulance_responder"),
             eq(users.status, "ACTIVE"),
+            eq(users.verificationStatus, "APPROVED"),
             eq(users.dutyStatus, "ON_DUTY"),
             gte(users.lastLocationUpdatedAt, new Date(Date.now() - RESPONDER_HEARTBEAT_FRESHNESS_MS)),
             sql`ST_DWithin(
@@ -565,7 +556,11 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
           .where(
             and(
               eq(users.id, nextResponder.id),
-              eq(users.dutyStatus, "ON_DUTY")
+              eq(users.role, "ambulance_responder"),
+              eq(users.status, "ACTIVE"),
+              eq(users.verificationStatus, "APPROVED"),
+              eq(users.dutyStatus, "ON_DUTY"),
+              gte(users.lastLocationUpdatedAt, new Date(Date.now() - RESPONDER_HEARTBEAT_FRESHNESS_MS))
             )
           )
           .returning({ id: users.id });
@@ -590,30 +585,51 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
             skippedResponderIds: updatedSkipped,
             etaMinutes: Math.max(2, Math.round(nextItem.distanceKm * 5)),
           })
-          .where(eq(incidents.id, incident.id))
+          .where(and(
+            eq(incidents.id, incident.id),
+            eq(incidents.status, 'DISPATCHED'),
+            isNull(incidents.responderId),
+            isNull(incidents.currentOfferResponderId),
+            eq(incidents.dispatchMethod, 'AUTO_1KM'),
+          ))
           .returning({ id: incidents.id, offerExpiresAt: incidents.offerExpiresAt });
 
-        console.log(`[Cascade] Successfully transmitted offer to responder ${nextResponder.fullName}.`);
-        cascaded = true;
         if (updatedOffer) {
+          console.log(`[Cascade] Successfully transmitted offer to responder ${nextResponder.fullName}.`);
+          cascaded = true;
           pushTarget = {
             responderId: nextResponder.id,
             incidentId: updatedOffer.id,
             offerExpiresAt: updatedOffer.offerExpiresAt,
           };
+        } else {
+          // A PACC/manual action won after the expired offer was claimed. Do
+          // not strand the responder reserved by this losing cascade.
+          await db.update(users)
+            .set({ dutyStatus: 'ON_DUTY' })
+            .where(and(eq(users.id, nextResponder.id), eq(users.dutyStatus, 'ACTIVE_DISPATCH')));
+          return;
         }
         break;
       }
 
-      if (pushTarget) await sendDispatchOfferPush(pushTarget);
+      if (pushTarget) {
+        void sendDispatchOfferPush(pushTarget)
+          .catch((error) => console.error('[Cascade] Failed to send next-offer push:', error));
+      }
 
       if (!cascaded) {
-        // All candidates in range were already reserved by concurrent dispatches
-        console.log(`[Cascade] All candidates within 2km already reserved for incident ${incident.id}. Reverting to PENDING.`);
-        await db.delete(incidents).where(eq(incidents.id, incident.id));
-        await db.update(verificationRequests)
-          .set({ status: "PENDING", updatedAt: new Date() })
-          .where(eq(verificationRequests.id, incident.requestId));
+        // Preserve the incident and skipped-responder record. Deleting this row
+        // made the report disappear and allowed the same responder to be
+        // offered repeatedly after a burst race.
+        console.log(`[Cascade] All candidates within 2km are reserved for incident ${incident.id}. Keeping it for PACC reassignment.`);
+        await notifyPaccAndCdrrmo({
+          title: 'Automatic Dispatch Re-assignment Required',
+          body: `No available alternate responder for Request #${request.requestId || request.id}. PACC reassignment is required.`,
+          type: 'dispatch_reassignment_required',
+          metadata: { incidentId: incident.id, requestId: incident.requestId },
+        });
+        await retryPendingAutomaticDispatches();
       }
     } else {
       // The only available responder timed out and there is no alternate unit.
@@ -642,9 +658,17 @@ export async function checkAndCascadeExpiredOffers() {
   try {
     const now = new Date();
 
-    // 1. Find all active incidents in DISPATCHED state where the offer expired
+    // Keep each scheduler pass bounded and query only offers that can actually
+    // expire. A following invocation continues the ordered backlog.
     const expiredIncidents = await db.query.incidents.findMany({
-      where: eq(incidents.status, "DISPATCHED"),
+      where: and(
+        eq(incidents.status, 'DISPATCHED'),
+        isNotNull(incidents.currentOfferResponderId),
+        isNotNull(incidents.offerExpiresAt),
+        lte(incidents.offerExpiresAt, now),
+      ),
+      orderBy: (incident, { asc }) => [asc(incident.offerExpiresAt), asc(incident.id)],
+      limit: 25,
     });
 
     for (const incident of expiredIncidents) {
@@ -667,37 +691,9 @@ export async function checkAndCascadeExpiredOffers() {
   }
 }
 
-// Background scheduler method to automatically recycle expired manual overrides back to general triage queue (Option B)
+/** @deprecated All offer expiry must use the compare-and-swap cascade path. */
 export async function checkAndRecycleManualOverrides() {
-  try {
-    const now = new Date();
-
-    const manualIncidents = await db.query.incidents.findMany({
-      where: and(
-        eq(incidents.status, "DISPATCHED"),
-        eq(incidents.dispatchMethod, "PACC_MANUAL")
-      ),
-    });
-
-    for (const incident of manualIncidents) {
-      if (incident.offerExpiresAt && incident.offerExpiresAt <= now) {
-        console.log(`Manual Override Timeout: Incident ${incident.id} was not force-dispatched by PACC dispatcher within 120 seconds. Recycling to general triage queue.`);
-
-        // 1. Delete/Resolve incident entry since we revert to triage PENDING status
-        await db.delete(incidents).where(eq(incidents.id, incident.id));
-
-        // 2. Revert request status back to PENDING so it re-enters the PACC triage queue
-        await db.update(verificationRequests)
-          .set({
-            status: "PENDING",
-            updatedAt: new Date()
-          })
-          .where(eq(verificationRequests.id, incident.requestId));
-      }
-    }
-  } catch (error) {
-    console.error("Error in checkAndRecycleManualOverrides:", error);
-  }
+  await checkAndCascadeExpiredOffers();
 }
 
 // Self-healing: detect and fix responders stuck in ACTIVE_DISPATCH with no active incident.

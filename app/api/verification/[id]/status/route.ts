@@ -8,6 +8,21 @@ import { createClient } from "@/lib/supabase-server";
 import { autoDispatchIncident } from "@/lib/dispatch-engine";
 import crypto from "crypto";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
+import { rejectVerificationRequest } from "@/lib/reject-verification-request";
+import { z } from "zod";
+
+const UpdateVerificationStatusSchema = z.object({
+  status: VerificationStatusSchema,
+  rejectionReason: z.string().max(250).optional(),
+}).superRefine((value, context) => {
+  if (value.status === 'REJECTED' && !value.rejectionReason?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['rejectionReason'],
+      message: 'A clear rejection reason is required.',
+    });
+  }
+});
 
 export async function PATCH(
   req: NextRequest,
@@ -15,10 +30,11 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const body = await req.json();
-    const { status } = body;
-
-    const validatedStatus = VerificationStatusSchema.parse(status);
+    const bodyResult = UpdateVerificationStatusSchema.safeParse(await req.json());
+    if (!bodyResult.success) {
+      return NextResponse.json({ error: "Invalid status or request data" }, { status: 400 });
+    }
+    const { status: validatedStatus, rejectionReason } = bodyResult.data;
 
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -40,56 +56,7 @@ export async function PATCH(
     }
 
     if (validatedStatus === "REJECTED") {
-      const rejection = await db.transaction(async (tx) => {
-        const [lockedRequest] = await tx
-          .select()
-          .from(verificationRequests)
-          .where(eq(verificationRequests.id, id))
-          .limit(1)
-          .for('update');
-
-        if (!lockedRequest) {
-          return { success: false as const, status: 404, error: "Request not found" };
-        }
-
-        const [lockedIncident] = await tx
-          .select()
-          .from(incidents)
-          .where(eq(incidents.requestId, id))
-          .limit(1)
-          .for('update');
-
-        const hasActiveAssignment = Boolean(
-          lockedIncident &&
-          lockedIncident.status !== "RESOLVED" &&
-          (lockedIncident.responderId || lockedIncident.currentOfferResponderId)
-        );
-        const canReject =
-          lockedRequest.status === "PENDING" ||
-          (lockedRequest.status === "VERIFIED" &&
-            lockedIncident?.dispatchMethod === "PACC_MANUAL" &&
-            !hasActiveAssignment);
-
-        if (!canReject) {
-          return {
-            success: false as const,
-            status: 409,
-            error: "Only pending or unassigned PACC-handled reports can be rejected.",
-          };
-        }
-
-        if (lockedIncident) {
-          await tx.delete(incidents).where(eq(incidents.id, lockedIncident.id));
-        }
-
-        const [updatedRequest] = await tx
-          .update(verificationRequests)
-          .set({ status: "REJECTED", updatedAt: new Date() })
-          .where(eq(verificationRequests.id, id))
-          .returning();
-
-        return { success: true as const, request: updatedRequest };
-      });
+      const rejection = await rejectVerificationRequest(id, rejectionReason);
 
       if (!rejection.success) {
         return NextResponse.json({ error: rejection.error }, { status: rejection.status });
@@ -99,6 +66,7 @@ export async function PATCH(
         success: true,
         id,
         status: rejection.request.status,
+        rejectionReason: rejection.request.rejectionReason,
         request: null,
         incident: null,
         autoDispatched: false,

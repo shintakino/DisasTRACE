@@ -1,5 +1,23 @@
 import { z } from "zod";
 
+const OptionalPhoneStringSchema = z.string().refine(
+  (value) => value === '' || /^09\d{9}$/.test(value),
+  'Phone number must contain 11 digits and start with 09',
+);
+const OptionalBloodPressureStringSchema = z.string().refine((value) => {
+  if (value === '') return true;
+  const match = /^(\d{1,3})\/(\d{1,3})$/.exec(value);
+  return Boolean(match && Number(match[1]) >= 1 && Number(match[1]) <= 300 && Number(match[2]) >= 1 && Number(match[2]) <= 300);
+}, 'Blood pressure must use the format 120/80');
+const optionalIntegerString = (min: number, max: number) => z.string().refine((value) => {
+  if (value === '') return true;
+  return /^\d+$/.test(value) && Number(value) >= min && Number(value) <= max;
+}, `Value must be a whole number from ${min} to ${max}`);
+const optionalDecimalString = (min = 0, max = 999999.99) => z.string().refine((value) => {
+  if (value === '') return true;
+  return /^\d+(?:\.\d{1,2})?$/.test(value) && Number(value) >= min && Number(value) <= max;
+}, `Value must be a number from ${min} to ${max}`);
+
 export const ReportStatusSchema = z.enum(["COMPLETED", "ONGOING", "RESPONDING"]);
 export type ReportStatus = z.infer<typeof ReportStatusSchema>;
 
@@ -85,18 +103,18 @@ export const InitialAssessmentSchema = z.object({
     status: z.string().optional().nullable(),
     breathSounds: z.string().optional().nullable(),
     oxygen: z.string().optional().nullable(),
-    lpm: z.string().optional().nullable(),
+    lpm: optionalDecimalString(0, 25).optional().nullable(),
     delivery: z.string().optional().nullable(),
   }).optional().nullable(),
 });
 
 export const VitalLogSchema = z.object({
   time: z.string().optional().nullable(),
-  bp: z.string().optional().nullable(),
-  pr: z.string().optional().nullable(),
-  o2_sat: z.string().optional().nullable(),
-  rr: z.string().optional().nullable(),
-  temp: z.string().optional().nullable(),
+  bp: OptionalBloodPressureStringSchema.optional().nullable(),
+  pr: optionalIntegerString(1, 300).optional().nullable(),
+  o2_sat: optionalIntegerString(1, 100).optional().nullable(),
+  rr: optionalIntegerString(1, 200).optional().nullable(),
+  temp: optionalDecimalString(20, 50).optional().nullable(),
   pupil: z.string().optional().nullable(),
   skin: z.string().optional().nullable(),
 });
@@ -107,7 +125,7 @@ export const PainAssessmentSchema = z.object({
   provocation: z.string().optional().nullable(),
   quality: z.string().optional().nullable(),
   radiation: z.string().optional().nullable(),
-  severity: z.string().optional().nullable(),
+  severity: optionalIntegerString(0, 10).optional().nullable(),
   time: z.string().optional().nullable(),
 });
 
@@ -150,10 +168,10 @@ export const RespondingTeamSchema = z.object({
 
 export const PatientCareReportPayloadSchema = z.object({
   id: z.string().optional().nullable(),
-  patientName: z.string(),
+  patientName: z.string().trim().min(1).max(255),
   patientAddress: z.string().optional().nullable(),
-  patientContact: z.string().optional().nullable(),
-  patientAge: z.number().optional().nullable(),
+  patientContact: OptionalPhoneStringSchema.optional().nullable(),
+  patientAge: z.number().int().min(0).max(130).optional().nullable(),
   patientGender: z.string().optional().nullable(),
   dispatchInfo: DispatchInfoSchema.optional().nullable(),
   emergencyType: EmergencyTypeSchema.optional().nullable(),
@@ -161,7 +179,7 @@ export const PatientCareReportPayloadSchema = z.object({
   initialAssessment: InitialAssessmentSchema.optional().nullable(),
   vitalsLogs: z.array(VitalLogSchema).optional().nullable(),
   painAssessment: PainAssessmentSchema.optional().nullable(),
-  gcsPoints: z.number().optional().nullable(),
+  gcsPoints: z.number().int().min(3).max(15).optional().nullable(),
   sampleHistory: SampleHistorySchema.optional().nullable(),
   traumaMarkers: z.array(z.string()).optional().nullable(),
   narrativeReport: z.string().optional().nullable(),
@@ -175,32 +193,32 @@ export const TripLogSchema = z.object({
   arrivalScene: z.string().optional().nullable(),
   departureScene: z.string().optional().nullable(),
   arrivalOffice: z.string().optional().nullable(),
-  distance: z.string().optional().nullable(),
+  distance: optionalDecimalString().optional().nullable(),
   date: z.string().optional().nullable(),
 });
 
 export const GasolineConsumedSchema = z.object({
-  balance: z.string().optional().nullable(),
-  issued: z.string().optional().nullable(),
-  purchase: z.string().optional().nullable(),
-  total: z.string().optional().nullable(),
-  deduction: z.string().optional().nullable(),
-  balanceEnd: z.string().optional().nullable(),
+  balance: optionalDecimalString().optional().nullable(),
+  issued: optionalDecimalString().optional().nullable(),
+  purchase: optionalDecimalString().optional().nullable(),
+  total: optionalDecimalString().optional().nullable(),
+  deduction: optionalDecimalString().optional().nullable(),
+  balanceEnd: optionalDecimalString().optional().nullable(),
 });
 
 export const LubricantsSchema = z.object({
-  carOil: z.string().optional().nullable(),
-  lubeOil: z.string().optional().nullable(),
-  grease: z.string().optional().nullable(),
+  carOil: optionalDecimalString().optional().nullable(),
+  lubeOil: optionalDecimalString().optional().nullable(),
+  grease: optionalDecimalString().optional().nullable(),
 });
 
 export const SpeedometerSchema = z.object({
-  beginning: z.string().optional().nullable(),
+  beginning: optionalDecimalString().optional().nullable(),
   remarks: z.string().optional().nullable(),
 });
 
 export const SignaturesSchema = z.object({
-  driverPhone: z.string().optional().nullable(),
+  driverPhone: OptionalPhoneStringSchema.optional().nullable(),
   driverSignature: z.string().optional().nullable(),
   passengerSignature: z.string().optional().nullable(),
   authorizedRepSignature: z.string().optional().nullable(),
@@ -208,9 +226,9 @@ export const SignaturesSchema = z.object({
 
 export const DriverTripTicketPayloadSchema = z.object({
   id: z.string().optional().nullable(),
-  date: z.string().optional().nullable(),
-  driverName: z.string(),
-  vehiclePlate: z.string(),
+  date: z.string().trim().min(1).max(50),
+  driverName: z.string().trim().min(1).max(255),
+  vehiclePlate: z.string().trim().min(1).max(50),
   passengerName: z.string().optional().nullable(),
   placesVisited: z.string().optional().nullable(),
   purpose: z.string().optional().nullable(),
@@ -237,8 +255,8 @@ export const DetailedIncidentReportSchema = z.object({
   crewFindings: z.string().optional(),
   natureOfCall: z.string().optional(),
   severityLevel: z.string().optional(),
-  peopleInvolved: z.number().optional(),
-  residentPeopleInvolved: z.number().optional(),
+  peopleInvolved: z.number().int().min(0).max(999).optional(),
+  residentPeopleInvolved: z.number().int().min(0).max(999).optional(),
   scenePhotos: z.array(z.string()), // URLs to Supabase Storage
   logs: z.array(
     z.object({

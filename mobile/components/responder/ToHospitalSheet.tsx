@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Info } from 'lucide-react-native';
 import { Hospital } from 'iconsax-react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
+import { isEligibleHospitalDestination } from '../../lib/hospital-destination-policy';
 
 export function ToHospitalSheet() {
   const { status, elapsedTimeSeconds, targetHospital, startReport, hospitalDistanceKm, hospitalEtaMins } = useResponderStore();
   const bottomSheetRef = useRef<BottomSheet>(null);
+  const hasEligibleDestination = isEligibleHospitalDestination(targetHospital);
 
   const snapPoints = useMemo(() => ['15%', '50%', '90%'], []);
 
@@ -43,9 +45,15 @@ export function ToHospitalSheet() {
           </View>
           <View className="ml-4 flex-1">
             <Text className="text-slate-800 font-bold text-base">
-              {targetHospital ? targetHospital.name : 'Finding hospital...'}
+              {hasEligibleDestination ? targetHospital.name : 'Destination required'}
             </Text>
-            <Text className="text-slate-500 text-xs mt-0.5">via Fastest Route</Text>
+            <Text className="text-slate-500 text-xs mt-0.5">
+              {hasEligibleDestination
+                ? targetHospital.recommended
+                  ? 'Nearest configured emergency-receiving hospital'
+                  : 'Responder-selected configured emergency-receiving hospital'
+                : 'Select an available hospital on the map'}
+            </Text>
           </View>
         </View>
 
@@ -80,14 +88,28 @@ export function ToHospitalSheet() {
 
         {/* Arrived Button */}
         <TouchableOpacity 
-          className="bg-[#1E3A8A] rounded-2xl py-4 items-center shadow-lg shadow-blue-900/20 active:bg-blue-900"
+          disabled={!hasEligibleDestination}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !hasEligibleDestination }}
+          className={`rounded-2xl py-4 items-center ${
+            hasEligibleDestination
+              ? 'bg-[#1E3A8A] shadow-lg shadow-blue-900/20 active:bg-blue-900'
+              : 'bg-slate-300'
+          }`}
           onPress={() => {
             // For now, arriving at hospital just opens the report form.
             startReport();
           }}
         >
-          <Text className="text-white font-bold text-lg">Arrived at Hospital</Text>
+          <Text className={`font-bold text-lg ${hasEligibleDestination ? 'text-white' : 'text-slate-500'}`}>
+            Arrived at Hospital
+          </Text>
         </TouchableOpacity>
+        {!hasEligibleDestination && (
+          <Text className="text-slate-500 text-xs text-center mt-2">
+            This action becomes available after an eligible destination is selected.
+          </Text>
+        )}
 
       </BottomSheetScrollView>
     </BottomSheet>

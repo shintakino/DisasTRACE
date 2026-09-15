@@ -16,10 +16,12 @@ import {
 import { useRouter } from 'expo-router';
 import { CheckCircle2, ChevronLeft, Phone, Send, ShieldAlert, UserRound, X } from 'lucide-react-native';
 import { syncChatbotReportToEmergencyStore } from '../../lib/chatbot-report-bridge';
+import { useRejectedReportRecovery } from '../../hooks/use-rejected-report-recovery';
 import { supabase } from '../../lib/supabase';
 import { askChatbot, cancelChatbotReport, ChatbotApiError, getChatbotReportStatus } from '../../services/chatbot-api';
 import { useChatbotStore } from '../../store/use-chatbot-store';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { appendGuestReportMessages, updateGuestReportHistory } from '../../lib/guest-report-history';
 
 const NAVY = '#1E3A8A';
 const BLUE = '#3B82F6';
@@ -50,14 +52,19 @@ export default function ChatbotPendingScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [actorReady, setActorReady] = useState(false);
   const refreshLock = useRef(false);
-  const rejectionHandled = useRef(false);
-  const scrollRef = useRef<ScrollView>(null);
   const activeReportId = activeReport?.id;
   const activeReporterMode = activeReport?.reporterMode;
   const activeGuestToken = activeReport?.guestAccessToken;
+  const { handleRejectedReport, hasHandledRejection } = useRejectedReportRecovery(
+    activeReporterMode === 'guest' ? 'guest' : 'registered',
+  );
+  const scrollRef = useRef<ScrollView>(null);
 
   const addMessage = (role: Message['role'], text: string) => {
     setMessages((current) => [...current, makeMessage(role, text)]);
+    if (activeReporterMode === 'guest' && activeReportId) {
+      void appendGuestReportMessages(activeReportId, [{ role, text }]);
+    }
   };
 
   const returnHome = useCallback(() => {
@@ -94,7 +101,7 @@ export default function ChatbotPendingScreen() {
   useEffect(() => {
     if (!hasHydrated || !actorReady) return;
     if (!activeReport) {
-      if (rejectionHandled.current) return;
+      if (hasHandledRejection.current) return;
       router.replace('/help/chatbot' as never);
       return;
     }
@@ -103,7 +110,7 @@ export default function ChatbotPendingScreen() {
       markActiveResponse();
       router.replace('/help/response-status' as never);
     }
-  }, [activeReport, actorReady, draft, hasHydrated, markActiveResponse, router]);
+  }, [activeReport, actorReady, draft, hasHandledRejection, hasHydrated, markActiveResponse, router]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -120,21 +127,7 @@ export default function ChatbotPendingScreen() {
         guestAccessToken: activeGuestToken,
       });
       if (status.status === 'REJECTED') {
-        if (!rejectionHandled.current) {
-          rejectionHandled.current = true;
-          const rejectedReporterMode = activeReporterMode;
-          clearReportToIdle();
-          useEmergencyReportStore.getState().resetReport();
-          Alert.alert(
-            'Report not accepted',
-            'PACC has closed this report. You can submit a new report if emergency assistance is still needed.',
-            [{
-              text: 'Start new report',
-              onPress: () => router.replace(`/help/chatbot?mode=${rejectedReporterMode === 'guest' ? 'guest' : 'resident'}` as never),
-            }],
-            { cancelable: false },
-          );
-        }
+        handleRejectedReport(status.rejectionReason);
         return;
       }
       const hasIncident = Boolean(status.incident);
@@ -146,7 +139,16 @@ export default function ChatbotPendingScreen() {
         triageClassification: status.triageClassification ?? undefined,
         hasIncident,
         isMergedDuplicate: status.isMergedDuplicate,
+        reportsRemaining: status.guestAllowance?.remaining,
       });
+      if (activeReporterMode === 'guest') {
+        void updateGuestReportHistory(activeReportId, {
+          status: status.status,
+          responseStatus: status.responseStatus,
+          rejectionReason: status.rejectionReason ?? undefined,
+          reportsRemaining: status.guestAllowance?.remaining,
+        });
+      }
       useEmergencyReportStore.getState().setDetails({
         incidentId: status.incident?.id,
         isMergedDuplicate: status.isMergedDuplicate,
@@ -163,7 +165,7 @@ export default function ChatbotPendingScreen() {
       refreshLock.current = false;
       setRefreshing(false);
     }
-  }, [activeGuestToken, activeReportId, activeReporterMode, clearReportToIdle, markActiveResponse, router, updateActiveReport]);
+  }, [activeGuestToken, activeReportId, activeReporterMode, handleRejectedReport, markActiveResponse, router, updateActiveReport]);
 
   useEffect(() => {
     if (!activeReportId) return;
@@ -293,6 +295,21 @@ export default function ChatbotPendingScreen() {
           <View style={styles.statusPill}><Text style={styles.statusPillText}>{activeReport.status}</Text></View>
         </View>
         <Text style={styles.statusText}>{activeReport.responseStatus}</Text>
+        {activeReport.reporterMode === 'guest' && activeReport.reportsRemaining !== undefined ? (
+          <View style={styles.allowanceBox}>
+            <Text style={styles.allowanceText}>
+              Guest reports remaining: {activeReport.reportsRemaining}
+            </Text>
+            <Text style={styles.allowanceHint}>
+              {activeReport.reportsRemaining <= 1
+                ? 'Create an account now so you can keep reporting after this allowance runs out.'
+                : 'Register before your Guest Mode allowance runs out.'}
+            </Text>
+            <TouchableOpacity onPress={() => router.push('/(auth)/sign-up' as never)} style={styles.registerLink}>
+              <Text style={styles.registerLinkText}>Create account</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         {refreshing ? <Text style={styles.refreshing}>Checking for updates…</Text> : null}
         {isRejected ? (
           <TouchableOpacity style={styles.removeButton} onPress={removeClosedReport}>
@@ -371,6 +388,11 @@ const styles = StyleSheet.create({
   statusPillText: { color: NAVY, fontSize: 10, fontWeight: '900' },
   statusText: { color: '#334155', fontSize: 14, lineHeight: 20, marginTop: 12 },
   refreshing: { color: '#64748B', fontSize: 11, marginTop: 7 },
+  allowanceBox: { backgroundColor: '#EFF6FF', borderRadius: 9, padding: 10, marginTop: 10 },
+  allowanceText: { color: NAVY, fontSize: 13, fontWeight: '900' },
+  allowanceHint: { color: '#475569', fontSize: 11, lineHeight: 16, marginTop: 3 },
+  registerLink: { minHeight: 36, alignSelf: 'flex-start', justifyContent: 'center' },
+  registerLinkText: { color: BLUE, fontWeight: '800', fontSize: 12 },
   cancelButton: { alignSelf: 'flex-start', minHeight: 44, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
   cancelText: { color: '#B91C1C', fontSize: 13, fontWeight: '800' },
   removeButton: { alignSelf: 'flex-start', minHeight: 44, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },

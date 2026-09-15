@@ -4,6 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, Calendar, PenTool } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SignaturePadModal } from './SignaturePadModal';
+import {
+  sanitizeDecimalInput,
+  sanitizePhoneInput,
+  validateTripTicketForm,
+} from '../../lib/responder-form-controls';
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -208,7 +213,28 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
     beginning: '', remarks: ''
   });
 
+  const tripTicketValidation = validateTripTicketForm({
+    driverName,
+    date,
+    vehiclePlate,
+    driverPhone,
+    quantities: [
+      tripLog.distance,
+      gasolineConsumed.balance,
+      gasolineConsumed.issued,
+      gasolineConsumed.purchase,
+      gasolineConsumed.total,
+      gasolineConsumed.deduction,
+      gasolineConsumed.balanceEnd,
+      lubricants.carOil,
+      lubricants.lubeOil,
+      lubricants.grease,
+      speedometer.beginning,
+    ],
+  });
+
   const handleSave = () => {
+    if (!tripTicketValidation.valid) return;
     onSave({
       date,
       driverName,
@@ -244,10 +270,23 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
             <ChevronLeft color="white" size={24} />
           </TouchableOpacity>
           <Text className="text-white text-base font-bold">{"Driver's Trip Ticket"}</Text>
-          <TouchableOpacity onPress={handleSave} className="bg-emerald-600 px-4 py-2 rounded-xl">
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={!tripTicketValidation.valid}
+            accessibilityState={{ disabled: !tripTicketValidation.valid }}
+            className={`px-4 py-2 rounded-xl ${tripTicketValidation.valid ? 'bg-emerald-600' : 'bg-slate-500 opacity-60'}`}
+          >
             <Text className="text-white font-bold text-xs">Save</Text>
           </TouchableOpacity>
         </View>
+
+        {!tripTicketValidation.valid && (
+          <View className="bg-red-50 border-b border-red-200 px-5 py-2">
+            <Text className="text-red-700 text-xs font-medium" accessibilityLiveRegion="polite">
+              {tripTicketValidation.errors[0]}
+            </Text>
+          </View>
+        )}
 
         <ScrollView
           className="flex-1 bg-slate-50"
@@ -321,15 +360,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
               <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Distance Travelled (km)</Text>
               <TextInput 
                 value={tripLog.distance} 
-                onChangeText={(val) => {
-                  let cleaned = val.replace(/[^0-9.]/g, '');
-                  const parts = cleaned.split('.');
-                  if (parts.length > 2) {
-                    cleaned = parts[0] + '.' + parts.slice(1).join('');
-                  }
-                  setTripLog({...tripLog, distance: cleaned});
-                }} 
-                keyboardType="numeric"
+                onChangeText={(val) => setTripLog({...tripLog, distance: sanitizeDecimalInput(val)})}
+                keyboardType="decimal-pad"
+                maxLength={9}
                 placeholder="15" 
                 className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" 
               />
@@ -344,15 +377,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Bal in Tank</Text>
                 <TextInput 
                   value={gasolineConsumed.balance} 
-                  onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    if (parts.length > 2) {
-                      cleaned = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    setGasolineConsumed({...gasolineConsumed, balance: cleaned});
-                  }} 
-                  keyboardType="numeric"
+                  onChangeText={(val) => setGasolineConsumed({...gasolineConsumed, balance: sanitizeDecimalInput(val)})}
+                  keyboardType="decimal-pad"
+                  maxLength={9}
                   placeholder="20" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -361,15 +388,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Issued Stock</Text>
                 <TextInput 
                   value={gasolineConsumed.issued} 
-                  onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    if (parts.length > 2) {
-                      cleaned = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    setGasolineConsumed({...gasolineConsumed, issued: cleaned});
-                  }} 
-                  keyboardType="numeric"
+                  onChangeText={(val) => setGasolineConsumed({...gasolineConsumed, issued: sanitizeDecimalInput(val)})}
+                  keyboardType="decimal-pad"
+                  maxLength={9}
                   placeholder="10" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -380,15 +401,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Purchased</Text>
                 <TextInput 
                   value={gasolineConsumed.purchase} 
-                  onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    if (parts.length > 2) {
-                      cleaned = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    setGasolineConsumed({...gasolineConsumed, purchase: cleaned});
-                  }} 
-                  keyboardType="numeric"
+                  onChangeText={(val) => setGasolineConsumed({...gasolineConsumed, purchase: sanitizeDecimalInput(val)})}
+                  keyboardType="decimal-pad"
+                  maxLength={9}
                   placeholder="0" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -397,15 +412,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Total</Text>
                 <TextInput 
                   value={gasolineConsumed.total} 
-                  onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    if (parts.length > 2) {
-                      cleaned = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    setGasolineConsumed({...gasolineConsumed, total: cleaned});
-                  }} 
-                  keyboardType="numeric"
+                  onChangeText={(val) => setGasolineConsumed({...gasolineConsumed, total: sanitizeDecimalInput(val)})}
+                  keyboardType="decimal-pad"
+                  maxLength={9}
                   placeholder="30" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -416,15 +425,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Trip Deduct</Text>
                 <TextInput 
                   value={gasolineConsumed.deduction} 
-                  onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    if (parts.length > 2) {
-                      cleaned = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    setGasolineConsumed({...gasolineConsumed, deduction: cleaned});
-                  }} 
-                  keyboardType="numeric"
+                  onChangeText={(val) => setGasolineConsumed({...gasolineConsumed, deduction: sanitizeDecimalInput(val)})}
+                  keyboardType="decimal-pad"
+                  maxLength={9}
                   placeholder="5" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -433,15 +436,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Bal End</Text>
                 <TextInput 
                   value={gasolineConsumed.balanceEnd} 
-                  onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    if (parts.length > 2) {
-                      cleaned = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    setGasolineConsumed({...gasolineConsumed, balanceEnd: cleaned});
-                  }} 
-                  keyboardType="numeric"
+                  onChangeText={(val) => setGasolineConsumed({...gasolineConsumed, balanceEnd: sanitizeDecimalInput(val)})}
+                  keyboardType="decimal-pad"
+                  maxLength={9}
                   placeholder="25" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -457,15 +454,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Car Oil (L)</Text>
                 <TextInput 
                   value={lubricants.carOil} 
-                  onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    if (parts.length > 2) {
-                      cleaned = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    setLubricants({...lubricants, carOil: cleaned});
-                  }} 
-                  keyboardType="numeric"
+                  onChangeText={(val) => setLubricants({...lubricants, carOil: sanitizeDecimalInput(val)})}
+                  keyboardType="decimal-pad"
+                  maxLength={9}
                   placeholder="0" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -474,15 +465,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Lube Oil (L)</Text>
                 <TextInput 
                   value={lubricants.lubeOil} 
-                  onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    if (parts.length > 2) {
-                      cleaned = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    setLubricants({...lubricants, lubeOil: cleaned});
-                  }} 
-                  keyboardType="numeric"
+                  onChangeText={(val) => setLubricants({...lubricants, lubeOil: sanitizeDecimalInput(val)})}
+                  keyboardType="decimal-pad"
+                  maxLength={9}
                   placeholder="0" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -491,15 +476,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Grease (kg)</Text>
                 <TextInput 
                   value={lubricants.grease} 
-                  onChangeText={(val) => {
-                    let cleaned = val.replace(/[^0-9.]/g, '');
-                    const parts = cleaned.split('.');
-                    if (parts.length > 2) {
-                      cleaned = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    setLubricants({...lubricants, grease: cleaned});
-                  }} 
-                  keyboardType="numeric"
+                  onChangeText={(val) => setLubricants({...lubricants, grease: sanitizeDecimalInput(val)})}
+                  keyboardType="decimal-pad"
+                  maxLength={9}
                   placeholder="0" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -509,15 +488,9 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
               <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Speedometer Begin Reading</Text>
               <TextInput 
                 value={speedometer.beginning} 
-                onChangeText={(val) => {
-                  let cleaned = val.replace(/[^0-9.]/g, '');
-                  const parts = cleaned.split('.');
-                  if (parts.length > 2) {
-                    cleaned = parts[0] + '.' + parts.slice(1).join('');
-                  }
-                  setSpeedometer({...speedometer, beginning: cleaned});
-                }} 
-                keyboardType="numeric"
+                onChangeText={(val) => setSpeedometer({...speedometer, beginning: sanitizeDecimalInput(val)})}
+                keyboardType="decimal-pad"
+                maxLength={9}
                 placeholder="12450" 
                 className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" 
               />
@@ -533,7 +506,14 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
           <View className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm mb-6 space-y-4">
             <View>
               <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Driver Cellphone Number</Text>
-              <TextInput value={driverPhone} onChangeText={setDriverPhone} keyboardType="phone-pad" placeholder="0917-123-4567" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
+              <TextInput
+                value={driverPhone}
+                onChangeText={(value) => setDriverPhone(sanitizePhoneInput(value))}
+                keyboardType="phone-pad"
+                maxLength={11}
+                placeholder="09171234567"
+                className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium"
+              />
             </View>
 
             {/* Driver E-Signature */}

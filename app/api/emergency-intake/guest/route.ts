@@ -57,13 +57,13 @@ export async function POST(request: NextRequest) {
     const isOwnedRetry = priorChatbotRequest?.reporterType === 'GUEST'
       && samePhilippineMobileNumber(priorChatbotRequest.contactNumber, result.data.contactNumber)
       && priorChatbotRequest.guestDeviceHash === deviceHash;
+    const settings = await db.query.systemSettings.findFirst({
+      where: eq(systemSettings.id, 'current'),
+      columns: { guestReportsPerPhoneLimit: true },
+    });
+    const guestLimit = settings?.guestReportsPerPhoneLimit ?? DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT;
     let deviceAllowanceReserved = false;
     if (!isOwnedRetry) {
-      const settings = await db.query.systemSettings.findFirst({
-        where: eq(systemSettings.id, 'current'),
-        columns: { guestReportsPerPhoneLimit: true },
-      });
-      const guestLimit = settings?.guestReportsPerPhoneLimit ?? DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT;
       const [{ total }] = await db.select({ total: count() }).from(verificationRequests).where(and(
         eq(verificationRequests.reporterType, 'GUEST'),
         inArray(verificationRequests.contactNumber, philippineMobileNumberVariants(result.data.contactNumber)),
@@ -94,6 +94,17 @@ export async function POST(request: NextRequest) {
       if (deviceAllowanceReserved) await releaseGuestDeviceAllowance(deviceHash).catch(() => undefined);
       throw error;
     }
+    const [[{ phoneUsed }], deviceQuota] = await Promise.all([
+      db.select({ phoneUsed: count() }).from(verificationRequests).where(and(
+        eq(verificationRequests.reporterType, 'GUEST'),
+        inArray(verificationRequests.contactNumber, philippineMobileNumberVariants(result.data.contactNumber)),
+      )),
+      db.query.guestDeviceReportQuotas.findFirst({
+        where: eq(guestDeviceReportQuotas.deviceHash, deviceHash),
+        columns: { reportCount: true },
+      }),
+    ]);
+    const used = Math.max(Number(phoneUsed), deviceQuota?.reportCount ?? 0);
     return NextResponse.json({
       success: true,
       request: submitted.request,
@@ -101,6 +112,11 @@ export async function POST(request: NextRequest) {
       guestAccessToken: submitted.guestAccessToken,
       autoDispatched: submitted.autoDispatched,
       replayed: submitted.replayed,
+      guestAllowance: {
+        limit: guestLimit,
+        used,
+        remaining: Math.max(0, guestLimit - used),
+      },
     }, { status: submitted.replayed ? 200 : 201 });
   } catch (error) {
     console.error('Guest emergency intake failed:', error);

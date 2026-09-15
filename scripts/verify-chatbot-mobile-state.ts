@@ -135,6 +135,27 @@ check('an interrupted submission restores as a retryable draft with the same ide
   assert.equal(restored.draft.imageUrl, 'https://example.test/evidence.jpg');
 });
 
+check('a persisted rejected report restores to idle so the reporter can submit again', () => {
+  const restored = restorePersistedChatbotState({
+    ...createInitialChatbotState('guest', 'guest'),
+    lifecycle: 'SUBMITTED_PENDING',
+    submissionId: '85cc2e14-2a93-481c-a997-dfe2f818db46',
+    activeReport: {
+      id: '85cc2e14-2a93-481c-a997-dfe2f818db46',
+      displayId: 'REQ-2026-4321',
+      reporterMode: 'guest',
+      guestAccessToken: 'b'.repeat(64),
+      status: 'REJECTED',
+      responseStatus: 'PACC rejected this report. Reason: The evidence was not clear.',
+      hasIncident: false,
+    },
+  });
+
+  assert.equal(restored.lifecycle, 'IDLE');
+  assert.equal(restored.submissionId, null);
+  assert.equal(restored.activeReport, null);
+});
+
 check('invalid persisted state fails closed to idle', () => {
   const restored = restorePersistedChatbotState({ lifecycle: 'SUBMITTED_PENDING' });
   assert.equal(restored.lifecycle, 'IDLE');

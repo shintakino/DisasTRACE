@@ -1,5 +1,31 @@
 # Progress Tracker
 
+## 2026-09-16 - Responder report management, destination safeguards, and numeric controls
+
+- Added responder report search, incident/status filters, newest/oldest sorting, bounded 15-record pagination, and reversible Active/Archived filing without deleting audit records.
+- Added deterministic nearest eligible hospital recommendation, eligible-only override, disabled precondition actions, PACC fallback guidance, exact incident binding, and server-side responder/arrival/hospital validation while preserving trusted telemetry.
+- Added shared numeric sanitization and range validation for affected-person counts, clinical measurements, PCR contacts, and trip-ticket quantities. Required Save/Submit actions now expose disabled accessibility state and concise feedback while Save Draft remains available.
+- Redacted public report projections, restricted direct report/PCR/trip-ticket database access, preserved PCR pain/GCS data, and hardened final report completion against pre-arrival submission and incorrect responder release.
+- Applied migrations `0024_fancy_cerise.sql` and `0025_responder_report_security_and_pcr_fields.sql`. Focused responder suites, existing guest/rejection/mobile recovery suites, web/mobile TypeScript, migration/RLS audits, `git diff --check`, and the Next.js production build pass.
+
+## 2026-09-15 - Guest resilience, concurrent dispatch, and automatic-arrival architecture
+
+- Approved and documented the cross-client repair contract before implementation: bounded device-local guest history, exact 11-digit callback input, visible remaining Guest Mode allowance, idempotent weak-network retries, and a single final submission action.
+- Made Unknown Cause an authoritative PACC-review classification and separated operator display priority from automatic dispatch ordering. Dispatchable reports may no longer be blocked by an older geographically ineligible request, while exhausted offers remain durable PACC reassignment work.
+- Defined server-authoritative automatic arrival as two consecutive trusted GPS readings within 75 metres with at most 50 metres horizontal accuracy, retaining authenticated manual arrival as a fallback.
+- Implemented bounded device-local Guest Report History with report tokens isolated in SecureStore, bounded intake/pending conversation transcripts, terminal reason/status updates, public-home completion routing, exact numeric callback sanitization, remaining-allowance feedback, structured validation errors (including the legacy registered form), retry-safe upload/submission/status/cancellation timeouts, serialized status polling, and one final review submission action.
+- Normalized Unknown Cause through one shared server triage policy for chatbot and direct-report APIs. Reworked the PACC list into a compact severity/reassignment/newness queue, removed the hidden 50-active-report cap, made Triage Now switch to the correct bucket, and coalesced burst Realtime refreshes.
+- Removed geographically ineligible head-of-line dispatch blocking, strengthened cascade responder eligibility and compare-and-swap protection, retained exhausted incidents for PACC instead of deleting them, and retired the destructive manual-expiry recycler. Responder report completion and release now commit together under an incident row lock; concurrent completion retries return the original report and new report/PCR/DTT identifiers use collision-resistant UUID-derived suffixes.
+- Added trusted GPS accuracy persistence and automatic `EN_ROUTE` to `ARRIVED` transition after two qualifying samples, with realtime responder UI reconciliation. Migrations `0021`–`0023` add forward-only partial uniqueness for new incident/request and responder-report relationships while retaining legacy duplicate history; the configured database migration audit is fully applied and clean.
+- Added focused regression scripts for guest intake/timeouts, initial triage, PACC priority/coalescing, dispatch recovery, and arrival geofencing. Web/mobile TypeScript checks, the Next.js production build, Android Expo export, rejected-report/mobile-state/location/deduplication regressions, and the live migration ledger/schema audit all pass.
+
+## 2026-09-15 - Rejected report lifecycle repair
+
+- Added a dedicated, required PACC rejection reason and a guarded transactional rejection service. Rejection now removes only an unassigned manual placeholder, cannot override an active or completed response, and persists the status and public feedback atomically.
+- Split the PACC verification view into active action/review queues, rejected records, and resolved Case Closed records. Rejecting a report now advances to the next active item instead of moving the operator into the rejected archive.
+- Added explicit rejected-report status, reason, recovery actions, registered-user notifications, and report-history presentation. Guest and registered mobile flows clear terminal local state and permit a fresh report instead of remaining locked on waiting or tracking screens.
+- Added migration `0020_remarkable_bushwacker.sql` and focused regression checks for queue classification, public status projection, rejection reason validation, and mobile terminal-state recovery.
+
 ## 2026-09-12 - Dispatch acceptance race and suspicious-duplicate merge repair
 
 - Moved responder offer ownership commit ahead of ETA calculation and made post-accept ETA/notification work non-fatal for the acceptance response. The server still atomically enforces the actual offer deadline; a valid last-moment acceptance no longer loses time to optional work.
@@ -679,6 +705,10 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Closed the requirements 12-15 review findings: public report detail responses now redact clinical/trip/signature/duplicate-reporter data, report completion requires an owned `ARRIVED` incident and cannot release a responder who has another unresolved call, parsed payload bounds are enforced, numeric range errors remain visible instead of being clamped into plausible measurements, and trusted GPS telemetry remains cached even when hospital context needs correction. Migration `0025_responder_report_security_and_pcr_fields.sql` persists PCR pain/GCS fields and replaces broad report/PCR/trip-ticket client access with owner/admin read-only policies; it is applied and verified in the configured database.
+- Added responder-owned report management with SQL-backed search, incident/status filters, newest/oldest sorting, 15-record pages, and reversible Active/Archived filing. Migration `0024_fancy_cerise.sql` adds the nullable archive timestamp and responder/archive/date index without deleting or hiding records from administrator audit access; it has been applied to the configured development database. The mobile responder list now uses bounded `FlatList` pages with protected Archive/Restore actions, while resident report history retains its existing behavior.
+- Restricted responder transport destinations to configured emergency-catering hospitals, with a deterministic nearest eligible recommendation and eligible manual overrides. Transport progression/report shortcuts stay disabled until a destination exists, empty eligibility directs responders to PACC, the responder store blocks client-side bypasses, and the authenticated location API independently rejects unknown, inactive, unowned, or pre-arrival transport transitions.
+- Added shared responder-form sanitizers and validators across the incident report, patient care report, and driver's trip ticket. Numeric-only fields now sanitize typed and pasted input with sensible bounds, required final actions expose concise validation feedback and disabled accessibility state, and Save Draft remains available for incomplete work. A focused regression script covers the shared control contract.
 - Updated `DEPLOYMENT_SETUP.md`, `DisasTRACE_Overall_System_Documentation.pdf`,
   and `FOR-DEV-ANSWERED.pdf` with the current migration sequence, Supabase
   Cron/pg_net setup, Expo Push/FCM deployment requirements, one-device mobile

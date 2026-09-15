@@ -6,21 +6,25 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
-import { eq, and, or, like, desc, sql, inArray, type SQL } from "drizzle-orm";
+import { eq, and, asc, count, desc, ilike, inArray, isNotNull, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import crypto from "crypto";
 import { PatientCareReportPayloadSchema, DriverTripTicketPayloadSchema } from "@/types/reports";
 import { formatOfficialBaliwagLocation, getReportLocation } from "@/lib/report-location";
+import {
+  parseResponderReportListQuery,
+  type ResponderReportListQuery,
+} from "@/lib/responder-report-management";
 
 const SubmitReportSchema = z.object({
   incidentId: z.string().uuid(),
-  description: z.string().optional(),
-  scenePhotos: z.array(z.string()).optional(),
-  participants: z.array(z.unknown()).optional(),
-  patientCareReports: z.array(PatientCareReportPayloadSchema).optional(),
+  description: z.string().trim().max(5_000).optional(),
+  scenePhotos: z.array(z.string().url().max(2_048)).max(20).optional(),
+  participants: z.array(z.unknown()).max(999).optional(),
+  patientCareReports: z.array(PatientCareReportPayloadSchema).max(999).optional(),
   driverTripTicket: DriverTripTicketPayloadSchema.optional().nullable(),
-});
+}).strict();
 
 const ReporterSourceSchema = z.enum(['all', 'registered', 'guest']).catch('all');
 
@@ -86,6 +90,7 @@ export async function GET(req: NextRequest) {
           residentName: users.fullName,
           type: verificationRequests.type,
           status: verificationRequests.status,
+          rejectionReason: verificationRequests.rejectionReason,
           createdAt: verificationRequests.createdAt,
           location: verificationRequests.locationDescription,
           barangay: verificationRequests.barangay,
@@ -106,6 +111,8 @@ export async function GET(req: NextRequest) {
         responderName: r.residentName || 'Guest Reporter',
         type: r.type,
         status: r.status, // PENDING, VERIFIED, REJECTED, DUPLICATE
+        rejectionReason: r.rejectionReason,
+        incidentStatus: null as string | null,
         date: new Date(r.createdAt).toLocaleDateString("en-US", {
           year: 'numeric',
           month: 'long',
@@ -134,6 +141,21 @@ export async function GET(req: NextRequest) {
         crewFindings: "User Submitted Report. No crew findings recorded.",
         scenePhotos: [],
       }));
+
+      if (dbRequests.length > 0) {
+        const requestIds = dbRequests.map((request) => request.id);
+        const incidentStates = await db
+          .select({ requestId: incidents.requestId, status: incidents.status })
+          .from(incidents)
+          .where(inArray(incidents.requestId, requestIds));
+        const incidentStatusByRequest = new Map(
+          incidentStates.map((incident) => [incident.requestId, incident.status]),
+        );
+        filtered = filtered.map((request) => ({
+          ...request,
+          incidentStatus: incidentStatusByRequest.get(request.id) ?? null,
+        }));
+      }
 
       if (search) {
         filtered = filtered.filter(
@@ -179,15 +201,52 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
+
+    if (userProfile.role === 'public_user') {
+      return NextResponse.json({ error: "Residents must use their report-history view." }, { status: 403 });
+    }
     if (reporterSourceCondition) {
       whereConditions.push(reporterSourceCondition);
     }
 
+    let responderQuery: ResponderReportListQuery | null = null;
+    if (userProfile.role === 'ambulance_responder') {
+      try {
+        responderQuery = parseResponderReportListQuery(searchParams);
+      } catch {
+        return NextResponse.json({ error: 'Invalid report list query parameters.' }, { status: 400 });
+      }
+
+      whereConditions.push(
+        responderQuery.archive === 'archived'
+          ? isNotNull(reports.archivedAt)
+          : isNull(reports.archivedAt),
+      );
+      if (responderQuery.status === 'completed') {
+        whereConditions.push(eq(reports.status, 'SUBMITTED'));
+      } else if (responderQuery.status === 'ongoing') {
+        whereConditions.push(eq(reports.status, 'DRAFT'));
+      }
+      if (responderQuery.type) {
+        whereConditions.push(ilike(verificationRequests.type, `%${responderQuery.type}%`));
+      }
+      if (responderQuery.search) {
+        const searchCondition = or(
+          ilike(reports.id, `%${responderQuery.search}%`),
+          ilike(verificationRequests.type, `%${responderQuery.search}%`),
+          ilike(verificationRequests.nature, `%${responderQuery.search}%`),
+          ilike(verificationRequests.barangay, `%${responderQuery.search}%`),
+        );
+        if (searchCondition) whereConditions.push(searchCondition);
+      }
+    }
+
     // Fetch reports by joining Drizzle schema tables with dynamic filters
-    const dbReports = await db
+    const reportQuery = db
       .select({
         id: reports.id,
         responderName: users.fullName,
+        vehicleId: incidents.assignedAmbulance,
         type: verificationRequests.type,
         status: reports.status,
         createdAt: reports.createdAt,
@@ -200,6 +259,7 @@ export async function GET(req: NextRequest) {
         crewFindings: reports.description,
         scenePhotos: reports.scenePhotos,
         participants: reports.participants,
+        archivedAt: reports.archivedAt,
         patientCareCount: sql<number>`(select count(*)::int from patient_care_reports where patient_care_reports.incident_id = ${reports.incidentId})`,
         verificationRequestId: verificationRequests.id,
       })
@@ -208,7 +268,27 @@ export async function GET(req: NextRequest) {
       .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
       .innerJoin(users, eq(reports.responderId, users.id))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
-      .orderBy(desc(reports.createdAt));
+      .$dynamic();
+
+    const dbReports = responderQuery
+      ? await reportQuery
+          .orderBy(
+            responderQuery.sort === 'oldest' ? asc(reports.createdAt) : desc(reports.createdAt),
+            responderQuery.sort === 'oldest' ? asc(reports.id) : desc(reports.id),
+          )
+          .limit(responderQuery.limit)
+          .offset((responderQuery.page - 1) * responderQuery.limit)
+      : await reportQuery.orderBy(desc(reports.createdAt));
+
+    const responderTotal = responderQuery
+      ? Number((await db
+          .select({ value: count() })
+          .from(reports)
+          .innerJoin(incidents, eq(reports.incidentId, incidents.id))
+          .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
+          .innerJoin(users, eq(reports.responderId, users.id))
+          .where(and(...whereConditions)))[0]?.value ?? 0)
+      : null;
 
     // Fetch duplicate requests for all fetched reports
     const primaryRequestIds = dbReports.map(r => r.verificationRequestId).filter(Boolean);
@@ -269,6 +349,7 @@ export async function GET(req: NextRequest) {
         id: r.id,
         createdAt: r.createdAt.toISOString(),
         responderName: r.responderName,
+        vehicleId: r.vehicleId,
         type: r.type,
         status: r.status === 'SUBMITTED' ? 'COMPLETED' : 'ONGOING',
         date: new Date(r.createdAt).toLocaleDateString("en-US", {
@@ -304,11 +385,13 @@ export async function GET(req: NextRequest) {
         })(),
         crewFindings: r.crewFindings || "No additional logs provided.",
         scenePhotos: Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
+        archivedAt: r.archivedAt?.toISOString() ?? null,
+        isArchived: r.archivedAt !== null,
         duplicates: duplicatesForReport,
       };
     });
 
-    if (search) {
+    if (!responderQuery && search) {
       filtered = filtered.filter(
         (r) =>
           r.responderName.toLowerCase().includes(search) ||
@@ -317,12 +400,23 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (type) {
+    if (!responderQuery && type) {
       filtered = filtered.filter((r) => r.type === type);
     }
 
-    if (status) {
+    if (!responderQuery && status) {
       filtered = filtered.filter((r) => r.status === status);
+    }
+
+    if (responderQuery) {
+      const total = responderTotal ?? 0;
+      return NextResponse.json({
+        data: filtered,
+        total,
+        page: responderQuery.page,
+        limit: responderQuery.limit,
+        totalPages: Math.max(1, Math.ceil(total / responderQuery.limit)),
+      });
     }
 
     return NextResponse.json({
@@ -359,7 +453,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid payload", details: result.error.format() }, { status: 400 });
     }
 
-    const { incidentId, description, scenePhotos, participants } = result.data;
+    const {
+      incidentId,
+      description,
+      scenePhotos,
+      participants,
+      patientCareReports: submittedPatientCareReports,
+      driverTripTicket: submittedDriverTripTicket,
+    } = result.data;
 
     // 1. Fetch incident to verify details
     const incident = await db.query.incidents.findFirst({
@@ -374,15 +475,9 @@ export async function POST(req: NextRequest) {
       where: eq(reports.incidentId, incidentId),
     });
     if (existingReport) {
-      if (existingReport.responderId === user.id) {
-        return NextResponse.json({
-          success: true,
-          report: existingReport,
-          alreadySubmitted: true,
-          message: "Incident report was already submitted.",
-        });
+      if (existingReport.responderId !== user.id) {
+        return NextResponse.json({ error: "This incident already has a submitted report." }, { status: 409 });
       }
-      return NextResponse.json({ error: "This incident already has a submitted report." }, { status: 409 });
     }
 
     if (incident.responderId !== user.id) {
@@ -392,86 +487,164 @@ export async function POST(req: NextRequest) {
       }, { status: 403 });
     }
 
-    // Generate unique Report ID
+    // Generate a collision-resistant, human-readable report suffix. The old
+    // four-digit random number was unsafe when several crews completed calls
+    // at the same time.
     const year = new Date().getFullYear();
-    const randNum = crypto.randomInt(1000, 10000);
-    const reportId = `REP-${year}-${randNum}`;
+    const reportSuffix = crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
+    const reportId = `REP-${year}-${reportSuffix}`;
 
-    // 2. Insert into reports table
-    const [newReport] = await db.insert(reports).values({
-      id: reportId,
-      incidentId,
-      responderId: user.id,
-      status: "SUBMITTED",
-      description: description || "No additional logs provided.",
-      scenePhotos: scenePhotos || [],
-      participants: participants || [],
-    }).returning();
-
-    // 2.1. Insert Patient Care Reports (if provided)
-    if (body.patientCareReports && Array.isArray(body.patientCareReports)) {
-      for (let i = 0; i < body.patientCareReports.length; i++) {
-        const pcr = body.patientCareReports[i];
-        const pcrId = `PCR-${year}-${randNum}-${i + 1}`;
-        await db.insert(patientCareReports).values({
-          id: pcrId,
-          incidentId,
-          patientName: pcr.patientName,
-          patientAddress: pcr.patientAddress ? getReportLocation(pcr.patientAddress, "N/A") : null,
-          patientContact: pcr.patientContact || null,
-          patientAge: pcr.patientAge || null,
-          patientGender: pcr.patientGender || null,
-          dispatchInfo: pcr.dispatchInfo || null,
-          emergencyType: pcr.emergencyType || null,
-          incidentInfo: pcr.incidentInfo || null,
-          initialAssessment: pcr.initialAssessment || null,
-          vitalsLogs: pcr.vitalsLogs || null,
-          sampleHistory: pcr.sampleHistory || null,
-          traumaMarkers: pcr.traumaMarkers || null,
-          narrativeReport: pcr.narrativeReport || null,
-          handoffSignatures: pcr.handoffSignatures || null,
-          liabilityRelease: pcr.liabilityRelease || null,
-          respondingTeam: pcr.respondingTeam || null,
-        });
+    // Report, clinical/trip children, incident completion, and responder
+    // release form one transaction. A failed child write cannot shrink the
+    // available responder pool permanently.
+    const completion = await db.transaction(async (tx) => {
+      const [lockedIncident] = await tx.select()
+        .from(incidents)
+        .where(eq(incidents.id, incidentId))
+        .for('update');
+      if (!lockedIncident || lockedIncident.responderId !== user.id) {
+        return { kind: 'reassigned' as const };
       }
-      console.log(`Successfully saved ${body.patientCareReports.length} patient care report(s).`);
-    }
 
-    // 2.2. Insert Driver Trip Ticket (if provided)
-    if (body.driverTripTicket) {
-      const dtt = body.driverTripTicket;
-      const dttId = `DTT-${year}-${randNum}`;
-      await db.insert(driverTripTickets).values({
-        id: dttId,
-        incidentId,
-        driverName: dtt.driverName,
-        vehiclePlate: dtt.vehiclePlate,
-        passengerName: dtt.passengerName || null,
-        placesVisited: dtt.placesVisited ? getReportLocation(dtt.placesVisited, "N/A") : null,
-        purpose: dtt.purpose || null,
-        tripLog: dtt.tripLog || null,
-        gasolineConsumed: dtt.gasolineConsumed || null,
-        lubricants: dtt.lubricants || null,
-        speedometer: dtt.speedometer || null,
-        remarks: dtt.remarks || null,
-        signatures: dtt.signatures || null,
+      // A retry that waited for another request to finish observes the report
+      // only after taking the incident lock and returns the original result.
+      const concurrentReport = await tx.query.reports.findFirst({
+        where: eq(reports.incidentId, incidentId),
       });
-      console.log(`Successfully saved driver trip ticket.`);
+      if (concurrentReport) {
+        await tx.update(incidents)
+          .set({ status: 'RESOLVED', resolvedAt: lockedIncident.resolvedAt ?? new Date() })
+          .where(eq(incidents.id, incidentId));
+        const otherActiveIncident = await tx.query.incidents.findFirst({
+          where: and(
+            eq(incidents.responderId, user.id),
+            ne(incidents.id, incidentId),
+            ne(incidents.status, 'RESOLVED'),
+          ),
+          columns: { id: true },
+        });
+        if (!otherActiveIncident) {
+          await tx.update(users)
+            .set({ dutyStatus: 'ON_DUTY' })
+            .where(and(eq(users.id, user.id), eq(users.dutyStatus, 'ACTIVE_DISPATCH')));
+        }
+        return { kind: 'existing' as const, report: concurrentReport };
+      }
+
+      if (lockedIncident.status !== 'ARRIVED') {
+        return { kind: 'not_ready' as const };
+      }
+
+      const [insertedReport] = await tx.insert(reports).values({
+        id: reportId,
+        incidentId,
+        responderId: user.id,
+        status: "SUBMITTED",
+        description: description || "No additional logs provided.",
+        scenePhotos: scenePhotos || [],
+        participants: participants || [],
+      }).returning();
+
+      // 2.1. Insert Patient Care Reports (if provided)
+      if (submittedPatientCareReports) {
+        for (let i = 0; i < submittedPatientCareReports.length; i++) {
+          const pcr = submittedPatientCareReports[i];
+          const pcrId = `PCR-${year}-${reportSuffix}-${i + 1}`;
+          await tx.insert(patientCareReports).values({
+            id: pcrId,
+            incidentId,
+            patientName: pcr.patientName,
+            patientAddress: pcr.patientAddress ? getReportLocation(pcr.patientAddress, "N/A") : null,
+            patientContact: pcr.patientContact || null,
+            patientAge: pcr.patientAge ?? null,
+            patientGender: pcr.patientGender || null,
+            dispatchInfo: pcr.dispatchInfo || null,
+            emergencyType: pcr.emergencyType || null,
+            incidentInfo: pcr.incidentInfo || null,
+            initialAssessment: pcr.initialAssessment || null,
+            vitalsLogs: pcr.vitalsLogs || null,
+            painAssessment: pcr.painAssessment || null,
+            gcsPoints: pcr.gcsPoints ?? null,
+            sampleHistory: pcr.sampleHistory || null,
+            traumaMarkers: pcr.traumaMarkers || null,
+            narrativeReport: pcr.narrativeReport || null,
+            handoffSignatures: pcr.handoffSignatures || null,
+            liabilityRelease: pcr.liabilityRelease || null,
+            respondingTeam: pcr.respondingTeam || null,
+          });
+        }
+        console.log(`Successfully saved ${submittedPatientCareReports.length} patient care report(s).`);
+      }
+
+      // 2.2. Insert Driver Trip Ticket (if provided)
+      if (submittedDriverTripTicket) {
+        const dtt = submittedDriverTripTicket;
+        const dttId = `DTT-${year}-${reportSuffix}`;
+        await tx.insert(driverTripTickets).values({
+          id: dttId,
+          incidentId,
+          driverName: dtt.driverName,
+          vehiclePlate: dtt.vehiclePlate,
+          passengerName: dtt.passengerName || null,
+          placesVisited: dtt.placesVisited ? getReportLocation(dtt.placesVisited, "N/A") : null,
+          purpose: dtt.purpose || null,
+          tripLog: dtt.tripLog || null,
+          gasolineConsumed: dtt.gasolineConsumed || null,
+          lubricants: dtt.lubricants || null,
+          speedometer: dtt.speedometer || null,
+          remarks: dtt.remarks || null,
+          signatures: dtt.signatures || null,
+        });
+        console.log(`Successfully saved driver trip ticket.`);
+      }
+
+      // 3. Update parent incident to RESOLVED and set resolvedAt
+      await tx.update(incidents)
+        .set({
+          status: "RESOLVED",
+          resolvedAt: new Date(),
+        })
+        .where(eq(incidents.id, incidentId));
+
+      // 4. Reset responder status back to ON_DUTY so they become available for new dispatches
+      const otherActiveIncident = await tx.query.incidents.findFirst({
+        where: and(
+          eq(incidents.responderId, user.id),
+          ne(incidents.id, incidentId),
+          ne(incidents.status, 'RESOLVED'),
+        ),
+        columns: { id: true },
+      });
+      if (!otherActiveIncident) {
+        await tx.update(users)
+          .set({ dutyStatus: "ON_DUTY" })
+          .where(and(eq(users.id, user.id), eq(users.dutyStatus, 'ACTIVE_DISPATCH')));
+      }
+
+      return { kind: 'created' as const, report: insertedReport };
+    });
+
+    if (completion.kind === 'reassigned') {
+      return NextResponse.json({
+        error: "This response is no longer assigned to you. It may have been reassigned to another responder.",
+        code: 'INCIDENT_REASSIGNED',
+      }, { status: 403 });
     }
-
-
-    // 3. Update parent incident to RESOLVED and set resolvedAt
-    await db.update(incidents)
-      .set({
-        status: "RESOLVED",
-        resolvedAt: new Date(),
-      })
-      .where(eq(incidents.id, incidentId));
-
-    // 4. Reset responder status back to ON_DUTY so they become available for new dispatches
-    await db.update(users)
-      .set({ dutyStatus: "ON_DUTY" })
-      .where(eq(users.id, user.id));
+    if (completion.kind === 'not_ready') {
+      return NextResponse.json({
+        error: 'Arrival at the incident scene must be confirmed before a final report can be submitted.',
+        code: 'REPORT_NOT_READY',
+      }, { status: 409 });
+    }
+    if (completion.kind === 'existing') {
+      return NextResponse.json({
+        success: true,
+        report: completion.report,
+        alreadySubmitted: true,
+        message: "Incident report was already submitted.",
+      });
+    }
+    const newReport = completion.report;
 
     // 5. Send report audit status update notification if their updates setting is enabled (defaults to true)
     const updatesEnabled = user.user_metadata?.notification_preferences?.updates !== false;

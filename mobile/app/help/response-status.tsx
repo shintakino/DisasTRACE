@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Clock3, MapPinned, Radio } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { useChatbotStore } from '../../store/use-chatbot-store';
+import { useRejectedReportRecovery } from '../../hooks/use-rejected-report-recovery';
+import { fetchWithTimeout } from '../../lib/network-timeout';
 
 interface IncidentStatus {
   status: 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'RESOLVED';
@@ -37,8 +39,9 @@ export default function EmergencyResponseStatusScreen() {
   const [recoveryState, setRecoveryState] = useState<DispatchRecoveryState>(null);
   const [loading, setLoading] = useState(true);
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
+  const { handleRejectedReport } = useRejectedReportRecovery(isGuest ? 'guest' : 'registered');
 
-  const returnToWaiting = () => {
+  const returnToWaiting = useCallback(() => {
     setIncident(null);
     useEmergencyReportStore.getState().setDetails({
       incidentId: undefined,
@@ -55,7 +58,7 @@ export default function EmergencyResponseStatusScreen() {
       return;
     }
     router.replace('/help/pending' as never);
-  };
+  }, [report.chatbotOrigin, router]);
 
   useEffect(() => {
     if (report.chatbotOrigin && incident?.status === 'RESOLVED') {
@@ -66,14 +69,17 @@ export default function EmergencyResponseStatusScreen() {
   useEffect(() => {
     if (!report.id) return;
     let mounted = true;
+    let refreshing = false;
     const requestId = report.id;
     const load = async () => {
+      if (refreshing) return;
+      refreshing = true;
       try {
         const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
         const query = new URLSearchParams({ requestId });
         const headers: Record<string, string> = {};
         if (isGuest && report.guestAccessToken) {
-          query.set('accessToken', report.guestAccessToken);
+          headers['X-Guest-Report-Token'] = report.guestAccessToken;
         } else {
           const { data: { session } } = await supabase.auth.getSession();
           if (!session?.access_token) return;
@@ -83,9 +89,20 @@ export default function EmergencyResponseStatusScreen() {
         // Use the scoped server status endpoint for both reporter types. It
         // remains reliable when mobile realtime is suspended during a PACC
         // coordination update or a responder accepts from a push notification.
-        const response = await fetch(`${apiUrl}/emergency-intake/status?${query.toString()}`, { headers });
+        const response = await fetchWithTimeout(
+          `${apiUrl}/emergency-intake/status?${query.toString()}`,
+          { headers },
+          10_000,
+          'Response status refresh',
+        );
         const result = await response.json().catch(() => null);
         if (!mounted || !response.ok || !result?.data) return;
+
+        if (result.data.status === 'REJECTED') {
+          mounted = false;
+          handleRejectedReport(result.data.rejectionReason);
+          return;
+        }
 
         const remoteIncident = result.data.incident as { id: string; status: IncidentStatus['status']; responderId?: string | null; responder_id?: string | null } | null;
         const nextIncident = remoteIncident ? {
@@ -106,6 +123,7 @@ export default function EmergencyResponseStatusScreen() {
       } catch (error) {
         console.error('[ResponseStatus] Failed to refresh response status:', error);
       } finally {
+        refreshing = false;
         if (mounted) setLoading(false);
       }
     };
@@ -115,7 +133,7 @@ export default function EmergencyResponseStatusScreen() {
       mounted = false;
       clearInterval(interval);
     };
-  }, [isGuest, report.guestAccessToken, report.id]);
+  }, [handleRejectedReport, isGuest, report.guestAccessToken, report.id, returnToWaiting]);
 
   const message = useMemo(() => messageFor(incident, agencies, recoveryState), [agencies, incident, recoveryState]);
   return <View style={styles.page}>

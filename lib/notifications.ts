@@ -5,6 +5,7 @@ import crypto from "crypto";
 export type NotificationType =
   | "new_incident"
   | "incident_verified"
+  | "incident_rejected"
   | "ambulance_dispatched"
   | "responder_arrived"
   | "incident_resolved"
@@ -20,7 +21,7 @@ export async function createNotification(
   type: NotificationType,
   title: string,
   body: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ) {
   try {
     const id = crypto.randomUUID();

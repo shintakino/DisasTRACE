@@ -6,6 +6,8 @@ import { TransmissionLoader } from '../../components/help/TransmissionLoader';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
 import { signOutFromMobile } from '../../lib/mobile-auth';
+import { useRejectedReportRecovery } from '../../hooks/use-rejected-report-recovery';
+import { fetchWithTimeout } from '../../lib/network-timeout';
 import * as Haptics from 'expo-haptics';
 
 export default function PendingScreen() {
@@ -23,6 +25,7 @@ export default function PendingScreen() {
   const hasRoutedToResponseStatus = useRef(false);
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
   const homeRoute = isGuest ? '/' : '/(tabs)/index';
+  const { handleRejectedReport } = useRejectedReportRecovery(isGuest ? 'guest' : 'registered');
 
   // Reconcile through the server every few seconds. Realtime subscriptions are
   // useful for immediacy but Android may suspend them while the app is in the
@@ -31,23 +34,37 @@ export default function PendingScreen() {
     const requestId = report.id;
     if (!requestId) return;
     let active = true;
+    let refreshing = false;
     const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
 
     const refreshDispatchState = async () => {
+      if (refreshing) return;
+      refreshing = true;
       try {
         const params = new URLSearchParams({ requestId });
         const headers: Record<string, string> = {};
         if (isGuest && report.guestAccessToken) {
-          params.set('accessToken', report.guestAccessToken);
+          headers['X-Guest-Report-Token'] = report.guestAccessToken;
         } else {
           const { data: { session } } = await supabase.auth.getSession();
           if (!session?.access_token) return;
           headers.Authorization = `Bearer ${session.access_token}`;
         }
 
-        const response = await fetch(`${apiUrl}/emergency-intake/status?${params.toString()}`, { headers });
+        const response = await fetchWithTimeout(
+          `${apiUrl}/emergency-intake/status?${params.toString()}`,
+          { headers },
+          10_000,
+          'Report dispatch refresh',
+        );
         const result = response.ok ? await response.json() : null;
         if (!active || !result?.data) return;
+
+        if (result.data.status === 'REJECTED') {
+          active = false;
+          handleRejectedReport(result.data.rejectionReason);
+          return;
+        }
 
         const incident = result.data.incident as { id: string; responderId?: string | null; responder_id?: string | null } | null;
         if (incident) {
@@ -75,6 +92,8 @@ export default function PendingScreen() {
         }
       } catch (error) {
         console.error('[PendingScreen] Server dispatch reconciliation failed:', error);
+      } finally {
+        refreshing = false;
       }
     };
 
@@ -84,7 +103,7 @@ export default function PendingScreen() {
       active = false;
       clearInterval(interval);
     };
-  }, [isGuest, report.guestAccessToken, report.id]);
+  }, [handleRejectedReport, isGuest, report.guestAccessToken, report.id, router]);
 
   // Lock gestures and navigation
   useEffect(() => {
@@ -149,33 +168,9 @@ export default function PendingScreen() {
 
     let active = true;
 
-    if (isGuest && report.guestAccessToken) {
-      const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
-      const checkGuestStatus = async () => {
-        try {
-          const response = await fetch(`${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(requestId)}&accessToken=${encodeURIComponent(report.guestAccessToken!)}`);
-          const result = await response.json();
-          if (!active || !response.ok || !result.data) return;
-
-          const incident = result.data.incident as { id: string } | null;
-          if (result.data.status === 'VERIFIED' || incident) {
-            useEmergencyReportStore.setState((state) => ({
-              report: { ...state.report, incidentId: incident?.id },
-            }));
-            router.replace('/help/response-status');
-          }
-        } catch (error) {
-          console.error('[PendingScreen] Guest status check failed:', error);
-        }
-      };
-
-      void checkGuestStatus();
-      const interval = setInterval(() => void checkGuestStatus(), 3000);
-      return () => {
-        active = false;
-        clearInterval(interval);
-      };
-    }
+    // Guest Mode already uses the scoped, timeout-bounded server poll above.
+    // Do not start a second overlapping poll or place its secure token in a URL.
+    if (isGuest) return;
 
     async function checkCurrentStatus() {
       try {
@@ -226,7 +221,7 @@ export default function PendingScreen() {
     return () => {
       active = false;
     };
-  }, [isGuest, report.guestAccessToken, report.id, router]);
+  }, [handleRejectedReport, isGuest, report.guestAccessToken, report.id, router]);
 
   // Real-time verification request listener
   useEffect(() => {
@@ -296,27 +291,8 @@ export default function PendingScreen() {
               setupIncidentSubscription(requestId);
             }
           } else if (payload.new && payload.new.status === 'REJECTED') {
-            // Tactile haptic feedback
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-            
-            // Unsubscribe channel
             supabase.removeChannel(channel);
-            
-            // Clear local report details from store
-            useEmergencyReportStore.getState().resetReport();
-            
-            // Alert user and redirect back to dashboard
-            Alert.alert(
-              "Report Dismissed",
-              "Baliwag CDRRMO PACC has rejected or dismissed your incident report. If this is an error, please try submitting again or call PACC directly.",
-              [
-                { 
-                  text: "OK", 
-                  onPress: () => router.replace(homeRoute as any)
-                }
-              ],
-              { cancelable: false }
-            );
+            handleRejectedReport(payload.new.rejection_reason);
           } else if (payload.new && payload.new.status === 'DUPLICATE') {
             const parentId = payload.new.parent_request_id || payload.new.parentRequestId;
             if (parentId) {
@@ -389,7 +365,7 @@ export default function PendingScreen() {
         incidentChannelRef.current = null;
       }
     };
-  }, [homeRoute, isGuest, report.id, router]);
+  }, [handleRejectedReport, homeRoute, isGuest, report.id, router]);
 
   // Trigger tactile haptic success feedback and start auto-navigation timer when accepted
   useEffect(() => {

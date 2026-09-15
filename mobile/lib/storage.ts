@@ -3,6 +3,7 @@ import { decode } from "base64-arraybuffer";
 import { supabase } from "./supabase";
 import { Image } from 'react-native';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { fetchWithTimeout } from './network-timeout';
 
 /**
  * Optimizes an image URI on-device by resizing and compressing it.
@@ -170,11 +171,11 @@ export async function uploadEmergencyEvidence(apiUrl: string, imageUri: string):
     type: 'image/jpeg',
   } as any);
 
-  const response = await fetch(`${apiUrl}/emergency-intake/evidence`, {
+  const response = await fetchWithTimeout(`${apiUrl}/emergency-intake/evidence`, {
     method: 'POST',
     headers: { Accept: 'application/json' },
     body: formData,
-  });
+  }, 30_000, 'Evidence upload');
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.imageUrl) throw new Error(result.error || 'Unable to upload the evidence image.');
   return result.imageUrl;

@@ -14,8 +14,21 @@ import { Volume2, VolumeX, ShieldAlert, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { WebPreloader } from "@/components/ui/web-preloader"
-import { getIncidentAlertPriority, INCIDENT_ALERT_PRIORITY_RANK, type IncidentAlertPriority } from "@/lib/incident-severity"
+import { getIncidentAlertPriority, type IncidentAlertPriority } from "@/lib/incident-severity"
 import { formatOfficialBaliwagLocation } from "@/lib/report-location"
+import { classifyActiveVerificationBucket } from "@/lib/rejected-report-workflow"
+import { compareActiveVerificationItems } from "@/lib/verification-queue-priority"
+
+function isActiveRequest(request: VerificationRequest) {
+  return classifyActiveVerificationBucket({
+    requestStatus: request.status,
+    incidentStatus: request.incident?.status,
+    triageClassification: request.triageClassification,
+    requiresPaccReassignment: request.requiresPaccReassignment,
+    responderId: request.incident?.responderId,
+    currentOfferResponderId: request.incident?.currentOfferResponderId,
+  }) !== null
+}
 
 export default function VerificationPage() {
   const { user } = useAuth()
@@ -29,6 +42,8 @@ export default function VerificationPage() {
 
   const isMutedRef = useRef(isMuted)
   const audioCtxRef = useRef<AudioContext | null>(null)
+  const silentFetchRunningRef = useRef(false)
+  const silentFetchQueuedRef = useRef(false)
 
   // Sync mute state to ref for realtime callbacks
   useEffect(() => {
@@ -43,17 +58,6 @@ export default function VerificationPage() {
   // Merge Duplicate States
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false)
   const [mergeReqId, setMergeReqId] = useState<string | null>(null)
-
-  // Helper to determine if a request needs manual PACC dispatch
-  const needsManualDispatch = (r: VerificationRequest) => {
-    return (
-      r.status === "VERIFIED" &&
-      r.incident &&
-      r.incident.status === "DISPATCHED" &&
-      !r.incident.responderId &&
-      !r.incident.currentOfferResponderId
-    );
-  };
 
   const initAudio = () => {
     if (audioCtxRef.current) return audioCtxRef.current;
@@ -183,7 +187,7 @@ export default function VerificationPage() {
       
       // Select the first pending request if none selected
       if (data.length > 0 && !selectedId) {
-        const firstPending = data.find((r: VerificationRequest) => r.status === "PENDING" || needsManualDispatch(r))
+        const firstPending = data.find((request: VerificationRequest) => isActiveRequest(request))
         if (firstPending) setSelectedId(firstPending.id)
       }
       return data
@@ -202,13 +206,29 @@ export default function VerificationPage() {
   }
 
   const fetchRequestsSilent = async () => {
+    if (silentFetchRunningRef.current) {
+      silentFetchQueuedRef.current = true
+      return
+    }
+    silentFetchRunningRef.current = true
     try {
-      const response = await fetch("/api/verification")
-      if (!response.ok) throw new Error("Failed to fetch requests")
-      const data = await response.json()
-      setRequests(data)
+      do {
+        silentFetchQueuedRef.current = false
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(() => controller.abort(), 12_000)
+        try {
+          const response = await fetch("/api/verification", { signal: controller.signal })
+          if (!response.ok) throw new Error("Failed to fetch requests")
+          const data = await response.json()
+          setRequests(data)
+        } finally {
+          window.clearTimeout(timeoutId)
+        }
+      } while (silentFetchQueuedRef.current)
     } catch (error) {
       console.error("Silent verification update failed:", error)
+    } finally {
+      silentFetchRunningRef.current = false
     }
   }
 
@@ -253,6 +273,12 @@ export default function VerificationPage() {
             if (isEmergency) {
               const priority = getIncidentAlertPriority(newRequest.severity);
               if (priority === "critical" || priority === "severe") {
+                setFilter(
+                  newRequest.triage_classification === 'HIGH_CONFIDENCE_EMERGENCY'
+                    || newRequest.triage_classification === 'HIGH_CONFIDENCE_NON_EMERGENCY'
+                    ? 'ACTION'
+                    : 'REVIEW',
+                );
                 setSelectedId(newRequest.id);
                 playAlertSound(priority);
                 toast[priority === "critical" ? "error" : "warning"](
@@ -329,45 +355,57 @@ export default function VerificationPage() {
     };
   }, [user]);
 
-  const handleUpdateStatus = async (id: string, status: VerificationStatus) => {
+  const handleUpdateStatus = async (
+    id: string,
+    status: VerificationStatus,
+    rejectionReason?: string,
+  ): Promise<boolean> => {
     setIsProcessing(true)
     try {
       const response = await fetch(`/api/verification/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, rejectionReason }),
       })
 
-      if (!response.ok) throw new Error("Failed to update status")
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(payload?.error || "Failed to update status")
 
       toast.success(`Request ${status === "VERIFIED" ? "accepted" : "rejected"}`)
-      
-      // Optimistic update
-      setRequests((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status } : r))
-      )
-      
-      if (status === "REJECTED") {
-        // A rejection is a closed audit record, not a disappearance. Keep it
-        // selected and make its new location in the queue explicit to PACC.
-        setFilter("REJECTED")
-        setSelectedId(id)
-        return
-      }
 
-      // Move to next pending request
+      const nextRequests = requests.map((request) =>
+        request.id === id
+          ? { ...request, status, rejectionReason: payload?.rejectionReason ?? rejectionReason ?? null }
+          : request,
+      )
+      setRequests(nextRequests)
+
       const currentIdx = requests.findIndex(r => r.id === id)
-      const nextPending = requests.slice(currentIdx + 1).find(r => r.status === "PENDING" || needsManualDispatch(r)) || 
-                          requests.slice(0, currentIdx).find(r => r.status === "PENDING" || needsManualDispatch(r))
-      
-      if (nextPending) {
-        setSelectedId(nextPending.id)
-      } else {
-        setSelectedId(null)
-      }
-    } catch (error) {
+      const orderedCandidates = [
+        ...nextRequests.slice(currentIdx + 1),
+        ...nextRequests.slice(0, currentIdx),
+      ]
+      const preferredBucket = filter === "ACTION" || filter === "REVIEW" ? filter : null
+      const nextPending = orderedCandidates.find((request) => {
+        if (!isActiveRequest(request)) return false
+        if (!preferredBucket) return true
+        return classifyActiveVerificationBucket({
+          requestStatus: request.status,
+          incidentStatus: request.incident?.status,
+          triageClassification: request.triageClassification,
+          requiresPaccReassignment: request.requiresPaccReassignment,
+          responderId: request.incident?.responderId,
+          currentOfferResponderId: request.incident?.currentOfferResponderId,
+        }) === preferredBucket
+      }) || orderedCandidates.find(isActiveRequest)
+
+      setSelectedId(nextPending?.id ?? null)
+      void fetchRequestsSilent()
+      return true
+    } catch (error: unknown) {
       console.error(error)
-      toast.error("Failed to update status")
+      toast.error(error instanceof Error ? error.message : "Failed to update status")
+      return false
     } finally {
       setIsProcessing(false)
     }
@@ -416,8 +454,8 @@ export default function VerificationPage() {
     if (dispatchedId) {
       const currentIdx = refreshedRequests.findIndex((r) => r.id === dispatchedId)
       const nextPending =
-        refreshedRequests.slice(currentIdx + 1).find((r) => r.status === "PENDING" || needsManualDispatch(r)) ||
-        refreshedRequests.slice(0, currentIdx).find((r) => r.status === "PENDING" || needsManualDispatch(r))
+        refreshedRequests.slice(currentIdx + 1).find(isActiveRequest) ||
+        refreshedRequests.slice(0, currentIdx).find(isActiveRequest)
 
       if (nextPending) {
         setSelectedId(nextPending.id)
@@ -455,8 +493,8 @@ export default function VerificationPage() {
       // Automatically select the next pending request (or null)
       const currentIdx = requests.findIndex((r) => r.id === duplicateId)
       const nextPending =
-        requests.slice(currentIdx + 1).find((r) => r.status === "PENDING" || needsManualDispatch(r)) ||
-        requests.slice(0, currentIdx).find((r) => r.status === "PENDING" || needsManualDispatch(r))
+        requests.slice(currentIdx + 1).find(isActiveRequest) ||
+        requests.slice(0, currentIdx).find(isActiveRequest)
 
       if (nextPending) {
         setSelectedId(nextPending.id)
@@ -472,14 +510,21 @@ export default function VerificationPage() {
   }
 
   const selectedRequest = requests.find((r) => r.id === selectedId) || null
-  const activeAlerts = requests.filter((r) => r.status === "PENDING" || needsManualDispatch(r))
-  const mostUrgentAlert = activeAlerts.reduce<VerificationRequest | null>((currentMostUrgent, request) => {
-    if (!currentMostUrgent) return request;
-
-    return INCIDENT_ALERT_PRIORITY_RANK[getIncidentAlertPriority(request.severity)] > INCIDENT_ALERT_PRIORITY_RANK[getIncidentAlertPriority(currentMostUrgent.severity)]
-      ? request
-      : currentMostUrgent;
-  }, null);
+  const activeAlerts = requests.filter(isActiveRequest)
+  const mostUrgentAlert = [...activeAlerts].sort(compareActiveVerificationItems)[0] ?? null
+  const focusForTriage = (request: VerificationRequest | null) => {
+    if (!request) return
+    const bucket = classifyActiveVerificationBucket({
+      requestStatus: request.status,
+      incidentStatus: request.incident?.status,
+      triageClassification: request.triageClassification,
+      requiresPaccReassignment: request.requiresPaccReassignment,
+      responderId: request.incident?.responderId,
+      currentOfferResponderId: request.incident?.currentOfferResponderId,
+    })
+    if (bucket) setFilter(bucket)
+    setSelectedId(request.id)
+  }
   const activeAlertPriority = mostUrgentAlert ? getIncidentAlertPriority(mostUrgentAlert.severity) : "standard";
   const alertInterval = activeAlertPriority === "critical" ? 3000 : activeAlertPriority === "severe" ? 4500 : 7000;
 
@@ -558,7 +603,7 @@ export default function VerificationPage() {
           
           <div className="flex items-center gap-3 relative z-10">
             <button 
-              onClick={() => setSelectedId(mostUrgentAlert?.id ?? activeAlerts[0].id)}
+              onClick={() => focusForTriage(mostUrgentAlert ?? activeAlerts[0])}
               className="bg-white text-red-600 font-bold px-3 py-1 rounded-lg text-xs hover:bg-red-50 hover:scale-105 active:scale-95 transition-all shadow-sm flex items-center gap-1.5"
             >
               <Sparkles className="size-3.5" />
@@ -603,7 +648,7 @@ export default function VerificationPage() {
         <ResidentPanel
           request={selectedRequest}
           onAccept={handleAccept}
-          onReject={(id) => handleUpdateStatus(id, "REJECTED")}
+          onReject={(id, rejectionReason) => handleUpdateStatus(id, "REJECTED", rejectionReason)}
           onMerge={(id) => {
             setMergeReqId(id)
             setIsMergeModalOpen(true)

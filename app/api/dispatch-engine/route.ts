@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides, healOrphanedActiveDispatches } from "@/lib/dispatch-engine";
+import { checkAndCascadeExpiredOffers, healOrphanedActiveDispatches } from "@/lib/dispatch-engine";
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
     await checkAndCascadeExpiredOffers();
     
     // 2. Run recycling check on expired PACC manual overrides (Option B backup)
-    await checkAndRecycleManualOverrides();
 
     // 3. Self-heal orphaned ACTIVE_DISPATCH responders with no active incident
     await healOrphanedActiveDispatches();

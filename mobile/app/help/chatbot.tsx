@@ -41,6 +41,7 @@ import {
   isObviouslySyntheticGuestPhone,
   isReportProgressVisible,
   isValidGuestPhone,
+  sanitizeGuestPhoneInput,
   isWithinBaliwag,
   parseExactPeopleInput,
   type ChatbotDraft,
@@ -50,6 +51,7 @@ import {
 import { askChatbot, submitChatbotReport } from '../../services/chatbot-api';
 import { useChatbotStore } from '../../store/use-chatbot-store';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { archiveGuestReport } from '../../lib/guest-report-history';
 
 const API_URL = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
 const NAVY = '#1E3A8A';
@@ -131,6 +133,7 @@ export default function EmergencyChatbotScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([makeMessage('bot', WELCOME)]);
   const [composer, setComposer] = useState('');
   const [fieldValue, setFieldValue] = useState('');
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [pendingReportIntent, setPendingReportIntent] = useState<Partial<ChatbotDraft> | null>(null);
   const [languageStyle, setLanguageStyle] = useState<LanguageStyle>('en');
   const [waiting, setWaiting] = useState(false);
@@ -384,12 +387,24 @@ export default function EmergencyChatbotScreen() {
   const submitReport = async () => {
     if (submissionLock.current || lifecycle !== 'DRAFT' || activeSlot !== 'review' || !submissionId) return;
     if (!draft.photoUri || !draft.incidentType || !draft.nature || draft.latitude === undefined
-      || draft.longitude === undefined || !draft.peopleInvolved || !draft.victimCondition) return;
+      || draft.longitude === undefined || !draft.peopleInvolved || !draft.victimCondition) {
+      const missing = getNextMissingSlot(draft, reporterMode);
+      setEditTarget(missing);
+      Alert.alert('Complete required information', `Please complete ${missing === 'evidence' ? 'photo evidence' : missing} before submitting.`);
+      return;
+    }
     if (!isWithinBaliwag(draft.latitude, draft.longitude)) {
       Alert.alert('Outside service area', 'Reports can only be submitted from inside the Baliwag City service area. Update your GPS location and try again.');
       return;
     }
-    if (reporterMode === 'guest' && (!isValidGuestPhone(draft.contactNumber) || (draft.landmarks?.trim().length ?? 0) < 5)) return;
+    if (reporterMode === 'guest' && (!isValidGuestPhone(draft.contactNumber) || (draft.landmarks?.trim().length ?? 0) < 5)) {
+      const missing = getNextMissingSlot(draft, reporterMode);
+      setEditTarget(missing);
+      Alert.alert('Complete required information', missing === 'contactNumber'
+        ? 'Enter exactly 11 digits beginning with 09.'
+        : 'Add a recognizable nearby landmark.');
+      return;
+    }
 
     submissionLock.current = true;
     markSubmitting();
@@ -411,7 +426,22 @@ export default function EmergencyChatbotScreen() {
         triageClassification: result.request.triageClassification,
         hasIncident: Boolean(result.incident),
         isMergedDuplicate: false,
+        reportsRemaining: result.guestAllowance?.remaining,
       };
+      if (reporterMode === 'guest') {
+        await archiveGuestReport({
+          id: report.id,
+          displayId: report.displayId,
+          incidentType: completeDraft.incidentType,
+          status: report.status,
+          responseStatus: report.responseStatus,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          reportsRemaining: result.guestAllowance?.remaining,
+          messages: messages.map(({ role, text }) => ({ role, text })),
+          accessToken: report.guestAccessToken,
+        });
+      }
       markSubmitted(report);
       syncChatbotReportToEmergencyStore({ draft: completeDraft, activeReport: report, submissionId });
       router.replace((result.autoDispatched ? '/help/response-status' : '/help/chatbot-pending') as never);
@@ -437,6 +467,9 @@ export default function EmergencyChatbotScreen() {
     autoComplete?: TextInputProps['autoComplete'];
     importantForAutofill?: TextInputProps['importantForAutofill'];
     textContentType?: TextInputProps['textContentType'];
+    maxLength?: number;
+    onChangeText?: (value: string) => void;
+    error?: string | null;
     notice?: React.ReactNode;
     onSubmit: (value: string) => void;
   }) => (
@@ -444,17 +477,22 @@ export default function EmergencyChatbotScreen() {
       {input.notice}
       <TextInput
         value={fieldValue}
-        onChangeText={setFieldValue}
+        onChangeText={(value) => {
+          setFieldError(null);
+          (input.onChangeText ?? setFieldValue)(value);
+        }}
         placeholder={input.placeholder}
         placeholderTextColor="#64748B"
         keyboardType={input.keyboard ?? 'default'}
         autoComplete={input.autoComplete}
         importantForAutofill={input.importantForAutofill}
         textContentType={input.textContentType}
+        maxLength={input.maxLength}
         autoCorrect={false}
         style={styles.fieldInput}
         onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
       />
+      {input.error ? <Text style={styles.fieldError}>{input.error}</Text> : null}
       <TouchableOpacity style={styles.primary} onPress={() => input.onSubmit(fieldValue.trim())}>
         <Send color="#FFF" size={17} />
         <Text style={styles.primaryText}>Send response</Text>
@@ -523,22 +561,27 @@ export default function EmergencyChatbotScreen() {
       return renderFieldForm({
         placeholder: draft.contactNumber || '0917 123 4567',
         keyboard: 'phone-pad',
+        maxLength: 11,
+        onChangeText: (value) => setFieldValue(sanitizeGuestPhoneInput(value)),
+        error: fieldError,
         autoComplete: 'tel',
         importantForAutofill: 'noExcludeDescendants',
         textContentType: 'telephoneNumber',
         notice: (
           <View style={styles.guestSafetyNotice}>
             <Text style={styles.guestSafetyNoticeText}>
-              For your safety, your exact GPS location and a protected device identifier are recorded with this report. False reports may be punishable under applicable law. Please enter an active mobile number so responders can contact you.
+              Required callback number: exactly 11 digits beginning with 09. PACC or responders may call this number about the incident. Letters are not accepted.
             </Text>
           </View>
         ),
         onSubmit: (contactNumber) => {
           if (isObviouslySyntheticGuestPhone(contactNumber)) {
+            setFieldError('Use an active number; repeating or sequential digits are not accepted.');
             addMessage('bot', 'Please enter an active mobile number. Repeating or sequential numbers are not accepted.');
             return;
           }
           if (!isValidGuestPhone(contactNumber)) {
+            setFieldError('Enter exactly 11 digits beginning with 09.');
             addMessage('bot', 'Please enter a valid Philippine mobile number, such as 09171234567.');
             return;
           }
@@ -651,12 +694,11 @@ export default function EmergencyChatbotScreen() {
         <View pointerEvents={waiting ? 'none' : 'auto'} style={[styles.controls, waiting && styles.disabledControls]}>{renderControls()}</View>
       </ScrollView>
 
-      <View style={styles.composer}>
+      {activeSlot !== 'review' && lifecycle !== 'SUBMITTING' ? <View style={styles.composer}>
         <TextInput
           value={composer}
           onChangeText={setComposer}
           onSubmitEditing={() => void sendComposer()}
-          editable={lifecycle !== 'SUBMITTING'}
           placeholder={lifecycle === 'DRAFT' && activeSlot === 'peopleInvolved'
             ? 'Type one exact number and send'
             : 'Ask an approved safety or DisasTRACE question'}
@@ -664,10 +706,10 @@ export default function EmergencyChatbotScreen() {
           style={styles.composerInput}
           onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
         />
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send chat message" style={styles.sendButton} onPress={() => void sendComposer()} disabled={waiting || lifecycle === 'SUBMITTING'}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send chat message" style={styles.sendButton} onPress={() => void sendComposer()} disabled={waiting}>
           {waiting ? <ActivityIndicator color="#FFF" size="small" /> : <Send color="#FFF" size={18} />}
         </TouchableOpacity>
-      </View>
+      </View> : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -757,6 +799,7 @@ const styles = StyleSheet.create({
   optionText: { flex: 1, color: '#1E293B', fontWeight: '700', fontSize: 14 },
   chevron: { color: BLUE, fontSize: 25, lineHeight: 25 },
   fieldInput: { minHeight: 48, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, backgroundColor: '#FFF', color: '#0F172A', paddingHorizontal: 14, fontSize: 14 },
+  fieldError: { color: '#B91C1C', fontSize: 12, fontWeight: '700' },
   help: { color: '#64748B', fontSize: 12, lineHeight: 18 },
   warning: { color: '#9A3412', backgroundColor: '#FFF7ED', borderRadius: 8, padding: 10, fontSize: 12, lineHeight: 18 },
   guestSafetyNotice: { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 10, padding: 12 },

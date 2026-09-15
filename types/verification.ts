@@ -38,6 +38,7 @@ export const VerificationRequestSchema = z.object({
   status: VerificationStatusSchema,
   triageClassification: TriageClassificationSchema,
   triageReasons: z.array(z.string()),
+  rejectionReason: z.string().nullable().optional(),
   coordinationAgencies: z.array(z.string()),
   reporterType: z.enum(['REGISTERED', 'GUEST']),
   nature: IncidentNatureSchema,

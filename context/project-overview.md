@@ -28,7 +28,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 1. Responder registers with credentials and government ID.
 2. Account is pending until verified by a CDRRMO Super Admin.
 3. Once verified, responder receives dispatch alerts with a countdown timer.
-4. Responder accepts, navigates to the scene via live GPS map, confirms arrival, and logs the outcome.
+4. Responder accepts and navigates to the scene via live GPS map; trusted proximity to the incident pin automatically records arrival, with a manual fallback for GPS or pin inaccuracies, before the responder logs the outcome.
 5. Responder fills out an incident report form (pre-populated from the public user's submission).
 6. Reports can be saved as drafts offline and synced when connectivity restores.
 
@@ -45,6 +45,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 - A person can choose **Login as Guest** from the launch or sign-in screen during an emergency.
 - The person goes directly to the Emergency Chatbot; no account is created and no general app access is granted.
 - The guest chatbot captures a valid Philippine mobile callback number, automatic GPS, a nearby landmark/reference, incident details, the exact number of people affected, condition, and required photo/evidence. The registered-resident chatbot uses the verified phone number already stored on the account and follows the same automatic GPS/landmark process; location permission is required to continue.
+- Guest Mode keeps a bounded report and chatbot history on the submitting device, including final status or rejection feedback, and displays the remaining lifetime Guest Mode allowance with a registration reminder.
 - Automated initial triage sends high-confidence emergencies into ambulance dispatch and routes non-emergency or flagged reports to PACC.
 - When a response starts, the device can view its live response/tracking status.
 - PACC can record coordination with PNP, BFP, CDRRMO, Barangay, DSWD, or Hospital; residents and guests see the dynamic agencies and responder status.
@@ -79,6 +80,9 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 - Detailed incident report form with pre-populated data.
 - Draft/offline save with sync reminders.
 - Duty status management visible to admins.
+- Responder report history is managed with server-side search, filtering, sorting, bounded pagination, and a reversible personal archive. Archiving never deletes the operational or audit record.
+- Medical transport recommends the nearest configured hospital that currently caters to emergencies. This is a proximity/availability aid rather than a clinical suitability decision; responders may override it with another eligible configured hospital.
+- Workflow actions remain visibly disabled until their required information and preceding state are valid, and numeric-only responder fields reject non-numeric input at both client and API boundaries.
 
 ### Administration
 

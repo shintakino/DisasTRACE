@@ -4,19 +4,19 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
 import { createClient } from "@/lib/supabase-server";
-import { and, count, desc, eq, gte, inArray } from "drizzle-orm";
-import { checkAndCascadeExpiredOffers, checkAndRecycleManualOverrides, healOrphanedActiveDispatches, retryPendingAutomaticDispatches } from "@/lib/dispatch-engine";
+import { and, count, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import { checkAndCascadeExpiredOffers, healOrphanedActiveDispatches, retryPendingAutomaticDispatches } from "@/lib/dispatch-engine";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS, isLikelyDuplicateIncident } from "@/lib/incident-deduplication";
 import { resolveBaliwagBarangay } from "@/lib/barangay-boundaries";
 import { systemSettings } from "@/db/schema/system_settings";
 import { requiresPaccReassignment } from "@/lib/dispatch-policy";
+import { createPublicRequestId, deriveInitialTriage } from "@/lib/initial-triage-policy";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     // 1. Run self-healing checks on active dispatch offers and manual overrides
     await checkAndCascadeExpiredOffers();
-    await checkAndRecycleManualOverrides();
     await healOrphanedActiveDispatches();
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -33,14 +33,46 @@ export async function GET(req: NextRequest) {
     // while its automatic offer is still being created.
     await retryPendingAutomaticDispatches();
 
-    // Fetch from database
-    const requests = await db.query.verificationRequests.findMany({
-      orderBy: [desc(verificationRequests.createdAt)],
-      limit: 50,
-      with: {
-        resident: true,
-      }
-    });
+    // Bound active work and terminal history independently. A burst of recent
+    // rejected/closed records must never push an older actionable report out
+    // of PACC's queue window.
+    const [activeRequestRows, terminalRequestRows] = await Promise.all([
+      db.select({ id: verificationRequests.id })
+        .from(verificationRequests)
+        .leftJoin(incidents, eq(incidents.requestId, verificationRequests.id))
+        .where(or(
+          eq(verificationRequests.status, 'PENDING'),
+          and(
+            eq(verificationRequests.status, 'VERIFIED'),
+            eq(incidents.status, 'DISPATCHED'),
+            isNull(incidents.responderId),
+            isNull(incidents.currentOfferResponderId),
+          ),
+        ))
+        .orderBy(desc(verificationRequests.createdAt)),
+      db.select({ id: verificationRequests.id })
+        .from(verificationRequests)
+        .leftJoin(incidents, eq(incidents.requestId, verificationRequests.id))
+        .where(or(
+          eq(verificationRequests.status, 'REJECTED'),
+          and(
+            eq(verificationRequests.status, 'VERIFIED'),
+            eq(incidents.status, 'RESOLVED'),
+          ),
+        ))
+        .orderBy(desc(verificationRequests.createdAt))
+        .limit(50),
+    ]);
+    const visibleRequestIds = [...new Set(
+      [...activeRequestRows, ...terminalRequestRows].map((row) => row.id),
+    )];
+    const requests = visibleRequestIds.length
+      ? await db.query.verificationRequests.findMany({
+        where: inArray(verificationRequests.id, visibleRequestIds),
+        orderBy: [desc(verificationRequests.createdAt)],
+        with: { resident: true },
+      })
+      : [];
 
     const requestIds = requests.map((request) => request.id);
     const residentIds = [...new Set(
@@ -112,6 +144,7 @@ export async function GET(req: NextRequest) {
         id: r.id,
         requestId: r.requestId,
         status: r.status,
+        rejectionReason: r.rejectionReason,
         triageClassification: r.triageClassification,
         triageReasons: r.triageReasons,
         coordinationAgencies: r.coordinationAgencies,
@@ -213,18 +246,28 @@ export async function POST(req: NextRequest) {
       report, settings?.deduplicationRadiusMeters ?? INCIDENT_DEDUPLICATION_RADIUS_METERS,
     ));
 
-    // Generate Request ID
-    const year = new Date().getFullYear();
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    const requestIdStr = `REQ-${year}-${randomNum}`;
+    const databaseId = crypto.randomUUID();
+    const requestIdStr = createPublicRequestId(databaseId);
 
-    // Determine initial status based on request nature (we will try to auto-dispatch first if critical)
+    // Nature and initial classification are server-owned. In particular,
+    // Unknown Cause always waits for PACC to identify the coordinating agency.
     const severityLevel = severity || 'Medium';
-    const requestNature = (nature || 'EMERGENCY').toUpperCase() as 'EMERGENCY' | 'NON-EMERGENCY';
+    const triage = deriveInitialTriage({
+      incidentType,
+      requestedNature: nature,
+      suspicious: nearbyDuplicate,
+    });
+    const requestNature = triage.nature;
+    const triageReasons = [
+      ...triage.reasons,
+      ...(nearbyDuplicate && triage.classification === 'SUSPICIOUS_POSSIBLE_PRANK'
+        ? ['A similar report was submitted nearby in the last 20 minutes. PACC review is required before dispatch.']
+        : []),
+    ];
 
     // Insert into database
     const [newRequest] = await db.insert(verificationRequests).values({
-      id: crypto.randomUUID(),
+      id: databaseId,
       requestId: requestIdStr,
       residentId: user.id,
       status: 'PENDING',
@@ -232,14 +275,8 @@ export async function POST(req: NextRequest) {
       type: incidentType,
       peopleInvolved: peopleInvolved || 'None',
       severity: severityLevel,
-      triageClassification: nearbyDuplicate
-        ? 'SUSPICIOUS_POSSIBLE_PRANK'
-        : requestNature === 'EMERGENCY'
-        ? 'HIGH_CONFIDENCE_EMERGENCY'
-        : 'HIGH_CONFIDENCE_NON_EMERGENCY',
-      triageReasons: nearbyDuplicate
-        ? ['A similar report was submitted nearby in the last 20 minutes. PACC review is required before dispatch.']
-        : [],
+      triageClassification: triage.classification,
+      triageReasons,
       locationDescription: landmarks || null,
       barangay: barangay.name,
       barangayPsgcCode: barangay.psgcCode,
@@ -249,7 +286,7 @@ export async function POST(req: NextRequest) {
     }).returning();
 
     // Auto Dispatch Logic
-    if (!nearbyDuplicate && (severityLevel === 'Critical' || severityLevel === 'Emergency' || requestNature === 'EMERGENCY')) {
+    if (triage.classification === 'HIGH_CONFIDENCE_EMERGENCY') {
       const { retryPendingAutomaticDispatches } = await import('@/lib/dispatch-engine');
       const nextIncident = await retryPendingAutomaticDispatches();
       const incident = nextIncident?.requestId === newRequest.id ? nextIncident : null;

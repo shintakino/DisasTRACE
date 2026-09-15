@@ -26,6 +26,12 @@ import { OfflineBanner } from '../dashboard/OfflineBanner';
 import * as Notifications from 'expo-notifications';
 import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
+import {
+  getAutomaticHospitalRecommendation,
+  isEligibleHospitalDestination,
+  isValidGeoPoint,
+  rankEligibleHospitals,
+} from '../../lib/hospital-destination-policy';
 
 // Helper to calculate distance in meters
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -165,6 +171,7 @@ export function ResponderHome() {
   const lastDbUpdateRef = useRef<number>(0);
   const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const [hospitals, setHospitals] = useState<any[]>([]);
+  const [hospitalLoadState, setHospitalLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const liveLocation = useLiveBarangay(
     role === 'ambulance_responder' && hasLiveLocation,
     hasLiveLocation
@@ -181,7 +188,7 @@ export function ResponderHome() {
 
   const hospitalsWithDistance = useMemo(() => {
     if (!currentLocation || hospitals.length === 0) return [];
-    return hospitals.map(h => {
+    return hospitals.filter((hospital) => isValidGeoPoint(hospital.coordinates)).map(h => {
       const distMeters = calculateDistanceMeters(
         currentLocation[1],
         currentLocation[0],
@@ -196,23 +203,20 @@ export function ResponderHome() {
     });
   }, [hospitals, currentLocation]);
 
+  const eligibleHospitalsWithDistance = useMemo(() => rankEligibleHospitals(
+    hospitals,
+    { latitude: currentLocation[1], longitude: currentLocation[0] },
+  ), [hospitals, currentLocation]);
+
   const nearestHospitalId = useMemo(() => {
-    if (hospitalsWithDistance.length === 0) return null;
-    let minMeters = Infinity;
-    let nearestId = null;
-    hospitalsWithDistance.forEach(h => {
-      if (h.distanceMeters < minMeters) {
-        minMeters = h.distanceMeters;
-        nearestId = h.id;
-      }
-    });
-    return nearestId;
-  }, [hospitalsWithDistance]);
+    return eligibleHospitalsWithDistance[0]?.id ?? null;
+  }, [eligibleHospitalsWithDistance]);
 
   const enrichedSelectedHospital = useMemo(() => {
     if (!selectedHospital) return null;
     return hospitalsWithDistance.find(h => h.id === selectedHospital.id) || selectedHospital;
   }, [selectedHospital, hospitalsWithDistance]);
+  const hasEligibleTargetHospital = isEligibleHospitalDestination(targetHospital);
 
 
   // Simulated Drive Telemetry properties
@@ -688,6 +692,20 @@ export function ResponderHome() {
           && !incident?.responder_id
           && incident?.current_offer_responder_id === user.id
         );
+      if (
+        stillOwned
+        && incident?.status === 'ARRIVED'
+        && useResponderStore.getState().status === 'en_route'
+      ) {
+        const current = useResponderStore.getState();
+        useResponderStore.setState({
+          status: 'on_scene',
+          sceneTimeSeconds: 0,
+          responseTimeSeconds: current.elapsedTimeSeconds,
+          isArrivalConfirmVisible: false,
+        });
+        return;
+      }
       if (!stillOwned && mounted && useResponderStore.getState().activeDispatch?.id === incidentId) {
         useResponderStore.getState().completeIncident();
         Alert.alert(
@@ -724,6 +742,7 @@ export function ResponderHome() {
 
   useEffect(() => {
     const fetchHospitals = async () => {
+      setHospitalLoadState('loading');
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const reqHeaders: any = { 'Content-Type': 'application/json' };
@@ -743,13 +762,16 @@ export function ResponderHome() {
           name: h.name,
           address: h.address,
           coordinates: { latitude: h.lat, longitude: h.lng },
-          caters: h.caters !== false,
+          caters: h.caters === true,
           phone: h.phone || ''
         }));
         
         setHospitals(mapped);
+        setHospitalLoadState('ready');
       } catch (err) {
         console.error("Error fetching mobile map hospitals:", err);
+        setHospitals([]);
+        setHospitalLoadState('error');
       }
     };
     
@@ -757,6 +779,33 @@ export function ResponderHome() {
       fetchHospitals();
     }
   }, [status]);
+
+  // A recommendation is established once for a transport leg. Subsequent GPS
+  // updates only refresh distances and must never replace a responder override.
+  useEffect(() => {
+    const recommendation = getAutomaticHospitalRecommendation({
+      status,
+      currentTarget: targetHospital,
+      candidates: hospitals,
+      origin: hasLiveLocation
+        ? { latitude: currentLocation[1], longitude: currentLocation[0] }
+        : null,
+    });
+    if (!recommendation) return;
+
+    setTargetHospital({
+      ...recommendation,
+      recommended: true,
+    });
+    setSelectedHospital(null);
+  }, [
+    currentLocation,
+    hasLiveLocation,
+    hospitals,
+    setTargetHospital,
+    status,
+    targetHospital,
+  ]);
 
 
   // 1. Activate live GPS telemetry tracking
@@ -1087,6 +1136,7 @@ export function ResponderHome() {
         )}
 
         {hospitalsWithDistance.map((hospital) => {
+          const isEligible = isEligibleHospitalDestination(hospital);
           const isTarget = status === 'to_hospital' && targetHospital?.id === hospital.id;
           const isSelected = selectedHospital?.id === hospital.id;
           const isNearest = hospital.id === nearestHospitalId;
@@ -1095,13 +1145,13 @@ export function ResponderHome() {
               key={hospital.id} 
               id={hospital.id} 
               lngLat={[hospital.coordinates.longitude, hospital.coordinates.latitude]}
-              onPress={() => {
-                isMarkerPress.current = true;
-                setSelectedHospital((prev: any) => prev?.id === hospital.id ? null : hospital);
-                setTimeout(() => {
-                  isMarkerPress.current = false;
-                }, 300);
-              }}
+              onPress={isEligible ? () => {
+                  isMarkerPress.current = true;
+                  setSelectedHospital((prev: any) => prev?.id === hospital.id ? null : hospital);
+                  setTimeout(() => {
+                    isMarkerPress.current = false;
+                  }, 300);
+                } : undefined}
             >
               <View className="items-center justify-center">
                 {/* Floating Tooltip Card */}
@@ -1138,9 +1188,20 @@ export function ResponderHome() {
                   {isTarget && (
                     <View className="absolute w-16 h-16 rounded-full border border-red-500/50 bg-red-500/10 border-dashed animate-pulse" />
                   )}
-                  <View className={`w-8 h-8 rounded-full items-center justify-center shadow-sm ${(isTarget || isSelected) ? 'bg-blue-600 shadow-blue-400 scale-110 border-2 border-white' : 'bg-slate-800 border-2 border-slate-600'} z-10`}>
-                    <Hospital color={(isTarget || isSelected) ? "white" : "#94A3B8"} size={16} variant="Bold" />
+                  <View className={`w-8 h-8 rounded-full items-center justify-center shadow-sm ${
+                    (isTarget || isSelected)
+                      ? 'bg-blue-600 shadow-blue-400 scale-110 border-2 border-white'
+                      : isEligible
+                        ? 'bg-slate-800 border-2 border-slate-600'
+                        : 'bg-slate-200 border-2 border-slate-300'
+                  } z-10`}>
+                    <Hospital color={(isTarget || isSelected) ? "white" : isEligible ? "#94A3B8" : "#CBD5E1"} size={16} variant="Bold" />
                   </View>
+                  {!isEligible && (
+                    <View className="bg-slate-700 rounded px-1.5 py-0.5 mt-1">
+                      <Text className="text-white text-[7px] font-bold uppercase">Unavailable</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </Marker>
@@ -1288,13 +1349,25 @@ export function ResponderHome() {
 
         {status === 'to_hospital' && !targetHospital && !selectedHospital && (
           <View className="px-6 mt-4 pointer-events-auto">
-            <View className="bg-orange-500/90 p-3.5 rounded-xl backdrop-blur-md border border-orange-400 shadow-lg shadow-black/10">
-              <Text className="text-white font-bold text-xs text-center">Tap a hospital marker on the map to select destination</Text>
+            <View className={`${
+              hospitalLoadState === 'error' || (hospitalLoadState === 'ready' && eligibleHospitalsWithDistance.length === 0)
+                ? 'bg-red-600/95 border-red-500'
+                : 'bg-orange-500/90 border-orange-400'
+            } p-3.5 rounded-xl backdrop-blur-md border shadow-lg shadow-black/10`}>
+              <Text className="text-white font-bold text-xs text-center">
+                {hospitalLoadState === 'error'
+                  ? 'Hospital availability could not be loaded. Contact PACC before transport.'
+                  : hospitalLoadState === 'ready' && eligibleHospitalsWithDistance.length === 0
+                    ? 'No configured hospital is accepting emergencies. Contact PACC for destination coordination.'
+                    : !hasLiveLocation
+                      ? 'Waiting for live GPS before recommending the nearest available hospital.'
+                      : 'Selecting the nearest configured emergency-receiving hospital...'}
+              </Text>
             </View>
           </View>
         )}
 
-        {status === 'to_hospital' && !targetHospital && enrichedSelectedHospital && (
+        {status === 'to_hospital' && enrichedSelectedHospital && enrichedSelectedHospital.id !== targetHospital?.id && (
           <View className="px-6 mt-4 pointer-events-auto">
             <View className="bg-white rounded-2xl p-4 shadow-xl border border-slate-200">
               <View className="flex-row items-center mb-3">
@@ -1321,13 +1394,20 @@ export function ResponderHome() {
                 </View>
               </View>
               <TouchableOpacity
+                disabled={!isEligibleHospitalDestination(enrichedSelectedHospital)}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !isEligibleHospitalDestination(enrichedSelectedHospital) }}
                 onPress={() => {
-                  setTargetHospital(enrichedSelectedHospital);
+                  setTargetHospital({ ...enrichedSelectedHospital, recommended: false });
                   setSelectedHospital(null);
                 }}
-                className="bg-[#1E3A8A] rounded-xl py-3 items-center"
+                className={`rounded-xl py-3 items-center ${
+                  isEligibleHospitalDestination(enrichedSelectedHospital) ? 'bg-[#1E3A8A]' : 'bg-slate-300'
+                }`}
               >
-                <Text className="text-white font-bold text-sm">Navigate to This Hospital</Text>
+                <Text className={`font-bold text-sm ${
+                  isEligibleHospitalDestination(enrichedSelectedHospital) ? 'text-white' : 'text-slate-500'
+                }`}>Use This Available Hospital</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1414,11 +1494,18 @@ export function ResponderHome() {
         ) && (
           <View className="absolute top-[50%] right-6 z-50 pointer-events-auto">
             <TouchableOpacity 
+              disabled={!hasEligibleTargetHospital}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !hasEligibleTargetHospital }}
               onPress={() => useResponderStore.getState().startReport()}
-              className="bg-blue-900/90 backdrop-blur-md rounded-2xl px-5 py-3.5 flex-row items-center border border-blue-700/50 shadow-lg shadow-black/20"
+              className={`${
+                hasEligibleTargetHospital
+                  ? 'bg-blue-900/90 border-blue-700/50 shadow-lg shadow-black/20'
+                  : 'bg-slate-300/95 border-slate-400/50'
+              } backdrop-blur-md rounded-2xl px-5 py-3.5 flex-row items-center border`}
             >
-              <FolderDown color="white" size={18} />
-              <Text className="text-white font-bold ml-2">Fill Report</Text>
+              <FolderDown color={hasEligibleTargetHospital ? 'white' : '#64748B'} size={18} />
+              <Text className={`${hasEligibleTargetHospital ? 'text-white' : 'text-slate-500'} font-bold ml-2`}>Fill Report</Text>
             </TouchableOpacity>
           </View>
         )}

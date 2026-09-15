@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import * as FileSystem from 'expo-file-system/legacy';
+import {
+  canEnterHospitalReport,
+  canStartHospitalTransport,
+  isEligibleHospitalDestination,
+} from '../lib/hospital-destination-policy';
 
 const DRAFTS_FILE_PATH = `${FileSystem.documentDirectory}disas_trace_drafts.json`;
 
@@ -45,6 +50,7 @@ export interface HospitalDetails {
   name: string;
   coordinates: { latitude: number; longitude: number };
   caters: boolean;
+  recommended?: boolean;
 }
 
 export interface DispatchDetails {
@@ -191,7 +197,17 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
   setStatus: (status) => set({ status }),
   setActiveDispatch: (activeDispatch) => set({ activeDispatch }),
-  setTargetHospital: (targetHospital) => set({ targetHospital }),
+  setTargetHospital: (targetHospital) => {
+    if (targetHospital !== null && !isEligibleHospitalDestination(targetHospital)) {
+      console.warn('[useResponderStore] Ignored an unavailable or invalid hospital destination.');
+      return;
+    }
+    set({
+      targetHospital,
+      hospitalDistanceKm: null,
+      hospitalEtaMins: null,
+    });
+  },
   setHospitalRouteMetrics: (hospitalDistanceKm, hospitalEtaMins) => set({ hospitalDistanceKm, hospitalEtaMins }),
   incrementSceneTime: () => set((state) => ({ sceneTimeSeconds: state.sceneTimeSeconds + 1 })),
   incrementElapsedTime: () => set((state) => ({ elapsedTimeSeconds: state.elapsedTimeSeconds + 1 })),
@@ -287,14 +303,29 @@ export const useResponderStore = create<ResponderState>((set) => ({
     });
   },
 
-  transportToHospital: () => set({
-    status: 'to_hospital',
-    targetHospital: null, // Reset so it can be dynamically chosen
-    elapsedTimeSeconds: 0
-  }),
+  transportToHospital: () => {
+    if (!canStartHospitalTransport(useResponderStore.getState().status)) {
+      console.warn('[useResponderStore] Hospital transport is only available after scene arrival.');
+      return;
+    }
+    set({
+      status: 'to_hospital',
+      targetHospital: null, // Reset so it can be dynamically chosen
+      hospitalDistanceKm: null,
+      hospitalEtaMins: null,
+      elapsedTimeSeconds: 0,
+    });
+  },
 
   startReport: async () => {
-    const activeDispatch = useResponderStore.getState().activeDispatch;
+    const currentState = useResponderStore.getState();
+    const activeDispatch = currentState.activeDispatch;
+    if (!canEnterHospitalReport(currentState.status, currentState.targetHospital)) {
+      alert(currentState.status === 'to_hospital'
+        ? 'Select an available emergency-receiving hospital before continuing to the report.'
+        : 'The incident report becomes available after arrival at the scene.');
+      return;
+    }
     if (activeDispatch) {
       let isOnline = false;
       try {
@@ -307,9 +338,41 @@ export const useResponderStore = create<ResponderState>((set) => ({
         try {
           const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
           const { data: { session } } = await supabase.auth.getSession();
+          const authorizationHeaders: Record<string, string> = {};
+          if (session?.access_token) {
+            authorizationHeaders.Authorization = `Bearer ${session.access_token}`;
+          }
+
+          if (currentState.status === 'to_hospital' && currentState.targetHospital) {
+            if (!currentState.currentLocation) {
+              alert('A live responder location is required before hospital transport can be confirmed.');
+              return;
+            }
+
+            const destinationResponse = await fetch(`${apiUrl}/api/responder/location`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...authorizationHeaders,
+              },
+              body: JSON.stringify({
+                latitude: currentState.currentLocation[1],
+                longitude: currentState.currentLocation[0],
+                responderStatus: 'to_hospital',
+                incidentId: activeDispatch.id,
+                targetHospitalId: currentState.targetHospital.id,
+              }),
+            });
+            const destinationResult = await destinationResponse.json();
+            if (!destinationResponse.ok || destinationResult?.held) {
+              alert(destinationResult?.message || 'The hospital destination could not be confirmed. Contact PACC or select another available hospital.');
+              return;
+            }
+          }
+
           const response = await fetch(
             `${apiUrl}/api/incidents/status?incidentId=${encodeURIComponent(activeDispatch.id)}`,
-            { headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {} },
+            { headers: authorizationHeaders },
           );
           const result = await response.json();
           if (result?.code === 'INCIDENT_REASSIGNED') {

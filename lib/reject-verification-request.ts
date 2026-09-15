@@ -1,0 +1,88 @@
+import { db } from '@/db';
+import { incidents } from '@/db/schema/incidents';
+import { verificationRequests } from '@/db/schema/verification_requests';
+import { eq } from 'drizzle-orm';
+import { normalizeRequiredRejectionReason } from '@/lib/rejected-report-workflow';
+
+interface RejectionFailure {
+  success: false;
+  status: 400 | 404 | 409;
+  error: string;
+}
+
+interface RejectionSuccess {
+  success: true;
+  request: typeof verificationRequests.$inferSelect;
+}
+
+export type RejectVerificationRequestResult = RejectionFailure | RejectionSuccess;
+
+export async function rejectVerificationRequest(
+  id: string,
+  rawRejectionReason: unknown,
+): Promise<RejectVerificationRequestResult> {
+  const rejectionReason = normalizeRequiredRejectionReason(rawRejectionReason);
+  if (!rejectionReason) {
+    return {
+      success: false,
+      status: 400,
+      error: 'A clear rejection reason is required.',
+    };
+  }
+
+  return db.transaction(async (tx) => {
+    const [lockedRequest] = await tx
+      .select()
+      .from(verificationRequests)
+      .where(eq(verificationRequests.id, id))
+      .limit(1)
+      .for('update');
+
+    if (!lockedRequest) {
+      return { success: false, status: 404, error: 'Request not found' } as const;
+    }
+
+    const [lockedIncident] = await tx
+      .select()
+      .from(incidents)
+      .where(eq(incidents.requestId, id))
+      .limit(1)
+      .for('update');
+
+    const isUnassignedPaccPlaceholder = Boolean(
+      lockedIncident
+      && lockedIncident.status === 'DISPATCHED'
+      && lockedIncident.dispatchMethod === 'PACC_MANUAL'
+      && !lockedIncident.responderId
+      && !lockedIncident.currentOfferResponderId,
+    );
+    const canReject = lockedIncident
+      ? isUnassignedPaccPlaceholder
+        && (lockedRequest.status === 'PENDING' || lockedRequest.status === 'VERIFIED')
+      : lockedRequest.status === 'PENDING';
+
+    if (!canReject) {
+      return {
+        success: false,
+        status: 409,
+        error: 'Only pending reports without an active response can be rejected.',
+      } as const;
+    }
+
+    if (lockedIncident) {
+      await tx.delete(incidents).where(eq(incidents.id, lockedIncident.id));
+    }
+
+    const [updatedRequest] = await tx
+      .update(verificationRequests)
+      .set({
+        status: 'REJECTED',
+        rejectionReason,
+        updatedAt: new Date(),
+      })
+      .where(eq(verificationRequests.id, id))
+      .returning();
+
+    return { success: true, request: updatedRequest } as const;
+  });
+}

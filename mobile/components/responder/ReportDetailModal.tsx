@@ -42,6 +42,14 @@ export function ReportDetailModal({
   ];
 
   const currentReport = allReports[selectedReportIndex] || allReports[0];
+  const responderName = typeof report.responderName === 'string' && report.responderName.trim()
+    ? report.responderName.trim()
+    : 'Assigned Responder';
+  const responderInitials = responderName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part: string) => part.charAt(0).toUpperCase())
+    .join('') || 'AR';
 
   return (
     <>
@@ -56,20 +64,11 @@ export function ReportDetailModal({
                 <View className="flex-1">
                   <View className="flex-row items-center mb-4">
                     <View className="w-10 h-10 rounded-full bg-[#1E3A8A] items-center justify-center mr-3">
-                      <Text className="text-white font-bold">RB</Text>
+                      <Text className="text-white font-bold">{responderInitials}</Text>
                     </View>
                     <View>
-                      <Text className="text-base font-bold text-slate-800">Renzy Bastes</Text>
-                      <Text className="text-xs text-slate-500">Responder</Text>
-                    </View>
-                  </View>
-                  <View className="flex-row items-center">
-                    <View className="w-10 h-10 rounded-full bg-[#1E3A8A] items-center justify-center mr-3">
-                      <Text className="text-white font-bold">CG</Text>
-                    </View>
-                    <View>
-                      <Text className="text-base font-bold text-slate-800">Christopher Guanzing</Text>
-                      <Text className="text-xs text-slate-500">Responder</Text>
+                      <Text className="text-base font-bold text-slate-800">{responderName}</Text>
+                      <Text className="text-xs text-slate-500">Submitting Responder</Text>
                     </View>
                   </View>
                 </View>
@@ -88,7 +87,9 @@ export function ReportDetailModal({
                   <Truck size={32} color="#1E3A8A" />
                 </View>
                 <Text className="text-xl font-bold text-slate-800">{report.id}</Text>
-                <Text className="text-sm font-bold text-slate-500 mt-1">AMB-001</Text>
+                <Text className="text-sm font-bold text-slate-500 mt-1">
+                  {report.vehicleId || 'Ambulance not recorded'}
+                </Text>
               </View>
 
               {/* Tabs */}
@@ -171,7 +172,7 @@ export function ReportDetailModal({
                 </View>
                 <View className="flex-row justify-between mb-4">
                   <Text className="text-sm font-medium text-slate-500">People Involved</Text>
-                  <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.peopleInvolved !== undefined ? String(currentReport.peopleInvolved) : '3'}</Text>
+                  <Text className="text-sm font-bold text-[#1E3A8A]">{currentReport.peopleInvolved !== undefined ? String(currentReport.peopleInvolved) : 'Not recorded'}</Text>
                 </View>
                 <View className="flex-row justify-between mb-6">
                   <Text className="text-sm font-medium text-slate-500">Location</Text>
@@ -221,7 +222,7 @@ export function ReportDetailModal({
                     </View>
                     <View className="flex-row justify-between mb-4">
                       <Text className="text-sm font-medium text-slate-500">People Involved</Text>
-                      <Text className="text-sm font-bold text-[#1E3A8A]">{report.peopleInvolved !== undefined ? String(report.peopleInvolved) : '3'}</Text>
+                      <Text className="text-sm font-bold text-[#1E3A8A]">{report.peopleInvolved !== undefined ? String(report.peopleInvolved) : 'Not recorded'}</Text>
                     </View>
                     <View className="flex-row justify-between mb-4">
                       <Text className="text-sm font-medium text-slate-500">Location</Text>

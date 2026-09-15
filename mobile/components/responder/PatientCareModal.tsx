@@ -4,6 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Check, Calendar, PenTool } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SignaturePadModal } from './SignaturePadModal';
+import {
+  sanitizeBloodPressureInput,
+  sanitizeBoundedIntegerInput,
+  sanitizeDecimalInput,
+  sanitizePhoneInput,
+  validatePatientCareForm,
+} from '../../lib/responder-form-controls';
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -170,7 +177,7 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
   const [patientName, setPatientName] = useState(data?.patientName || '');
   const [patientAddress, setPatientAddress] = useState(data?.patientAddress || '');
   const [patientContact, setPatientContact] = useState(data?.patientContact || '');
-  const [patientAge, setPatientAge] = useState(data?.patientAge ? String(data.patientAge) : '');
+  const [patientAge, setPatientAge] = useState(data?.patientAge != null ? String(data.patientAge) : '');
   const [patientGender, setPatientGender] = useState(data?.patientGender || 'Male');
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -224,7 +231,7 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
     location: '', onset: 'Gradual', provocation: 'None', quality: 'Aching', radiation: 'None', severity: '5', time: ''
   });
 
-  const [gcsPoints, setGcsPoints] = useState(data?.gcsPoints || '');
+  const [gcsPoints, setGcsPoints] = useState(data?.gcsPoints != null ? String(data.gcsPoints) : '');
 
   const [sampleHistory, setSampleHistory] = useState(data?.sampleHistory || {
     allergies: 'None', medications: 'None', pastMedicalHistory: '', lastOralIntake: '', eventsLeadingToInjury: ''
@@ -245,7 +252,18 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
     teamLeader: '', teamMembers: '', driver: ''
   });
 
+  const patientCareValidation = validatePatientCareForm({
+    patientName,
+    patientAge,
+    patientContact,
+    gcsPoints: String(gcsPoints ?? ''),
+    lpm: initialAssessment.breathing?.lpm,
+    painSeverity: painAssessment.severity,
+    vitalsLogs,
+  });
+
   const handleSave = () => {
+    if (!patientCareValidation.valid) return;
     onSave({
       patientName,
       patientAddress,
@@ -312,10 +330,23 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
             <ChevronLeft color="white" size={24} />
           </TouchableOpacity>
           <Text className="text-white text-base font-bold">Patient {patientIndex + 1} Care Report</Text>
-          <TouchableOpacity onPress={handleSave} className="bg-emerald-600 px-4 py-2 rounded-xl">
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={!patientCareValidation.valid}
+            accessibilityState={{ disabled: !patientCareValidation.valid }}
+            className={`px-4 py-2 rounded-xl ${patientCareValidation.valid ? 'bg-emerald-600' : 'bg-slate-500 opacity-60'}`}
+          >
             <Text className="text-white font-bold text-xs">Save</Text>
           </TouchableOpacity>
         </View>
+
+        {!patientCareValidation.valid && (
+          <View className="bg-red-50 border-b border-red-200 px-5 py-2">
+            <Text className="text-red-700 text-xs font-medium" accessibilityLiveRegion="polite">
+              {patientCareValidation.errors[0]}
+            </Text>
+          </View>
+        )}
 
         <ScrollView className="flex-1 bg-slate-50" contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
           {/* Patient Profile */}
@@ -330,8 +361,9 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
                 <Text className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-1">Age</Text>
                 <TextInput 
                   value={patientAge} 
-                  onChangeText={(val) => setPatientAge(val.replace(/[^0-9]/g, ''))} 
-                  keyboardType="numeric" 
+                  onChangeText={(val) => setPatientAge(sanitizeBoundedIntegerInput(val, 130))}
+                  keyboardType="number-pad"
+                  maxLength={3}
                   placeholder="25" 
                   className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" 
                 />
@@ -353,7 +385,14 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
             </View>
             <View>
               <Text className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-1">Contact Number</Text>
-              <TextInput value={patientContact} onChangeText={setPatientContact} placeholder="09123456789" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium" />
+              <TextInput
+                value={patientContact}
+                onChangeText={(value) => setPatientContact(sanitizePhoneInput(value))}
+                keyboardType="phone-pad"
+                maxLength={11}
+                placeholder="09123456789"
+                className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium"
+              />
             </View>
           </View>
 
@@ -439,8 +478,9 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
                 <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">GCS Points</Text>
                 <TextInput 
                   value={gcsPoints} 
-                  onChangeText={(val) => setGcsPoints(val.replace(/[^0-9]/g, ''))} 
-                  keyboardType="numeric" 
+                  onChangeText={(val) => setGcsPoints(sanitizeBoundedIntegerInput(val, 15))}
+                  keyboardType="number-pad"
+                  maxLength={2}
                   placeholder="15" 
                   className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" 
                 />
@@ -518,7 +558,14 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
                 </View>
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Flow Rate (LPM)</Text>
-                  <TextInput value={initialAssessment.breathing.lpm} onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, lpm: val}})} placeholder="0" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                  <TextInput
+                    value={initialAssessment.breathing.lpm}
+                    onChangeText={(val) => setInitialAssessment({...initialAssessment, breathing: {...initialAssessment.breathing, lpm: sanitizeDecimalInput(val, 2, 1)}})}
+                    keyboardType="decimal-pad"
+                    maxLength={4}
+                    placeholder="0"
+                    className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs"
+                  />
                 </View>
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Delivery Device</Text>
@@ -555,14 +602,15 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
                 </View>
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-0.5">BP</Text>
-                  <TextInput value={log.bp} onChangeText={(val) => updateVitalLog(idx, 'bp', val)} placeholder="120/80" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
+                  <TextInput value={log.bp} onChangeText={(val) => updateVitalLog(idx, 'bp', sanitizeBloodPressureInput(val))} keyboardType="numbers-and-punctuation" maxLength={7} placeholder="120/80" className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" />
                 </View>
                 <View className="flex-1">
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-0.5">PR (bpm)</Text>
                   <TextInput 
                     value={log.pr} 
-                    onChangeText={(val) => updateVitalLog(idx, 'pr', val.replace(/[^0-9]/g, ''))} 
-                    keyboardType="numeric"
+                    onChangeText={(val) => updateVitalLog(idx, 'pr', sanitizeBoundedIntegerInput(val, 300))}
+                    keyboardType="number-pad"
+                    maxLength={3}
                     placeholder="80" 
                     className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                   />
@@ -573,8 +621,9 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-0.5">O2 Sat (%)</Text>
                   <TextInput 
                     value={log.o2_sat} 
-                    onChangeText={(val) => updateVitalLog(idx, 'o2_sat', val.replace(/[^0-9]/g, ''))} 
-                    keyboardType="numeric"
+                    onChangeText={(val) => updateVitalLog(idx, 'o2_sat', sanitizeBoundedIntegerInput(val, 100))}
+                    keyboardType="number-pad"
+                    maxLength={3}
                     placeholder="98" 
                     className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                   />
@@ -583,8 +632,9 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-0.5">RR (cpm)</Text>
                   <TextInput 
                     value={log.rr} 
-                    onChangeText={(val) => updateVitalLog(idx, 'rr', val.replace(/[^0-9]/g, ''))} 
-                    keyboardType="numeric"
+                    onChangeText={(val) => updateVitalLog(idx, 'rr', sanitizeBoundedIntegerInput(val, 200))}
+                    keyboardType="number-pad"
+                    maxLength={3}
                     placeholder="16" 
                     className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                   />
@@ -593,15 +643,9 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
                   <Text className="text-slate-400 text-[8px] font-bold uppercase mb-0.5">Temp (°C)</Text>
                   <TextInput 
                     value={log.temp} 
-                    onChangeText={(val) => {
-                      let cleaned = val.replace(/[^0-9.]/g, '');
-                      const parts = cleaned.split('.');
-                      if (parts.length > 2) {
-                        cleaned = parts[0] + '.' + parts.slice(1).join('');
-                      }
-                      updateVitalLog(idx, 'temp', cleaned);
-                    }} 
-                    keyboardType="numeric"
+                    onChangeText={(val) => updateVitalLog(idx, 'temp', sanitizeDecimalInput(val, 2, 1))}
+                    keyboardType="decimal-pad"
+                    maxLength={4}
                     placeholder="36.5" 
                     className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs" 
                   />
@@ -656,11 +700,9 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
                 <Text className="text-slate-400 text-[8px] font-bold uppercase mb-1">Sev (1-10)</Text>
                 <TextInput 
                   value={painAssessment.severity} 
-                  onChangeText={(val) => {
-                    const cleaned = val.replace(/[^0-9]/g, '');
-                    setPainAssessment({...painAssessment, severity: cleaned});
-                  }} 
-                  keyboardType="numeric" 
+                  onChangeText={(val) => setPainAssessment({...painAssessment, severity: sanitizeBoundedIntegerInput(val, 10)})}
+                  keyboardType="number-pad"
+                  maxLength={2}
                   placeholder="5" 
                   className="border border-slate-200 rounded-xl px-2 py-1.5 bg-slate-50 text-slate-800 font-medium text-xs text-center" 
                 />

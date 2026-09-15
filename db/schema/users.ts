@@ -27,6 +27,7 @@ export const users = pgTable('users', {
   dutyStatus: text('duty_status', { enum: ['OFF_DUTY', 'ON_DUTY', 'ACTIVE_DISPATCH'] }).default('OFF_DUTY').notNull(),
   lastLatitude: doublePrecision('last_latitude'),
   lastLongitude: doublePrecision('last_longitude'),
+  lastLocationAccuracy: doublePrecision('last_location_accuracy'),
   lastLocationUpdatedAt: timestamp('last_location_updated_at', { withTimezone: true }),
   locationGeom: geometryPoint('location_geom'),
   otpCode: varchar('otp_code', { length: 255 }),

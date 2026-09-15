@@ -1,9 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
+import { MAX_REJECTION_REASON_LENGTH, normalizeRequiredRejectionReason } from "@/lib/rejected-report-workflow"
 import { VerificationRequest } from "@/types/verification"
 import { CheckCircle2, Phone, MapPin, History, ShieldCheck, XCircle, Check, GitMerge, HelpCircle } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -11,12 +15,16 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 interface ResidentPanelProps {
   request: VerificationRequest | null
   onAccept: (id: string) => void
-  onReject: (id: string) => void
+  onReject: (id: string, rejectionReason: string) => Promise<boolean>
   onMerge?: (id: string) => void
   isProcessing: boolean
 }
 
 export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessing }: ResidentPanelProps) {
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState("")
+  const normalizedReason = normalizeRequiredRejectionReason(rejectionReason)
+
   if (!request) {
     return (
       <div className="w-80 shrink-0 border-l bg-white p-4 flex flex-col items-center justify-center text-slate-400 text-sm italic">
@@ -45,14 +53,24 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
     request.nature === "EMERGENCY" &&
     !request.incident;
 
+  const isTerminal = request.status === "REJECTED" || request.incident?.status === "RESOLVED"
+
+  const handleReject = async () => {
+    if (!normalizedReason) return
+    if (await onReject(request.id, normalizedReason)) {
+      setIsRejectDialogOpen(false)
+      setRejectionReason("")
+    }
+  }
+
   return (
     <div className="w-80 shrink-0 border-l bg-white p-4 flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
+      {!isTerminal && <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-3">
           <Button
             variant="secondary"
             className="w-full flex items-center justify-center gap-2"
-            onClick={() => onReject(request.id)}
+            onClick={() => setIsRejectDialogOpen(true)}
             disabled={
               isProcessing ||
               !(request.status === "PENDING" || needsManualDispatch)
@@ -84,7 +102,19 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
             Merge Duplicate
           </Button>
         )}
-      </div>
+      </div>}
+
+      {request.status === "REJECTED" && (
+        <Card className="border-red-200 bg-red-50 p-4 text-red-900">
+          <div className="flex items-center gap-2 text-sm font-bold">
+            <XCircle className="h-4 w-4" />
+            Rejected
+          </div>
+          <p className="mt-2 text-xs leading-relaxed">
+            {request.rejectionReason || "No rejection reason was recorded for this legacy report."}
+          </p>
+        </Card>
+      )}
 
       <Separator />
 
@@ -198,6 +228,46 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
           </div>
         </Card>
       </div>
+      <Dialog
+        open={isRejectDialogOpen}
+        onOpenChange={(open) => {
+          if (isProcessing) return
+          setIsRejectDialogOpen(open)
+          if (!open) setRejectionReason("")
+        }}
+      >
+        <DialogContent className="max-w-md rounded-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle>Reject report</DialogTitle>
+            <DialogDescription>
+              Give a clear reason. This exact feedback will be shown to the public reporter.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Textarea
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+              maxLength={MAX_REJECTION_REASON_LENGTH}
+              placeholder="Example: The submitted location and details could not be verified."
+              className="min-h-28 resize-none"
+              disabled={isProcessing}
+              autoFocus
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>{normalizedReason ? "Reason ready to send" : "A rejection reason is required"}</span>
+              <span>{rejectionReason.length}/{MAX_REJECTION_REASON_LENGTH}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)} disabled={isProcessing}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleReject} disabled={!normalizedReason || isProcessing}>
+              {isProcessing ? "Rejecting…" : "Reject report"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

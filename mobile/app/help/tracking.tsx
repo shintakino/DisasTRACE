@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Modal, Alert, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Modal, BackHandler } from 'react-native';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPin, CheckCircle2, Truck, Navigation, LogOut } from 'lucide-react-native';
@@ -7,6 +7,8 @@ import { Hospital } from 'iconsax-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
 import { signOutFromMobile } from '../../lib/mobile-auth';
+import { useRejectedReportRecovery } from '../../hooks/use-rejected-report-recovery';
+import { fetchWithTimeout } from '../../lib/network-timeout';
 import * as Haptics from 'expo-haptics';
 
 const { height, width } = Dimensions.get('window');
@@ -78,6 +80,8 @@ export default function TrackingScreen() {
   const [liveResponderStatus, setLiveResponderStatus] = useState<string | null>(null);
   const [liveTargetHospital, setLiveTargetHospital] = useState<any | null>(null);
   const [coordinationAgencies, setCoordinationAgencies] = useState<string[]>([]);
+
+  const { handleRejectedReport } = useRejectedReportRecovery(isGuest ? 'guest' : 'registered');
 
   const coordinationMessage = () => {
     const coordination = coordinationAgencies.length === 0
@@ -265,19 +269,30 @@ export default function TrackingScreen() {
     if (isGuest || !report.id) return;
 
     let active = true;
+    let refreshing = false;
     const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'https://disas-trace.vercel.app/api';
 
     const syncRegisteredTracking = async () => {
+      if (refreshing) return;
+      refreshing = true;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) return;
 
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(report.id!)}`,
           { headers: { Authorization: `Bearer ${session.access_token}` } },
+          10_000,
+          'Report tracking refresh',
         );
         const result = response.ok ? await response.json() : null;
         if (!active || !result?.data) return;
+
+        if (result.data.status === 'REJECTED') {
+          active = false;
+          handleRejectedReport(result.data.rejectionReason);
+          return;
+        }
 
         const incident = result.data.incident as { id: string; status: string } | null;
         useEmergencyReportStore.setState((state) => ({
@@ -334,6 +349,8 @@ export default function TrackingScreen() {
         }
       } catch (error) {
         console.error('[TrackingScreen] Registered tracking refresh failed:', error);
+      } finally {
+        refreshing = false;
       }
     };
 
@@ -343,7 +360,7 @@ export default function TrackingScreen() {
       active = false;
       clearInterval(interval);
     };
-  }, [isGuest, report.id]);
+  }, [handleRejectedReport, isGuest, report.id]);
 
   // Guest tracking is refreshed through the report-scoped endpoint. This also
   // supplies the parent incident for a merged duplicate and keeps arrival state
@@ -351,13 +368,27 @@ export default function TrackingScreen() {
   useEffect(() => {
     if (!isGuest || !report.id || !report.guestAccessToken) return;
     let active = true;
+    let refreshing = false;
     const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
 
     const syncGuestTracking = async () => {
+      if (refreshing) return;
+      refreshing = true;
       try {
-        const response = await fetch(`${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(report.id!)}&accessToken=${encodeURIComponent(report.guestAccessToken!)}`);
+        const response = await fetchWithTimeout(
+          `${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(report.id!)}`,
+          { headers: { 'X-Guest-Report-Token': report.guestAccessToken! } },
+          10_000,
+          'Guest report tracking refresh',
+        );
         const result = response.ok ? await response.json() : null;
         if (!active || !result?.data) return;
+
+        if (result.data.status === 'REJECTED') {
+          active = false;
+          handleRejectedReport(result.data.rejectionReason);
+          return;
+        }
 
         const incident = result.data.incident as { id: string; status: string; responderId: string | null } | null;
         useEmergencyReportStore.setState((state) => ({
@@ -400,6 +431,8 @@ export default function TrackingScreen() {
         }
       } catch (error) {
         console.error('[TrackingScreen] Guest tracking refresh failed:', error);
+      } finally {
+        refreshing = false;
       }
     };
 
@@ -409,7 +442,7 @@ export default function TrackingScreen() {
       active = false;
       clearInterval(interval);
     };
-  }, [isGuest, report.guestAccessToken, report.id]);
+  }, [handleRejectedReport, isGuest, report.guestAccessToken, report.id]);
 
   // 2. Request-level Incident Lifecycle Listener (Tracks inserts, updates, and deletes)
   useEffect(() => {
@@ -524,34 +557,8 @@ export default function TrackingScreen() {
             setCoordinationAgencies(updatedAgencies);
           }
           if (payload.new && payload.new.status === 'REJECTED') {
-            // Error haptic vibe
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-            
-            // Unsubscribe channel
             supabase.removeChannel(reqChannel);
-            
-            // Clean up emergency report Zustand store
-            useEmergencyReportStore.setState((state) => ({
-              report: {
-                ...state.report,
-                incidentId: undefined,
-                id: undefined,
-                requestId: undefined
-              }
-            }));
-            
-            // Show alert and redirect back to Home dashboard
-            Alert.alert(
-              "Report Dismissed",
-              "Baliwag CDRRMO PACC has rejected or dismissed your incident report. If this is an error, please try submitting again or call PACC directly.",
-              [
-                { 
-                  text: "OK", 
-                  onPress: () => router.replace(isGuest ? '/' : '/(tabs)/index' as any)
-                }
-              ],
-              { cancelable: false }
-            );
+            handleRejectedReport(payload.new.rejection_reason);
           }
         }
       )
@@ -571,7 +578,7 @@ export default function TrackingScreen() {
     return () => {
       supabase.removeChannel(reqChannel);
     };
-  }, [isGuest, report.id, router]);
+  }, [handleRejectedReport, isGuest, report.id, router]);
 
   // 3. Incident-specific high-frequency telemetry broadcasts receiver
   useEffect(() => {

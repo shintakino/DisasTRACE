@@ -1,0 +1,99 @@
+export const MAX_REJECTION_REASON_LENGTH = 250;
+
+export type VerificationRequestStatus = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'DUPLICATE';
+export type VerificationIncidentStatus = 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'RESOLVED';
+export type VerificationQueueClassification = 'ACTIVE' | 'REJECTED' | 'CASE_CLOSED';
+export type ActiveVerificationBucket = 'ACTION' | 'REVIEW';
+
+interface VerificationQueueState {
+  requestStatus: VerificationRequestStatus;
+  incidentStatus?: VerificationIncidentStatus | null;
+}
+
+interface ActionableVerificationQueueState extends VerificationQueueState {
+  triageClassification?: string | null;
+  requiresPaccReassignment?: boolean;
+  responderId?: string | null;
+  currentOfferResponderId?: string | null;
+}
+
+/**
+ * Rejection is a PACC triage outcome. Case Closed means that an accepted
+ * report completed its response lifecycle. A rejected report always remains
+ * rejected even if inconsistent legacy data still points at a resolved case.
+ */
+export function classifyVerificationQueueItem(
+  input: VerificationQueueState,
+): VerificationQueueClassification {
+  if (input.requestStatus === 'REJECTED') return 'REJECTED';
+  if (input.requestStatus === 'VERIFIED' && input.incidentStatus === 'RESOLVED') {
+    return 'CASE_CLOSED';
+  }
+  return 'ACTIVE';
+}
+
+export function classifyActiveVerificationBucket(
+  input: ActionableVerificationQueueState,
+): ActiveVerificationBucket | null {
+  if (classifyVerificationQueueItem(input) !== 'ACTIVE') return null;
+
+  const needsDispatch = input.requiresPaccReassignment === true || (
+    input.requestStatus === 'VERIFIED'
+    && input.incidentStatus === 'DISPATCHED'
+    && !input.responderId
+    && !input.currentOfferResponderId
+  );
+  if (input.requestStatus !== 'PENDING' && !needsDispatch) return null;
+
+  return input.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY'
+    || input.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY'
+    ? 'ACTION'
+    : 'REVIEW';
+}
+
+export function normalizeRequiredRejectionReason(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (!normalized) return null;
+  return normalized.slice(0, MAX_REJECTION_REASON_LENGTH);
+}
+
+export function projectReporterReportStatus(input: {
+  requestStatus: VerificationRequestStatus;
+  incidentStatus?: VerificationIncidentStatus | null;
+  rejectionReason?: string | null;
+}) {
+  const outcome = classifyVerificationQueueItem(input);
+  const rejectionReason = normalizeRequiredRejectionReason(input.rejectionReason);
+
+  if (outcome === 'REJECTED') {
+    const reasonText = rejectionReason
+      ? ` Reason: ${rejectionReason}`
+      : ' Please contact PACC if you need the rejection reason.';
+    return {
+      status: input.requestStatus,
+      outcome,
+      terminal: true,
+      rejectionReason,
+      responseStatus: `PACC rejected this report.${reasonText} You can submit a new report if assistance is still needed.`,
+    } as const;
+  }
+
+  if (outcome === 'CASE_CLOSED') {
+    return {
+      status: input.requestStatus,
+      outcome,
+      terminal: true,
+      rejectionReason: null,
+      responseStatus: 'Case Closed. Emergency response coordination has been completed.',
+    } as const;
+  }
+
+  return {
+    status: input.requestStatus,
+    outcome,
+    terminal: false,
+    rejectionReason: null,
+    responseStatus: 'PACC is reviewing or coordinating this report.',
+  } as const;
+}

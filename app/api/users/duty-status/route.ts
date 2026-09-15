@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import { retryPendingAutomaticDispatches } from "@/lib/dispatch-engine";
@@ -48,8 +48,12 @@ export async function PATCH(req: NextRequest) {
         dutyStatus,
         updatedAt: new Date()
       })
-      .where(eq(users.id, user.id))
+      .where(and(eq(users.id, user.id), ne(users.dutyStatus, 'ACTIVE_DISPATCH')))
       .returning();
+
+    if (!updatedUser) {
+      return NextResponse.json({ error: 'Conflict: A dispatch reserved this responder before the duty change completed.' }, { status: 409 });
+    }
 
     if (dutyStatus === 'ON_DUTY') {
       await retryPendingAutomaticDispatches();

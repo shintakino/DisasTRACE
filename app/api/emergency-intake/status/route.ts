@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { incidents } from '@/db/schema/incidents';
@@ -8,10 +8,15 @@ import { hospitals } from '@/db/schema/hospitals';
 import { createClient } from '@/lib/supabase-server';
 import { cascadeIncident } from '@/lib/dispatch-engine';
 import { requiresPaccReassignment } from '@/lib/dispatch-policy';
+import { projectReporterReportStatus } from '@/lib/rejected-report-workflow';
+import { systemSettings } from '@/db/schema/system_settings';
+import { guestDeviceReportQuotas } from '@/db/schema/guest_device_report_quotas';
+import { DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT } from '@/lib/guest-report-limit';
+import { philippineMobileNumberVariants } from '@/lib/phone-number';
 
 export async function GET(request: NextRequest) {
   const requestId = request.nextUrl.searchParams.get('requestId');
-  const accessToken = request.nextUrl.searchParams.get('accessToken');
+  const accessToken = request.headers.get('x-guest-report-token') ?? request.nextUrl.searchParams.get('accessToken');
   if (!requestId) return NextResponse.json({ data: null, error: 'Missing report ID.', message: 'Missing report ID.' }, { status: 400 });
 
   let report: typeof verificationRequests.$inferSelect | undefined;
@@ -63,8 +68,15 @@ export async function GET(request: NextRequest) {
   const coordinationText = agencies.length > 0
     ? `Coordinating with ${agencies.length === 1 ? agencies[0] : `${agencies.slice(0, -1).join(', ')} and ${agencies.at(-1)}`}.`
     : null;
+  const rejectionProjection = projectReporterReportStatus({
+    requestStatus: report.status,
+    rejectionReason: report.rejectionReason,
+  });
+  const outcome = report.status === 'REJECTED'
+    ? 'REJECTED'
+    : incident?.status === 'RESOLVED' ? 'CASE_CLOSED' : 'ACTIVE';
   const responseStatus = report.status === 'REJECTED'
-    ? 'PACC has closed this report. Contact PACC if you still need assistance.'
+    ? rejectionProjection.responseStatus
     : report.status === 'DUPLICATE' && !incident
       ? 'PACC linked this report to another report of the same event and is reviewing the primary response.'
       : needsPaccReassignment
@@ -82,9 +94,31 @@ export async function GET(request: NextRequest) {
         : report.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY'
           ? coordinationText || 'PACC is securing the nearest available responder.'
           : 'PACC is reviewing your report.';
+  let guestAllowance: { limit: number; used: number; remaining: number } | undefined;
+  if (report.reporterType === 'GUEST' && report.contactNumber && report.guestDeviceHash) {
+    const [settings, [{ phoneUsed }], deviceQuota] = await Promise.all([
+      db.query.systemSettings.findFirst({
+        where: eq(systemSettings.id, 'current'),
+        columns: { guestReportsPerPhoneLimit: true },
+      }),
+      db.select({ phoneUsed: count() }).from(verificationRequests).where(and(
+        eq(verificationRequests.reporterType, 'GUEST'),
+        inArray(verificationRequests.contactNumber, philippineMobileNumberVariants(report.contactNumber)),
+      )),
+      db.query.guestDeviceReportQuotas.findFirst({
+        where: eq(guestDeviceReportQuotas.deviceHash, report.guestDeviceHash),
+        columns: { reportCount: true },
+      }),
+    ]);
+    const limit = settings?.guestReportsPerPhoneLimit ?? DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT;
+    const used = Math.max(Number(phoneUsed), deviceQuota?.reportCount ?? 0);
+    guestAllowance = { limit, used, remaining: Math.max(0, limit - used) };
+  }
   return NextResponse.json({
     data: {
       status: report.status,
+      outcome,
+      rejectionReason: report.status === 'REJECTED' ? rejectionProjection.rejectionReason : null,
       triageClassification: report.triageClassification,
       coordinationAgencies: agencies,
       responseStatus,
@@ -103,6 +137,7 @@ export async function GET(request: NextRequest) {
       trackingRequestId,
       isMergedDuplicate: trackingRequestId !== report.id,
       requiresPaccReassignment: needsPaccReassignment,
+      guestAllowance,
     },
     error: null,
     message: null,

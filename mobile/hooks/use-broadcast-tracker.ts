@@ -1,11 +1,31 @@
 import { useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { supabase } from '../lib/supabase';
 import { useResponderStore, checkConnectivity } from '../stores/useResponderStore';
 import { isMockedLocation } from '../lib/location-integrity';
+import { isEligibleHospitalDestination } from '../lib/hospital-destination-policy';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
+let lastTransportContextAlertAt = 0;
+
+async function handleTransportContextRejection(response: Response): Promise<boolean> {
+  if (response.status < 400 || response.status >= 500) return false;
+  const result = await response.json().catch(() => null) as { code?: string; message?: string } | null;
+  if (result?.code === 'HOSPITAL_DESTINATION_UNAVAILABLE' || result?.code === 'HOSPITAL_DESTINATION_REQUIRED') {
+    useResponderStore.getState().setTargetHospital(null);
+  }
+  const now = Date.now();
+  if (now - lastTransportContextAlertAt > 15_000) {
+    lastTransportContextAlertAt = now;
+    Alert.alert(
+      'Hospital destination needs attention',
+      result?.message || 'Contact PACC or select another available hospital before continuing.',
+    );
+  }
+  return true;
+}
 
 if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
   TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
@@ -19,6 +39,7 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
         const location = locations[0];
         const lat = location.coords.latitude;
         const lng = location.coords.longitude;
+        const accuracy = location.coords.accuracy;
         const isMockedLocationSignal = isMockedLocation(location);
         
         console.log(isMockedLocationSignal
@@ -38,6 +59,7 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
             body: JSON.stringify({
               latitude: lat,
               longitude: lng,
+              accuracy,
               isMockedLocation: isMockedLocationSignal,
             })
           });
@@ -135,7 +157,7 @@ export function useBroadcastTracker(
     }
 
     // Helper to query location with high-accuracy, cache fallback, and safe defaults
-    const queryPosition = async (): Promise<{ latitude: number; longitude: number; heading: number; speed: number; isMockedLocation: boolean } | null> => {
+    const queryPosition = async (): Promise<{ latitude: number; longitude: number; accuracy: number | null; heading: number; speed: number; isMockedLocation: boolean } | null> => {
       try {
         const loc = await Promise.race([
           Location.getCurrentPositionAsync({
@@ -149,6 +171,7 @@ export function useBroadcastTracker(
           return {
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
+            accuracy: loc.coords.accuracy,
             heading: loc.coords.heading || 0,
             speed: loc.coords.speed || 0,
             isMockedLocation: isMockedLocation(loc),
@@ -162,6 +185,7 @@ export function useBroadcastTracker(
             return {
               latitude: lastLoc.coords.latitude,
               longitude: lastLoc.coords.longitude,
+              accuracy: lastLoc.coords.accuracy,
               heading: lastLoc.coords.heading || 0,
               speed: lastLoc.coords.speed || 0,
               isMockedLocation: isMockedLocation(lastLoc),
@@ -177,6 +201,7 @@ export function useBroadcastTracker(
         return {
           latitude: 14.954 + (Math.random() - 0.5) * 0.002,
           longitude: 120.902 + (Math.random() - 0.5) * 0.002,
+          accuracy: null,
           heading: 0,
           speed: 0,
           isMockedLocation: false,
@@ -287,6 +312,14 @@ export function useBroadcastTracker(
             }
 
             const sendTelemetry = async () => {
+              // Entering the hospital leg briefly precedes the recommendation
+              // effect. Do not turn that expected UI state into a rejected
+              // request or a permanently retrying offline action.
+              if (
+                statusRef.current === 'to_hospital'
+                && !isEligibleHospitalDestination(targetHospitalRef.current)
+              ) return;
+
               let isOnline = false;
               try {
                 isOnline = await checkConnectivity();
@@ -303,7 +336,9 @@ export function useBroadcastTracker(
                   payload: {
                     latitude: lat,
                     longitude: lng,
+                    accuracy: pos.accuracy,
                     responderStatus: statusRef.current,
+                    incidentId,
                     targetHospitalId: targetHospitalRef.current?.id ?? null,
                   }
                 });
@@ -317,11 +352,20 @@ export function useBroadcastTracker(
                   body: JSON.stringify({
                     latitude: lat,
                     longitude: lng,
+                    accuracy: pos.accuracy,
                     responderStatus: statusRef.current,
+                    incidentId,
                     targetHospitalId: targetHospitalRef.current?.id ?? null,
                   })
                 });
                 if (!response.ok) {
+                  if (
+                    statusRef.current === 'to_hospital'
+                    && await handleTransportContextRejection(response)
+                  ) {
+                    console.warn('[BroadcastTracker] Hospital transport context was rejected and will not be queued.');
+                    return;
+                  }
                   throw new Error(`HTTP error ${response.status}`);
                 }
               } catch (err) {
@@ -333,7 +377,9 @@ export function useBroadcastTracker(
                   payload: {
                     latitude: lat,
                     longitude: lng,
+                    accuracy: pos.accuracy,
                     responderStatus: statusRef.current,
+                    incidentId,
                     targetHospitalId: targetHospitalRef.current?.id ?? null,
                   }
                 });
@@ -394,6 +440,11 @@ export function useBroadcastTracker(
           }
 
           const sendInitialTelemetry = async () => {
+            if (
+              responderStatus === 'to_hospital'
+              && !isEligibleHospitalDestination(targetHospital)
+            ) return;
+
             let isOnline = false;
             try {
               isOnline = await checkConnectivity();
@@ -410,7 +461,9 @@ export function useBroadcastTracker(
                 payload: {
                   latitude: lat,
                   longitude: lng,
+                  accuracy: pos.accuracy,
                   responderStatus,
+                  incidentId,
                   targetHospitalId: targetHospital?.id ?? null,
                 }
               });
@@ -424,11 +477,20 @@ export function useBroadcastTracker(
                 body: JSON.stringify({
                   latitude: lat,
                   longitude: lng,
+                  accuracy: pos.accuracy,
                   responderStatus,
+                  incidentId,
                   targetHospitalId: targetHospital?.id ?? null,
                 })
               });
               if (!response.ok) {
+                if (
+                  responderStatus === 'to_hospital'
+                  && await handleTransportContextRejection(response)
+                ) {
+                  console.warn('[BroadcastTracker] Initial hospital transport context was rejected and will not be queued.');
+                  return;
+                }
                 throw new Error(`HTTP status ${response.status}`);
               }
             } catch (err) {
@@ -440,7 +502,9 @@ export function useBroadcastTracker(
                 payload: {
                   latitude: lat,
                   longitude: lng,
+                  accuracy: pos.accuracy,
                   responderStatus,
+                  incidentId,
                   targetHospitalId: targetHospital?.id ?? null,
                 }
               });

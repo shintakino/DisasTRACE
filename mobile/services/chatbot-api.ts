@@ -10,6 +10,7 @@ import {
   type ChatbotSlot,
   type ChatbotStatus,
 } from '../lib/chatbot-contracts';
+import { fetchWithTimeout } from '../lib/network-timeout';
 
 const API_URL = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
 
@@ -29,6 +30,11 @@ const IntakeResponseSchema = z.object({
   }).passthrough(),
   incident: z.object({ id: z.string() }).passthrough().nullable(),
   guestAccessToken: z.string().length(64).nullable().optional(),
+  guestAllowance: z.object({
+    limit: z.number().int().nonnegative(),
+    used: z.number().int().nonnegative(),
+    remaining: z.number().int().nonnegative(),
+  }).optional(),
   autoDispatched: z.boolean(),
   replayed: z.boolean(),
 }).passthrough();
@@ -36,7 +42,7 @@ const IntakeResponseSchema = z.object({
 export type IntakeResult = z.infer<typeof IntakeResponseSchema>;
 
 export class ChatbotApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly details?: unknown) {
     super(message);
     this.name = 'ChatbotApiError';
   }
@@ -55,7 +61,8 @@ async function parseResponse(response: Response): Promise<unknown> {
     const errorMessage = body && typeof body === 'object'
       ? (body as { error?: unknown; message?: unknown }).error ?? (body as { message?: unknown }).message
       : null;
-    throw new ChatbotApiError(typeof errorMessage === 'string' ? errorMessage : 'The request could not be completed.', response.status);
+    const details = body && typeof body === 'object' ? (body as { details?: unknown }).details : undefined;
+    throw new ChatbotApiError(typeof errorMessage === 'string' ? errorMessage : 'The request could not be completed.', response.status, details);
   }
   return body;
 }
@@ -68,7 +75,7 @@ export async function askChatbot(input: {
   pendingSlot?: ChatbotSlot;
 }): Promise<ChatbotResponse> {
   const authorization = await getAuthorizationHeader(input.reporterMode);
-  const response = await fetch(`${API_URL}/chatbot/respond`, {
+  const response = await fetchWithTimeout(`${API_URL}/chatbot/respond`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authorization },
     body: JSON.stringify({
@@ -83,7 +90,7 @@ export async function askChatbot(input: {
         victimCondition: input.draft.victimCondition,
       },
     }),
-  });
+  }, 15_000, 'Chatbot request');
   const parsed = ApiEnvelopeSchema.safeParse(await parseResponse(response));
   if (!parsed.success) throw new ChatbotApiError('The chatbot returned an invalid response.', 502);
   return parsed.data.data;
@@ -98,7 +105,7 @@ export async function submitChatbotReport(input: {
   const guestDevicePayload = input.reporterMode === 'guest'
     ? { deviceId: getMobileDeviceId() }
     : {};
-  const response = await fetch(`${API_URL}/emergency-intake/${input.reporterMode === 'guest' ? 'guest' : 'registered'}`, {
+  const response = await fetchWithTimeout(`${API_URL}/emergency-intake/${input.reporterMode === 'guest' ? 'guest' : 'registered'}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authorization },
     body: JSON.stringify({
@@ -119,7 +126,7 @@ export async function submitChatbotReport(input: {
       imageUrl: input.draft.imageUrl,
       chatbotSubmissionId: input.submissionId,
     }),
-  });
+  }, 15_000, 'Report submission');
   const parsed = IntakeResponseSchema.safeParse(await parseResponse(response));
   if (!parsed.success) throw new ChatbotApiError('The report server returned an invalid response.', 502);
   return parsed.data;
@@ -132,10 +139,15 @@ export async function getChatbotReportStatus(input: {
 }): Promise<ChatbotStatus> {
   const authorization = await getAuthorizationHeader(input.reporterMode);
   const query = new URLSearchParams({ requestId: input.requestId });
-  if (input.reporterMode === 'guest' && input.guestAccessToken) query.set('accessToken', input.guestAccessToken);
-  const response = await fetch(`${API_URL}/emergency-intake/status?${query.toString()}`, {
-    headers: { Accept: 'application/json', ...authorization },
-  });
+  const response = await fetchWithTimeout(`${API_URL}/emergency-intake/status?${query.toString()}`, {
+    headers: {
+      Accept: 'application/json',
+      ...authorization,
+      ...(input.reporterMode === 'guest' && input.guestAccessToken
+        ? { 'X-Guest-Report-Token': input.guestAccessToken }
+        : {}),
+    },
+  }, 10_000, 'Report status refresh');
   const parsed = ChatbotStatusResponseSchema.safeParse(await parseResponse(response));
   if (!parsed.success) throw new ChatbotApiError('The report status response was invalid.', 502);
   return parsed.data.data;
@@ -151,10 +163,10 @@ export async function cancelChatbotReport(input: {
   const body = input.reporterMode === 'guest'
     ? { requestId: input.requestId, accessToken: input.guestAccessToken }
     : { requestId: input.requestId };
-  const response = await fetch(`${API_URL}/${endpoint}`, {
+  const response = await fetchWithTimeout(`${API_URL}/${endpoint}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authorization },
     body: JSON.stringify(body),
-  });
+  }, 10_000, 'Report cancellation');
   await parseResponse(response);
 }

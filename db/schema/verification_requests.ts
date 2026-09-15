@@ -12,6 +12,7 @@ export const verificationRequests = pgTable('verification_requests', {
   guestDeviceHash: varchar('guest_device_hash', { length: 64 }),
   guestAccessToken: varchar('guest_access_token', { length: 128 }).unique(),
   status: text('status', { enum: ['PENDING', 'VERIFIED', 'REJECTED', 'DUPLICATE'] }).default('PENDING').notNull(),
+  rejectionReason: text('rejection_reason'),
   parentRequestId: varchar('parent_request_id', { length: 255 }).references((): AnyPgColumn => verificationRequests.id),
   nature: text('nature', { enum: ['EMERGENCY', 'NON-EMERGENCY'] }).default('EMERGENCY').notNull(),
   type: text('type', { enum: ['Medical Emergency', 'Vehicular Collision', 'Fire Emergency', 'Structural Failure', 'Flood/Water', 'Unknown Cause', 'Patient Transport', 'Other / non-emergency request'] }).notNull(),

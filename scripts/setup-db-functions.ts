@@ -99,17 +99,21 @@ const runSetup = async () => {
                 now(),
                 jsonb_build_object('requestId', new.id)
               );
-            elsif new.status = 'REJECTED' and (old.status is null or old.status <> 'REJECTED') and new.resident_id is not null then
+            elsif new.status = 'REJECTED' and (old.status is null or old.status <> 'REJECTED') and new.resident_id is not null and new.rejection_reason is not null then
               insert into public.notifications (id, user_id, type, title, body, unread, created_at, metadata)
               values (
                 gen_random_uuid()::text,
                 new.resident_id,
-                'incident_verified',
+                'incident_rejected',
                 'Report Rejected',
-                'Your request (' || coalesce(new.nature, 'Emergency') || ') has been rejected.',
+                'PACC rejected report ' || new.request_id || '. Reason: ' || new.rejection_reason,
                 true,
                 now(),
-                jsonb_build_object('requestId', new.id)
+                jsonb_build_object(
+                  'requestId', new.id,
+                  'displayRequestId', new.request_id,
+                  'rejectionReason', new.rejection_reason
+                )
               );
             end if;
           end if;

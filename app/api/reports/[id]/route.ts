@@ -8,6 +8,7 @@ import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care"
 import { and, eq, or } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { formatOfficialBaliwagLocation, getReportDetailText, getReportLocation } from "@/lib/report-location";
+import { parseResponderReportArchivePayload } from "@/lib/responder-report-management";
 
 
 export async function GET(
@@ -32,6 +33,7 @@ export async function GET(
     }
 
     const isAdmin = userProfile.role === "pacc_admin" || userProfile.role === "cdrrmo_super_admin";
+    const canViewOperationalDetails = isAdmin || userProfile.role === 'ambulance_responder';
     const accessCondition = isAdmin
       ? undefined
       : userProfile.role === "ambulance_responder"
@@ -67,6 +69,7 @@ export async function GET(
         residentId: verificationRequests.residentId,
         reporterType: verificationRequests.reporterType,
         contactNumber: verificationRequests.contactNumber,
+        rejectionReason: verificationRequests.rejectionReason,
         verificationRequestId: verificationRequests.id,
       })
       .from(reports)
@@ -84,13 +87,22 @@ export async function GET(
 
     if (results.length === 0) {
       // 2. If not found, check verification_requests (user report)
+      // Responders may only open a report row that they own. Do not fall back
+      // to a raw verification request, which has no responder ownership column.
+      if (userProfile.role === 'ambulance_responder') {
+        return NextResponse.json({ error: "Report not found" }, { status: 404 });
+      }
+
+      const verificationAccessCondition = userProfile.role === 'public_user'
+        ? eq(verificationRequests.residentId, user.id)
+        : undefined;
       const userReq = await db.query.verificationRequests.findFirst({
         where: and(
           or(
             eq(verificationRequests.id, id),
             eq(verificationRequests.requestId, id)
           ),
-          ...(accessCondition ? [accessCondition] : [])
+          ...(verificationAccessCondition ? [verificationAccessCondition] : [])
         ),
         with: {
           resident: true,
@@ -114,7 +126,7 @@ export async function GET(
         });
         if (responder) {
           responderName = responder.fullName;
-          vehicleId = incident.assignedAmbulance || "AMB-001";
+          vehicleId = incident.assignedAmbulance || "N/A";
         }
       }
 
@@ -125,6 +137,8 @@ export async function GET(
         vehicleId: vehicleId,
         type: userReq.type,
         status: userReq.status, // PENDING, VERIFIED, REJECTED, DUPLICATE
+        rejectionReason: userReq.rejectionReason,
+        incidentStatus: incident?.status ?? null,
         date: new Date(userReq.createdAt).toLocaleDateString("en-US", {
           year: 'numeric',
           month: 'long',
@@ -166,7 +180,7 @@ export async function GET(
       };
 
       // Fetch duplicates for the resident request
-      const dbDuplicates = await db
+      const dbDuplicates = isAdmin ? await db
         .select({
           id: verificationRequests.id,
           requestId: verificationRequests.requestId,
@@ -183,7 +197,7 @@ export async function GET(
         })
         .from(verificationRequests)
         .innerJoin(users, eq(verificationRequests.residentId, users.id))
-        .where(eq(verificationRequests.parentRequestId, userReq.id));
+        .where(eq(verificationRequests.parentRequestId, userReq.id)) : [];
 
       const duplicates = dbDuplicates.map(d => ({
         id: d.id,
@@ -234,16 +248,16 @@ export async function GET(
     }
 
     // Fetch associated Patient Care Reports and Driver Trip Ticket
-    const patientCare = await db
+    const patientCare = canViewOperationalDetails ? await db
       .select()
       .from(patientCareReports)
-      .where(eq(patientCareReports.incidentId, r.incidentId));
+      .where(eq(patientCareReports.incidentId, r.incidentId)) : [];
 
-    const tripTicket = await db
+    const tripTicket = canViewOperationalDetails ? await db
       .select()
       .from(driverTripTickets)
       .where(eq(driverTripTickets.incidentId, r.incidentId))
-      .limit(1);
+      .limit(1) : [];
 
     const normalizedPatientCare = patientCare.map((item) => ({
       ...item,
@@ -261,9 +275,11 @@ export async function GET(
       id: r.id,
       incidentId: r.incidentId,
       responderName: r.responderName,
-      vehicleId: r.vehicleId || "AMB-001",
+      vehicleId: r.vehicleId || "N/A",
       type: r.type,
       status: r.status === 'SUBMITTED' ? 'COMPLETED' : 'ONGOING',
+      rejectionReason: r.rejectionReason,
+      incidentStatus: 'RESOLVED',
       date: new Date(r.createdAt).toLocaleDateString("en-US", {
         year: 'numeric',
         month: 'long',
@@ -277,7 +293,9 @@ export async function GET(
       barangay: r.barangay,
       residentReportDescription: getReportDetailText(r.residentReportDescription, "Awaiting detail logs."),
       residentPhotoUrl: r.residentPhotoUrl,
-      crewFindings: r.crewFindings || "No findings recorded.",
+      crewFindings: canViewOperationalDetails
+        ? (r.crewFindings || "No findings recorded.")
+        : "Responder documentation was submitted.",
       natureOfCall: r.natureOfCall,
       severityLevel: r.severityLevel,
       peopleInvolved: (() => {
@@ -297,7 +315,7 @@ export async function GET(
         if (r.peopleInvolved === '6+ Persons') return 6;
         return 0;
       })(),
-      scenePhotos: Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
+      scenePhotos: canViewOperationalDetails && Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
       residentName: residentName,
       residentPhone: residentPhone,
       residentAddress: residentAddress,
@@ -306,13 +324,13 @@ export async function GET(
         { action: "Ambulance Arrived at Scene", time: new Date(r.createdAt).toLocaleTimeString() },
         { action: "Report Logs Submitted", time: new Date(r.createdAt).toLocaleTimeString() },
       ],
-      participants: Array.isArray(r.participants) ? r.participants : [],
-      patientCareReports: normalizedPatientCare,
-      driverTripTicket: normalizedTripTicket,
+      participants: canViewOperationalDetails && Array.isArray(r.participants) ? r.participants : [],
+      patientCareReports: canViewOperationalDetails ? normalizedPatientCare : [],
+      driverTripTicket: canViewOperationalDetails ? normalizedTripTicket : null,
     };
 
     // Fetch duplicates for the responder report's associated verification request
-    const dbDuplicates = await db
+    const dbDuplicates = canViewOperationalDetails ? await db
       .select({
         id: verificationRequests.id,
         requestId: verificationRequests.requestId,
@@ -329,7 +347,7 @@ export async function GET(
       })
       .from(verificationRequests)
       .innerJoin(users, eq(verificationRequests.residentId, users.id))
-      .where(eq(verificationRequests.parentRequestId, r.verificationRequestId));
+      .where(eq(verificationRequests.parentRequestId, r.verificationRequestId)) : [];
 
     const duplicates = dbDuplicates.map(d => ({
       id: d.id,
@@ -363,5 +381,64 @@ export async function GET(
   } catch (error) {
     console.error("Error in GET /api/reports/[id]:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userProfile = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+      columns: { role: true, status: true },
+    });
+    if (!userProfile || userProfile.role !== 'ambulance_responder') {
+      return NextResponse.json({ error: 'Only responders can manage their report archive.' }, { status: 403 });
+    }
+    if (userProfile.status !== 'ACTIVE') {
+      return NextResponse.json({ error: 'Your responder account is not active.' }, { status: 403 });
+    }
+
+    let payload: { archived: boolean };
+    try {
+      payload = parseResponderReportArchivePayload(await req.json());
+    } catch {
+      return NextResponse.json({ error: 'The archived field must be a boolean.' }, { status: 400 });
+    }
+
+    const { id } = await params;
+    const now = new Date();
+    const [updatedReport] = await db
+      .update(reports)
+      .set({ archivedAt: payload.archived ? now : null, updatedAt: now })
+      .where(and(
+        eq(reports.id, id),
+        eq(reports.responderId, user.id),
+        eq(reports.status, 'SUBMITTED'),
+      ))
+      .returning({ id: reports.id, archivedAt: reports.archivedAt });
+
+    if (!updatedReport) {
+      return NextResponse.json({ error: 'Submitted report not found.' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      report: {
+        id: updatedReport.id,
+        archivedAt: updatedReport.archivedAt?.toISOString() ?? null,
+        isArchived: updatedReport.archivedAt !== null,
+      },
+    });
+  } catch (error) {
+    console.error('Error in PATCH /api/reports/[id]:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

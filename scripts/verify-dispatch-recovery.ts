@@ -5,7 +5,9 @@ import {
   canResponderAcceptDispatchOffer,
   evaluateManualDispatchEligibility,
   isResponderHeartbeatFresh,
+  prioritizeAutomaticDispatchRequests,
   requiresPaccReassignment,
+  selectNextDispatchableRequest,
   shouldRetryAutomaticDispatch,
 } from '../lib/dispatch-policy';
 
@@ -51,6 +53,32 @@ check('only the first waiting emergency may claim an automatic responder', () =>
   assert.equal(canClaimAutomaticDispatchTurn(firstRequestId, firstRequestId), true);
   assert.equal(canClaimAutomaticDispatchTurn(firstRequestId, laterRequestId), false);
   assert.equal(canClaimAutomaticDispatchTurn(null, firstRequestId), false);
+});
+
+check('orders dispatchable emergencies by severity tier and FIFO within a tier', () => {
+  const requests = prioritizeAutomaticDispatchRequests([
+    { id: 'high-new', severity: 'High', createdAt: new Date('2026-09-15T10:03:00Z') },
+    { id: 'critical-new', severity: 'Critical', createdAt: new Date('2026-09-15T10:02:00Z') },
+    { id: 'critical-old', severity: 'Critical', createdAt: new Date('2026-09-15T10:01:00Z') },
+    { id: 'medium-old', severity: 'Medium', createdAt: new Date('2026-09-15T10:00:00Z') },
+  ]);
+
+  assert.deepEqual(requests.map((request) => request.id), [
+    'critical-old',
+    'critical-new',
+    'high-new',
+    'medium-old',
+  ]);
+});
+
+check('an undispatchable older report does not block the next eligible report', () => {
+  const next = selectNextDispatchableRequest([
+    { id: 'critical-without-unit', severity: 'Critical', createdAt: new Date('2026-09-15T10:00:00Z') },
+    { id: 'critical-with-unit', severity: 'Critical', createdAt: new Date('2026-09-15T10:01:00Z') },
+    { id: 'high-with-unit', severity: 'High', createdAt: new Date('2026-09-15T09:59:00Z') },
+  ], new Set(['critical-with-unit', 'high-with-unit']));
+
+  assert.equal(next?.id, 'critical-with-unit');
 });
 
 check('accepts only the responder who owns an unassigned dispatch offer', () => {

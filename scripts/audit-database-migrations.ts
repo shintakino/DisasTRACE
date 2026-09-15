@@ -64,6 +64,7 @@ const expectedColumns = [
   ['verification_requests', 'guest_device_hash'],
   ['verification_requests', 'triage_classification'],
   ['verification_requests', 'coordination_agencies'],
+  ['verification_requests', 'rejection_reason'],
   ['verification_requests', 'photo_latitude'],
   ['verification_requests', 'photo_longitude'],
   ['verification_requests', 'barangay'],
@@ -130,8 +131,25 @@ async function audit() {
       WHERE trigger_schema = 'public'
     `;
     const triggerSet = new Set(triggers.map((row) => row.trigger_name));
-    const missingTriggers = ['trg_update_location_geom']
+    const missingTriggers = [
+      'trg_update_location_geom',
+      'on_verification_request_notification',
+      'on_incident_notification',
+      'on_user_verification_notification',
+    ]
       .filter((trigger) => !triggerSet.has(trigger));
+
+    const notificationFunctionRows = await sql<{ definition: string }[]>`
+      SELECT pg_get_functiondef(procedure.oid) AS definition
+      FROM pg_proc procedure
+      INNER JOIN pg_namespace namespace ON namespace.oid = procedure.pronamespace
+      WHERE namespace.nspname = 'public'
+        AND procedure.proname = 'generate_database_notifications'
+    `;
+    const hasRejectedReportNotification = notificationFunctionRows.some((row) =>
+      row.definition.includes('incident_rejected')
+      && row.definition.includes('new.rejection_reason'),
+    );
 
     const deduplicationConstraints = await sql<{ conname: string }[]>`
       SELECT conname
@@ -179,6 +197,8 @@ async function audit() {
     for (const index of missingIndexes) console.log(`  MISSING_INDEX ${index}`);
     console.log(`Missing expected triggers: ${missingTriggers.length}`);
     for (const trigger of missingTriggers) console.log(`  MISSING_TRIGGER ${trigger}`);
+    console.log(`Missing rejected-report notification function branch: ${hasRejectedReportNotification ? 0 : 1}`);
+    if (!hasRejectedReportNotification) console.log('  MISSING_NOTIFICATION_BRANCH incident_rejected');
     console.log(`Guest nullable-column mismatches: ${missingNullableColumns.length}`);
     for (const column of missingNullableColumns) console.log(`  NULLABILITY_MISMATCH ${column}`);
     console.log(`Missing deduplication-radius constraint: ${missingDeduplicationConstraint ? 1 : 0}`);
@@ -202,6 +222,7 @@ async function audit() {
       || missingColumns.length
       || missingIndexes.length
       || missingTriggers.length
+      || !hasRejectedReportNotification
       || missingNullableColumns.length
       || missingDeduplicationConstraint
     ) {

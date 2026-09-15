@@ -80,6 +80,7 @@ export const ChatbotActiveReportSchema = z.object({
   triageClassification: z.string().optional(),
   hasIncident: z.boolean(),
   isMergedDuplicate: z.boolean().optional(),
+  reportsRemaining: z.number().int().nonnegative().optional(),
 }).strict();
 
 export const ChatbotResponseSchema = z.object({
@@ -102,6 +103,8 @@ export const ChatbotResponseSchema = z.object({
 export const ChatbotStatusResponseSchema = z.object({
   data: z.object({
     status: z.string().min(1),
+    outcome: z.enum(['ACTIVE', 'REJECTED', 'CASE_CLOSED']).optional(),
+    rejectionReason: z.string().min(1).nullable().optional(),
     triageClassification: z.string().nullable().optional(),
     coordinationAgencies: z.array(z.string()).optional(),
     responseStatus: z.string().min(1),
@@ -114,6 +117,11 @@ export const ChatbotStatusResponseSchema = z.object({
     }).passthrough().nullable(),
     trackingRequestId: z.string(),
     isMergedDuplicate: z.boolean(),
+    guestAllowance: z.object({
+      limit: z.number().int().nonnegative(),
+      used: z.number().int().nonnegative(),
+      remaining: z.number().int().nonnegative(),
+    }).optional(),
   }),
   error: z.null(),
   message: z.string().nullable(),
@@ -159,6 +167,15 @@ export function isValidGuestPhone(value: string | undefined): boolean {
   const compact = (value ?? '').replace(/[\s()-]/g, '');
   if (!/^(?:\+63|0)9\d{9}$/.test(compact)) return false;
   return !isObviouslySyntheticGuestPhone(compact);
+}
+
+/** Keeps Guest Mode input in the single visible local form: 09XXXXXXXXX. */
+export function sanitizeGuestPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  const local = digits.startsWith('63')
+    ? `0${digits.slice(2)}`
+    : digits.startsWith('9') ? `0${digits}` : digits;
+  return local.slice(0, 11);
 }
 
 /** Mirrors the server's guest-only synthetic-number screen for immediate UX. */
@@ -236,6 +253,9 @@ export function restorePersistedChatbotState(value: unknown): PersistedChatbotSt
   const parsed = PersistedStateSchema.safeParse(value);
   if (!parsed.success) return createInitialChatbotState();
   const state = parsed.data;
+  if (state.activeReport?.status === 'REJECTED') {
+    return createInitialChatbotState(state.reporterMode, state.ownerId);
+  }
   if (state.lifecycle !== 'IDLE' && !state.ownerId) return createInitialChatbotState(state.reporterMode);
   if ((state.lifecycle === 'DRAFT' || state.lifecycle === 'SUBMITTING') && !state.submissionId) {
     return createInitialChatbotState(state.reporterMode);

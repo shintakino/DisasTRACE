@@ -6,6 +6,7 @@ import { ChevronLeft, CheckCircle, X } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { supabase } from '../../lib/supabase';
 import { uploadIncidentPhoto } from '../../lib/storage';
+import { fetchWithTimeout, withTimeout } from '../../lib/network-timeout';
 const WHAT_OPTIONS = [
   "Conscious and stable",
   "Conscious and Unstable",
@@ -90,7 +91,17 @@ export default function DetailsScreen() {
   const [isAutoDispatched, setIsAutoDispatched] = useState(false);
 
   const handleSubmit = async () => {
-    if (isSubmitting || showSubmitted || !what || !where || !when || !how) return;
+    if (isSubmitting || showSubmitted) return;
+    const missing = [
+      !what || (what === 'Other' && !whatOther.trim()) ? 'WHAT: condition of those affected' : null,
+      !where || (where === 'Other' && !whereOther.trim()) ? 'WHERE: scene access' : null,
+      !when ? 'WHEN: incident time' : null,
+      !how || (how === 'Other' && !howOther.trim()) ? 'HOW: incident cause' : null,
+    ].filter((item): item is string => Boolean(item));
+    if (missing.length > 0) {
+      Alert.alert('Complete required fields', `Please provide:\n• ${missing.join('\n• ')}`);
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -99,7 +110,11 @@ export default function DetailsScreen() {
       if (report.photoUri) {
         const uniqueId = Date.now().toString() + Math.random().toString(36).substring(7);
         console.log('[DetailsScreen] Uploading incident scene photo to Supabase storage with ID:', uniqueId);
-        uploadedUrl = await uploadIncidentPhoto(uniqueId, report.photoUri);
+        uploadedUrl = await withTimeout(
+          uploadIncidentPhoto(uniqueId, report.photoUri),
+          30_000,
+          'Photo upload',
+        );
         console.log('[DetailsScreen] Uploaded incident scene photo successfully. Public URL:', uploadedUrl);
       }
 
@@ -117,15 +132,16 @@ export default function DetailsScreen() {
 
       const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Please sign in again before submitting this report.');
       
-      const response = await fetch(`${apiUrl}/verification`, {
+      const response = await fetchWithTimeout(`${apiUrl}/verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify(payload)
-      });
+      }, 15_000, 'Report submission');
       
       const data = await response.json();
       
@@ -153,7 +169,10 @@ export default function DetailsScreen() {
     } catch (error) {
       console.error("Submission error:", error);
       setIsSubmitting(false);
-      Alert.alert("Submission Failed", "There was an error submitting your report. Please check your connection and try again.");
+      Alert.alert(
+        "Submission Failed",
+        error instanceof Error ? error.message : "There was an error submitting your report. Please check your connection and try again.",
+      );
     }
   };
 
@@ -233,10 +252,10 @@ export default function DetailsScreen() {
         </View>
         
         <TouchableOpacity 
-          style={[styles.submitBtn, (!what || !where || !when || !how || isSubmitting || showSubmitted) && styles.submitBtnDisabled]} 
-          onPress={handleSubmit} 
+          style={[styles.submitBtn, (isSubmitting || showSubmitted) && styles.submitBtnDisabled]}
+          onPress={handleSubmit}
           activeOpacity={0.8}
-          disabled={!what || !where || !when || !how || isSubmitting || showSubmitted}
+          disabled={isSubmitting || showSubmitted}
         >
           {isSubmitting ? (
             <ActivityIndicator color="#FFF" size="small" />

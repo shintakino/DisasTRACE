@@ -174,6 +174,13 @@ export default function EntryScreen() {
           >
             <Text style={styles.guestButtonText}>Login as Guest</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.historyButton}
+            onPress={() => router.push('/help/guest-history' as never)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.historyButtonText}>View Guest Report History</Text>
+          </TouchableOpacity>
         </Animated.View>
       )}
     </View>
@@ -281,5 +288,15 @@ const styles = StyleSheet.create({
   guestButtonText: {
     color: '#B91C1C',
     fontWeight: '700',
+  },
+  historyButton: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyButtonText: {
+    color: '#1E3A8A',
+    fontWeight: '700',
+    fontSize: 13,
   },
 });

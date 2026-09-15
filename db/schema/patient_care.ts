@@ -14,6 +14,8 @@ export const patientCareReports = pgTable('patient_care_reports', {
   incidentInfo: jsonb('incident_info'), // Site of incident, Chief complaints
   initialAssessment: jsonb('initial_assessment'), // LOC, Circulation, Airway, Trachea, Spinal Injury, Bleeding, Control
   vitalsLogs: jsonb('vitals_logs'), // Array of logs (time, bp, pr, o2_sat, rr, temp, pupil, skin, pain)
+  painAssessment: jsonb('pain_assessment'), // OPQRST pain assessment captured by the responder
+  gcsPoints: integer('gcs_points'), // Glasgow Coma Scale total (3-15)
   sampleHistory: jsonb('sample_history'), // Allergies, Medications, Past Medical History, Last Oral Intake, Events leading to injury
   traumaMarkers: jsonb('trauma_markers'), // Body diagram injury coordinates/regions
   narrativeReport: text('narrative_report'), // Multiline narrative text

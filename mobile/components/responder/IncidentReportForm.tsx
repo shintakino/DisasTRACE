@@ -9,6 +9,11 @@ import { PatientCareModal } from './PatientCareModal';
 import { TripTicketModal } from './TripTicketModal';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { getReportLocation } from '../../lib/report-location';
+import {
+  sanitizeBloodPressureInput,
+  sanitizeBoundedIntegerInput,
+  validateIncidentReportForSubmission,
+} from '../../lib/responder-form-controls';
 
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -26,6 +31,7 @@ const EMERGENCY_TYPES = [
 ];
 const SEVERITY_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
 const PATIENT_STATUSES = ['Stable — Conscious', 'Stable — Unconscious', 'Critical', 'Deceased'];
+const MAX_PATIENTS = 999;
 
 function InlineDropdown({ 
   label, options, value, onSelect, isOpen, onToggle 
@@ -159,6 +165,7 @@ export function IncidentReportForm() {
   }
 
   const addPatient = () => {
+    if (patients.length >= MAX_PATIENTS) return;
     const newId = patients.length > 0 ? Math.max(...patients.map(p => p.id)) + 1 : 1;
     setPatients([...patients, { id: newId, status: 'Stable — Conscious', bp: '', hr: '', spo2: '', pcrDetails: null }]);
   };
@@ -199,7 +206,7 @@ export function IncidentReportForm() {
   };
 
   const handleSubmit = () => {
-    if (activeDispatch) {
+    if (activeDispatch && submissionValidation.valid) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       const responderName = profile?.fullName || 'Ambulance Responder';
@@ -298,6 +305,13 @@ export function IncidentReportForm() {
       submitReport(activeDispatch.id, formData);
     }
   };
+
+  const submissionValidation = validateIncidentReportForSubmission({
+    activeDispatchId: activeDispatch?.id,
+    location: dispatchLocation,
+    patients,
+  });
+  const isSubmitDisabled = isSubmittingReport || !submissionValidation.valid;
 
 
   return (
@@ -423,14 +437,24 @@ export function IncidentReportForm() {
               <View>
                 <Text className="text-[#1E3A8A] font-black text-[10px] uppercase tracking-widest mb-2">ACTUAL NUMBER OF PATIENTS</Text>
                 <View className="flex-row items-center justify-between border border-slate-200 rounded-xl px-4 py-2 bg-white mb-2">
-                  <TouchableOpacity onPress={() => removePatient()} className="w-8 h-8 rounded-full bg-slate-200 items-center justify-center">
+                  <TouchableOpacity
+                    onPress={() => removePatient()}
+                    disabled={patients.length <= 1}
+                    accessibilityState={{ disabled: patients.length <= 1 }}
+                    className={`w-8 h-8 rounded-full items-center justify-center ${patients.length <= 1 ? 'bg-slate-100 opacity-50' : 'bg-slate-200'}`}
+                  >
                     <Minus size={16} color="#475569" />
                   </TouchableOpacity>
                   <View className="items-center">
                     <Text className="text-[#1E3A8A] font-bold text-xl">{patients.length}</Text>
                     <Text className="text-slate-400 text-[8px] font-bold tracking-widest uppercase mt-0.5">PATIENTS ON SCENE</Text>
                   </View>
-                  <TouchableOpacity onPress={addPatient} className="w-8 h-8 rounded-full bg-blue-100 items-center justify-center">
+                  <TouchableOpacity
+                    onPress={addPatient}
+                    disabled={patients.length >= MAX_PATIENTS}
+                    accessibilityState={{ disabled: patients.length >= MAX_PATIENTS }}
+                    className={`w-8 h-8 rounded-full items-center justify-center ${patients.length >= MAX_PATIENTS ? 'bg-slate-100 opacity-50' : 'bg-blue-100'}`}
+                  >
                     <Plus size={16} color="#1E3A8A" />
                   </TouchableOpacity>
                 </View>
@@ -496,7 +520,9 @@ export function IncidentReportForm() {
                           placeholder="120/80"
                           placeholderTextColor="#94A3B8"
                           value={patient.bp}
-                          onChangeText={(val) => updatePatient(patient.id, 'bp', val)}
+                          onChangeText={(val) => updatePatient(patient.id, 'bp', sanitizeBloodPressureInput(val))}
+                          keyboardType="numbers-and-punctuation"
+                          maxLength={7}
                         />
                       </View>
                       <View className="flex-1">
@@ -506,7 +532,9 @@ export function IncidentReportForm() {
                           placeholder="bpm"
                           placeholderTextColor="#94A3B8"
                           value={patient.hr}
-                          onChangeText={(val) => updatePatient(patient.id, 'hr', val)}
+                          onChangeText={(val) => updatePatient(patient.id, 'hr', sanitizeBoundedIntegerInput(val, 300))}
+                          keyboardType="number-pad"
+                          maxLength={3}
                         />
                       </View>
                       <View className="flex-1">
@@ -516,7 +544,9 @@ export function IncidentReportForm() {
                           placeholder="%"
                           placeholderTextColor="#94A3B8"
                           value={patient.spo2}
-                          onChangeText={(val) => updatePatient(patient.id, 'spo2', val)}
+                          onChangeText={(val) => updatePatient(patient.id, 'spo2', sanitizeBoundedIntegerInput(val, 100))}
+                          keyboardType="number-pad"
+                          maxLength={3}
                         />
                       </View>
                     </View>
@@ -532,7 +562,9 @@ export function IncidentReportForm() {
 
                 <TouchableOpacity 
                   onPress={addPatient}
-                  className="bg-[#1E3A8A] rounded-2xl py-4 flex-row justify-center items-center mt-2"
+                  disabled={patients.length >= MAX_PATIENTS}
+                  accessibilityState={{ disabled: patients.length >= MAX_PATIENTS }}
+                  className={`rounded-2xl py-4 flex-row justify-center items-center mt-2 ${patients.length >= MAX_PATIENTS ? 'bg-slate-300' : 'bg-[#1E3A8A]'}`}
                 >
                   <Plus color="white" size={20} />
                   <Text className="text-white font-bold ml-2">Add Patient</Text>
@@ -551,29 +583,37 @@ export function IncidentReportForm() {
           </ScrollView>
 
           {/* Sticky Footer */}
-          <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 p-4 pb-8 flex-row space-x-3">
-            <TouchableOpacity 
+          <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 p-4 pb-8">
+            {!submissionValidation.valid && (
+              <Text className="text-red-700 text-xs font-medium mb-2" accessibilityLiveRegion="polite">
+                {submissionValidation.errors[0]}
+              </Text>
+            )}
+            <View className="flex-row space-x-3">
+              <TouchableOpacity
                 onPress={handleSaveDraft}
-              className="flex-1 bg-yellow-50 border border-yellow-100 rounded-2xl py-4 flex-row justify-center items-center shadow-sm"
-            >
-              <FolderDown size={18} color="#92400E" />
-              <Text className="text-[#92400E] font-bold ml-2 text-base">Save as Draft</Text>
-            </TouchableOpacity>
+                className="flex-1 bg-yellow-50 border border-yellow-100 rounded-2xl py-4 flex-row justify-center items-center shadow-sm"
+              >
+                <FolderDown size={18} color="#92400E" />
+                <Text className="text-[#92400E] font-bold ml-2 text-base">Save as Draft</Text>
+              </TouchableOpacity>
             
-            <TouchableOpacity 
-              onPress={handleSubmit}
-              disabled={isSubmittingReport}
-              className={`flex-1 rounded-2xl py-4 flex-row justify-center items-center shadow-md ${isSubmittingReport ? 'bg-[#1E3A8A]/80' : 'bg-[#1E3A8A]'}`}
-            >
-              {isSubmittingReport ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <>
-                  <Check size={18} color="white" />
-                  <Text className="text-white font-bold ml-2 text-base">Submit</Text>
-                </>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSubmit}
+                disabled={isSubmitDisabled}
+                accessibilityState={{ disabled: isSubmitDisabled }}
+                className={`flex-1 rounded-2xl py-4 flex-row justify-center items-center ${isSubmitDisabled ? 'bg-slate-300' : 'bg-[#1E3A8A] shadow-md'}`}
+              >
+                {isSubmittingReport ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <>
+                    <Check size={18} color="white" />
+                    <Text className="text-white font-bold ml-2 text-base">Submit</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 

@@ -11,6 +11,7 @@ import { isWithinOfficialBaliwagBoundary, resolveBaliwagBarangay } from '@/lib/b
 import { systemSettings } from '@/db/schema/system_settings';
 import { distanceBetweenCoordinatesMeters } from '@/lib/location-integrity';
 import { isObviouslySyntheticPhilippineMobileNumber, normalizePhilippineMobileNumber, samePhilippineMobileNumber } from '@/lib/phone-number';
+import { createPublicRequestId, deriveInitialTriage } from '@/lib/initial-triage-policy';
 
 const IncidentTypeSchema = z.enum([
   'Medical Emergency',
@@ -33,10 +34,13 @@ const ContactNumberSchema = z.string()
 export const GuestDeviceIdSchema = z.string().trim().min(8).max(256)
   .regex(/^[A-Za-z0-9._:-]+$/, 'This device could not be identified. Please update the app and try again.');
 
-const GuestContactNumberSchema = ContactNumberSchema.refine(
-  (value) => !isObviouslySyntheticPhilippineMobileNumber(value),
-  { message: 'Use an active Philippine mobile number. Repeating or sequential numbers are not accepted.' },
-);
+const GuestContactNumberSchema = z.string()
+  .trim()
+  .regex(/^09\d{9}$/, 'Guest callback number must contain exactly 11 digits beginning with 09.')
+  .refine(
+    (value) => !isObviouslySyntheticPhilippineMobileNumber(value),
+    { message: 'Use an active Philippine mobile number. Repeating or sequential numbers are not accepted.' },
+  );
 
 const IntakeDetailsSchema = z.object({
   incidentType: IncidentTypeSchema,
@@ -129,7 +133,7 @@ export function isWithinBaliwag(latitude: number, longitude: number) {
 
 function isConsistent(input: EmergencyIntake) {
   if (input.nature === 'NON-EMERGENCY') return true;
-  return input.peopleInvolved > 0 && input.incidentType !== 'Unknown Cause' && input.victimCondition !== 'Unknown / cannot assess';
+  return input.peopleInvolved > 0 && input.victimCondition !== 'Unknown / cannot assess';
 }
 
 export async function submitEmergencyIntake(input: EmergencyIntake, actor: IntakeActor) {
@@ -137,12 +141,11 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
   // Only the explicit non-emergency categories may bypass emergency dispatch.
   // Every emergency category is normalized server-side so a modified client
   // cannot downgrade a fire, collision, flood, or structural failure.
-  const supportsNonEmergency = input.incidentType === 'Patient Transport'
-    || input.incidentType === 'Other / non-emergency request'
-    || input.incidentType === 'Unknown Cause';
-  const normalizedInput: EmergencyIntake = supportsNonEmergency
-    ? input
-    : { ...input, nature: 'EMERGENCY' };
+  const authoritativeNature = deriveInitialTriage({
+    incidentType: input.incidentType,
+    requestedNature: input.nature,
+  }).nature;
+  const normalizedInput: EmergencyIntake = { ...input, nature: authoritativeNature };
   input = normalizedInput;
   const existingReplay = await loadChatbotReplay(input, actor);
   if (existingReplay) return existingReplay;
@@ -181,23 +184,25 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
     reasons.push('The attached photo GPS differs materially from the reported GPS. PACC review is required.');
   }
 
-  let triageClassification: TriageClassification;
-  if (nearbyDuplicate || repeatedContact || photoLocationConflict) {
-    triageClassification = 'SUSPICIOUS_POSSIBLE_PRANK';
-  } else if (!consistent) {
-    triageClassification = 'UNCERTAIN_INCOMPLETE';
-  } else if (input.nature === 'NON-EMERGENCY') {
-    triageClassification = 'HIGH_CONFIDENCE_NON_EMERGENCY';
-  } else {
-    triageClassification = 'HIGH_CONFIDENCE_EMERGENCY';
+  const triage = deriveInitialTriage({
+    incidentType: input.incidentType,
+    requestedNature: input.nature,
+    answersConsistent: consistent,
+    suspicious: nearbyDuplicate || repeatedContact || photoLocationConflict,
+  });
+  input = { ...input, nature: triage.nature };
+  const triageClassification: TriageClassification = triage.classification;
+  for (const reason of triage.reasons) {
+    if (!reasons.includes(reason)) reasons.unshift(reason);
   }
 
-  const requestId = `REQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const databaseId = input.chatbotSubmissionId ?? crypto.randomUUID();
+  const requestId = createPublicRequestId(databaseId);
   const guestAccessToken = actor.reporterType === 'GUEST' ? crypto.randomBytes(32).toString('hex') : null;
   let request: typeof verificationRequests.$inferSelect;
   try {
     [request] = await db.insert(verificationRequests).values({
-      id: input.chatbotSubmissionId ?? crypto.randomUUID(),
+      id: databaseId,
       requestId,
       residentId: actor.residentId,
       reporterType: actor.reporterType,

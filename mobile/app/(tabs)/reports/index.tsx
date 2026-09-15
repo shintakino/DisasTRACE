@@ -1,131 +1,323 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar, ActivityIndicator, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Flame, CarFront, Activity, AlertTriangle, MapPin } from 'lucide-react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { type Href, useRouter } from 'expo-router';
+import {
+  Activity,
+  AlertTriangle,
+  Archive,
+  CarFront,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  MapPin,
+  RotateCcw,
+  Search,
+} from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { useAuthStatus } from '../../../hooks/use-auth-status';
 import { ReportDetailModal } from '../../../components/responder/ReportDetailModal';
 import { supabase } from '../../../lib/supabase';
 import { formatBaliwagLocation } from '../../../lib/baliwag-location';
 
+const RESPONDER_PAGE_SIZE = 15;
+const TYPE_FILTERS = [
+  { label: 'All types', value: '' },
+  { label: 'Medical', value: 'Medical Emergency' },
+  { label: 'Vehicular', value: 'Vehicular Collision' },
+  { label: 'Fire', value: 'Fire Emergency' },
+  { label: 'Structural', value: 'Structural Failure' },
+  { label: 'Flood/Water', value: 'Flood/Water' },
+  { label: 'Unknown', value: 'Unknown Cause' },
+  { label: 'Transport', value: 'Patient Transport' },
+  { label: 'Other', value: 'Other / non-emergency request' },
+] as const;
+
+type StatusFilter = 'all' | 'completed' | 'ongoing';
+type ArchiveFilter = 'active' | 'archived';
+type SortOrder = 'newest' | 'oldest';
+
+type Pagination = {
+  page: number;
+  total: number;
+  totalPages: number;
+};
+
+type ReportApiItem = {
+  id: string;
+  requestId?: string;
+  type?: string;
+  date?: string;
+  createdAt?: string;
+  status?: string;
+  incidentStatus?: string | null;
+  responderName?: string | null;
+  vehicleId?: string | null;
+  barangay?: string | null;
+  location?: string | null;
+  residentName?: string | null;
+  natureOfCall?: string | null;
+  peopleInvolved?: number;
+  residentPhotoUrl?: string | null;
+  crewFindings?: string | null;
+  scenePhotos?: string[];
+  duplicates?: Array<Record<string, unknown>>;
+  archivedAt?: string | null;
+  isArchived?: boolean;
+};
+
+type ReportListItem = ReportApiItem & {
+  type: string;
+  date: string;
+  status: string;
+  location: string;
+  response: string;
+  icon: LucideIcon;
+};
+
+type ReportsApiResponse = {
+  data?: ReportApiItem[];
+  error?: string;
+  page?: number;
+  total?: number;
+  totalPages?: number;
+};
+
 export default function MyReportsScreen() {
   const router = useRouter();
-  const [selectedReport, setSelectedReport] = useState<any>(null);
-  const [reports, setReports] = useState<any[]>([]);
+  const [selectedReport, setSelectedReport] = useState<ReportListItem | null>(null);
+  const [reports, setReports] = useState<ReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [archiveUpdatingId, setArchiveUpdatingId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, total: 0, totalPages: 1 });
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const requestSequence = useRef(0);
+  const activeRequest = useRef<AbortController | null>(null);
   const { role, isLoaded, user } = useAuthStatus();
-  const isResponder = role?.includes('responder');
+  const isResponder = role?.includes('responder') ?? false;
+  const displayLoading = loading && (!isLoaded || Boolean(user));
 
-  const fetchReports = async () => {
+  useEffect(() => {
+    if (!isResponder) return;
+    const timer = setTimeout(() => {
+      setPagination((current) => ({ ...current, page: 1 }));
+      setSearch(searchInput.trim());
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [isResponder, searchInput]);
+
+  const fetchReports = useCallback(async (asRefresh = false) => {
+    const sequence = ++requestSequence.current;
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+
+    // Defer UI state updates so this callback remains safe when started by an effect.
+    await Promise.resolve();
+    if (asRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+
     try {
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
       const { data: { session } } = await supabase.auth.getSession();
-      const reqHeaders: any = {};
-      if (session?.access_token) {
-        reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+      const reqHeaders: Record<string, string> = {};
+      if (session?.access_token) reqHeaders.Authorization = `Bearer ${session.access_token}`;
+
+      const params = new URLSearchParams({ category: isResponder ? 'responder' : 'user' });
+      if (isResponder) {
+        if (search) params.set('search', search);
+        if (typeFilter) params.set('type', typeFilter);
+        params.set('status', statusFilter);
+        params.set('archive', archiveFilter);
+        params.set('sort', sortOrder);
+        params.set('page', String(pagination.page));
+        params.set('limit', String(RESPONDER_PAGE_SIZE));
       }
 
-      const response = await fetch(`${apiUrl}/api/reports`, {
+      const response = await fetch(`${apiUrl}/api/reports?${params.toString()}`, {
         headers: reqHeaders,
+        signal: controller.signal,
       });
-      const result = await response.json();
-      
-      if (result.data) {
-        const mappedReports = result.data.map((r: any) => {
-          let icon = AlertTriangle;
-          if (r.type?.toLowerCase().includes('vehicular') || r.type?.toLowerCase().includes('collision') || r.type?.toLowerCase().includes('accident')) {
-            icon = CarFront;
-          } else if (r.type?.toLowerCase().includes('medical') || r.type?.toLowerCase().includes('emergency')) {
-            icon = Activity;
-          } else if (r.type?.toLowerCase().includes('fire')) {
-            icon = Flame;
-          }
+      const result = await response.json().catch(() => null) as ReportsApiResponse | null;
+      if (!response.ok) throw new Error(result?.error || 'Reports could not be loaded. Please try again.');
+      if (sequence !== requestSequence.current) return;
 
-          return {
-            ...r,
-            id: r.id,
-            type: r.type || 'Incident',
-            date: r.date || 'Today',
-            status: r.status || 'COMPLETED',
-            location: formatBaliwagLocation(r.barangay) ?? 'Location unavailable',
-            response: r.responderName ? `AMB-${r.responderName.slice(0, 3).toUpperCase()} Dispatched` : 'Dispatched',
-            icon,
-          };
-        });
-        setReports(mappedReports);
+      const mappedReports: ReportListItem[] = Array.isArray(result?.data) ? result.data.map((report) => {
+        let icon: LucideIcon = AlertTriangle;
+        if (report.type?.toLowerCase().includes('vehicular') || report.type?.toLowerCase().includes('collision') || report.type?.toLowerCase().includes('accident')) {
+          icon = CarFront;
+        } else if (report.type?.toLowerCase().includes('medical') || report.type?.toLowerCase().includes('emergency')) {
+          icon = Activity;
+        } else if (report.type?.toLowerCase().includes('fire')) {
+          icon = Flame;
+        }
+
+        const rawStatus = report.status || 'COMPLETED';
+        const status = !isResponder && rawStatus !== 'REJECTED' && report.incidentStatus === 'RESOLVED'
+          ? 'CASE_CLOSED'
+          : rawStatus;
+        const responseLabel = isResponder
+          ? (report.vehicleId ? `${report.vehicleId} assigned` : 'Responder report')
+          : status === 'REJECTED'
+            ? 'Rejected by PACC'
+            : status === 'CASE_CLOSED'
+              ? 'Case closed'
+              : status === 'DUPLICATE'
+                ? 'Linked to primary report'
+                : status === 'PENDING'
+                  ? 'Awaiting PACC review'
+                  : 'Response in progress';
+
+        return {
+          ...report,
+          type: report.type || 'Incident',
+          date: report.date || 'Today',
+          status,
+          location: formatBaliwagLocation(report.barangay) ?? 'Location unavailable',
+          response: responseLabel,
+          icon,
+        };
+      }) : [];
+
+      setReports(mappedReports);
+      if (isResponder) {
+        setPagination((current) => ({
+          page: Number(result?.page) || current.page,
+          total: Number(result?.total) || 0,
+          totalPages: Math.max(1, Number(result?.totalPages) || 1),
+        }));
       }
-    } catch (error) {
-      console.error('Error fetching reports on mobile:', error);
+    } catch (fetchError) {
+      if (controller.signal.aborted || sequence !== requestSequence.current) return;
+      console.error('Error fetching reports on mobile:', fetchError);
+      setReports([]);
+      setError(fetchError instanceof Error ? fetchError.message : 'Reports could not be loaded. Please try again.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (sequence === requestSequence.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  };
+  }, [archiveFilter, isResponder, pagination.page, search, sortOrder, statusFilter, typeFilter]);
 
   useEffect(() => {
-    if (isLoaded) {
-      if (user) {
-        fetchReports();
-      } else {
-        setLoading(false);
-      }
-    }
-  }, [isLoaded, user]);
+    if (!isLoaded) return;
+    if (!user) return;
+    const timer = setTimeout(() => void fetchReports(), 0);
+    return () => {
+      clearTimeout(timer);
+      activeRequest.current?.abort();
+    };
+  }, [fetchReports, isLoaded, reloadVersion, user]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchReports();
+  const updateArchive = async (report: ReportListItem) => {
+    if (archiveUpdatingId || report.status !== 'COMPLETED') return;
+    const shouldArchive = archiveFilter === 'active';
+    setArchiveUpdatingId(report.id);
+    setActionMessage(null);
+    setError(null);
+
+    try {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${apiUrl}/api/reports/${encodeURIComponent(report.id)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ archived: shouldArchive }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || 'The report archive could not be updated.');
+
+      setSelectedReport(null);
+      setActionMessage(shouldArchive ? 'Report moved to Archived.' : 'Report restored to Active.');
+      if (reports.length === 1 && pagination.page > 1) {
+        setPagination((current) => ({ ...current, page: current.page - 1 }));
+      } else {
+        // Trigger a render before refetching so the request always uses the
+        // latest search/filter/sort state rather than this mutation's closure.
+        setReloadVersion((current) => current + 1);
+      }
+    } catch (mutationError) {
+      setError(mutationError instanceof Error ? mutationError.message : 'The report archive could not be updated.');
+    } finally {
+      setArchiveUpdatingId(null);
+    }
   };
 
-  // Group reports for resident view
-  const today: any[] = [];
-  const yesterday: any[] = [];
-  const older: any[] = [];
+  const onRefresh = () => void fetchReports(true);
 
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const oneDay = 24 * 60 * 60 * 1000;
+  const changePage = (page: number) => {
+    if (loading || refreshing || archiveUpdatingId || page < 1 || page > pagination.totalPages) return;
+    setPagination((current) => ({ ...current, page }));
+  };
 
-  reports.forEach((r) => {
-    try {
-      const timestamp = r.createdAt ? Date.parse(r.createdAt) : Date.parse(r.date);
-      if (!Number.isFinite(timestamp)) throw new Error('Invalid report timestamp');
-      const rDate = new Date(timestamp);
-      const reportStart = new Date(rDate.getFullYear(), rDate.getMonth(), rDate.getDate()).getTime();
-      const diffDays = Math.max(0, Math.floor((todayStart - reportStart) / oneDay));
-      
-      if (diffDays === 0 || r.date === 'Today') {
-        today.push(r);
-      } else if (diffDays === 1) {
-        yesterday.push(r);
-      } else {
-        older.push(r);
-      }
-    } catch {
-      today.push(r);
-    }
-  });
+  const chooseType = (value: string) => {
+    setTypeFilter(value);
+    setPagination((current) => ({ ...current, page: 1 }));
+  };
 
-  const renderReportCard = (report: any) => {
+  const chooseStatus = (value: StatusFilter) => {
+    if (archiveFilter === 'archived' && value === 'ongoing') return;
+    setStatusFilter(value);
+    setPagination((current) => ({ ...current, page: 1 }));
+  };
+
+  const chooseArchive = (value: ArchiveFilter) => {
+    setArchiveFilter(value);
+    if (value === 'archived') setStatusFilter('completed');
+    setPagination((current) => ({ ...current, page: 1 }));
+    setActionMessage(null);
+  };
+
+  const toggleSort = () => {
+    setSortOrder((current) => current === 'newest' ? 'oldest' : 'newest');
+    setPagination((current) => ({ ...current, page: 1 }));
+  };
+
+  const renderReportCard = (report: ReportListItem) => {
     const Icon = report.icon;
-    
-    let statusBgColor = 'bg-[#1E3A8A]'; // COMPLETED / default
-    if (report.status === 'RESPONDING') statusBgColor = 'bg-[#10B981]'; // Green 500 equivalent
-    if (report.status === 'ONGOING') statusBgColor = 'bg-[#F59E0B]'; // Amber 500 equivalent
-    
+    let statusBgColor = 'bg-[#1E3A8A]';
+    if (report.status === 'RESPONDING') statusBgColor = 'bg-[#10B981]';
+    if (report.status === 'ONGOING') statusBgColor = 'bg-[#F59E0B]';
+    if (report.status === 'CASE_CLOSED') statusBgColor = 'bg-[#22C55E]';
+    if (report.status === 'REJECTED') statusBgColor = 'bg-[#DC2626]';
+    const statusLabel = report.status === 'CASE_CLOSED' ? 'CASE CLOSED' : report.status;
+    const archiveDisabled = !!archiveUpdatingId || report.status !== 'COMPLETED';
+
     return (
-      <TouchableOpacity 
-        key={`${report.id}-${report.status}`}
-        activeOpacity={0.7}
-        onPress={() => {
-          if (isResponder) {
-            setSelectedReport(report);
-          } else {
-            router.push(`/(tabs)/reports/${report.id}` as any);
-          }
-        }}
-        className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100"
-      >
+      <View className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100">
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            if (isResponder) setSelectedReport(report);
+            else router.push(`/(tabs)/reports/${report.id}` as Href);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Open report ${report.id}`}
+        >
         <View className="flex-row justify-between items-start mb-4">
           <View className="flex-row items-center flex-1">
             <View className="w-14 h-14 rounded-2xl bg-red-200/50 items-center justify-center mr-4">
@@ -139,13 +331,11 @@ export default function MyReportsScreen() {
           <View className="items-end justify-between h-14 py-1">
             <Text className="text-xs font-medium text-slate-400 uppercase tracking-wider">{report.date}</Text>
             <View className={`px-3 py-1 rounded-full ${statusBgColor}`}>
-              <Text className="text-xs font-bold text-white uppercase">{report.status}</Text>
+              <Text className="text-xs font-bold text-white uppercase">{statusLabel}</Text>
             </View>
           </View>
         </View>
-        
         <View className="h-[1px] bg-slate-100 w-full mb-4" />
-        
         <View className="flex-row items-start">
           <View className="flex-1 min-w-0 flex-row items-start pr-3">
             <MapPin size={16} color="#64748B" />
@@ -155,56 +345,225 @@ export default function MyReportsScreen() {
             <Text className="text-sm font-medium text-slate-400 text-right" numberOfLines={2}>{report.response}</Text>
           </View>
         </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+
+        {isResponder && (
+          <TouchableOpacity
+            disabled={archiveDisabled}
+            onPress={() => void updateArchive(report)}
+            className={`mt-4 rounded-2xl py-3 flex-row items-center justify-center ${archiveDisabled ? 'bg-slate-100' : 'bg-blue-50'}`}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: archiveDisabled }}
+            accessibilityLabel={archiveFilter === 'active' ? 'Archive report' : 'Restore report'}
+          >
+            {archiveUpdatingId === report.id ? (
+              <ActivityIndicator size="small" color="#1E3A8A" />
+            ) : archiveFilter === 'active' ? (
+              <Archive size={16} color={archiveDisabled ? '#94A3B8' : '#1E3A8A'} />
+            ) : (
+              <RotateCcw size={16} color={archiveDisabled ? '#94A3B8' : '#1E3A8A'} />
+            )}
+            <Text className={`ml-2 text-sm font-bold ${archiveDisabled ? 'text-slate-400' : 'text-[#1E3A8A]'}`}>
+              {report.status !== 'COMPLETED'
+                ? 'Submit before archiving'
+                : archiveFilter === 'active' ? 'Archive' : 'Restore'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
     );
   };
 
-  const renderSection = (title: string, data: any[]) => (
+  const today: ReportListItem[] = [];
+  const yesterday: ReportListItem[] = [];
+  const older: ReportListItem[] = [];
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  if (!isResponder) {
+    reports.forEach((report) => {
+      try {
+        const timestamp = report.createdAt ? Date.parse(report.createdAt) : Date.parse(report.date);
+        if (!Number.isFinite(timestamp)) throw new Error('Invalid report timestamp');
+        const reportDate = new Date(timestamp);
+        const reportStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate()).getTime();
+        const diffDays = Math.max(0, Math.floor((todayStart - reportStart) / oneDay));
+        if (diffDays === 0 || report.date === 'Today') today.push(report);
+        else if (diffDays === 1) yesterday.push(report);
+        else older.push(report);
+      } catch {
+        today.push(report);
+      }
+    });
+  }
+
+  const renderResidentSection = (title: string, data: ReportListItem[]) => (
     <View className="mb-2">
       <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">{title}</Text>
-      {data.map(renderReportCard)}
+      {data.map((report) => <React.Fragment key={`${report.id}-${report.status}`}>{renderReportCard(report)}</React.Fragment>)}
     </View>
   );
 
+  const responderControls = (
+    <View className="pt-5 pb-2">
+      <View className="bg-white border border-slate-200 rounded-2xl px-4 flex-row items-center mb-4">
+        <Search size={18} color="#64748B" />
+        <TextInput
+          value={searchInput}
+          onChangeText={setSearchInput}
+          placeholder="Search report ID, type, or barangay"
+          placeholderTextColor="#94A3B8"
+          className="flex-1 py-3.5 px-3 text-slate-800"
+          maxLength={80}
+          returnKeyType="search"
+        />
+      </View>
+
+      <View className="flex-row bg-slate-200 rounded-2xl p-1 mb-4">
+        {(['active', 'archived'] as ArchiveFilter[]).map((value) => (
+          <TouchableOpacity
+            key={value}
+            onPress={() => chooseArchive(value)}
+            className={`flex-1 py-2.5 rounded-xl ${archiveFilter === value ? 'bg-white' : 'bg-transparent'}`}
+          >
+            <Text className={`text-center text-sm font-bold ${archiveFilter === value ? 'text-[#1E3A8A]' : 'text-slate-500'}`}>
+              {value === 'active' ? 'Active' : 'Archived'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
+        {TYPE_FILTERS.map((option) => (
+          <TouchableOpacity
+            key={option.label}
+            onPress={() => chooseType(option.value)}
+            className={`px-4 py-2 rounded-full mr-2 border ${typeFilter === option.value ? 'bg-[#1E3A8A] border-[#1E3A8A]' : 'bg-white border-slate-200'}`}
+          >
+            <Text className={`text-xs font-bold ${typeFilter === option.value ? 'text-white' : 'text-slate-600'}`}>{option.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-row">
+          {(['all', 'completed', 'ongoing'] as StatusFilter[]).map((value) => (
+            <TouchableOpacity
+              key={value}
+              disabled={archiveFilter === 'archived' && value === 'ongoing'}
+              onPress={() => chooseStatus(value)}
+              className={`px-3 py-2 rounded-xl mr-2 ${archiveFilter === 'archived' && value === 'ongoing' ? 'bg-slate-100' : statusFilter === value ? 'bg-blue-100' : 'bg-white border border-slate-200'}`}
+              accessibilityState={{ disabled: archiveFilter === 'archived' && value === 'ongoing' }}
+            >
+              <Text className={`text-xs font-bold capitalize ${archiveFilter === 'archived' && value === 'ongoing' ? 'text-slate-300' : statusFilter === value ? 'text-[#1E3A8A]' : 'text-slate-500'}`}>{value}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity onPress={toggleSort} className="px-3 py-2 rounded-xl bg-white border border-slate-200">
+          <Text className="text-xs font-bold text-slate-600">{sortOrder === 'newest' ? 'Newest first' : 'Oldest first'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {!!actionMessage && <Text className="text-sm font-semibold text-emerald-700 mb-3">{actionMessage}</Text>}
+      {!!error && (
+        <View className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-4">
+          <Text className="text-sm font-semibold text-red-700 mb-2">{error}</Text>
+          <TouchableOpacity onPress={() => void fetchReports()} className="self-start">
+            <Text className="text-sm font-bold text-[#1E3A8A]">Try again</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {!displayLoading && !error && (
+        <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+          {pagination.total} {pagination.total === 1 ? 'report' : 'reports'}
+        </Text>
+      )}
+    </View>
+  );
+
+  const paginationFooter = !displayLoading && !error && reports.length > 0 ? (
+    <View className="flex-row items-center justify-between bg-white border border-slate-200 rounded-2xl px-3 py-3 mb-24 mt-1">
+      <TouchableOpacity
+        disabled={pagination.page <= 1 || !!archiveUpdatingId}
+        onPress={() => changePage(pagination.page - 1)}
+        className={`w-11 h-11 rounded-xl items-center justify-center ${pagination.page <= 1 || archiveUpdatingId ? 'bg-slate-100' : 'bg-blue-50'}`}
+        accessibilityLabel="Previous reports page"
+        accessibilityState={{ disabled: pagination.page <= 1 || !!archiveUpdatingId }}
+      >
+        <ChevronLeft size={20} color={pagination.page <= 1 || archiveUpdatingId ? '#94A3B8' : '#1E3A8A'} />
+      </TouchableOpacity>
+      <View className="items-center">
+        <Text className="text-sm font-bold text-slate-800">Page {pagination.page} of {pagination.totalPages}</Text>
+        <Text className="text-xs text-slate-500">Up to {RESPONDER_PAGE_SIZE} per page</Text>
+      </View>
+      <TouchableOpacity
+        disabled={pagination.page >= pagination.totalPages || !!archiveUpdatingId}
+        onPress={() => changePage(pagination.page + 1)}
+        className={`w-11 h-11 rounded-xl items-center justify-center ${pagination.page >= pagination.totalPages || archiveUpdatingId ? 'bg-slate-100' : 'bg-blue-50'}`}
+        accessibilityLabel="Next reports page"
+        accessibilityState={{ disabled: pagination.page >= pagination.totalPages || !!archiveUpdatingId }}
+      >
+        <ChevronRight size={20} color={pagination.page >= pagination.totalPages || archiveUpdatingId ? '#94A3B8' : '#1E3A8A'} />
+      </TouchableOpacity>
+    </View>
+  ) : <View className="h-24" />;
+
   return (
     <View className="flex-1 bg-white">
-      <View className="bg-[#1E3A8A] pt-14 pb-6 px-6" style={{ paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 20 : 60 }}>
+      <View className="bg-[#1E3A8A] pt-14 pb-6 px-6" style={{ paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 20 : 60 }}>
         <Text className="text-2xl font-bold text-white">My Reports</Text>
       </View>
 
-      <ScrollView 
-        className="flex-1 px-6 pt-6 bg-slate-50" 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E3A8A']} />
-        }
-      >
-        {loading ? (
-          <View className="flex-1 justify-center items-center py-20">
-            <ActivityIndicator size="large" color="#1E3A8A" />
-          </View>
-        ) : reports.length === 0 ? (
-          <View className="flex-1 justify-center items-center py-20">
-            <Text className="text-slate-400 font-bold">No reports found</Text>
-          </View>
-        ) : isResponder ? (
-          <>
-            {reports.map(renderReportCard)}
-          </>
-        ) : (
-          <>
-            {today.length > 0 && renderSection('TODAY', today)}
-            {yesterday.length > 0 && renderSection('YESTERDAY', yesterday)}
-            {older.length > 0 && renderSection('OLDER', older)}
-          </>
-        )}
-        <View className="h-24" />
-      </ScrollView>
-      <ReportDetailModal 
-        visible={!!selectedReport}
-        report={selectedReport}
-        onClose={() => setSelectedReport(null)}
-      />
+      {isResponder ? (
+        <FlatList
+          data={displayLoading ? [] : reports}
+          keyExtractor={(item) => `${item.id}-${item.status}`}
+          renderItem={({ item }) => renderReportCard(item)}
+          className="flex-1 bg-slate-50"
+          contentContainerStyle={{ paddingHorizontal: 24 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E3A8A']} />}
+          ListHeaderComponent={responderControls}
+          ListEmptyComponent={displayLoading ? (
+            <View className="items-center py-16"><ActivityIndicator size="large" color="#1E3A8A" /></View>
+          ) : !error ? (
+            <View className="items-center py-16">
+              <Text className="text-slate-700 font-bold mb-1">No reports found</Text>
+              <Text className="text-slate-400 text-center">
+                {archiveFilter === 'archived' ? 'Archived reports will appear here.' : 'Try changing the search or filters.'}
+              </Text>
+            </View>
+          ) : null}
+          ListFooterComponent={paginationFooter}
+        />
+      ) : (
+        <ScrollView
+          className="flex-1 px-6 pt-6 bg-slate-50"
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E3A8A']} />}
+        >
+          {displayLoading ? (
+            <View className="items-center py-20"><ActivityIndicator size="large" color="#1E3A8A" /></View>
+          ) : error ? (
+            <View className="items-center py-20">
+              <Text className="text-red-700 font-bold text-center mb-3">{error}</Text>
+              <TouchableOpacity onPress={() => void fetchReports()}><Text className="font-bold text-[#1E3A8A]">Try again</Text></TouchableOpacity>
+            </View>
+          ) : reports.length === 0 ? (
+            <View className="items-center py-20"><Text className="text-slate-400 font-bold">No reports found</Text></View>
+          ) : (
+            <>
+              {today.length > 0 && renderResidentSection('TODAY', today)}
+              {yesterday.length > 0 && renderResidentSection('YESTERDAY', yesterday)}
+              {older.length > 0 && renderResidentSection('OLDER', older)}
+            </>
+          )}
+          <View className="h-24" />
+        </ScrollView>
+      )}
+
+      <ReportDetailModal visible={!!selectedReport} report={selectedReport} onClose={() => setSelectedReport(null)} />
     </View>
   );
 }

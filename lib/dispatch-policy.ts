@@ -121,6 +121,30 @@ export function shouldRetryAutomaticDispatch(request: AutomaticDispatchRetryStat
     && request.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY';
 }
 
+export interface AutomaticDispatchPriorityItem {
+  id: string;
+  severity: string;
+  createdAt: Date | string;
+}
+
+const AUTOMATIC_SEVERITY_RANK: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
+
+export function prioritizeAutomaticDispatchRequests<T extends AutomaticDispatchPriorityItem>(requests: T[]) {
+  return [...requests].sort((a, b) => {
+    const severity = (AUTOMATIC_SEVERITY_RANK[b.severity] ?? 0) - (AUTOMATIC_SEVERITY_RANK[a.severity] ?? 0);
+    if (severity !== 0) return severity;
+    const fifo = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    return fifo !== 0 ? fifo : a.id.localeCompare(b.id);
+  });
+}
+
+export function selectNextDispatchableRequest<T extends AutomaticDispatchPriorityItem>(
+  requests: T[],
+  dispatchableRequestIds: ReadonlySet<string>,
+) {
+  return prioritizeAutomaticDispatchRequests(requests).find((request) => dispatchableRequestIds.has(request.id)) ?? null;
+}
+
 /** Only the oldest eligible pending request may reserve an automatic unit. */
 export function canClaimAutomaticDispatchTurn(queueHeadRequestId: string | null | undefined, requestId: string) {
   return queueHeadRequestId === requestId;

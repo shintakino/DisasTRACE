@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Platform, StatusBar, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, User, MapPin, Award, CheckCircle, Edit3 } from 'lucide-react-native';
+import { ArrowLeft, User, MapPin, Award, CheckCircle, Edit3, XCircle } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
 import { formatBaliwagLocation } from '../../../lib/baliwag-location';
 
@@ -75,10 +75,10 @@ export default function IncidentDetailScreen() {
 
   // Once report is loaded, fetch existing feedback
   useEffect(() => {
-    if (report?.incidentId) {
+    if (report?.incidentId && report.status !== 'REJECTED') {
       fetchExistingFeedback(report.incidentId);
     }
-  }, [report?.incidentId]);
+  }, [report?.incidentId, report?.status]);
 
   const handleFeedbackSubmit = async () => {
     if (rating === 0) {
@@ -159,6 +159,12 @@ export default function IncidentDetailScreen() {
   }
 
   const hasSubmittedFeedback = !!existingFeedback && !isEditing;
+  const isRejected = report.status === 'REJECTED';
+  const isCaseClosed = !isRejected && (report.incidentStatus === 'RESOLVED' || report.status === 'CASE_CLOSED');
+  const reportStatusLabel = isRejected ? 'Rejected' : isCaseClosed ? 'Case Closed' : report.status;
+  const rejectionReason = typeof report.rejectionReason === 'string' && report.rejectionReason.trim()
+    ? report.rejectionReason.trim()
+    : 'No rejection reason was recorded for this earlier report.';
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -175,6 +181,27 @@ export default function IncidentDetailScreen() {
       </View>
 
       <ScrollView className="flex-1 px-6 -mt-4" showsVerticalScrollIndicator={false}>
+        {isRejected && (
+          <View
+            accessible
+            accessibilityRole="alert"
+            accessibilityLabel={`Report rejected by PACC. Reason: ${rejectionReason}`}
+            className="bg-red-50 rounded-3xl p-6 border border-red-200 mb-6 mt-6"
+          >
+            <View className="flex-row items-center mb-3">
+              <View className="w-11 h-11 rounded-full bg-red-100 items-center justify-center mr-3">
+                <XCircle size={23} color="#DC2626" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-lg font-bold text-red-800">Report Rejected</Text>
+                <Text className="text-xs font-semibold text-red-600 mt-0.5">PACC did not accept this report for response.</Text>
+              </View>
+            </View>
+            <Text className="text-xs font-bold text-red-700 uppercase tracking-wider mb-2">Reason from PACC</Text>
+            <Text className="text-sm text-red-900 leading-6">{rejectionReason}</Text>
+          </View>
+        )}
+
         <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1 mt-6">RESPONSE TIMELINE</Text>
         <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
           {report.logs?.map((log: any, idx: number) => {
@@ -206,6 +233,12 @@ export default function IncidentDetailScreen() {
             <Text className="text-sm font-medium text-slate-500">Type</Text>
             <Text className="text-sm font-bold text-slate-800">{report.type}</Text>
           </View>
+          <View className="flex-row justify-between mb-5 items-center">
+            <Text className="text-sm font-medium text-slate-500">Status</Text>
+            <Text className={`text-sm font-bold ${isRejected ? 'text-red-700' : isCaseClosed ? 'text-green-700' : 'text-slate-800'}`}>
+              {reportStatusLabel}
+            </Text>
+          </View>
           <View className="flex-row justify-between mb-5">
             <Text className="text-sm font-medium text-slate-500">Location</Text>
             <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>{formatBaliwagLocation(report.barangay) ?? 'Location unavailable'}</Text>
@@ -216,34 +249,36 @@ export default function IncidentDetailScreen() {
           </View>
           <View className="flex-row justify-between">
             <Text className="text-sm font-medium text-slate-500">Handled by</Text>
-            <Text className="text-sm font-bold text-slate-800">{report.responderName || 'CDRRMO Team'}</Text>
+            <Text className="text-sm font-bold text-slate-800">{isRejected ? 'PACC Dispatcher' : report.responderName || 'CDRRMO Team'}</Text>
           </View>
         </View>
 
-        <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">RESPONDER NOTE</Text>
-        <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
-          <View className="flex-row items-center mb-5">
-            <View className="w-12 h-12 rounded-full bg-blue-100 items-center justify-center mr-4">
-              <User size={24} color="#1E3A8A" />
+        {!isRejected && (
+          <>
+            <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">RESPONDER NOTE</Text>
+            <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
+              <View className="flex-row items-center mb-5">
+                <View className="w-12 h-12 rounded-full bg-blue-100 items-center justify-center mr-4">
+                  <User size={24} color="#1E3A8A" />
+                </View>
+                <View>
+                  <Text className="text-base font-bold text-slate-800">{report.responderName || 'Ambulance Responder'}</Text>
+                  <Text className="text-xs text-slate-500">Ambulance Crew · {report.date}</Text>
+                </View>
+              </View>
+              <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <Text className="text-sm text-slate-600 leading-6">
+                  {report.crewFindings || 'No crew findings or medical logs were attached to this report.'}
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text className="text-base font-bold text-slate-800">{report.responderName || 'Ambulance Responder'}</Text>
-              <Text className="text-xs text-slate-500">Ambulance Crew · {report.date}</Text>
-            </View>
-          </View>
-          <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-            <Text className="text-sm text-slate-600 leading-6">
-              {report.crewFindings || 'No crew findings or medical logs were attached to this report.'}
+
+            {/* FEEDBACK SECTION */}
+            <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">
+              {hasSubmittedFeedback ? 'YOUR FEEDBACK' : 'RATE US'}
             </Text>
-          </View>
-        </View>
 
-        {/* FEEDBACK SECTION */}
-        <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">
-          {hasSubmittedFeedback ? 'YOUR FEEDBACK' : 'RATE US'}
-        </Text>
-
-        {loadingFeedback ? (
+            {loadingFeedback ? (
           <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-10 items-center py-10">
             <ActivityIndicator size="small" color="#1E3A8A" />
             <Text className="text-slate-400 font-medium mt-2 text-sm">Loading feedback...</Text>
@@ -340,6 +375,8 @@ export default function IncidentDetailScreen() {
               </TouchableOpacity>
             </View>
           </View>
+            )}
+          </>
         )}
       </ScrollView>
     </View>

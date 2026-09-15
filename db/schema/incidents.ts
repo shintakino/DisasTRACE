@@ -1,7 +1,8 @@
-import { pgTable, text, varchar, timestamp, integer, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, varchar, timestamp, integer, uuid, uniqueIndex } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { verificationRequests } from './verification_requests';
 import { hospitals } from './hospitals';
+import { sql } from 'drizzle-orm';
 
 export const incidents = pgTable('incidents', {
   id: varchar('id', { length: 255 }).primaryKey(), // Server-generated UUID
@@ -22,4 +23,8 @@ export const incidents = pgTable('incidents', {
   offerExpiresAt: timestamp('offer_expires_at', { withTimezone: true }),
   dispatchMethod: varchar('dispatch_method', { length: 20, enum: ['AUTO_1KM', 'PACC_MANUAL'] }),
   dispatchOfferDurationSeconds: integer('dispatch_offer_duration_seconds').default(30).notNull(),
-});
+}, (table) => ({
+  oneIncidentPerRequest: uniqueIndex('incidents_request_id_unique')
+    .on(table.requestId)
+    .where(sql`${table.createdAt} >= '2026-09-15 00:00:00+08'::timestamptz`),
+}));

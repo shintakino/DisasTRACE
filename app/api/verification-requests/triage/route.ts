@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase-server";
 import { autoDispatchIncident } from "@/lib/dispatch-engine";
 import { z } from "zod";
 import crypto from "crypto";
+import { rejectVerificationRequest } from "@/lib/reject-verification-request";
 
 const TriageSchema = z.object({
   requestId: z.string().uuid(),
@@ -14,6 +15,14 @@ const TriageSchema = z.object({
   nature: z.enum(['EMERGENCY', 'NON-EMERGENCY']).optional(),
   severity: z.enum(['Low', 'Medium', 'High', 'Critical']).optional(),
   rejectionReason: z.string().max(250).optional(),
+}).superRefine((value, context) => {
+  if (value.action === 'REJECT' && !value.rejectionReason?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['rejectionReason'],
+      message: 'A clear rejection reason is required.',
+    });
+  }
 });
 
 export async function POST(req: NextRequest) {
@@ -111,22 +120,11 @@ export async function POST(req: NextRequest) {
         where: eq(verificationRequests.id, requestId),
       });
     } else {
-      // Rejection: immediately set status to REJECTED
-      const [updated] = await db.update(verificationRequests)
-        .set({
-          status: 'REJECTED',
-          triageReasons: rejectionReason
-            ? [...existingReq.triageReasons, `PACC rejection reason: ${rejectionReason}`]
-            : existingReq.triageReasons,
-          updatedAt: new Date(),
-        })
-        .where(eq(verificationRequests.id, requestId))
-        .returning();
-
-      // Remove any associated pending incidents to clean up the DB
-      await db.delete(incidents).where(eq(incidents.requestId, requestId));
-
-      finalReq = updated;
+      const rejection = await rejectVerificationRequest(requestId, rejectionReason);
+      if (!rejection.success) {
+        return NextResponse.json({ error: rejection.error }, { status: rejection.status });
+      }
+      finalReq = rejection.request;
     }
 
     return NextResponse.json({

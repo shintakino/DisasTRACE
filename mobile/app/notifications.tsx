@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, Trash, CloudLightning, Megaphone, FileText } from 'lucide-react-native';
+import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, Trash, CloudLightning, Megaphone, FileText, XCircle } from 'lucide-react-native';
 import { useAuthStatus } from '../hooks/use-auth-status';
 import { supabase } from '../lib/supabase';
 import { isNotificationVisibleForRole } from '../lib/report-location';
@@ -191,6 +191,15 @@ export default function NotificationsScreen() {
         } else {
           router.push('/(tabs)/reports' as any);
         }
+      } else if (item.type === 'incident_rejected') {
+        const requestId = typeof item.metadata?.requestId === 'string'
+          ? item.metadata.requestId
+          : null;
+        if (requestId) {
+          router.push(`/(tabs)/reports/${requestId}` as any);
+        } else {
+          router.push('/(tabs)/reports' as any);
+        }
       } else if (item.type === 'report_audited') {
         router.replace('/(tabs)/profile' as any);
       } else if (item.type === 'pagasa_alert') {
@@ -275,6 +284,8 @@ export default function NotificationsScreen() {
       case 'incident_verified':
       case 'registration_approved':
         return <ShieldCheck size={22} color="#22C55E" />;
+      case 'incident_rejected':
+        return <XCircle size={22} color="#DC2626" />;
       case 'pagasa_alert':
         return <CloudLightning size={22} color="#F59E0B" />;
       case 'system_announcement':

@@ -5,16 +5,27 @@ import { CheckCircle2, Star } from 'lucide-react-native';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { useChatbotStore } from '../../store/use-chatbot-store';
 import { supabase } from '../../lib/supabase';
+import { updateGuestReportHistory } from '../../lib/guest-report-history';
 
 export default function ResolutionScreen() {
   const router = useRouter();
   const report = useEmergencyReportStore((state) => state.report);
   const resetReport = useEmergencyReportStore((state) => state.resetReport);
+  const isGuest = report.reporterMode === 'guest';
   
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isLeavingRef = useRef(false);
+
+  useEffect(() => {
+    if (isGuest && report.id) {
+      void updateGuestReportHistory(report.id, {
+        status: 'RESOLVED',
+        responseStatus: 'Response coordination for this incident has been completed.',
+      });
+    }
+  }, [isGuest, report.id]);
 
   const formatDuration = (seconds?: number) => {
     if (seconds === undefined || seconds === null) return '12 Minutes'; // Fallback
@@ -33,8 +44,8 @@ export default function ResolutionScreen() {
     useChatbotStore.getState().clearReportToIdle();
     // Replace the terminal response route with the tab navigator. This avoids
     // leaving a dead resolution route behind Android back navigation.
-    router.replace('/(tabs)');
-  }, [resetReport, router]);
+    router.replace((isGuest ? '/' : '/(tabs)') as never);
+  }, [isGuest, resetReport, router]);
  
   useEffect(() => {
     const onBackPress = () => {
@@ -51,7 +62,7 @@ export default function ResolutionScreen() {
 
   const handleReturnHome = async () => {
     if (isLeavingRef.current || isSubmitting) return;
-    if (rating === 0) {
+    if (isGuest || rating === 0) {
       returnToHome();
       return;
     }
@@ -137,8 +148,8 @@ export default function ResolutionScreen() {
           </View>
         </View>
 
-        {/* Rating Section */}
-        <View style={styles.ratingSection}>
+        {/* Guest reports have no authenticated owner for feedback attribution. */}
+        {!isGuest ? <View style={styles.ratingSection}>
           <Text style={styles.ratingTitle}>Rate the response service</Text>
           <View style={styles.starsContainer}>
             {[1, 2, 3, 4, 5].map((star) => (
@@ -166,7 +177,9 @@ export default function ResolutionScreen() {
             value={feedback}
             onChangeText={setFeedback}
           />
-        </View>
+        </View> : (
+          <Text style={styles.guestNote}>This completed report remains available in Guest Report History on this device.</Text>
+        )}
 
         {/* Action Button */}
         <TouchableOpacity style={styles.returnButton} onPress={handleReturnHome} activeOpacity={0.8} disabled={isLeavingRef.current || isSubmitting}>
@@ -273,6 +286,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  guestNote: {
+    color: '#475569',
+    textAlign: 'center',
+    marginBottom: 28,
+    lineHeight: 20,
   },
   returnButtonText: {
     color: '#FFF',

@@ -141,6 +141,48 @@
       "when": 1789603200000,
       "tag": "0019_persist_transport_destination",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789603200001,
+      "tag": "0020_remarkable_bushwacker",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1789603200002,
+      "tag": "0021_dark_omega_flight",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1789603200003,
+      "tag": "0022_responder_report_invariant",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789603200004,
+      "tag": "0023_partial_uniqueness_alignment",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789603200005,
+      "tag": "0024_fancy_cerise",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789603200006,
+      "tag": "0025_responder_report_security_and_pcr_fields",
+      "breakpoints": true
     }
   ]
 }

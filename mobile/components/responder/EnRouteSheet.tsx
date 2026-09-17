@@ -63,17 +63,17 @@ export function EnRouteSheet() {
         <View className="flex-row space-x-3 mb-6">
           <View className="flex-1 bg-white border border-slate-100 shadow-sm shadow-slate-200 rounded-2xl p-3 items-center justify-center">
             <Text className="text-red-700 font-bold text-xl">{activeDispatch?.eta?.replace('~', '') || ''}</Text>
-            <Text className="text-slate-400 text-[9px] font-bold mt-1 uppercase tracking-widest">ETA</Text>
+            <Text className="text-slate-500 text-xs font-bold mt-1 uppercase tracking-widest">ETA</Text>
           </View>
           <View className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl p-3 items-center justify-center">
             <Text className="text-[#1E3A8A] font-bold text-xl">{formatTime(elapsedTimeSeconds)}</Text>
-            <Text className="text-slate-400 text-[9px] font-bold mt-1 uppercase tracking-widest">ELAPSED</Text>
+            <Text className="text-slate-500 text-xs font-bold mt-1 uppercase tracking-widest">ELAPSED</Text>
           </View>
           <View className="flex-1 bg-white border border-slate-100 shadow-sm shadow-slate-200 rounded-2xl p-3 items-center justify-center">
             <Text className="text-[#1E3A8A] font-bold text-xl">
               {currentSpeedKph > 0 ? `${currentSpeedKph} km/h` : '0 km/h'}
             </Text>
-            <Text className="text-slate-400 text-[9px] font-bold mt-1 uppercase tracking-widest">SPEED</Text>
+            <Text className="text-slate-500 text-xs font-bold mt-1 uppercase tracking-widest">SPEED</Text>
           </View>
         </View>
 
@@ -106,30 +106,30 @@ export function EnRouteSheet() {
                   </View>
                 </View>
                 <View className="bg-red-100 px-3 py-1.5 rounded-full">
-                  <Text className="text-red-700 text-[10px] font-black uppercase tracking-widest">CRITICAL</Text>
+                  <Text className="text-red-700 text-xs font-black uppercase tracking-widest">CRITICAL</Text>
                 </View>
               </View>
 
               {/* Details Grid */}
               <View className="flex-row mb-6 pb-6 border-b border-slate-100">
                 <View className="flex-1 border-r border-slate-100 pr-4">
-                  <Text className="text-slate-400 text-[10px] font-bold tracking-widest uppercase mb-1">NATURE OF CALL</Text>
+                  <Text className="text-slate-500 text-xs font-bold tracking-widest uppercase mb-1">NATURE OF CALL</Text>
                   <Text className="text-[#1E3A8A] font-bold text-sm">{activeDispatch?.natureOfCall}</Text>
                 </View>
                 <View className="flex-1 pl-4">
-                  <Text className="text-slate-400 text-[10px] font-bold tracking-widest uppercase mb-1">TYPE OF EMERGENCY</Text>
+                  <Text className="text-slate-500 text-xs font-bold tracking-widest uppercase mb-1">TYPE OF EMERGENCY</Text>
                   <Text className="text-[#1E3A8A] font-bold text-sm">{activeDispatch?.typeOfEmergency || activeDispatch?.type}</Text>
                 </View>
               </View>
 
               <View className="mb-6 pb-6 border-b border-slate-100">
-                <Text className="text-slate-400 text-[10px] font-bold tracking-widest uppercase mb-1">PEOPLE INVOLVED</Text>
+                <Text className="text-slate-500 text-xs font-bold tracking-widest uppercase mb-1">PEOPLE INVOLVED</Text>
                 <Text className="text-[#1E3A8A] font-bold text-sm">{activeDispatch?.peopleInvolved}</Text>
               </View>
 
               {/* Attachment */}
               <View className="mb-6">
-                <Text className="text-slate-400 text-[10px] font-bold tracking-widest uppercase mb-3">RESIDENT&apos;S ATTACHMENT</Text>
+                <Text className="text-slate-500 text-xs font-bold tracking-widest uppercase mb-3">RESIDENT&apos;S ATTACHMENT</Text>
                 {activeDispatch?.attachmentUrl ? (
                   <TouchableOpacity 
                     activeOpacity={0.9} 
@@ -139,7 +139,7 @@ export function EnRouteSheet() {
                     <Image source={{ uri: activeDispatch?.attachmentUrl }} className="w-full h-full" resizeMode="cover" />
                     <View className="absolute bottom-0 left-0 right-0 bg-black/60 p-2 flex-row justify-between items-center">
                       <Text className="text-white text-xs font-medium">IMG_7904.jpg</Text>
-                      <Text className="text-white/80 text-[10px] font-semibold">Click to expand</Text>
+                      <Text className="text-white/80 text-xs font-semibold">Click to expand</Text>
                     </View>
                   </TouchableOpacity>
                 ) : (

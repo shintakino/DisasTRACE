@@ -225,8 +225,27 @@ check('manual dispatch rejects stale report state and active offers', () => {
     now,
   }), {
     allowed: false,
+    code: 'REPORT_REJECTED',
+    message: 'This report was rejected and cannot be dispatched. Review its rejection record.',
+  });
+
+  assert.deepEqual(evaluateManualDispatchEligibility({
+    requestStatus: 'DUPLICATE', incident: null, responder, now,
+  }), {
+    allowed: false,
+    code: 'REPORT_DUPLICATE',
+    message: 'This report was merged as a duplicate and cannot be dispatched separately.',
+  });
+
+  assert.deepEqual(evaluateManualDispatchEligibility({
+    requestStatus: 'VERIFIED',
+    incident: { status: 'RESOLVED', currentOfferResponderId: null, responderId: 'responder-1' },
+    responder,
+    now,
+  }), {
+    allowed: false,
     code: 'REPORT_CLOSED',
-    message: 'This report was already rejected or marked as a duplicate. Refresh the verification queue.',
+    message: 'This response is Case Closed and cannot be dispatched again.',
   });
 
   assert.deepEqual(evaluateManualDispatchEligibility({

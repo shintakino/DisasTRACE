@@ -29,6 +29,7 @@ export const VerificationIncidentSchema = z.object({
   status: z.enum(['DISPATCHED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED']),
   responderId: z.string().nullable().optional(),
   currentOfferResponderId: z.string().nullable().optional(),
+  offerExpiresAt: z.string().nullable().optional(),
   dispatchMethod: z.string().nullable().optional(),
 }).nullable().optional();
 

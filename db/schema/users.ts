@@ -20,6 +20,8 @@ export const users = pgTable('users', {
   rejectionReason: text('rejection_reason'),
   idType: text('id_type'),
   idImageUrl: text('id_image_url'),
+  privacyConsentAt: timestamp('privacy_consent_at', { withTimezone: true }),
+  privacyPolicyVersion: varchar('privacy_policy_version', { length: 100 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   

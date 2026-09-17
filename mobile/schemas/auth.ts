@@ -34,6 +34,8 @@ export const PasswordSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
   termsAccepted: z.boolean().refine(val => val === true, "You must accept the terms"),
+  privacyConsentAt: z.string().datetime().optional(),
+  privacyPolicyVersion: z.string().min(1).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],

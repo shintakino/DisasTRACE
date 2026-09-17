@@ -6,6 +6,7 @@ import { ContactDetailsSchema, ContactDetailsType } from '../../schemas/auth';
 import { useSignUpStore } from '../../store/useSignUpStore';
 import { ArrowDown2, SearchNormal1 } from 'iconsax-react-native';
 import * as Haptics from 'expo-haptics';
+import { fetchWithTimeout } from '../../lib/network-timeout';
 
 interface Props {
   onNext: () => void;
@@ -90,13 +91,13 @@ export default function Step2({ onNext, onBack }: Props) {
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
       // 1. Resolve phone number uniqueness first
-      const response = await fetch(`${apiUrl}/api/auth/resolve-phone`, {
+      const response = await fetchWithTimeout(`${apiUrl}/api/auth/resolve-phone`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ phone: stepData.mobileNumber }),
-      });
+      }, 10_000, 'phone number check');
 
       if (response.ok) {
         setPhoneError("This mobile number is already registered. Please use another one.");
@@ -106,13 +107,13 @@ export default function Step2({ onNext, onBack }: Props) {
       }
       
       // 2. Trigger send-signup OTP
-      const otpResponse = await fetch(`${apiUrl}/api/auth/otp/send-signup`, {
+      const otpResponse = await fetchWithTimeout(`${apiUrl}/api/auth/otp/send-signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ phone: stepData.mobileNumber }),
-      });
+      }, 15_000, 'verification SMS');
 
       const otpResData = await otpResponse.json();
 
@@ -159,7 +160,7 @@ export default function Step2({ onNext, onBack }: Props) {
 
     try {
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${apiUrl}/api/auth/otp/verify-signup`, {
+      const response = await fetchWithTimeout(`${apiUrl}/api/auth/otp/verify-signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +169,7 @@ export default function Step2({ onNext, onBack }: Props) {
           phone: phoneForOtp,
           otpCode: code,
         }),
-      });
+      }, 12_000, 'OTP verification');
 
       const resData = await response.json();
 
@@ -207,7 +208,7 @@ export default function Step2({ onNext, onBack }: Props) {
 
     try {
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${apiUrl}/api/auth/otp/send-signup`, {
+      const response = await fetchWithTimeout(`${apiUrl}/api/auth/otp/send-signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,7 +216,7 @@ export default function Step2({ onNext, onBack }: Props) {
         body: JSON.stringify({
           phone: phoneForOtp,
         }),
-      });
+      }, 15_000, 'verification SMS resend');
 
       const resData = await response.json();
 
@@ -419,7 +420,7 @@ export default function Step2({ onNext, onBack }: Props) {
                     setSearchQuery('');
                   }}
                 >
-                  <Text className="text-lg text-[#EF4444] font-bold">USE: "{searchQuery}"</Text>
+                  <Text className="text-lg text-[#EF4444] font-bold">{`USE: "${searchQuery}"`}</Text>
                 </TouchableOpacity>
               )}
 

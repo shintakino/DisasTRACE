@@ -10,6 +10,7 @@ import {
   type GuestReportHistoryEntry,
 } from '../../lib/guest-report-history';
 import { getChatbotReportStatus } from '../../services/chatbot-api';
+import { GuestAllowanceBanner } from '../../components/guest/GuestAllowanceBanner';
 
 export default function GuestHistoryScreen() {
   const router = useRouter();
@@ -30,9 +31,10 @@ export default function GuestHistoryScreen() {
       if (!token) throw new Error('The secure report credential is no longer available on this device.');
       const latest = await getChatbotReportStatus({ reporterMode: 'guest', requestId: entry.id, guestAccessToken: token });
       await updateGuestReportHistory(entry.id, {
-        status: latest.outcome === 'CASE_CLOSED' ? 'RESOLVED' : latest.status,
+        status: latest.outcome === 'CASE_CLOSED' ? 'RESOLVED' : latest.outcome === 'CANCELLED' ? 'CANCELLED' : latest.status,
         responseStatus: latest.responseStatus,
         rejectionReason: latest.rejectionReason ?? undefined,
+        reportsRemaining: latest.guestAllowance?.remaining ?? entry.reportsRemaining,
       });
       await load();
     } catch (error) {
@@ -50,6 +52,7 @@ export default function GuestHistoryScreen() {
       </View>
       {loading ? <ActivityIndicator style={styles.loading} color="#1E3A8A" /> : (
         <ScrollView contentContainerStyle={styles.list}>
+          <GuestAllowanceBanner remaining={entries.find((entry) => entry.reportsRemaining !== undefined)?.reportsRemaining} />
           {entries.length === 0 ? (
             <View style={styles.empty}><Clock3 color="#64748B" size={30} /><Text style={styles.emptyTitle}>No guest reports yet</Text><Text style={styles.subtitle}>Reports submitted in Guest Mode will appear here.</Text></View>
           ) : entries.map((entry) => (

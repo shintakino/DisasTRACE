@@ -270,8 +270,17 @@ export default function HomeScreen() {
 
           if (request) {
             console.log('[HomeScreen] Latest verification request found:', request.id, 'status:', request.status);
+            const chatbotState = useChatbotStore.getState();
+            const resumesChatbotReport = chatbotState.reporterMode === 'registered'
+              && chatbotState.ownerId === user.id
+              && chatbotState.activeReport?.id === request.id;
             
             if (request.status === 'PENDING' && shouldResumeResidentRequest({ status: request.status })) {
+              if (resumesChatbotReport) {
+                chatbotState.updateActiveReport({ status: request.status, hasIncident: false });
+                if (active) router.replace('/help/chatbot-pending' as never);
+                return;
+              }
               // Restore store state and route to pending
               useEmergencyReportStore.setState({
                 report: {
@@ -305,6 +314,19 @@ export default function HomeScreen() {
               if (!active) return;
               if (incident && shouldResumeResidentRequest({ status: request.status, incidentStatus: incident.status })) {
                 console.log('[HomeScreen] Active incident found:', incident.id, 'status:', incident.status);
+                if (resumesChatbotReport) {
+                  chatbotState.updateActiveReport({
+                    status: request.status,
+                    hasIncident: true,
+                    incidentId: incident.id,
+                    trackingRequestId: request.id,
+                    responseStatus: incident.responder_id
+                      ? 'A responder accepted the report. Live response status is available.'
+                      : 'PACC is selecting or awaiting an available responder.',
+                  });
+                  if (active) router.replace('/help/response-status');
+                  return;
+                }
                 
                 // Restore store state and route to tracking
                 useEmergencyReportStore.setState({

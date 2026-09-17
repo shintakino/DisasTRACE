@@ -33,9 +33,14 @@ export const RecentReportSchema = z.object({
   id: z.string(),
   requestId: z.string(),
   vehicleId: z.string(),
-  origin: z.string(),
   destination: z.string(),
   timestamp: z.string(),
+  type: z.string(),
+  severity: z.enum(["Low", "Medium", "High", "Critical"]),
+  nature: z.enum(["EMERGENCY", "NON-EMERGENCY"]),
+  requestStatus: z.enum(["PENDING", "VERIFIED", "REJECTED", "DUPLICATE"]),
+  incidentStatus: z.enum(["DISPATCHED", "EN_ROUTE", "ARRIVED", "RESOLVED"]).nullable(),
+  requiresPaccReassignment: z.boolean(),
 });
 
 export type RecentReport = z.infer<typeof RecentReportSchema>;

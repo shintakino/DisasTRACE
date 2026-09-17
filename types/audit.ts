@@ -8,6 +8,9 @@ export const AuditLogEntrySchema = z.object({
   timestamp: z.string(), // ISO format preferred for internal data
   date: z.string(), // e.g., "21 March 2026"
   time: z.string(), // e.g., "09:43 AM"
+  actorRole: z.string().optional(),
+  entityId: z.string().nullable().optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 export type AuditLogEntry = z.infer<typeof AuditLogEntrySchema>;
 

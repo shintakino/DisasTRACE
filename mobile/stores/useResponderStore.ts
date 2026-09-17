@@ -38,6 +38,7 @@ export type DispatchState = 'idle' | 'dispatch_offered' | 'en_route' | 'on_scene
 
 export interface QueueAction {
   id: string; // unique timestamp/uuid
+  ownerUserId: string;
   type: 'STATE_CHANGE' | 'TELEMETRY_SYNC';
   timestamp: string; // ISO string
   endpoint: string; // target endpoint
@@ -78,6 +79,7 @@ export interface DispatchDetails {
 
 export interface DraftForm {
   id: string; // e.g. df-123
+  ownerUserId: string;
   incidentId: string; // matches DispatchDetails.id
   incidentType: string; // e.g. "Fire Emergency"
   lastSaved: string; // e.g. "2 mins ago"
@@ -96,6 +98,8 @@ interface ResponderState {
   isArrivalConfirmVisible: boolean;
   isSubmittingReport: boolean;
   showReportSuccess: boolean;
+  lastReportDelivery: 'CONFIRMED' | 'QUEUED_OFFLINE' | null;
+  lastArrivalDelivery: 'CONFIRMED' | 'QUEUED_OFFLINE' | null;
   currentSpeedKph: number;
   hospitalDistanceKm: number | null;
   hospitalEtaMins: number | null;
@@ -112,6 +116,7 @@ interface ResponderState {
   submittedIncidentIds: string[];
   offlineQueue: QueueAction[];
   isSyncingQueue: boolean;
+  lastQueueError: string | null;
   
   // Actions
   setStatus: (status: DispatchState) => void;
@@ -134,11 +139,11 @@ interface ResponderState {
   completeIncident: () => void;
   
   // Forms & Drafts Actions
-  saveDraft: (incident: DispatchDetails, formData: any, explicitlySaved?: boolean) => void;
+  saveDraft: (incident: DispatchDetails, formData: any, explicitlySaved?: boolean) => Promise<void>;
   removeDraft: (draftId: string) => void;
   openFormForIncident: (incident: DispatchDetails) => void;
 
-  enqueueAction: (action: Omit<QueueAction, 'id' | 'timestamp'>) => Promise<void>;
+  enqueueAction: (action: Omit<QueueAction, 'id' | 'timestamp' | 'ownerUserId'>) => Promise<void>;
   dequeueAction: (id: string) => Promise<void>;
   loadOfflineQueue: () => Promise<void>;
   setSyncingQueue: (isSyncing: boolean) => void;
@@ -183,6 +188,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
   isArrivalConfirmVisible: false,
   isSubmittingReport: false,
   showReportSuccess: false,
+  lastReportDelivery: null,
+  lastArrivalDelivery: null,
   currentSpeedKph: 0,
   hospitalDistanceKm: null,
   hospitalEtaMins: null,
@@ -194,6 +201,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
   submittedIncidentIds: [],
   offlineQueue: [],
   isSyncingQueue: false,
+  lastQueueError: null,
 
   setStatus: (status) => set({ status }),
   setActiveDispatch: (activeDispatch) => set({ activeDispatch }),
@@ -276,8 +284,12 @@ export const useResponderStore = create<ResponderState>((set) => ({
             useResponderStore.getState().completeIncident();
             return;
           }
-          if (!response.ok) throw new Error(result?.error || `HTTP ${response.status}`);
+          if (!response.ok) {
+            alert(result?.error || `Arrival was rejected by the server (HTTP ${response.status}).`);
+            return;
+          }
           dbSuccess = true;
+          set({ lastArrivalDelivery: 'CONFIRMED' });
           console.log('[useResponderStore] Successfully updated status to ARRIVED in DB.');
         } catch (e) {
           console.error('[useResponderStore] Failed to update incident status to ARRIVED (treating as offline):', e);
@@ -292,6 +304,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
           method: 'POST',
           payload: { incidentId: activeDispatch.id, status: 'ARRIVED' }
         });
+        set({ lastArrivalDelivery: 'QUEUED_OFFLINE' });
+        alert('Arrival saved on this device and is still syncing with PACC. Keep the app open after reconnecting.');
       }
     }
     const enRouteDuration = useResponderStore.getState().elapsedTimeSeconds;
@@ -394,10 +408,10 @@ export const useResponderStore = create<ResponderState>((set) => ({
   },
 
   submitReport: async (incidentId?: string, formData?: any) => {
-    set({ isSubmittingReport: true });
+    set({ isSubmittingReport: true, lastReportDelivery: null });
     const idToSubmit = incidentId || useResponderStore.getState().activeDispatch?.id;
     if (!idToSubmit) {
-      set({ isSubmittingReport: false, showReportSuccess: true });
+      set({ isSubmittingReport: false });
       return;
     }
 
@@ -457,25 +471,28 @@ export const useResponderStore = create<ResponderState>((set) => ({
         })
       });
 
-      const res = await response.json();
+      const res = await response.json().catch(() => null);
+      if (!response.ok || !res?.success) {
+        console.error('Failed to submit report:', res?.error || response.status);
+        if (res?.code === 'INCIDENT_REASSIGNED') {
+          alert(res.error);
+          useResponderStore.getState().completeIncident();
+          return;
+        }
+        alert(res?.error || `Failed to submit report (HTTP ${response.status}).`);
+        set({ isSubmittingReport: false });
+        return;
+      }
       if (res.success) {
         const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
         set((state) => ({
           isSubmittingReport: false,
           showReportSuccess: true,
+          lastReportDelivery: 'CONFIRMED',
           lastSubmittedSummary: summary,
           submittedIncidentIds: [...state.submittedIncidentIds, idToSubmit],
           drafts: nextDrafts
         }));
-      } else {
-        console.error('Failed to submit report:', res.error);
-        if (res.code === 'INCIDENT_REASSIGNED') {
-          alert(res.error);
-          useResponderStore.getState().completeIncident();
-          return;
-        }
-        alert(res.error || 'Failed to submit report.');
-        set({ isSubmittingReport: false });
       }
     } catch (err) {
       console.error('Error submitting report to API, queuing offline:', err);
@@ -495,13 +512,11 @@ export const useResponderStore = create<ResponderState>((set) => ({
         }
       });
 
-      const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
-      set((state) => ({
+      set(() => ({
         isSubmittingReport: false,
         showReportSuccess: true,
+        lastReportDelivery: 'QUEUED_OFFLINE',
         lastSubmittedSummary: summary,
-        submittedIncidentIds: [...state.submittedIncidentIds, idToSubmit],
-        drafts: nextDrafts
       }));
     }
   },
@@ -515,6 +530,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
     isArrivalConfirmVisible: false,
     isSubmittingReport: false,
     showReportSuccess: false,
+    lastReportDelivery: null,
+    lastArrivalDelivery: null,
     currentSpeedKph: 0,
     hospitalDistanceKm: null,
     hospitalEtaMins: null,
@@ -536,11 +553,15 @@ export const useResponderStore = create<ResponderState>((set) => ({
     lastSubmittedSummary: null
   }),
 
-  saveDraft: (incident, formData, explicitlySaved = false) => set((state) => {
+  saveDraft: async (incident, formData, explicitlySaved = false) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user.id) return;
+    set((state) => {
     const existingDraftIndex = state.drafts.findIndex(d => d.incidentId === incident.id);
     const existingDraft = existingDraftIndex >= 0 ? state.drafts[existingDraftIndex] : undefined;
     const newDraft: DraftForm = {
       id: existingDraft?.id || `df-${Date.now()}`,
+      ownerUserId: session.user.id,
       incidentId: incident.id,
       incidentType: incident.typeOfEmergency || incident.type,
       lastSaved: explicitlySaved || existingDraft?.explicitlySaved
@@ -560,8 +581,9 @@ export const useResponderStore = create<ResponderState>((set) => ({
       newDrafts = [...state.drafts, newDraft];
     }
     
-    return { drafts: newDrafts };
-  }),
+      return { drafts: newDrafts };
+    });
+  },
 
   removeDraft: (draftId) => set((state) => ({
     drafts: state.drafts.filter((draft) => draft.id !== draftId),
@@ -573,20 +595,28 @@ export const useResponderStore = create<ResponderState>((set) => ({
   }),
 
   enqueueAction: async (action) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user.id) {
+      console.error('[useResponderStore] Refusing to queue an action without an authenticated responder.');
+      return;
+    }
+    set({ lastQueueError: null });
     let updatedQueue: QueueAction[] = [];
     const currentQueue = useResponderStore.getState().offlineQueue;
-    const telemetryIndex = currentQueue.findIndex(a => a.type === 'TELEMETRY_SYNC');
+    const telemetryIndex = currentQueue.findIndex(a => a.type === 'TELEMETRY_SYNC' && a.ownerUserId === session.user.id);
 
     if (action.type === 'TELEMETRY_SYNC' && telemetryIndex !== -1) {
       updatedQueue = [...currentQueue];
       updatedQueue[telemetryIndex] = {
         ...updatedQueue[telemetryIndex],
+        ownerUserId: session.user.id,
         payload: action.payload,
         timestamp: new Date().toISOString()
       };
     } else {
       const newAction: QueueAction = {
         ...action,
+        ownerUserId: session.user.id,
         id: `id-${Date.now()}`,
         timestamp: new Date().toISOString()
       };
@@ -606,9 +636,14 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
   loadOfflineQueue: async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const ownerUserId = session?.user.id;
       const stored = await SecureStore.getItemAsync('disas_trace_offline_state_queue');
       if (stored) {
-        set({ offlineQueue: JSON.parse(stored) });
+        const parsed = JSON.parse(stored) as QueueAction[];
+        const owned = ownerUserId ? parsed.filter((action) => action.ownerUserId === ownerUserId) : [];
+        set({ offlineQueue: owned });
+        await serializeSecureStoreWrite(owned);
       } else {
         set({ offlineQueue: [] });
       }
@@ -616,15 +651,19 @@ export const useResponderStore = create<ResponderState>((set) => ({
       const fileInfo = await FileSystem.getInfoAsync(DRAFTS_FILE_PATH);
       if (fileInfo.exists) {
         const fileContent = await FileSystem.readAsStringAsync(DRAFTS_FILE_PATH);
-        set({ drafts: JSON.parse(fileContent) });
+        const parsed = JSON.parse(fileContent) as DraftForm[];
+        const owned = ownerUserId ? parsed.filter((draft) => draft.ownerUserId === ownerUserId) : [];
+        set({ drafts: owned });
+        await persistDrafts(owned);
       } else {
         // Fallback to legacy SecureStore if file doesn't exist yet
         const storedDrafts = await SecureStore.getItemAsync('disas_trace_drafts');
         if (storedDrafts) {
-          const parsed = JSON.parse(storedDrafts);
-          set({ drafts: parsed });
+          const parsed = JSON.parse(storedDrafts) as DraftForm[];
+          const owned = ownerUserId ? parsed.filter((draft) => draft.ownerUserId === ownerUserId) : [];
+          set({ drafts: owned });
           // Migrate to FileSystem immediately
-          await FileSystem.writeAsStringAsync(DRAFTS_FILE_PATH, storedDrafts);
+          await FileSystem.writeAsStringAsync(DRAFTS_FILE_PATH, JSON.stringify(owned));
           await SecureStore.deleteItemAsync('disas_trace_drafts').catch(() => {});
         } else {
           set({ drafts: [] });

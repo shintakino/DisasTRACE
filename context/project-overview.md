@@ -17,6 +17,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 ### Public User (Android — Expo)
 
 1. User registers with personal details, contact info, and a government-issued ID photo.
+   Before registration, the user can read the current Data Privacy Policy and must explicitly consent; the accepted policy version and timestamp are retained with the account.
 2. Phone number is verified via OTP (textbee.dev).
 3. Account enters "Pending Approval" — user is blocked from all features until a CDRRMO Super Admin verifies the registration (PACC Admins no longer perform user validations).
 4. Once verified, user can submit emergency or non-emergency incident reports with photos, GPS location, and a structured WH form.
@@ -92,6 +93,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 - Account banning with reason tracking.
 - Responder activity logs and status history.
 - Report export to PDF.
+- Historical Incident Demand Outlook for CDRRMO planning, based only on verified incidents and clearly distinguished from a real-time hazard warning.
 
 ### Notifications
 
@@ -118,7 +120,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 
 - iOS mobile app.
 - Push notifications / external notification services.
-- Automated emergency detection or predictive analytics.
+- Automated emergency prediction, official hazard forecasting, or real-time warning issuance. The bounded historical demand outlook is descriptive planning support only.
 - Fire, flood, police, or non-medical emergency response.
 - Billing and subscription systems.
 - Employee performance monitoring.

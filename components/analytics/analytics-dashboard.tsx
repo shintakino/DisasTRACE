@@ -101,9 +101,6 @@ export function AnalyticsDashboard() {
     if (authLoading) return;
 
     if (role !== "cdrrmo_super_admin") {
-      setLoading(false);
-      setData(null);
-      setError("You do not have permission to view administrative analytics.");
       return;
     }
 
@@ -146,6 +143,24 @@ export function AnalyticsDashboard() {
     setRefreshing(true);
     setReloadKey((current) => current + 1);
   };
+
+  if (!authLoading && role !== "cdrrmo_super_admin") {
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center">
+        <Card className="w-full max-w-xl border-red-200 bg-red-50 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-800">
+              <TriangleAlert className="size-5" />
+              Analytics unavailable
+            </CardTitle>
+            <CardDescription className="text-red-700">
+              You do not have permission to view administrative analytics.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading && !data) {
     return (
@@ -216,6 +231,27 @@ export function AnalyticsDashboard() {
       </section>
 
       <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-5">
+        <Card className="border-slate-200 py-0 shadow-sm xl:col-span-5">
+          <CardHeader className="border-b border-slate-100 px-6 py-5">
+            <CardTitle className="text-lg font-bold text-[#1E3A8A]">Historical Incident Demand Outlook</CardTitle>
+            <CardDescription>{data.outlook.disclaimer}</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            {data.outlook.available ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <SummaryMetric label="Next completed interval estimate" value={data.outlook.projectedCount ?? 0} detail={`Recent range ${data.outlook.observedRange?.min ?? 0}–${data.outlook.observedRange?.max ?? 0}`} icon={Activity} iconClassName="bg-blue-50 text-blue-700" />
+                <SummaryMetric label="Demand direction" value={data.outlook.direction ?? 'stable'} detail="Compared with the preceding four intervals" icon={FileBarChart} iconClassName="bg-violet-50 text-violet-700" />
+                <SummaryMetric label="Leading incident type" value={data.outlook.leadingType ?? 'None'} detail={`${data.outlook.sampleSize} verified incidents in the sample`} icon={ClipboardCheck} iconClassName="bg-amber-50 text-amber-700" />
+                <SummaryMetric label="Leading barangay" value={data.outlook.leadingBarangay ?? 'None'} detail="Use for readiness planning, not hazard warning" icon={TriangleAlert} iconClassName="bg-rose-50 text-rose-700" />
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Insufficient verified incident history. At least four completed intervals and five verified incidents are required before an estimate is shown.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card className="border-slate-200 py-0 shadow-sm xl:col-span-3">
           <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
             <div>

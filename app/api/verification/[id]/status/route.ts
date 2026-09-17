@@ -10,6 +10,7 @@ import crypto from "crypto";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 import { rejectVerificationRequest } from "@/lib/reject-verification-request";
 import { z } from "zod";
+import { createAuditActor } from '@/lib/audit-events';
 
 const UpdateVerificationStatusSchema = z.object({
   status: VerificationStatusSchema,
@@ -56,7 +57,7 @@ export async function PATCH(
     }
 
     if (validatedStatus === "REJECTED") {
-      const rejection = await rejectVerificationRequest(id, rejectionReason);
+      const rejection = await rejectVerificationRequest(id, rejectionReason, createAuditActor(user));
 
       if (!rejection.success) {
         return NextResponse.json({ error: rejection.error }, { status: rejection.status });

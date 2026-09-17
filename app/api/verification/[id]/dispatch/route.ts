@@ -13,6 +13,8 @@ import {
   RESPONDER_HEARTBEAT_FRESHNESS_MS,
 } from '@/lib/dispatch-policy';
 import { createClient } from '@/lib/supabase-server';
+import { auditLogs } from '@/db/schema/audit_logs';
+import { createAuditActor, createAuditEvent, PACC_AUDIT_ACTIONS } from '@/lib/audit-events';
 
 const ManualDispatchSchema = z.object({
   responderId: z.string().trim().min(1).max(255),
@@ -184,6 +186,14 @@ export async function POST(
         .update(verificationRequests)
         .set({ status: 'VERIFIED', updatedAt: now })
         .where(eq(verificationRequests.id, id));
+
+      await tx.insert(auditLogs).values(createAuditEvent({
+        actor: createAuditActor(user),
+        action: PACC_AUDIT_ACTIONS.dispatch,
+        entityType: 'INCIDENT',
+        entityId: incident.id,
+        details: { requestId: verificationRequest.requestId, responderId: responder.id, responderName: responder.fullName, offerExpiresAt: offerExpiresAt.toISOString() },
+      }));
 
       return {
         success: true as const,

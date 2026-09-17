@@ -17,6 +17,18 @@
 - **Headings**: Bold, Primary Navy Blue.
 - **Body Text**: Regular, Dark Grey (#4B5563).
 - **Dashboard Stats**: Large, Extra Bold numbers for high-visibility metrics.
+- **Operational Text**: Critical labels, times, locations, and status metadata use at least 12px; 9–10px text is reserved for nonessential decoration only.
+
+## Operational Hierarchy and Feedback
+
+- Command surfaces designate at most one item as **Priority now**. Actionable work precedes terminal history; severity, reassignment need, and recency determine prominence. Other records remain readable but visually quieter.
+- Red and persistent animation are reserved for the single most urgent actionable state. Secondary cards use neutral surfaces and status accents so multiple incidents do not compete equally.
+- Incident essentials (severity, type, location, affected people, current status, and recommended next action) appear before evidence, automation metadata, or reporter history.
+- Every major workflow action provides persistent, accessible feedback with four parts: what is happening or happened, the server-confirmed result, what happens next, and what the user should do. Errors retain the server reason and a retry/refresh path.
+- Mobile status views retain the last confirmed report state during a weak-network refresh failure, mark it as stale, and provide Retry. Locally queued responder work uses amber/pending language and must never look server-confirmed.
+- A dispatch offer awaiting acceptance is shown in a separate, read-only **Awaiting Responder** lane with its deadline; it does not block the PACC operator or look like a completed dispatch.
+- Mobile sign-up provides an inspectable Data Privacy Policy before its required consent control. Registration stays visibly disabled until the form and consent are valid.
+- Use the same Guest Mode allowance banner on pending review, active response, resolution, and device-local history so a direct dispatch never skips the remaining-count reminder.
 
 ## Design Tokens
 - **Border Radius**:
@@ -42,5 +54,5 @@
 - Profile: `user-tick`
 
 ## Interactions
-- **Hover States**: Subtle shadow increase and scale effect on dashboard cards.
+- **Hover States**: Subtle shadow or border changes on dashboard cards; avoid scale motion on dense operational grids.
 - **Animations**: Smooth transitions for the "Welcome to DisasTRACE" login sequence and real-time ambulance tracking updates on the map.

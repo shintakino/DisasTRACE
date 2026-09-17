@@ -5,7 +5,7 @@ import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
 import { sendDispatchOfferExpiredPush, sendDispatchOfferPush } from "@/lib/push-notifications";
-import { asc, eq, and, or, sql, isNull, isNotNull, gte, lte } from "drizzle-orm";
+import { eq, and, or, sql, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import {
   canCascadeDispatchOffer,
   RESPONDER_HEARTBEAT_FRESHNESS_MS,
@@ -308,7 +308,7 @@ export async function autoDispatchIncident(
 // becomes available so confirmed emergencies do not remain stranded at PACC.
 // autoDispatchIncident owns the row locks and responder reservation, keeping
 // concurrent heartbeats and submissions idempotent.
-export async function retryPendingAutomaticDispatches() {
+export async function retryPendingAutomaticDispatches(options: { throwOnError?: boolean } = {}) {
   try {
     const pendingEmergencies = await db.query.verificationRequests.findMany({
       where: and(
@@ -346,11 +346,35 @@ export async function retryPendingAutomaticDispatches() {
     // Telemetry and duty-status updates must still succeed when the best-effort
     // recovery query is temporarily unavailable.
     console.error('Error retrying pending automatic dispatches:', error);
+    if (options.throwOnError) throw error;
     return null;
   }
 }
 
-export async function cascadeIncident(incidentId: string, timedOutResponderId: string | null) {
+export interface DispatchMaintenanceResult {
+  processed: number;
+  failed: number;
+}
+
+// The scheduler drains more than one report per invocation so simultaneous
+// emergencies do not depend on an operator opening the PACC queue. Each inner
+// dispatch remains transactionally responsible for responder reservation.
+export async function drainPendingAutomaticDispatches(maxAssignments = 10): Promise<DispatchMaintenanceResult> {
+  let processed = 0;
+  try {
+    for (let attempt = 0; attempt < maxAssignments; attempt += 1) {
+      const incident = await retryPendingAutomaticDispatches({ throwOnError: true });
+      if (!incident) break;
+      processed += 1;
+    }
+    return { processed, failed: 0 };
+  } catch (error) {
+    console.error('Background pending-dispatch drain failed:', error);
+    return { processed, failed: 1 };
+  }
+}
+
+export async function cascadeIncident(incidentId: string, timedOutResponderId: string | null): Promise<boolean> {
   try {
     const incidentSnapshot = await db.query.incidents.findFirst({
       where: eq(incidents.id, incidentId),
@@ -358,12 +382,12 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
 
     if (!incidentSnapshot) {
       console.error(`Incident ${incidentId} not found during cascade.`);
-      return;
+      return true;
     }
 
     if (!timedOutResponderId || !canCascadeDispatchOffer(incidentSnapshot, timedOutResponderId)) {
       console.log(`[Cascade] Offer ${incidentId} was already accepted, cleared, or reassigned.`);
-      return;
+      return true;
     }
 
     const request = await db.query.verificationRequests.findFirst({
@@ -372,7 +396,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
 
     if (!request) {
       console.error(`Verification request for incident ${incidentId} not found during cascade.`);
-      return;
+      return true;
     }
 
     // Mark the timed-out/rejecting responder as skipped
@@ -400,7 +424,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
 
     if (!incident) {
       console.log(`[Cascade] Offer ${incidentId} changed before cascade could claim it.`);
-      return;
+      return true;
     }
 
     // The old responder is no longer allowed to accept this incident. A push
@@ -444,7 +468,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
       // oldest automatic emergency waiting in the queue use the released unit.
       await retryPendingAutomaticDispatches();
 
-      return;
+      return true;
     }
 
     const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
@@ -608,7 +632,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
           await db.update(users)
             .set({ dutyStatus: 'ON_DUTY' })
             .where(and(eq(users.id, nextResponder.id), eq(users.dutyStatus, 'ACTIVE_DISPATCH')));
-          return;
+          return true;
         }
         break;
       }
@@ -645,8 +669,10 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
       });
       await retryPendingAutomaticDispatches();
     }
+    return true;
   } catch (error) {
     console.error("Error in cascadeIncident:", error);
+    return false;
   }
 }
 
@@ -654,7 +680,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
 // this timestamp; the scheduler, not a paused mobile timer, releases it.
 const DISPATCH_GRACE_PERIOD_MS = 0;
 
-export async function checkAndCascadeExpiredOffers() {
+export async function checkAndCascadeExpiredOffers(): Promise<DispatchMaintenanceResult> {
   try {
     const now = new Date();
 
@@ -671,6 +697,7 @@ export async function checkAndCascadeExpiredOffers() {
       limit: 25,
     });
 
+    let processed = 0;
     for (const incident of expiredIncidents) {
       if (!incident.offerExpiresAt) {
         continue;
@@ -684,10 +711,14 @@ export async function checkAndCascadeExpiredOffers() {
 
       // Found expired offer: Cascade to next responder
       console.log(`Cascade: Dispatch offer for incident ${incident.id} expired. Routing to next responder.`);
-      await cascadeIncident(incident.id, incident.currentOfferResponderId);
+      const succeeded = await cascadeIncident(incident.id, incident.currentOfferResponderId);
+      if (!succeeded) return { processed, failed: 1 };
+      processed += 1;
     }
+    return { processed, failed: 0 };
   } catch (error) {
     console.error("Error in checkAndCascadeExpiredOffers:", error);
+    throw error;
   }
 }
 
@@ -699,7 +730,7 @@ export async function checkAndRecycleManualOverrides() {
 // Self-healing: detect and fix responders stuck in ACTIVE_DISPATCH with no active incident.
 // This can happen when a race condition, crash, or cascade error leaves a responder reserved
 // but with no corresponding DISPATCHED incident pointing to them.
-export async function healOrphanedActiveDispatches() {
+export async function healOrphanedActiveDispatches(): Promise<DispatchMaintenanceResult> {
   try {
     // 1. Find all responders currently in ACTIVE_DISPATCH
     const activeDispatchResponders = await db.query.users.findMany({
@@ -709,7 +740,7 @@ export async function healOrphanedActiveDispatches() {
       ),
     });
 
-    if (activeDispatchResponders.length === 0) return;
+    if (activeDispatchResponders.length === 0) return { processed: 0, failed: 0 };
 
     // 2. Find all DISPATCHED incidents that have an active offer or assigned responder
     const activeIncidents = await db.query.incidents.findMany({
@@ -735,15 +766,19 @@ export async function healOrphanedActiveDispatches() {
     }
 
     // 3. Reset orphaned responders (ACTIVE_DISPATCH but no incident pointing to them)
+    let processed = 0;
     for (const responder of activeDispatchResponders) {
       if (!busyResponderIds.has(responder.id)) {
         console.log(`[SelfHeal] Responder ${responder.fullName} (${responder.id}) is stuck in ACTIVE_DISPATCH with no active incident. Resetting to ON_DUTY.`);
         await db.update(users)
           .set({ dutyStatus: "ON_DUTY" })
           .where(eq(users.id, responder.id));
+        processed += 1;
       }
     }
+    return { processed, failed: 0 };
   } catch (error) {
     console.error("Error in healOrphanedActiveDispatches:", error);
+    throw error;
   }
 }

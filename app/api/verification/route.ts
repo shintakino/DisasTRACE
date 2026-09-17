@@ -5,7 +5,6 @@ import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
 import { createClient } from "@/lib/supabase-server";
 import { and, count, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
-import { checkAndCascadeExpiredOffers, healOrphanedActiveDispatches, retryPendingAutomaticDispatches } from "@/lib/dispatch-engine";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS, isLikelyDuplicateIncident } from "@/lib/incident-deduplication";
 import { resolveBaliwagBarangay } from "@/lib/barangay-boundaries";
@@ -15,9 +14,6 @@ import { createPublicRequestId, deriveInitialTriage } from "@/lib/initial-triage
 
 export async function GET() {
   try {
-    // 1. Run self-healing checks on active dispatch offers and manual overrides
-    await checkAndCascadeExpiredOffers();
-    await healOrphanedActiveDispatches();
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -26,12 +22,6 @@ export async function GET() {
     if (role !== "pacc_admin") {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-
-    // A high-confidence emergency is offered to a responder before it becomes
-    // PACC work. Re-run the bounded FIFO dispatcher before reading the queue so
-    // a realtime INSERT cannot briefly surface an emergency for manual triage
-    // while its automatic offer is still being created.
-    await retryPendingAutomaticDispatches();
 
     // Bound active work and terminal history independently. A burst of recent
     // rejected/closed records must never push an older actionable report out
@@ -46,7 +36,6 @@ export async function GET() {
             eq(verificationRequests.status, 'VERIFIED'),
             eq(incidents.status, 'DISPATCHED'),
             isNull(incidents.responderId),
-            isNull(incidents.currentOfferResponderId),
           ),
         ))
         .orderBy(desc(verificationRequests.createdAt)),
@@ -172,6 +161,7 @@ export async function GET() {
           status: incident.status,
           responderId: incident.responderId,
           currentOfferResponderId: incident.currentOfferResponderId,
+          offerExpiresAt: incident.offerExpiresAt?.toISOString() ?? null,
           dispatchMethod: incident.dispatchMethod
         } : null,
         // Keep an exhausted automatic offer in the action queue. It is not a

@@ -2,13 +2,14 @@
 
 import * as React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MapIncident, MapSummary, IncidentStatus } from "@/types/map";
-import { Calendar as CalendarIcon, ArrowRight, Activity, Flame, Car, ShieldAlert, Clock, MapPin } from "lucide-react";
+import { MapIncident, MapSummary } from "@/types/map";
+import { Calendar as CalendarIcon, Activity, Flame, Car, ShieldAlert, Clock, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as UICalendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { compareOperationalIncidents, isOperationalIncidentActive } from "@/lib/incident-display-priority";
 
 interface IncidentPanelProps {
   summary: MapSummary;
@@ -20,10 +21,10 @@ interface IncidentPanelProps {
   onOpenDetails?: (id: string) => void;
   category?: "user" | "responder";
   onCategoryChange?: (category: "user" | "responder") => void;
+  onPriorityChange?: (incidentId: string | undefined) => void;
 }
 
 export function IncidentPanel({
-  summary: externalSummary,
   incidents,
   onSelectIncident,
   selectedIncidentId,
@@ -32,6 +33,7 @@ export function IncidentPanel({
   onOpenDetails,
   category: externalCategory,
   onCategoryChange,
+  onPriorityChange,
 }: IncidentPanelProps) {
   const [internalCategory, setInternalCategory] = React.useState<"user" | "responder">("user");
   const category = externalCategory !== undefined ? externalCategory : internalCategory;
@@ -109,16 +111,14 @@ export function IncidentPanel({
     }
 
     return true;
-  });
-
-  const displayDateStr = selectedDate 
-    ? format(selectedDate, "MM.dd.yyyy") 
-    : new Date().toLocaleDateString("en-US", {
-        timeZone: "Asia/Manila",
-        month: "2-digit",
-        day: "2-digit",
-        year: "numeric",
-      }).replace(/\//g, ".");
+  }).sort((a, b) => compareOperationalIncidents(
+    { id: a.id, severity: a.severity, status: a.status, createdAt: a.createdAt },
+    { id: b.id, severity: b.severity, status: b.status, createdAt: b.createdAt },
+  ));
+  const priorityIncidentId = filteredIncidents.find((incident) => isOperationalIncidentActive({ status: incident.status }))?.id;
+  React.useEffect(() => {
+    onPriorityChange?.(priorityIncidentId);
+  }, [onPriorityChange, priorityIncidentId]);
 
   return (
     <div className="flex flex-col h-full w-[400px] border-r bg-white shadow-xl z-10">
@@ -267,6 +267,7 @@ export function IncidentPanel({
               >
                 <IncidentCard
                   incident={incident}
+                  isPriority={incident.id === priorityIncidentId}
                   isSelected={selectedIncidentId === incident.id}
                   onClick={() => onSelectIncident(incident)}
                   onOpenDetails={onOpenDetails}
@@ -292,11 +293,10 @@ export function IncidentPanel({
 
 function SummaryCard({ label, count, gradient }: { label: string; count: number; gradient: string }) {
   return (
-    <div className={cn("relative p-4 flex flex-col items-start justify-center rounded-2xl border-none shadow-sm h-24 overflow-hidden group hover:scale-[1.02] transition-transform text-white bg-gradient-to-br", gradient)}>
+    <div className={cn("relative flex h-16 flex-col items-start justify-center overflow-hidden rounded-xl border-none bg-gradient-to-br px-3 text-white shadow-sm", gradient)}>
       <div className="absolute inset-0 bg-black/5" />
-      <span className="relative z-10 text-3xl font-black leading-none tracking-tighter">{count}</span>
-      <span className="relative z-10 text-[10px] font-black tracking-widest mt-2 opacity-80 uppercase">{label}</span>
-      <div className="absolute -right-2 -bottom-2 w-12 h-12 rounded-full bg-white/20 opacity-30 group-hover:scale-150 transition-transform" />
+      <span className="relative z-10 text-2xl font-black leading-none tracking-tight">{count}</span>
+      <span className="relative z-10 mt-1 text-[10px] font-black uppercase tracking-wide opacity-85">{label}</span>
     </div>
   );
 }
@@ -314,11 +314,13 @@ function TabTrigger({ value, children }: { value: string; children: React.ReactN
 
 function IncidentCard({
   incident,
+  isPriority,
   isSelected,
   onClick,
   onOpenDetails,
 }: {
   incident: MapIncident;
+  isPriority: boolean;
   isSelected: boolean;
   onClick: () => void;
   onOpenDetails?: (id: string) => void;
@@ -348,7 +350,9 @@ function IncidentCard({
         "relative group cursor-pointer transition-all rounded-2xl border bg-white overflow-hidden flex flex-col",
         isSelected 
           ? "border-slate-900 shadow-xl ring-1 ring-slate-900 translate-x-1" 
-          : "border-slate-100 shadow-sm hover:border-slate-200 hover:shadow-md hover:-translate-y-0.5"
+          : isPriority
+            ? "border-red-300 bg-red-50/40 shadow-md"
+            : "border-slate-100 shadow-sm hover:border-slate-200 hover:shadow-md"
       )}
       onClick={onClick}
     >
@@ -356,6 +360,14 @@ function IncidentCard({
       <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusColors[incident.status] || "bg-slate-400")} />
 
       <div className="p-5 pl-6 flex-1">
+        {isPriority ? (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="rounded-full bg-red-700 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white">Priority now</span>
+            <span className="text-xs font-bold text-red-800">{incident.severity} severity</span>
+          </div>
+        ) : (
+          <div className="mb-2 text-xs font-bold text-slate-500">{incident.severity} severity</div>
+        )}
         <div className="flex justify-between items-start mb-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">

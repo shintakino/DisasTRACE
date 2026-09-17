@@ -6,9 +6,8 @@ import { IncidentPanel } from "@/components/map/incident-panel";
 import { MapContainer } from "@/components/map/map-container";
 import { useMapData } from "@/hooks/use-map-data";
 import { MapIncident } from "@/types/map";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
@@ -16,11 +15,12 @@ import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
 import { WebPreloader } from "@/components/ui/web-preloader";
 
 function MapPageContent() {
-  const { incidents, responders, hospitals, summary, isLoading, error } = useMapData();
+  const { incidents, responders, hospitals, summary, isLoading, error, refresh } = useMapData();
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
   const [filter, setFilter] = useState("ALL");
   const [category, setCategory] = useState<"user" | "responder">("user");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [priorityIncidentId, setPriorityIncidentId] = useState<string | undefined>();
   
   // Layer visibility state (requests vs reports)
   const [showReports, setShowReports] = useState(true);
@@ -85,7 +85,8 @@ function MapPageContent() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>
-            {error}. Please try refreshing the page.
+            {error}. The last confirmed map state could not be refreshed.
+            <Button type="button" variant="outline" className="mt-3 block" onClick={refresh}>Retry map data</Button>
           </AlertDescription>
         </Alert>
       </div>
@@ -114,6 +115,7 @@ function MapPageContent() {
               onOpenDetails={handleOpenDetails}
               category={category}
               onCategoryChange={setCategory}
+              onPriorityChange={setPriorityIncidentId}
             />
           </div>
 
@@ -158,6 +160,7 @@ function MapPageContent() {
               responders={responders}
               hospitals={hospitals}
               selectedIncidentId={selectedIncidentId}
+              priorityIncidentId={priorityIncidentId}
               onSelectIncident={handleSelectIncident}
             />
           </div>

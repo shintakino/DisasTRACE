@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { VerificationQueue } from "@/components/verification/verification-queue"
+import { ActionFeedback } from "@/components/verification/action-feedback"
 import { VerificationDetails } from "@/components/verification/verification-details"
 import { ResidentPanel } from "@/components/verification/resident-panel"
 import { ManualDispatchModal } from "@/components/verification/manual-dispatch-modal"
@@ -17,17 +18,43 @@ import { WebPreloader } from "@/components/ui/web-preloader"
 import { getIncidentAlertPriority, type IncidentAlertPriority } from "@/lib/incident-severity"
 import { formatOfficialBaliwagLocation } from "@/lib/report-location"
 import { classifyActiveVerificationBucket } from "@/lib/rejected-report-workflow"
-import { compareActiveVerificationItems } from "@/lib/verification-queue-priority"
+import { compareActiveVerificationItems, selectHighestPriorityVerificationItem } from "@/lib/verification-queue-priority"
+import {
+  createActionErrorFeedback,
+  createActionProcessingFeedback,
+  createActionSuccessFeedback,
+  type OperatorActionFeedback,
+} from "@/lib/operator-action-feedback"
 
 function isActiveRequest(request: VerificationRequest) {
-  return classifyActiveVerificationBucket({
+  const bucket = classifyActiveVerificationBucket({
     requestStatus: request.status,
     incidentStatus: request.incident?.status,
     triageClassification: request.triageClassification,
     requiresPaccReassignment: request.requiresPaccReassignment,
     responderId: request.incident?.responderId,
     currentOfferResponderId: request.incident?.currentOfferResponderId,
-  }) !== null
+  })
+  return bucket === 'ACTION' || bucket === 'REVIEW'
+}
+
+function selectNextActiveRequest(
+  requests: readonly VerificationRequest[],
+  preferredBucket?: 'ACTION' | 'REVIEW' | null,
+) {
+  const active = requests.filter((request) => {
+    if (!isActiveRequest(request)) return false
+    if (!preferredBucket) return true
+    return classifyActiveVerificationBucket({
+      requestStatus: request.status,
+      incidentStatus: request.incident?.status,
+      triageClassification: request.triageClassification,
+      requiresPaccReassignment: request.requiresPaccReassignment,
+      responderId: request.incident?.responderId,
+      currentOfferResponderId: request.incident?.currentOfferResponderId,
+    }) === preferredBucket
+  })
+  return selectHighestPriorityVerificationItem(active)
 }
 
 export default function VerificationPage() {
@@ -38,6 +65,7 @@ export default function VerificationPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [actionFeedback, setActionFeedback] = useState<OperatorActionFeedback | null>(null)
   const [isMuted, setIsMuted] = useState(false)
 
   const isMutedRef = useRef(isMuted)
@@ -187,7 +215,7 @@ export default function VerificationPage() {
       
       // Select the first pending request if none selected
       if (data.length > 0 && !selectedId) {
-        const firstPending = data.find((request: VerificationRequest) => isActiveRequest(request))
+        const firstPending = selectNextActiveRequest(data)
         if (firstPending) setSelectedId(firstPending.id)
       }
       return data
@@ -361,6 +389,12 @@ export default function VerificationPage() {
     rejectionReason?: string,
   ): Promise<boolean> => {
     setIsProcessing(true)
+    const currentRequest = requests.find((request) => request.id === id)
+    const requestLabel = currentRequest?.requestId ?? id
+    setActionFeedback(createActionProcessingFeedback(
+      status === 'REJECTED' ? `Rejecting ${requestLabel}` : `Updating ${requestLabel}`,
+      'The status is being confirmed with the server.',
+    ))
     try {
       const response = await fetch(`/api/verification/${id}/status`, {
         method: "PATCH",
@@ -371,8 +405,6 @@ export default function VerificationPage() {
       const payload = await response.json().catch(() => null)
       if (!response.ok) throw new Error(payload?.error || "Failed to update status")
 
-      toast.success(`Request ${status === "VERIFIED" ? "accepted" : "rejected"}`)
-
       const nextRequests = requests.map((request) =>
         request.id === id
           ? { ...request, status, rejectionReason: payload?.rejectionReason ?? rejectionReason ?? null }
@@ -380,31 +412,33 @@ export default function VerificationPage() {
       )
       setRequests(nextRequests)
 
-      const currentIdx = requests.findIndex(r => r.id === id)
-      const orderedCandidates = [
-        ...nextRequests.slice(currentIdx + 1),
-        ...nextRequests.slice(0, currentIdx),
-      ]
       const preferredBucket = filter === "ACTION" || filter === "REVIEW" ? filter : null
-      const nextPending = orderedCandidates.find((request) => {
-        if (!isActiveRequest(request)) return false
-        if (!preferredBucket) return true
-        return classifyActiveVerificationBucket({
-          requestStatus: request.status,
-          incidentStatus: request.incident?.status,
-          triageClassification: request.triageClassification,
-          requiresPaccReassignment: request.requiresPaccReassignment,
-          responderId: request.incident?.responderId,
-          currentOfferResponderId: request.incident?.currentOfferResponderId,
-        }) === preferredBucket
-      }) || orderedCandidates.find(isActiveRequest)
+      const nextPending = selectNextActiveRequest(nextRequests, preferredBucket)
+        ?? selectNextActiveRequest(nextRequests)
 
       setSelectedId(nextPending?.id ?? null)
+      const feedback = status === 'REJECTED'
+        ? createActionSuccessFeedback({
+            title: `${requestLabel} rejected`,
+            detail: `Removed from the active queue. Reason: ${payload?.rejectionReason ?? rejectionReason}`,
+            nextStep: 'The reporter can see the rejection reason and may submit a new report when appropriate.',
+            userAction: nextPending ? `Review ${nextPending.requestId}, the next priority report.` : 'No active report remains in this queue.',
+          })
+        : createActionSuccessFeedback({
+            title: `${requestLabel} updated`,
+            detail: 'The report status was confirmed by the server.',
+            nextStep: nextPending ? `${nextPending.requestId} is now selected.` : 'The active queue is clear.',
+            userAction: nextPending ? 'Continue with the selected report.' : 'Monitor for new reports.',
+          })
+      setActionFeedback(feedback)
+      toast.success(feedback.title)
       void fetchRequestsSilent()
       return true
     } catch (error: unknown) {
       console.error(error)
-      toast.error(error instanceof Error ? error.message : "Failed to update status")
+      const message = error instanceof Error ? error.message : "Failed to update status"
+      setActionFeedback(createActionErrorFeedback(`${requestLabel} was not changed`, message))
+      toast.error(message)
       return false
     } finally {
       setIsProcessing(false)
@@ -422,13 +456,48 @@ export default function VerificationPage() {
 
   const handleClassificationOverride = async (id: string, triageClassification: TriageClassification) => {
     setIsProcessing(true)
+    const currentRequest = requests.find((request) => request.id === id)
+    const requestLabel = currentRequest?.requestId ?? id
+    setActionFeedback(createActionProcessingFeedback(`Updating ${requestLabel} classification`, 'PACC classification and dispatch eligibility are being checked.'))
     try {
       const response = await fetch(`/api/verification/${id}/classification`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ triageClassification }) })
-      if (!response.ok) throw new Error('Unable to override classification')
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(payload?.error || 'Unable to override classification')
       setRequests((current) => current.map((request) => request.id === id ? { ...request, triageClassification, triageReasons: ['PACC manually overrode the automated classification.'] } : request))
-      toast.success('PACC classification override saved')
+      const emergency = triageClassification === 'HIGH_CONFIDENCE_EMERGENCY'
+      const existingIncident = payload?.incident as { status?: string; responderId?: string | null; currentOfferResponderId?: string | null } | null
+      const resolvedIncident = existingIncident?.status === 'RESOLVED'
+      const reassignmentRequired = existingIncident?.status === 'DISPATCHED'
+        && !existingIncident.responderId
+        && !existingIncident.currentOfferResponderId
+      const retainedActiveIncident = Boolean(existingIncident) && !resolvedIncident && !reassignmentRequired
+      const feedback = createActionSuccessFeedback({
+        title: `${requestLabel} classification changed`,
+        detail: emergency
+          ? payload?.autoDispatched
+            ? 'Emergency classification saved and a responder offer was sent.'
+            : resolvedIncident
+              ? 'Emergency classification saved. The linked incident is already Case Closed.'
+              : retainedActiveIncident
+              ? 'Emergency classification saved. The existing incident response remains active.'
+              : 'Emergency classification saved; no eligible responder received an automatic offer.'
+          : 'Classification saved and the report remains in PACC review.',
+        nextStep: emergency
+          ? payload?.autoDispatched
+            ? 'The system is awaiting responder acceptance.'
+            : resolvedIncident
+              ? 'No additional dispatch will be started for this closed case.'
+              : retainedActiveIncident ? 'Continue monitoring the existing response.' : 'Manual dispatch is required.'
+          : 'No automatic dispatch will occur for this classification.',
+        userAction: emergency && !payload?.autoDispatched && !retainedActiveIncident && !resolvedIncident ? 'Choose Dispatch to select an eligible unit.' : 'Continue reviewing the report status.',
+      })
+      setActionFeedback(feedback)
+      toast.success(feedback.title)
+      void fetchRequestsSilent()
     } catch (error) {
-      toast.error('Failed to override classification')
+      const message = error instanceof Error ? error.message : 'Failed to override classification'
+      setActionFeedback(createActionErrorFeedback(`${requestLabel} classification was not changed`, message))
+      toast.error(message)
     } finally {
       setIsProcessing(false)
     }
@@ -436,37 +505,64 @@ export default function VerificationPage() {
 
   const handleCoordinationUpdate = async (id: string, agencies: string[]) => {
     setIsProcessing(true)
+    const currentRequest = requests.find((request) => request.id === id)
+    const requestLabel = currentRequest?.requestId ?? id
+    const previousAgencies = currentRequest?.coordinationAgencies ?? []
+    const added = agencies.filter((agency) => !previousAgencies.includes(agency))
+    const removed = previousAgencies.filter((agency) => !agencies.includes(agency))
+    const action = added.length ? `Adding ${added.join(', ')}` : removed.length ? `Removing ${removed.join(', ')}` : 'Updating agencies'
+    setActionFeedback(createActionProcessingFeedback(`${action} for ${requestLabel}`, 'Agency coordination is being saved.'))
     try {
       const response = await fetch(`/api/verification/${id}/coordination`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agencies }) })
-      if (!response.ok) throw new Error('Unable to update agency coordination')
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(payload?.error || 'Unable to update agency coordination')
       setRequests((current) => current.map((request) => request.id === id ? { ...request, coordinationAgencies: agencies } : request))
-      toast.success(agencies.length ? 'Agency coordination updated' : 'Agency coordination cleared')
+      const change = added.length ? `Added ${added.join(', ')}` : removed.length ? `Removed ${removed.join(', ')}` : 'Agency coordination updated'
+      const feedback = createActionSuccessFeedback({
+        title: `${change} for ${requestLabel}`,
+        detail: agencies.length ? `Active coordination: ${agencies.join(', ')}.` : 'No external agency is currently marked as coordinating.',
+        nextStep: 'The reporter-facing status now reflects this coordination.',
+        userAction: 'Continue triage or dispatch when ready.',
+      })
+      setActionFeedback(feedback)
+      toast.success(feedback.title)
     } catch (error) {
-      toast.error('Failed to update agency coordination')
+      const message = error instanceof Error ? error.message : 'Failed to update agency coordination'
+      setActionFeedback(createActionErrorFeedback(`${requestLabel} coordination was not changed`, message))
+      toast.error(message)
     } finally {
       setIsProcessing(false)
     }
   }
 
-  const handleDispatchSuccess = async () => {
+  const handleDispatchSuccess = async (outcome: 'DISPATCHED' | 'STALE' = 'DISPATCHED') => {
     const dispatchedId = dispatchReqId;
-    const refreshedRequests = await fetchRequests()
     if (dispatchedId) {
-      const currentIdx = refreshedRequests.findIndex((r) => r.id === dispatchedId)
-      const nextPending =
-        refreshedRequests.slice(currentIdx + 1).find(isActiveRequest) ||
-        refreshedRequests.slice(0, currentIdx).find(isActiveRequest)
+      const dispatchedRequest = requests.find((request) => request.id === dispatchedId)
+      const nextPending = selectNextActiveRequest(requests.filter((request) => request.id !== dispatchedId))
 
       if (nextPending) {
         setSelectedId(nextPending.id)
       } else {
         setSelectedId(null)
       }
+      if (outcome === 'DISPATCHED') {
+        setActionFeedback(createActionSuccessFeedback({
+          title: `${dispatchedRequest?.requestId ?? dispatchedId} dispatch offer sent`,
+          detail: 'The selected responder has been notified.',
+          nextStep: 'The system is awaiting responder acceptance.',
+          userAction: nextPending ? `Review ${nextPending.requestId}, the next priority report.` : 'Monitor the offer and incoming reports.',
+        }))
+      }
     }
+    void fetchRequestsSilent()
   }
 
   const handleMerge = async (duplicateId: string, parentId: string) => {
     setIsProcessing(true)
+    const duplicate = requests.find((request) => request.id === duplicateId)
+    const parent = requests.find((request) => request.id === parentId)
+    setActionFeedback(createActionProcessingFeedback(`Merging ${duplicate?.requestId ?? duplicateId}`, `Linking this duplicate to ${parent?.requestId ?? parentId}.`))
     try {
       const response = await fetch(`/api/verification/${duplicateId}/merge`, {
         method: "POST",
@@ -479,31 +575,35 @@ export default function VerificationPage() {
         throw new Error(errorData.error || "Failed to merge incident")
       }
 
-      toast.success("Incident successfully merged as duplicate")
-
       // Update the duplicate request status in local state to 'DUPLICATE'
-      setRequests((prev) =>
-        prev.map((r) => (r.id === duplicateId ? { ...r, status: "DUPLICATE" } : r))
-      )
+      const nextRequests = requests.map((r) => (r.id === duplicateId ? { ...r, status: "DUPLICATE" as const } : r))
+      setRequests(nextRequests)
 
       // Close the modal and reset ID
       setIsMergeModalOpen(false)
       setMergeReqId(null)
 
       // Automatically select the next pending request (or null)
-      const currentIdx = requests.findIndex((r) => r.id === duplicateId)
-      const nextPending =
-        requests.slice(currentIdx + 1).find(isActiveRequest) ||
-        requests.slice(0, currentIdx).find(isActiveRequest)
+      const nextPending = selectNextActiveRequest(nextRequests)
 
       if (nextPending) {
         setSelectedId(nextPending.id)
       } else {
         setSelectedId(null)
       }
+      const feedback = createActionSuccessFeedback({
+        title: `${duplicate?.requestId ?? duplicateId} merged`,
+        detail: `Marked as a duplicate of ${parent?.requestId ?? parentId}.`,
+        nextStep: `Dispatch and status updates follow ${parent?.requestId ?? parentId}.`,
+        userAction: nextPending ? `Review ${nextPending.requestId}, the next priority report.` : 'Monitor for new reports.',
+      })
+      setActionFeedback(feedback)
+      toast.success(feedback.title)
     } catch (error: unknown) {
       console.error(error)
-      toast.error(error instanceof Error ? error.message : "Failed to merge incident")
+      const message = error instanceof Error ? error.message : "Failed to merge incident"
+      setActionFeedback(createActionErrorFeedback(`${duplicate?.requestId ?? duplicateId} was not merged`, message))
+      toast.error(message)
     } finally {
       setIsProcessing(false)
     }
@@ -585,9 +685,8 @@ export default function VerificationPage() {
             activeAlertPriority === "critical" ? "bg-red-700 border-red-800" : activeAlertPriority === "severe" ? "bg-orange-600 border-orange-700" : "bg-[#1E3A8A] border-[#172554]"
           )}
         >
-          <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:40px_40px] opacity-10 animate-[pulse_2s_infinite]" />
           <div className="flex items-center gap-3 relative z-10">
-            <div className="bg-white/20 p-1.5 rounded-full animate-bounce">
+            <div className="rounded-full bg-white/20 p-1.5">
               <ShieldAlert className="size-5 text-white" />
             </div>
             <span className="rounded-md bg-white/20 px-2 py-1 text-[11px] font-black tracking-wide">
@@ -626,7 +725,7 @@ export default function VerificationPage() {
                 </>
               ) : (
                 <>
-                  <Volume2 className="size-3.5 animate-bounce" />
+                  <Volume2 className="size-3.5" />
                   Sound On
                 </>
               )}
@@ -634,6 +733,10 @@ export default function VerificationPage() {
           </div>
         </div>
       )}
+
+      {actionFeedback ? (
+        <ActionFeedback feedback={actionFeedback} onDismiss={() => setActionFeedback(null)} />
+      ) : null}
 
       {/* Main Panel Content */}
       <div className="flex-1 flex overflow-hidden">

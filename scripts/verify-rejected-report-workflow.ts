@@ -76,6 +76,16 @@ check('projects rejection as a terminal reporter status with the exact reason', 
   assert.doesNotMatch(status.responseStatus, /case closed/i);
 });
 
+check('distinguishes reporter cancellation from a PACC rejection', () => {
+  const status = projectReporterReportStatus({
+    requestStatus: 'REJECTED',
+    rejectionReason: 'Cancelled by the reporter through the DisasTRACE chatbot.',
+  });
+  assert.equal(status.outcome, 'CANCELLED');
+  assert.match(status.responseStatus, /You cancelled this report/i);
+  assert.doesNotMatch(status.responseStatus, /PACC rejected/i);
+});
+
 check('gives a rejected guest a terminal reset and a guest resubmission route', () => {
   const transition = deriveRejectedReportTransition({
     reporterMode: 'guest',

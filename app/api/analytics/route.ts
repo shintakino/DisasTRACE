@@ -6,6 +6,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { createClient } from "@/lib/supabase-server";
 import { AnalyticsPeriodSchema, type AnalyticsPeriod } from "@/types/analytics";
 import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
+import { buildIncidentDemandOutlook, zeroFillCompletedBuckets } from "@/lib/incident-demand-outlook";
 
 const INCIDENT_TYPES = [
   { type: "Vehicular Collision", color: "#1E3A8A" },
@@ -25,6 +26,7 @@ interface TrendRow {
 
 function getTrendQuery(period: AnalyticsPeriod, barangay?: string) {
   const scope = (condition: SQL) => barangay ? and(condition, eq(verificationRequests.barangay, barangay)) : condition;
+  const verifiedScope = (condition: SQL) => scope(and(condition, eq(verificationRequests.status, 'VERIFIED'))!);
   if (period === "day") {
     return db
       .select({
@@ -32,7 +34,7 @@ function getTrendQuery(period: AnalyticsPeriod, barangay?: string) {
         count: sql<number>`count(*)`,
       })
       .from(verificationRequests)
-      .where(scope(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= timezone('Asia/Manila', CURRENT_DATE) - interval '13 days'`))
+      .where(verifiedScope(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= timezone('Asia/Manila', CURRENT_DATE) - interval '13 days' and timezone('Asia/Manila', ${verificationRequests.createdAt}) < timezone('Asia/Manila', CURRENT_DATE)`))
       .groupBy(sql`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon DD')`)
       .orderBy(sql`min(date_trunc('day', timezone('Asia/Manila', ${verificationRequests.createdAt})))`);
   }
@@ -44,7 +46,7 @@ function getTrendQuery(period: AnalyticsPeriod, barangay?: string) {
         count: sql<number>`count(*)`,
       })
       .from(verificationRequests)
-      .where(scope(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('week', timezone('Asia/Manila', now())) - interval '11 weeks'`))
+      .where(verifiedScope(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('week', timezone('Asia/Manila', now())) - interval '11 weeks' and timezone('Asia/Manila', ${verificationRequests.createdAt}) < date_trunc('week', timezone('Asia/Manila', now()))`))
       .groupBy(sql`concat('Week of ', to_char(date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt})), 'Mon DD'))`)
       .orderBy(sql`min(date_trunc('week', timezone('Asia/Manila', ${verificationRequests.createdAt})))`);
   }
@@ -55,7 +57,7 @@ function getTrendQuery(period: AnalyticsPeriod, barangay?: string) {
       count: sql<number>`count(*)`,
     })
     .from(verificationRequests)
-    .where(scope(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('month', timezone('Asia/Manila', now())) - interval '11 months'`))
+    .where(verifiedScope(sql`timezone('Asia/Manila', ${verificationRequests.createdAt}) >= date_trunc('month', timezone('Asia/Manila', now())) - interval '11 months' and timezone('Asia/Manila', ${verificationRequests.createdAt}) < date_trunc('month', timezone('Asia/Manila', now()))`))
     .groupBy(sql`to_char(timezone('Asia/Manila', ${verificationRequests.createdAt}), 'Mon YYYY')`)
     .orderBy(sql`min(date_trunc('month', timezone('Asia/Manila', ${verificationRequests.createdAt})))`);
 }
@@ -101,16 +103,28 @@ export async function GET(request: Request) {
       : condition;
 
     // Run queries individually for debuggability
-    let frequencyRows, trendRows, totalRows, verifiedRows, pendingRows, resolvedRows, responseTimeRows;
+    let frequencyRows, trendRows, totalRows, verifiedRows, pendingRows, resolvedRows, responseTimeRows, barangayRows;
 
     try {
       frequencyRows = await db
         .select({ type: verificationRequests.type, count: sql<number>`count(*)` })
         .from(verificationRequests)
-        .where(scope(sql`true`))
+        .where(scope(eq(verificationRequests.status, 'VERIFIED')))
         .groupBy(verificationRequests.type);
     } catch (e) {
       console.error("[Analytics] frequencyRows query failed:", e);
+      throw e;
+    }
+
+    try {
+      barangayRows = await db
+        .select({ barangay: verificationRequests.barangay, count: sql<number>`count(*)` })
+        .from(verificationRequests)
+        .where(scope(eq(verificationRequests.status, 'VERIFIED')))
+        .groupBy(verificationRequests.barangay)
+        .orderBy(sql`count(*) desc`);
+    } catch (e) {
+      console.error('[Analytics] barangayRows query failed:', e);
       throw e;
     }
 
@@ -184,6 +198,13 @@ export async function GET(request: Request) {
       undefined
     );
     const resolutionRate = verified > 0 ? Math.round((resolved / verified) * 100) : 0;
+    const completedTrendCounts = zeroFillCompletedBuckets(period, trends).map((item) => item.count);
+    const outlook = buildIncidentDemandOutlook({
+      completedBuckets: completedTrendCounts,
+      verifiedIncidents: verified,
+      leadingType: topFrequency?.count ? topFrequency.type : null,
+      leadingBarangay: barangayRows[0]?.barangay ?? null,
+    });
 
     const insights = totalReported === 0
       ? [{ title: "No incident history yet", detail: "Preparedness insights will appear once incident reports are recorded." }]
@@ -218,6 +239,7 @@ export async function GET(request: Request) {
           avgResponseMinutes,
         },
         insights,
+        outlook,
       },
     });
   } catch (error) {

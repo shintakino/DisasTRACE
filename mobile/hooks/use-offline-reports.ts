@@ -18,6 +18,7 @@ export function useOfflineReports() {
   } = useResponderStore();
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   // Monitor network connection status
   useEffect(() => {
@@ -100,6 +101,7 @@ export function useOfflineReports() {
     if (!isOnline || syncing) return;
     if (offlineQueue.length === 0 && drafts.length === 0) return;
 
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const syncOfflineQueueAndDrafts = async () => {
       setSyncing(true);
       setSyncingQueue(true);
@@ -118,39 +120,49 @@ export function useOfflineReports() {
               
               // Retrieve authenticated Supabase sessions to extract current bearer tokens
               const { data: { session } } = await supabase.auth.getSession();
+              if (!session?.user.id || action.ownerUserId !== session.user.id) {
+                console.warn('[useOfflineReports] Removing an offline action owned by a different responder session.');
+                await dequeueAction(action.id);
+                continue;
+              }
               const headers: any = { 'Content-Type': 'application/json' };
               if (session?.access_token) {
                 headers['Authorization'] = `Bearer ${session.access_token}`;
               }
 
               if (action.type === 'STATE_CHANGE') {
-                if (action.endpoint === '/api/incidents/status') {
-                  // Perform a direct Supabase table client call to match the status transition
-                  const { incidentId, status, resolvedAt } = action.payload;
-                  const updatePayload: any = { status };
-                  if (resolvedAt) {
-                    updatePayload.resolved_at = resolvedAt;
-                  }
-                  const { error } = await supabase
-                    .from('incidents')
-                    .update(updatePayload)
-                    .eq('id', incidentId);
-                  
-                  if (error) throw error;
-                } else {
-                  const response = await fetch(`${apiUrl}${action.endpoint}`, {
-                    method: action.method,
-                    headers,
-                    body: JSON.stringify(action.payload),
-                  });
-                  if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                      console.log(`[useOfflineReports] Dropping unauthorized state change action ${action.id}`);
-                      await dequeueAction(action.id);
-                      continue;
+                // Replay through authenticated server routes so authorization,
+                // ownership and workflow transition checks remain authoritative.
+                const response = await fetch(`${apiUrl}${action.endpoint}`, {
+                  method: action.method,
+                  headers,
+                  body: JSON.stringify(action.payload),
+                });
+                const result = await response.json().catch(() => null);
+                if (!response.ok) {
+                  if ([400, 403, 404, 409].includes(response.status)) {
+                    const message = result?.error || `The queued action was rejected (HTTP ${response.status}).`;
+                    useResponderStore.setState({ lastQueueError: message });
+                    await dequeueAction(action.id);
+                    if (result?.code === 'INCIDENT_REASSIGNED') {
+                      useResponderStore.getState().completeIncident();
                     }
-                    throw new Error(`REST action returned status ${response.status}`);
+                    continue;
                   }
+                  throw new Error(result?.error || `REST action returned status ${response.status}`);
+                }
+                if (action.endpoint === '/api/reports') {
+                  const incidentId = action.payload.incidentId;
+                  useResponderStore.setState((state) => ({
+                    submittedIncidentIds: state.submittedIncidentIds.includes(incidentId)
+                      ? state.submittedIncidentIds
+                      : [...state.submittedIncidentIds, incidentId],
+                    drafts: state.drafts.filter((draft) => draft.incidentId !== incidentId),
+                    lastReportDelivery: 'CONFIRMED',
+                    showReportSuccess: true,
+                  }));
+                } else if (action.endpoint === '/api/incidents/status' && action.payload.status === 'ARRIVED') {
+                  useResponderStore.setState({ lastArrivalDelivery: 'CONFIRMED' });
                 }
               } else if (action.type === 'TELEMETRY_SYNC') {
                 // Fire a standard REST location update via fetch against the specified endpoint
@@ -160,8 +172,9 @@ export function useOfflineReports() {
                   body: JSON.stringify(action.payload),
                 });
                 if (!response.ok) {
-                  if (response.status === 401 || response.status === 403) {
-                    console.log(`[useOfflineReports] Dropping unauthorized telemetry action ${action.id}`);
+                  if ([400, 403, 404, 409].includes(response.status)) {
+                    const result = await response.json().catch(() => null);
+                    useResponderStore.setState({ lastQueueError: result?.error || `Telemetry update rejected (HTTP ${response.status}).` });
                     await dequeueAction(action.id);
                     continue;
                   }
@@ -191,6 +204,11 @@ export function useOfflineReports() {
             
             for (const draft of cachedQueue) {
               try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user.id || draft.ownerUserId !== session.user.id) {
+                  console.warn('[useOfflineReports] Skipping a cached report owned by another responder session.');
+                  continue;
+                }
                 // Upload mock local file images (simulated bucket sync)
                 const scenePhotoUrls = draft.scenePhotos?.map((p: string) => 
                   p.startsWith('file://') ? `https://supabase-bucket.co/scenes/${draft.incidentId}/${Date.now()}.jpg` : p
@@ -204,7 +222,6 @@ export function useOfflineReports() {
                   participants: draft.participants || [],
                 };
 
-                const { data: { session } } = await supabase.auth.getSession();
                 const headers: any = { 'Content-Type': 'application/json' };
                 if (session?.access_token) {
                   headers['Authorization'] = `Bearer ${session.access_token}`;
@@ -255,6 +272,8 @@ export function useOfflineReports() {
         // Trigger a light tactile success haptic warning once all pending actions are fully flushed and synced
         if (queueSuccess) {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        } else {
+          retryTimer = setTimeout(() => setRetryNonce((value) => value + 1), 5_000);
         }
       } catch (err) {
         console.error('[useOfflineReports] Error during background synchronization:', err);
@@ -265,7 +284,10 @@ export function useOfflineReports() {
     };
 
     syncOfflineQueueAndDrafts();
-  }, [isOnline, offlineQueue.length, drafts.length, dequeueAction, setSyncingQueue]);
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [isOnline, offlineQueue.length, drafts.length, dequeueAction, retryNonce, setSyncingQueue]);
 
   // Method to save drafts offline
   const bufferReportOffline = async (report: {
@@ -276,10 +298,14 @@ export function useOfflineReports() {
     participants: any[];
   }) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user.id || (report.responderId && report.responderId !== session.user.id)) {
+        throw new Error('Cannot cache a report for a different responder session.');
+      }
       const cachedRaw = await SecureStore.getItemAsync(OFFLINE_REPORTS_KEY);
       const cachedQueue = cachedRaw ? JSON.parse(cachedRaw) : [];
       
-      const newQueue = [...cachedQueue, { ...report, id: `df-${Date.now()}`, timestamp: new Date().toISOString() }];
+      const newQueue = [...cachedQueue, { ...report, ownerUserId: session.user.id, id: `df-${Date.now()}`, timestamp: new Date().toISOString() }];
       await SecureStore.setItemAsync(OFFLINE_REPORTS_KEY, JSON.stringify(newQueue));
       
       console.log(`Offline: Report draft for incident ${report.incidentId} successfully cached in local SecureStore.`);

@@ -290,16 +290,16 @@ export function DispatchSheet() {
               >
                 {activeDispatch?.natureOfCall || 'EMERGENCY'}
               </Text>
-              <Text className="text-[#64748B] text-[8px] font-bold mt-1 uppercase tracking-[0.15em]">NATURE OF CALL</Text>
+              <Text className="text-[#64748B] text-xs font-bold mt-1 uppercase tracking-[0.15em]">NATURE OF CALL</Text>
             </View>
             <View className="flex-1 min-w-0 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center relative overflow-hidden">
               <View className="absolute bg-[#F1F5F9] w-10 h-10 rounded-full -top-2 opacity-80" />
               <Text className="text-[#334155] font-black text-lg z-10">{activeDispatch?.peopleInvolved || '1'}</Text>
-              <Text className="text-[#475569] text-[8px] font-bold mt-0.5 uppercase tracking-[0.15em] z-10">PERSONS</Text>
+              <Text className="text-[#475569] text-xs font-bold mt-0.5 uppercase tracking-[0.15em] z-10">PERSONS</Text>
             </View>
             <View className="flex-1 min-w-0 bg-white border border-[#E2E8F0] shadow-sm shadow-[#E2E8F0] rounded-[20px] py-3 px-2 items-center justify-center">
               <Text className="text-[#1E3A8A] font-black text-lg tracking-tight">{activeDispatch?.eta ?? 'Calculating'}</Text>
-              <Text className="text-[#64748B] text-[8px] font-bold mt-0.5 uppercase tracking-[0.15em]">ETA</Text>
+              <Text className="text-[#64748B] text-xs font-bold mt-0.5 uppercase tracking-[0.15em]">ETA</Text>
             </View>
           </View>
 
@@ -311,10 +311,10 @@ export function DispatchSheet() {
               </View>
               <View className="ml-3 flex-1 min-w-0">
                 <Text className="text-[#0F172A] font-black text-[13px]" numberOfLines={1}>{activeDispatch?.reporterName || 'Resident'}</Text>
-                <Text className="text-[#64748B] text-[9px] mt-0.5 font-bold uppercase tracking-[0.05em]" numberOfLines={1}>{activeDispatch?.reporterPhone || (activeDispatch?.attachmentUrl ? 'Live photo attached' : 'No photo attached')}</Text>
+                <Text className="text-[#64748B] text-xs mt-0.5 font-bold uppercase tracking-[0.05em]" numberOfLines={1}>{activeDispatch?.reporterPhone || (activeDispatch?.attachmentUrl ? 'Live photo attached' : 'No photo attached')}</Text>
               </View>
             </View>
-            <Text className="text-[#475569] text-[10px] font-semibold tracking-wide" numberOfLines={1}>{activeDispatch?.timestamp || ''}</Text>
+            <Text className="text-[#475569] text-xs font-semibold tracking-wide" numberOfLines={1}>{activeDispatch?.timestamp || ''}</Text>
           </View>
 
           {/* Captured Resident Photo Preview */}
@@ -336,7 +336,7 @@ export function DispatchSheet() {
                 </View>
                 <View className="bg-blue-600/90 px-2 py-0.5 rounded flex-row items-center gap-1">
                   <Maximize2 size={10} color="white" />
-                  <Text className="text-white text-[10px] font-bold">Expand</Text>
+                  <Text className="text-white text-xs font-bold">Expand</Text>
                 </View>
               </View>
             </TouchableOpacity>

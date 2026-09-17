@@ -30,6 +30,7 @@ interface MapContainerProps {
   responders: MapResponder[];
   hospitals: MapHospital[];
   selectedIncidentId?: string;
+  priorityIncidentId?: string;
   onSelectIncident: (id: string) => void;
 }
 
@@ -58,6 +59,7 @@ export function MapContainer({
   responders,
   hospitals,
   selectedIncidentId,
+  priorityIncidentId,
   onSelectIncident,
 }: MapContainerProps) {
   const mapRef = useRef<MapRef>(null);
@@ -190,6 +192,7 @@ export function MapContainer({
               status={incident.status}
               label={incident.caseId}
               isSelected={selectedIncidentId === incident.id}
+              isPriority={priorityIncidentId === incident.id}
               reporterName={incident.reporterName}
               reporterPhone={incident.reporterPhone}
               destination={incident.destination}

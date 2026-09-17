@@ -27,6 +27,7 @@ export function useMapData() {
 
   const fetchData = async (showSkeleton = true) => {
     if (showSkeleton) setIsLoading(true);
+    setError(null);
     try {
       const [incidentsRes, respondersRes, summaryRes, hospitalsRes] = await Promise.all([
         fetch("/api/map/incidents"),
@@ -48,6 +49,7 @@ export function useMapData() {
       setResponders(z.array(MapResponderSchema).parse(respondersData));
       setSummary(MapSummarySchema.parse(summaryData));
       setHospitals(z.array(MapHospitalSchema).parse(hospitalsData));
+      setError(null);
       if (showSkeleton) setIsLoading(false);
     } catch (err) {
       console.error("Error fetching map data:", err);

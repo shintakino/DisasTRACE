@@ -16,7 +16,7 @@ import { philippineMobileNumberVariants } from '@/lib/phone-number';
 
 export async function GET(request: NextRequest) {
   const requestId = request.nextUrl.searchParams.get('requestId');
-  const accessToken = request.headers.get('x-guest-report-token') ?? request.nextUrl.searchParams.get('accessToken');
+  const accessToken = request.headers.get('x-guest-report-token');
   if (!requestId) return NextResponse.json({ data: null, error: 'Missing report ID.', message: 'Missing report ID.' }, { status: 400 });
 
   let report: typeof verificationRequests.$inferSelect | undefined;
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     rejectionReason: report.rejectionReason,
   });
   const outcome = report.status === 'REJECTED'
-    ? 'REJECTED'
+    ? rejectionProjection.outcome
     : incident?.status === 'RESOLVED' ? 'CASE_CLOSED' : 'ACTIVE';
   const responseStatus = report.status === 'REJECTED'
     ? rejectionProjection.responseStatus
@@ -122,7 +122,14 @@ export async function GET(request: NextRequest) {
       triageClassification: report.triageClassification,
       coordinationAgencies: agencies,
       responseStatus,
-      incident,
+      incident: incident ? {
+        id: incident.id,
+        status: incident.status,
+        responderId: incident.responderId,
+        assignedAmbulance: incident.assignedAmbulance,
+        etaMinutes: incident.etaMinutes,
+        transportStatus: incident.transportStatus,
+      } : null,
       responder,
       transport: {
         status: incident?.transportStatus ?? 'NONE',

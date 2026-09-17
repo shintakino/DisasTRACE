@@ -1,5 +1,35 @@
 # Progress Tracker
 
+## 2026-09-17 - Consistent Guest Mode allowance visibility
+
+- Added one shared Guest Mode allowance banner with singular, plural, and exhausted states plus a direct registration action.
+- Persisted the remaining-report count through the chatbot-to-emergency state bridge and refreshed it from the scoped status endpoint so pending review, active response, resolution, and Guest Report History show the same authoritative reminder.
+- Added `verify-guest-allowance-visibility.ts`; its RED run failed before the shared contract existed, and its GREEN run plus mobile TypeScript and targeted ESLint pass.
+
+## 2026-09-16 - Panel QA hardening, privacy consent, auditability, and demand outlook
+
+- Made PACC queue reads authenticated and read-only, moved dispatch maintenance into the protected scheduler, added bounded simultaneous-report draining with truthful maintenance results, and kept unanswered offers visible in a non-blocking Awaiting Responder lane.
+- Split Rejected, Duplicate, and Case Closed dispatch outcomes; terminal records now disable and reject classification/coordination actions at both UI and API boundaries. Successful manual dispatch closes immediately and refreshes silently so the operator can continue working.
+- Added inspectable Data Privacy Policy consent during mobile signup, persisted its timestamp/version through the auth-profile trigger, bounded OTP/signup network waits, and stopped required ID-upload failures from being presented as completed registration.
+- Corrected the guest submission commit boundary: server confirmation is recorded before optional device history, so local storage failure cannot claim that PACC did not receive the report. Registered chatbot reports resume through their server-backed status hub after restart.
+- Added immutable PACC actor snapshots and structured audit events for rejection, classification, coordination, manual dispatch, and duplicate merge; preserved audit rows across account deletion and restricted the global feed to CDRRMO Super Admin.
+- Added a verified-report-only Historical Incident Demand Outlook using completed zero-filled buckets, weighted recent demand, observed range, direction, sample size, leading type/barangay, and an explicit non-warning disclaimer.
+- Added migrations `0026_nervous_boom_boom.sql` and `0027_route_owned_pacc_audit.sql`, replacing the legacy guessed-actor audit trigger with route-owned PACC events plus automatic immutable actor snapshots, and added the focused `verify-panel-qa-hardening.ts` regression suite.
+- Hardened fresh database setup so it cannot recreate the retired guessed-actor trigger, made malformed consent timestamps fail safely, and extended migration auditing to require privacy consent fields, audit actor snapshots, and the snapshot trigger.
+- Web/mobile TypeScript, focused panel/dispatch/rejection/recovery/priority/feedback suites, targeted ESLint, the live migration audit, `git diff --check`, the Next.js production build, and the Android Expo export all pass. TDD evidence is recorded in `docs/testing/panel-qa-hardening.tdd.md`.
+
+## 2026-09-16 - Operational hierarchy and major-action feedback
+
+- Unified operational prominence around one deterministic, auditable priority: actionable work first, then severity, PACC reassignment need, recency, and stable tie-breaking. PACC initial selection and post-action advancement now agree with the displayed priority queue.
+- Reworked PACC verification into one prominent Priority Now item with larger readable metadata, incident essentials and recommended action above secondary evidence, subdued archive/secondary records, and reduced persistent motion.
+- Added persistent accessible processing/success/error feedback for rejection, reclassification, agency coordination, manual dispatch, and duplicate merging. Messages state the exact outcome, reporter/dispatch effect, next step, and operator action while preserving server error reasons.
+- Expanded dashboard incident activity to include pending verification requests, real severity/workflow/assignment data, deterministic priority ranking before the display limit, realtime refresh, Retry, and an explicit Unassigned state instead of a fictional ambulance. KPI cards and activity rows now use calmer visual hierarchy and readable labels.
+- Priority-sorted the command-map feed and limited pulsing marker emphasis to one active incident while retaining explicit operator selection. Active severity and terminal history are visibly distinct.
+- Added public/guest status freshness feedback that retains last confirmed state through weak-network failures, exposes Retry, and routes verified reports to continuous response status even before responder assignment. Cancellation clears local state only after server confirmation and explains the next action.
+- Added responder delivery truthfulness: offline arrival/report work is marked device-local and pending, server rejections are not queued as offline success, and replay uses authenticated REST workflow checks before showing confirmed submission.
+- Closed independent review findings: offline actions and drafts are bound to the responder who created them, transient failures retry while terminal conflicts no longer block later work and remain visibly reported, guest tokens are header-only, public status exposes a minimal incident projection, reporter cancellation has a distinct `CANCELLED` public/history outcome, and retry/dispatch feedback cannot claim success from stale or failed actions.
+- Web/mobile TypeScript checks and focused priority, action-feedback, operational-ordering, and mobile-refresh regression scripts pass.
+
 ## 2026-09-16 - Responder report management, destination safeguards, and numeric controls
 
 - Added responder report search, incident/status filters, newest/oldest sorting, bounded 15-record pagination, and reversible Active/Archived filing without deleting audit records.

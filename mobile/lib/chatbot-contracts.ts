@@ -103,7 +103,7 @@ export const ChatbotResponseSchema = z.object({
 export const ChatbotStatusResponseSchema = z.object({
   data: z.object({
     status: z.string().min(1),
-    outcome: z.enum(['ACTIVE', 'REJECTED', 'CASE_CLOSED']).optional(),
+    outcome: z.enum(['ACTIVE', 'REJECTED', 'CANCELLED', 'CASE_CLOSED']).optional(),
     rejectionReason: z.string().min(1).nullable().optional(),
     triageClassification: z.string().nullable().optional(),
     coordinationAgencies: z.array(z.string()).optional(),

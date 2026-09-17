@@ -18,25 +18,29 @@ export function useRejectedReportRecovery(reporterMode: ChatbotReporterMode) {
     if (hasHandledRejection.current) return;
     hasHandledRejection.current = true;
 
+    const cancelledByReporter = rejectionReason?.startsWith('Cancelled by the reporter') === true;
     const transition = deriveRejectedReportTransition({
       reporterMode,
       rejectionReason: rejectionReason ?? '',
     });
+    const terminalMessage = cancelledByReporter
+      ? 'You cancelled this report before response started. PACC will not dispatch it, and you may submit a new report.'
+      : transition.message;
     const activeReport = useChatbotStore.getState().activeReport;
     if (reporterMode === 'guest' && activeReport) {
       void updateGuestReportHistory(activeReport.id, {
-        status: 'REJECTED',
-        responseStatus: transition.message,
-        rejectionReason: rejectionReason?.trim() || 'No rejection reason was provided by PACC.',
+        status: cancelledByReporter ? 'CANCELLED' : 'REJECTED',
+        responseStatus: terminalMessage,
+        rejectionReason: cancelledByReporter ? undefined : rejectionReason?.trim() || 'No rejection reason was provided by PACC.',
       });
     }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    void Haptics.notificationAsync(cancelledByReporter ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error).catch(() => {});
     useChatbotStore.getState().clearReportToIdle();
     useEmergencyReportStore.getState().resetReport();
 
     Alert.alert(
-      'Report rejected',
-      transition.message,
+      cancelledByReporter ? 'Report cancelled' : 'Report rejected',
+      terminalMessage,
       [
         { text: 'Home', onPress: () => router.replace(transition.homeRoute as never) },
         {

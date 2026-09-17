@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { useRouter, Link, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSignUpStore } from '../../store/useSignUpStore';
 import { ArrowLeft, UserTick } from 'iconsax-react-native';
 import { uploadGovernmentID } from '../../lib/storage';
 import { bindCurrentMobileSession } from '../../lib/mobile-auth';
+import { withTimeout } from '../../lib/network-timeout';
 
 import Step1 from '../../components/auth/Step1';
 import Step2 from '../../components/auth/Step2';
@@ -15,18 +16,16 @@ import Step4 from '../../components/auth/Step4';
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const role = 'public_user';
-  
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isAutoConfirmed, setIsAutoConfirmed] = useState(false);
-  const { data, reset, updateData } = useSignUpStore();
+  const { reset, updateData } = useSignUpStore();
 
   useEffect(() => {
     updateData({ role: 'public_user' });
-  }, []);
+  }, [updateData]);
 
   const handleRegister = async () => {
     setLoading(true);
@@ -49,6 +48,8 @@ export default function SignUpScreen() {
         { key: 'street', label: 'Street' },
         { key: 'idCardUri', label: 'ID Photo' },
         { key: 'idCardType', label: 'ID Type' }
+        ,{ key: 'privacyConsentAt', label: 'Data Privacy Consent' }
+        ,{ key: 'privacyPolicyVersion', label: 'Privacy Policy Version' }
       ];
 
       for (const field of requiredFields) {
@@ -57,29 +58,37 @@ export default function SignUpScreen() {
         }
       }
 
-      // 1. Create user in Supabase Auth
-      // Role and names are passed in user_metadata for the trigger to pick up
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: currentData.email || '',
-        password: currentData.password || '',
-        options: {
-          data: {
-            first_name: currentData.firstName,
-            middle_name: currentData.middleName || '',
-            last_name: currentData.lastName,
-            suffix: currentData.suffix || '',
-            full_name: `${currentData.firstName} ${currentData.middleName ? currentData.middleName + ' ' : ''}${currentData.lastName}${currentData.suffix ? ' ' + currentData.suffix : ''}`.trim(),
-            role: currentData.role,
-            phone: currentData.mobileNumber,
-            barangay: currentData.barangay,
-            address: `${currentData.street}, ${currentData.barangay}, ${currentData.city}, ${currentData.province}`,
-            id_type: currentData.idCardType,
-          }
-        }
-      });
+      // If Auth succeeded on an earlier attempt but the required ID upload
+      // timed out, reuse that authenticated account instead of creating a
+      // duplicate or trapping the user on "already registered".
+      const existingSession = await withTimeout(supabase.auth.getSession(), 10_000, 'registration recovery');
+      const matchingSession = existingSession.data.session?.user.email?.toLowerCase() === currentData.email?.toLowerCase()
+        ? existingSession.data.session
+        : null;
+      const signUpResult = matchingSession
+        ? { data: { user: matchingSession.user, session: matchingSession }, error: null }
+        : await withTimeout(supabase.auth.signUp({
+            email: currentData.email || '',
+            password: currentData.password || '',
+            options: {
+              data: {
+                first_name: currentData.firstName,
+                middle_name: currentData.middleName || '',
+                last_name: currentData.lastName,
+                suffix: currentData.suffix || '',
+                full_name: `${currentData.firstName} ${currentData.middleName ? currentData.middleName + ' ' : ''}${currentData.lastName}${currentData.suffix ? ' ' + currentData.suffix : ''}`.trim(),
+                role: currentData.role,
+                phone: currentData.mobileNumber,
+                barangay: currentData.barangay,
+                address: `${currentData.street}, ${currentData.barangay}, ${currentData.city}, ${currentData.province}`,
+                id_type: currentData.idCardType,
+                privacy_consent_at: currentData.privacyConsentAt,
+                privacy_policy_version: currentData.privacyPolicyVersion,
+              },
+            },
+          }), 20_000, 'account registration');
+      const { data: signUpData, error: signUpError } = signUpResult;
 
-      console.log('SignUp Response Data:', JSON.stringify(signUpData, null, 2));
-      
       if (signUpError) {
         // Handle case where user already exists
         if (signUpError.message.includes('already registered')) {
@@ -102,29 +111,24 @@ export default function SignUpScreen() {
       // RLS policies for storage might require authentication.
       if (signUpData.session) {
         setIsAutoConfirmed(true);
-        await bindCurrentMobileSession(signUpData.session.access_token);
+        await withTimeout(bindCurrentMobileSession(signUpData.session.access_token), 10_000, 'mobile session setup');
       }
 
       if (currentData.idCardUri) {
         if (!signUpData.session) {
-          console.warn('User is unauthenticated (email confirmation required). Skipping ID upload for now.');
-          // We still show success, but maybe add a note later that they'll need to upload ID after login.
-          // For now, we proceed to show the success modal.
+          throw new Error('Your account was created, but the required ID cannot be uploaded until your email is confirmed. Confirm your email, sign in, and complete verification.');
         } else {
-          try {
-            const filePath = await uploadGovernmentID(userId, currentData.idCardUri);
+            const filePath = await withTimeout(uploadGovernmentID(userId, currentData.idCardUri), 30_000, 'government ID upload');
 
-            await supabase
-              .from('users')
-              .update({ 
-                id_image_url: filePath, // Store path, not public URL
-              })
-              .eq('id', userId);
-          } catch (uploadErr: any) {
-            console.error('Error handling ID upload:', uploadErr);
-            // We don't want to block the whole process if just the ID upload fails, 
-            // but we should probably inform the user.
-          }
+            const { error: profileUpdateError } = await withTimeout((async () => (
+              await supabase
+                .from('users')
+                .update({
+                  id_image_url: filePath,
+                })
+                .eq('id', userId)
+            ))(), 15_000, 'verification profile update');
+            if (profileUpdateError) throw new Error(`Your account was created, but the required ID was not saved: ${profileUpdateError.message}`);
         }
       }
 

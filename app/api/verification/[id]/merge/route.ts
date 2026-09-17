@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import { incidents } from "@/db/schema/incidents";
 import { canBeDuplicateMergeParent, canBeMergedAsDuplicate } from "@/lib/verification-merge-policy";
+import { auditLogs } from '@/db/schema/audit_logs';
+import { createAuditEvent, PACC_AUDIT_ACTIONS } from '@/lib/audit-events';
 
 const MergeRequestSchema = z.object({
   parentRequestId: z.string().min(1),
@@ -89,6 +91,15 @@ export async function POST(
           isNull(verificationRequests.parentRequestId),
         ))
         .returning({ id: verificationRequests.id });
+      if (merged) {
+        await tx.insert(auditLogs).values(createAuditEvent({
+          actor: { id: dbUser.id, name: dbUser.fullName, role: dbUser.role },
+          action: PACC_AUDIT_ACTIONS.merged,
+          entityType: 'VERIFICATION_REQUEST',
+          entityId: id,
+          details: { requestId: targetRequest.requestId, parentRequestId, parentPublicRequestId: parentRequest.requestId },
+        }));
+      }
       return merged
         ? { status: 200 as const }
         : { status: 409, error: 'This report changed while it was being merged. Refresh the queue and try again.' };
@@ -102,10 +113,10 @@ export async function POST(
       success: true,
       message: "Incident report successfully merged as duplicate.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in POST /api/verification/[id]/merge:", error);
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: error instanceof Error ? error.message : "Internal Server Error" },
       { status: 500 }
     );
   }

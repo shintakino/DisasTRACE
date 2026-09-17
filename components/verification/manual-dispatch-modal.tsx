@@ -35,7 +35,7 @@ interface ManualDispatchModalProps {
   onClose: () => void
   requestId: string | null
   requestNum: string | null // e.g. REQ-2026-0046
-  onSuccess: () => Promise<void>
+  onSuccess: (outcome?: 'DISPATCHED' | 'STALE') => Promise<void>
 }
 
 export function ManualDispatchModal({
@@ -112,18 +112,18 @@ export function ManualDispatchModal({
 
       const data = await response.json().catch(() => null) as DispatchApiResponse | null
       if (!response.ok || !data?.success) {
-        const shouldRefresh = data?.code === "REPORT_CLOSED" || data?.code === "ACTIVE_DISPATCH_EXISTS"
+        const shouldRefresh = data?.code === "REPORT_CLOSED" || data?.code === "REPORT_REJECTED" || data?.code === "REPORT_DUPLICATE" || data?.code === "ACTIVE_DISPATCH_EXISTS"
         if (shouldRefresh) {
-          await onSuccess()
           onClose()
+          await onSuccess('STALE')
         }
         throw new Error(data?.error || "Failed to dispatch responder")
       }
 
       if (data.success) {
         toast.success(data.message || `Manual dispatch offer sent to ${responderName}! Awaiting acceptance.`)
-        await onSuccess()
         onClose()
+        await onSuccess('DISPATCHED')
       }
     } catch (error: unknown) {
       console.error(error)

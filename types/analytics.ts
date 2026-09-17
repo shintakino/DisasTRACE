@@ -28,12 +28,25 @@ const PreparednessInsightSchema = z.object({
   detail: z.string(),
 });
 
+const IncidentDemandOutlookSchema = z.object({
+  available: z.boolean(),
+  reason: z.enum(['READY', 'INSUFFICIENT_HISTORY']),
+  projectedCount: z.number().nullable(),
+  observedRange: z.object({ min: z.number(), max: z.number() }).nullable(),
+  direction: z.enum(['rising', 'stable', 'falling']).nullable(),
+  sampleSize: z.number(),
+  leadingType: z.string().nullable(),
+  leadingBarangay: z.string().nullable(),
+  disclaimer: z.string(),
+});
+
 export const AnalyticsDataSchema = z.object({
   period: AnalyticsPeriodSchema,
   frequencies: z.array(IncidentFrequencySchema),
   trends: z.array(IncidentTrendPointSchema),
   summary: AnalyticsSummarySchema,
   insights: z.array(PreparednessInsightSchema),
+  outlook: IncidentDemandOutlookSchema,
 });
 
 export type AnalyticsData = z.infer<typeof AnalyticsDataSchema>;

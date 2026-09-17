@@ -33,6 +33,7 @@ export const EmergencyReportSchema = z.object({
   isMergedDuplicate: z.boolean().optional(),
   reporterMode: z.enum(['guest', 'resident']).optional(),
   guestAccessToken: z.string().optional(),
+  guestReportsRemaining: z.number().int().nonnegative().optional(),
   triageClassification: z.enum(['HIGH_CONFIDENCE_EMERGENCY', 'HIGH_CONFIDENCE_NON_EMERGENCY', 'UNCERTAIN_INCOMPLETE', 'SUSPICIOUS_POSSIBLE_PRANK']).optional(),
   victimCondition: z.enum([
     'Conscious and stable',

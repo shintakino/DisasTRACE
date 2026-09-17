@@ -3,7 +3,9 @@ import { users } from './users';
 
 export const auditLogs = pgTable('audit_logs', {
   id: varchar('id', { length: 255 }).primaryKey(),
-  userId: varchar('user_id', { length: 255 }).references(() => users.id).notNull(),
+  userId: varchar('user_id', { length: 255 }).references(() => users.id, { onDelete: 'set null' }),
+  actorName: text('actor_name'),
+  actorRole: text('actor_role'),
   action: text('action').notNull(), // e.g., "USER_APPROVED", "INCIDENT_VERIFIED"
   entityType: text('entity_type').notNull(), // e.g., "USER", "INCIDENT"
   entityId: varchar('entity_id', { length: 255 }),

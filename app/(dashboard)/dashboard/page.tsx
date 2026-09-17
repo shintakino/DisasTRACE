@@ -2,15 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole } from "@/lib/navigation";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { IncidentTrends, IncidentDistribution } from "@/components/dashboard/incident-charts";
 import { RecentReports } from "@/components/dashboard/recent-reports";
 import { ResponderStatus } from "@/components/dashboard/responder-status";
 import { PACCResponderGrid } from "@/components/dashboard/pacc-responder-grid";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DashboardData, DashboardDataSchema } from "@/types/dashboard";
 import { useRouter } from "next/navigation";
 import { WebPreloader } from "@/components/ui/web-preloader";
@@ -22,8 +21,10 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<'PERMISSION' | 'NETWORK' | 'DATA'>('DATA');
   const [trendFilter, setTrendFilter] = useState("this_year");
   const [distFilter, setDistFilter] = useState("this_month");
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   const handleReportClick = (reportId: string) => {
     router.push(`/map?select=${reportId}`);
@@ -56,6 +57,12 @@ export default function DashboardPage() {
           await fetchRespondersSilent();
         }
       )
+      .on("postgres_changes", { event: "*", schema: "public", table: "verification_requests" }, () => {
+        setRefreshVersion((value) => value + 1);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "incidents" }, () => {
+        setRefreshVersion((value) => value + 1);
+      })
       .subscribe();
 
     return () => {
@@ -74,6 +81,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchDashboardData() {
+      setError(null);
       try {
         const [kpiRes, trendRes, reportRes, responderRes] = await Promise.all([
           fetch('/api/dashboard/kpis'),
@@ -107,6 +115,7 @@ export default function DashboardPage() {
           const firstError = [kpiJson, trendJson, reportJson, responderJson].find(r => r.error)?.message 
             || "One or more dashboard requests failed";
           setError(firstError);
+          setErrorKind([kpiRes, trendRes, reportRes, responderRes].some((response) => response.status === 401 || response.status === 403) ? 'PERMISSION' : 'DATA');
           console.error("Dashboard Fetch Error Detail:", {
             kpis: kpiJson,
             trends: trendJson,
@@ -117,6 +126,7 @@ export default function DashboardPage() {
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
         setError("A network error occurred while loading dashboard data.");
+        setErrorKind('NETWORK');
       } finally {
         setLoading(false);
       }
@@ -129,9 +139,10 @@ export default function DashboardPage() {
       } else {
         setLoading(false);
         setError("You do not have permission to view this dashboard.");
+        setErrorKind('PERMISSION');
       }
     }
-  }, [trendFilter, distFilter, role, authLoading]);
+  }, [trendFilter, distFilter, role, authLoading, refreshVersion]);
 
   if (loading) {
     return (
@@ -145,14 +156,30 @@ export default function DashboardPage() {
     return (
       <Alert variant="destructive" className="bg-red-50 border-red-200">
         <AlertCircle className="h-5 w-5" />
-        <AlertTitle className="text-lg font-bold">Dashboard Access Error</AlertTitle>
+        <AlertTitle className="text-lg font-bold">{errorKind === 'PERMISSION' ? 'Dashboard access denied' : 'Dashboard could not refresh'}</AlertTitle>
         <AlertDescription className="text-base mt-2">
           {error}
-          <div className="mt-4 text-sm opacity-80">
-            Current Detected Role: <strong>{String(role)}</strong>
-            <br />
-            Please ensure you are logged in with a Super Admin or PACC Admin account. If you just changed your role, try logging out and logging back in.
-          </div>
+          {errorKind === 'PERMISSION' ? (
+            <div className="mt-4 text-sm opacity-80">
+              Current detected role: <strong>{String(role)}</strong><br />
+              Sign in with a Super Admin or PACC Admin account. If the role just changed, sign out and sign in again.
+            </div>
+          ) : (
+            <div className="mt-4 text-sm opacity-80">
+              {errorKind === 'NETWORK' ? 'Check the command-center connection, then retry.' : 'The server response could not be validated. Retry, then contact system support if it continues.'}
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4 border-red-300 bg-white text-red-800 hover:bg-red-100"
+            onClick={() => {
+              setLoading(true);
+              setRefreshVersion((value) => value + 1);
+            }}
+          >
+            <RefreshCw className="mr-2 size-4" /> Retry dashboard
+          </Button>
         </AlertDescription>
       </Alert>
     );
@@ -168,7 +195,6 @@ export default function DashboardPage() {
           <div className="shrink-0">
             <KpiCards data={data.kpis} />
           </div>
-          
           <div className="grid grid-cols-1 gap-6 pb-4 md:grid-cols-2 lg:min-h-[736px] lg:flex-1 lg:grid-rows-2 lg:gap-4 lg:pb-0">
             <IncidentTrends 
               data={data.trends} 

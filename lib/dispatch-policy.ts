@@ -41,7 +41,7 @@ export type ManualDispatchEligibility =
   | { allowed: true }
   | {
     allowed: false;
-    code: 'REPORT_CLOSED' | 'ACTIVE_DISPATCH_EXISTS' | 'RESPONDER_UNAVAILABLE' | 'RESPONDER_OFFLINE';
+    code: 'REPORT_REJECTED' | 'REPORT_DUPLICATE' | 'REPORT_CLOSED' | 'ACTIVE_DISPATCH_EXISTS' | 'RESPONDER_UNAVAILABLE' | 'RESPONDER_OFFLINE';
     message: string;
   };
 
@@ -68,11 +68,25 @@ export function evaluateManualDispatchEligibility({
   now = new Date(),
   allowStaleHeartbeat = false,
 }: ManualDispatchEligibilityInput): ManualDispatchEligibility {
-  if (requestStatus === 'REJECTED' || requestStatus === 'DUPLICATE') {
+  if (requestStatus === 'REJECTED') {
+    return {
+      allowed: false,
+      code: 'REPORT_REJECTED',
+      message: 'This report was rejected and cannot be dispatched. Review its rejection record.',
+    };
+  }
+  if (requestStatus === 'DUPLICATE') {
+    return {
+      allowed: false,
+      code: 'REPORT_DUPLICATE',
+      message: 'This report was merged as a duplicate and cannot be dispatched separately.',
+    };
+  }
+  if (incident?.status === 'RESOLVED') {
     return {
       allowed: false,
       code: 'REPORT_CLOSED',
-      message: 'This report was already rejected or marked as a duplicate. Refresh the verification queue.',
+      message: 'This response is Case Closed and cannot be dispatched again.',
     };
   }
 

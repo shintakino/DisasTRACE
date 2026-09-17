@@ -6,6 +6,8 @@ import { db } from '@/db';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { incidents } from '@/db/schema/incidents';
 import { autoDispatchIncident } from '@/lib/dispatch-engine';
+import { auditLogs } from '@/db/schema/audit_logs';
+import { createAuditActor, createAuditEvent, PACC_AUDIT_ACTIONS } from '@/lib/audit-events';
 
 const ClassificationSchema = z.object({
   triageClassification: z.enum(['HIGH_CONFIDENCE_EMERGENCY', 'HIGH_CONFIDENCE_NON_EMERGENCY', 'UNCERTAIN_INCOMPLETE', 'SUSPICIOUS_POSSIBLE_PRANK']),
@@ -23,7 +25,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   });
   if (!existingRequest) return NextResponse.json({ error: 'Request not found.' }, { status: 404 });
   if (existingRequest.status === 'REJECTED' || existingRequest.status === 'DUPLICATE') {
-    return NextResponse.json({ error: 'Closed reports cannot be reclassified.' }, { status: 409 });
+    return NextResponse.json({ error: 'Rejected or duplicate reports cannot be reclassified.' }, { status: 409 });
+  }
+  const existingIncident = await db.query.incidents.findFirst({
+    where: eq(incidents.requestId, id),
+  });
+  if (existingIncident?.status === 'RESOLVED') {
+    return NextResponse.json({ error: 'Case Closed reports cannot be reclassified.' }, { status: 409 });
   }
 
   const nature = payload.data.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY'
@@ -31,16 +39,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     : payload.data.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY'
       ? 'NON-EMERGENCY'
       : existingRequest.nature;
-  const [updated] = await db.update(verificationRequests).set({
-    triageClassification: payload.data.triageClassification,
-    triageReasons: ['PACC manually overrode the automated classification.'],
-    nature,
-    updatedAt: new Date(),
-  }).where(eq(verificationRequests.id, id)).returning();
+  const [updated] = await db.transaction(async (tx) => {
+    const updatedRows = await tx.update(verificationRequests).set({
+      triageClassification: payload.data.triageClassification,
+      triageReasons: ['PACC manually overrode the automated classification.'],
+      nature,
+      updatedAt: new Date(),
+    }).where(eq(verificationRequests.id, id)).returning();
+    await tx.insert(auditLogs).values(createAuditEvent({
+      actor: createAuditActor(user),
+      action: PACC_AUDIT_ACTIONS.classification,
+      entityType: 'VERIFICATION_REQUEST',
+      entityId: id,
+      details: {
+        requestId: existingRequest.requestId,
+        before: { triageClassification: existingRequest.triageClassification, nature: existingRequest.nature },
+        after: { triageClassification: payload.data.triageClassification, nature },
+      },
+    }));
+    return updatedRows;
+  });
 
-  let incident = (await db.query.incidents.findFirst({
-    where: eq(incidents.requestId, id),
-  })) ?? null;
+  let incident = existingIncident ?? null;
   let autoDispatched = false;
 
   // An override to a high-confidence emergency is the explicit point at which

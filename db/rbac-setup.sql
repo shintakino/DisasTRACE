@@ -35,10 +35,20 @@ create or replace function public.handle_new_user_profile()
 returns trigger as $$
 declare
   user_role text;
+  privacy_consent_at_value timestamptz;
 begin
   -- Note: new.raw_user_meta_data is typed as jsonb in newer Supabase, but some envs treat it as text
   -- We cast to jsonb explicitly for robustness
   user_role := coalesce((new.raw_user_meta_data::jsonb)->>'role', 'public_user');
+
+  begin
+    privacy_consent_at_value := nullif(
+      (new.raw_user_meta_data::jsonb)->>'privacy_consent_at',
+      ''
+    )::timestamptz;
+  exception when others then
+    privacy_consent_at_value := null;
+  end;
 
   insert into public.users (
     id, 
@@ -53,7 +63,9 @@ begin
     created_at, 
     updated_at,
     responder_type,
-    barangay
+    barangay,
+    privacy_consent_at,
+    privacy_policy_version
   )
   values (
     new.id::text,
@@ -78,7 +90,9 @@ begin
     now(),
     now(),
     (new.raw_user_meta_data::jsonb)->>'responder_type',
-    (new.raw_user_meta_data::jsonb)->>'barangay'
+    (new.raw_user_meta_data::jsonb)->>'barangay',
+    privacy_consent_at_value,
+    (new.raw_user_meta_data::jsonb)->>'privacy_policy_version'
   );
   return new;
 end;

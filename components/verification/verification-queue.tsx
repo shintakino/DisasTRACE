@@ -9,7 +9,7 @@ import {
 import { cn } from "@/lib/utils"
 import { VerificationRequest } from "@/types/verification"
 import { formatDistanceToNow } from "date-fns"
-import { compareActiveVerificationItems, isNewVerificationItem } from "@/lib/verification-queue-priority"
+import { compareActiveVerificationItems, getVerificationPriorityReason, isNewVerificationItem } from "@/lib/verification-queue-priority"
 
 interface SummaryCardProps {
   label: string
@@ -23,26 +23,26 @@ function SummaryCard({ label, count, gradient, isActive, onClick }: SummaryCardP
   return (
     <Card
       className={cn(
-        "p-3 cursor-pointer transition-all border-none relative overflow-hidden flex flex-col bg-gradient-to-br shadow-sm rounded-xl",
+        "p-3 cursor-pointer transition-all relative overflow-hidden flex flex-col rounded-xl",
         gradient,
         isActive 
-          ? "opacity-100 scale-100 shadow-md ring-2 ring-offset-1 ring-[#1E3A8A]/30" 
-          : "opacity-45 hover:opacity-75 scale-95 hover:scale-[0.97]"
+          ? "border-transparent bg-gradient-to-br text-white shadow-md ring-2 ring-offset-1 ring-[#1E3A8A]/30"
+          : "border-slate-200 bg-white text-slate-700 shadow-none hover:border-slate-300 hover:bg-slate-50"
       )}
       onClick={onClick}
     >
-      <div className="absolute inset-0 bg-black/[0.03]" />
-      <div className="text-[10px] font-extrabold uppercase tracking-widest text-white/80 relative z-10">
+      {isActive ? <div className="absolute inset-0 bg-black/[0.03]" /> : null}
+      <div className={cn("relative z-10 text-xs font-extrabold uppercase tracking-wide", isActive ? "text-white/85" : "text-slate-600")}>
         {label}
       </div>
-      <div className="text-xl font-black mt-1 text-white relative z-10 leading-none">
+      <div className={cn("relative z-10 mt-1 text-2xl font-black leading-none", isActive ? "text-white" : "text-slate-900")}>
         {count}
       </div>
     </Card>
   )
 }
 
-export type VerificationQueueFilter = 'ACTION' | 'REVIEW' | 'REJECTED' | 'CASE_CLOSED';
+export type VerificationQueueFilter = 'ACTION' | 'REVIEW' | 'AWAITING' | 'REJECTED' | 'CASE_CLOSED';
 
 function queueState(request: VerificationRequest) {
   return {
@@ -77,12 +77,13 @@ export function VerificationQueue({
   const counts = {
     ACTION: requests.filter((request) => bucketFor(request) === 'ACTION').length,
     REVIEW: requests.filter((request) => bucketFor(request) === 'REVIEW').length,
+    AWAITING: requests.filter((request) => bucketFor(request) === 'AWAITING').length,
     REJECTED: requests.filter((request) => outcomeFor(request) === 'REJECTED').length,
     CASE_CLOSED: requests.filter((request) => outcomeFor(request) === 'CASE_CLOSED').length,
   }
 
   const filteredRequests = requests.filter((r) => {
-    if (filter === "ACTION" || filter === "REVIEW") return bucketFor(r) === filter
+    if (filter === "ACTION" || filter === "REVIEW" || filter === 'AWAITING') return bucketFor(r) === filter
     return outcomeFor(r) === filter
   });
 
@@ -106,7 +107,7 @@ export function VerificationQueue({
   };
 
   return (
-    <div className="flex flex-col h-full gap-2 w-72 shrink-0 border-r bg-white p-3">
+    <div className="flex h-full w-80 shrink-0 flex-col gap-2 border-r bg-white p-3">
       <div className="grid grid-cols-2 gap-2">
         <SummaryCard
           label="For Action"
@@ -121,6 +122,13 @@ export function VerificationQueue({
           gradient="from-[#F97316] to-[#FB923C]"
           isActive={filter === "REVIEW"}
           onClick={() => onFilterChange("REVIEW")}
+        />
+        <SummaryCard
+          label="Awaiting"
+          count={counts.AWAITING}
+          gradient="from-[#0369A1] to-[#0284C7]"
+          isActive={filter === "AWAITING"}
+          onClick={() => onFilterChange("AWAITING")}
         />
         <SummaryCard
           label="Rejected"
@@ -143,6 +151,8 @@ export function VerificationQueue({
           ? 'Active Queue · For Action'
           : filter === 'REVIEW'
             ? 'Active Queue · For Review'
+            : filter === 'AWAITING'
+              ? 'Background Dispatch · Awaiting Responder'
             : filter === 'REJECTED'
               ? 'Rejected Records'
               : 'Case Closed Records'}
@@ -156,31 +166,40 @@ export function VerificationQueue({
         }}
       >
         <div className="flex flex-col gap-1.5 py-1.5">
-          {sortedRequests.map((request) => (
+          {sortedRequests.map((request, index) => {
+            const isPriority = (filter === 'ACTION' || filter === 'REVIEW') && index === 0;
+            return (
             <Card
               key={request.id}
               className={cn(
-                "p-2 cursor-pointer transition-colors hover:bg-accent",
+                "cursor-pointer transition-colors hover:bg-accent",
+                isPriority ? "border-red-200 bg-red-50/60 p-4 shadow-sm" : "p-3",
                 selectedId === request.id && "border-primary ring-1 ring-primary"
               )}
               onClick={() => onSelect(request)}
             >
-              <div className="flex justify-between items-start gap-1 mb-1">
-                <span className="text-[10px] font-mono font-bold text-muted-foreground">
+              {isPriority ? (
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <Badge className="bg-red-700 text-[11px] font-black uppercase tracking-wide">Priority now</Badge>
+                  <span className="text-xs font-semibold text-red-800">{getVerificationPriorityReason(request)}</span>
+                </div>
+              ) : null}
+              <div className="mb-1 flex items-start justify-between gap-1">
+                <span className="font-mono text-xs font-bold text-muted-foreground">
                   {request.requestId}
                 </span>
                 <div className="flex items-center gap-1">
                 {isNewVerificationItem(request.receivedAt) && (filter === 'ACTION' || filter === 'REVIEW') ? (
-                  <Badge className="bg-red-600 text-[9px] px-1.5 py-0">NEW</Badge>
+                  <Badge className="bg-red-600 px-1.5 py-0 text-xs">NEW</Badge>
                 ) : null}
                 <Badge className={cn(
-                  "text-[9px] px-1.5 py-0",
+                  "px-1.5 py-0 text-xs",
                   request.severity === 'Critical' ? 'bg-red-700' : request.severity === 'High' ? 'bg-orange-600' : 'bg-slate-500',
                 )}>{request.severity}</Badge>
                 <Badge
                   variant={request.nature === "EMERGENCY" ? "default" : "secondary"}
                   className={cn(
-                    "text-[9px] px-1.5 py-0",
+                    "px-1.5 py-0 text-xs",
                     request.nature === "EMERGENCY" ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-500 hover:bg-gray-600"
                   )}
                 >
@@ -189,18 +208,23 @@ export function VerificationQueue({
                 </div>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <div className="font-bold text-sm leading-tight truncate">{request.type}</div>
-                <div className="text-[9px] text-muted-foreground whitespace-nowrap">
+                <div className={cn("truncate font-bold leading-tight", isPriority ? "text-lg" : "text-sm")}>{request.type}</div>
+                <div className="whitespace-nowrap text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(request.receivedAt), { addSuffix: true })}
                 </div>
               </div>
-              <div className="text-[10px] font-semibold text-[#1E3A8A] truncate">{classificationLabel(request)}</div>
-              <div className="text-[10px] text-muted-foreground truncate">{request.location}</div>
+              <div className="truncate text-xs font-semibold text-[#1E3A8A]">{classificationLabel(request)}</div>
+              {filter === 'AWAITING' ? (
+                <div className="mt-1 text-xs font-semibold text-sky-800">
+                  Offer pending{request.incident?.offerExpiresAt ? ` · expires ${new Date(request.incident.offerExpiresAt).toLocaleTimeString()}` : ''}. You may continue other work.
+                </div>
+              ) : null}
+              <div className={cn("truncate text-slate-600", isPriority ? "mt-1 text-sm font-medium" : "text-xs")}>{request.location}</div>
               {(filter === 'REJECTED' || filter === 'CASE_CLOSED') && (
                 <Badge
                   variant="outline"
                   className={cn(
-                    "mt-2 text-[9px] font-bold uppercase",
+                    "mt-2 text-xs font-bold uppercase",
                     filter === 'REJECTED'
                       ? "border-red-200 bg-red-50 text-red-700"
                       : "border-green-200 bg-green-50 text-green-700",
@@ -210,7 +234,7 @@ export function VerificationQueue({
                 </Badge>
               )}
             </Card>
-          ))}
+          )})}
           {sortedRequests.length === 0 && (
             <div className="text-center py-8 text-muted-foreground text-sm italic">
               No {filter.toLowerCase()} requests

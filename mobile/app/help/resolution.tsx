@@ -6,6 +6,7 @@ import { useEmergencyReportStore } from '../../store/use-emergency-report-store'
 import { useChatbotStore } from '../../store/use-chatbot-store';
 import { supabase } from '../../lib/supabase';
 import { updateGuestReportHistory } from '../../lib/guest-report-history';
+import { GuestAllowanceBanner } from '../../components/guest/GuestAllowanceBanner';
 
 export default function ResolutionScreen() {
   const router = useRouter();
@@ -178,7 +179,10 @@ export default function ResolutionScreen() {
             onChangeText={setFeedback}
           />
         </View> : (
-          <Text style={styles.guestNote}>This completed report remains available in Guest Report History on this device.</Text>
+          <View style={styles.guestSection}>
+            <Text style={styles.guestNote}>This completed report remains available in Guest Report History on this device.</Text>
+            <GuestAllowanceBanner remaining={report.guestReportsRemaining} />
+          </View>
         )}
 
         {/* Action Button */}
@@ -290,9 +294,9 @@ const styles = StyleSheet.create({
   guestNote: {
     color: '#475569',
     textAlign: 'center',
-    marginBottom: 28,
     lineHeight: 20,
   },
+  guestSection: { gap: 14, marginBottom: 28 },
   returnButtonText: {
     color: '#FFF',
     fontWeight: 'bold',

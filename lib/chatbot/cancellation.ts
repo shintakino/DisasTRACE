@@ -36,7 +36,7 @@ export async function cancelChatbotReport(requestId: string, proof: Cancellation
     const cancellationReason = 'Cancelled by the reporter through the DisasTRACE chatbot.';
     const [updated] = await transaction
       .update(verificationRequests)
-      .set({ status: 'REJECTED', triageReasons: [...report.triageReasons, cancellationReason], updatedAt: new Date() })
+      .set({ status: 'REJECTED', rejectionReason: cancellationReason, triageReasons: [...report.triageReasons, cancellationReason], updatedAt: new Date() })
       .where(and(eq(verificationRequests.id, report.id), eq(verificationRequests.status, 'PENDING')))
       .returning();
     return updated

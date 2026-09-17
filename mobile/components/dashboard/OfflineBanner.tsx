@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Animated, StyleSheet, ActivityIndicator } from 'react-native';
 import { useOfflineReports } from '../../hooks/use-offline-reports';
-import { WifiOff, Wifi } from 'lucide-react-native';
+import { useResponderStore } from '../../stores/useResponderStore';
+import { AlertTriangle, WifiOff, Wifi } from 'lucide-react-native';
 
 export function OfflineBanner() {
   const { isOnline, syncing, isSyncingQueue, offlineQueue } = useOfflineReports();
+  const lastQueueError = useResponderStore((state) => state.lastQueueError);
   const [showBanner, setShowBanner] = useState(false);
-  const [bannerStatus, setBannerStatus] = useState<'offline' | 'syncing' | 'restored'>('offline');
+  const [bannerStatus, setBannerStatus] = useState<'offline' | 'syncing' | 'restored' | 'failed'>('offline');
   const slideAnim = useRef(new Animated.Value(-100)).current;
   const timerRef = useRef<any>(null);
 
@@ -35,6 +37,10 @@ export function OfflineBanner() {
         duration: 350,
         useNativeDriver: true,
       }).start();
+    } else if (lastQueueError) {
+      setBannerStatus('failed');
+      setShowBanner(true);
+      Animated.timing(slideAnim, { toValue: 0, duration: 350, useNativeDriver: true }).start();
     } else {
       // 3. Online & Fully Flushed/Synced
       // Only transition to restored and then auto-hide if the banner was already visible!
@@ -63,7 +69,7 @@ export function OfflineBanner() {
         clearTimeout(timerRef.current);
       }
     };
-  }, [isOnline, isSyncingQueue, syncing, showBanner]);
+  }, [isOnline, isSyncingQueue, lastQueueError, syncing, showBanner]);
 
   if (!showBanner) return null;
 
@@ -72,6 +78,8 @@ export function OfflineBanner() {
     bgStyle = styles.syncBg;
   } else if (bannerStatus === 'restored') {
     bgStyle = styles.onlineBg;
+  } else if (bannerStatus === 'failed') {
+    bgStyle = styles.failedBg;
   }
 
   return (
@@ -92,6 +100,7 @@ export function OfflineBanner() {
         {bannerStatus === 'restored' && (
           <Wifi size={14} color="#FFFFFF" style={styles.iconStyle} />
         )}
+        {bannerStatus === 'failed' && <AlertTriangle size={14} color="#FFFFFF" style={styles.iconStyle} />}
         <Text style={styles.bannerText}>
           {bannerStatus === 'offline' && 'Offline — features limited'}
           {bannerStatus === 'syncing' && (
@@ -102,6 +111,7 @@ export function OfflineBanner() {
               : 'Restoring connections...'
           )}
           {bannerStatus === 'restored' && 'Connection Restored'}
+          {bannerStatus === 'failed' && `Update not applied: ${lastQueueError}`}
         </Text>
       </View>
     </Animated.View>
@@ -133,6 +143,7 @@ const styles = StyleSheet.create({
   syncBg: {
     backgroundColor: '#3B82F6', // Dynamic Info Blue
   },
+  failedBg: { backgroundColor: '#B91C1C' },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',

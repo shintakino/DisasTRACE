@@ -3,6 +3,8 @@ import { incidents } from '@/db/schema/incidents';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { eq } from 'drizzle-orm';
 import { normalizeRequiredRejectionReason } from '@/lib/rejected-report-workflow';
+import { auditLogs } from '@/db/schema/audit_logs';
+import { createAuditEvent, PACC_AUDIT_ACTIONS, type AuditActor } from '@/lib/audit-events';
 
 interface RejectionFailure {
   success: false;
@@ -20,6 +22,7 @@ export type RejectVerificationRequestResult = RejectionFailure | RejectionSucces
 export async function rejectVerificationRequest(
   id: string,
   rawRejectionReason: unknown,
+  actor?: AuditActor,
 ): Promise<RejectVerificationRequestResult> {
   const rejectionReason = normalizeRequiredRejectionReason(rawRejectionReason);
   if (!rejectionReason) {
@@ -82,6 +85,16 @@ export async function rejectVerificationRequest(
       })
       .where(eq(verificationRequests.id, id))
       .returning();
+
+    if (actor) {
+      await tx.insert(auditLogs).values(createAuditEvent({
+        actor,
+        action: PACC_AUDIT_ACTIONS.rejected,
+        entityType: 'VERIFICATION_REQUEST',
+        entityId: id,
+        details: { requestId: lockedRequest.requestId, rejectionReason, previousStatus: lockedRequest.status, newStatus: 'REJECTED' },
+      }));
+    }
 
     return { success: true, request: updatedRequest } as const;
   });

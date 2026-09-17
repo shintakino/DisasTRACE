@@ -193,7 +193,7 @@ export async function PATCH(req: NextRequest) {
     const adminClient = createAdminClient();
 
     // Perform database update
-    const updatePayload: any = { updatedAt: new Date() };
+    const updatePayload: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
     if (status) updatePayload.status = status;
     if (role) updatePayload.role = role;
     if (rejectionReason) updatePayload.rejectionReason = rejectionReason;
@@ -270,7 +270,6 @@ export async function DELETE(req: NextRequest) {
     await db.delete(statusLogs).where(eq(statusLogs.userId, id));
 
     // 4. Delete audit logs where the user is the performer (i.e. userId)
-    await db.delete(auditLogs).where(eq(auditLogs.userId, id));
 
     // 5. Handle incidents and reports referencing this user as a responder
     await db.update(incidents)
@@ -328,4 +327,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
-

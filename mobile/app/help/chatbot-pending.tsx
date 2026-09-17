@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CheckCircle2, ChevronLeft, Phone, Send, ShieldAlert, UserRound, X } from 'lucide-react-native';
+import { CheckCircle2, ChevronLeft, Phone, RefreshCw, Send, ShieldAlert, UserRound, WifiOff, X } from 'lucide-react-native';
 import { syncChatbotReportToEmergencyStore } from '../../lib/chatbot-report-bridge';
 import { useRejectedReportRecovery } from '../../hooks/use-rejected-report-recovery';
 import { supabase } from '../../lib/supabase';
@@ -22,6 +22,8 @@ import { askChatbot, cancelChatbotReport, ChatbotApiError, getChatbotReportStatu
 import { useChatbotStore } from '../../store/use-chatbot-store';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
 import { appendGuestReportMessages, updateGuestReportHistory } from '../../lib/guest-report-history';
+import { reportRefreshCopy } from '../../lib/report-status-feedback';
+import { GuestAllowanceBanner } from '../../components/guest/GuestAllowanceBanner';
 
 const NAVY = '#1E3A8A';
 const BLUE = '#3B82F6';
@@ -51,6 +53,8 @@ export default function ChatbotPendingScreen() {
   const [waiting, setWaiting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actorReady, setActorReady] = useState(false);
+  const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const refreshLock = useRef(false);
   const activeReportId = activeReport?.id;
   const activeReporterMode = activeReport?.reporterMode;
@@ -126,6 +130,8 @@ export default function ChatbotPendingScreen() {
         requestId: activeReportId,
         guestAccessToken: activeGuestToken,
       });
+      setLastCheckedAt(new Date());
+      setRefreshError(null);
       if (status.status === 'REJECTED') {
         handleRejectedReport(status.rejectionReason);
         return;
@@ -155,12 +161,13 @@ export default function ChatbotPendingScreen() {
         responderFullName: status.responder?.fullName ?? undefined,
       });
 
-      if (hasIncident) {
+      if (hasIncident || status.status === 'VERIFIED') {
         markActiveResponse();
         router.replace('/help/response-status' as never);
       }
-    } catch {
+    } catch (error) {
       // Preserve the last verified status. Polling continues independently.
+      setRefreshError(error instanceof Error ? error.message : 'Status refresh failed.');
     } finally {
       refreshLock.current = false;
       setRefreshing(false);
@@ -200,7 +207,11 @@ export default function ChatbotPendingScreen() {
               });
               clearReportToIdle();
               useEmergencyReportStore.getState().resetReport();
-              router.replace(`/help/chatbot?mode=${activeReport.reporterMode === 'guest' ? 'guest' : 'resident'}` as never);
+              Alert.alert(
+                'Report cancelled',
+                'The report was cancelled before a response started. PACC will not dispatch it, and you may start a new report.',
+                [{ text: 'Start a new report', onPress: () => router.replace(`/help/chatbot?mode=${activeReport.reporterMode === 'guest' ? 'guest' : 'resident'}` as never) }],
+              );
             } catch (error) {
               const locked = error instanceof ChatbotApiError && error.status === 409;
               Alert.alert(
@@ -256,6 +267,7 @@ export default function ChatbotPendingScreen() {
 
   const canCancel = activeReport.status === 'PENDING' && !activeReport.hasIncident;
   const isRejected = activeReport.status === 'REJECTED';
+  const refreshCopy = reportRefreshCopy({ lastCheckedAt, error: refreshError });
   const removeClosedReport = () => {
     Alert.alert(
       'Remove closed report?',
@@ -295,21 +307,16 @@ export default function ChatbotPendingScreen() {
           <View style={styles.statusPill}><Text style={styles.statusPillText}>{activeReport.status}</Text></View>
         </View>
         <Text style={styles.statusText}>{activeReport.responseStatus}</Text>
-        {activeReport.reporterMode === 'guest' && activeReport.reportsRemaining !== undefined ? (
-          <View style={styles.allowanceBox}>
-            <Text style={styles.allowanceText}>
-              Guest reports remaining: {activeReport.reportsRemaining}
-            </Text>
-            <Text style={styles.allowanceHint}>
-              {activeReport.reportsRemaining <= 1
-                ? 'Create an account now so you can keep reporting after this allowance runs out.'
-                : 'Register before your Guest Mode allowance runs out.'}
-            </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/sign-up' as never)} style={styles.registerLink}>
-              <Text style={styles.registerLinkText}>Create account</Text>
+        <View style={[styles.refreshState, refreshCopy.tone === 'warning' && styles.refreshWarning]}>
+          {refreshCopy.tone === 'warning' ? <WifiOff color="#B45309" size={15} /> : null}
+          <Text style={[styles.refreshStateText, refreshCopy.tone === 'warning' && styles.refreshWarningText]}>{refreshCopy.text}</Text>
+          {refreshCopy.tone === 'warning' ? (
+            <TouchableOpacity onPress={() => void refreshStatus()} disabled={refreshing} style={styles.retryButton}>
+              <RefreshCw color={NAVY} size={14} /><Text style={styles.retryText}>Retry now</Text>
             </TouchableOpacity>
-          </View>
-        ) : null}
+          ) : null}
+        </View>
+        {activeReport.reporterMode === 'guest' ? <GuestAllowanceBanner remaining={activeReport.reportsRemaining} style={styles.allowanceBox} /> : null}
         {refreshing ? <Text style={styles.refreshing}>Checking for updates…</Text> : null}
         {isRejected ? (
           <TouchableOpacity style={styles.removeButton} onPress={removeClosedReport}>
@@ -388,11 +395,13 @@ const styles = StyleSheet.create({
   statusPillText: { color: NAVY, fontSize: 10, fontWeight: '900' },
   statusText: { color: '#334155', fontSize: 14, lineHeight: 20, marginTop: 12 },
   refreshing: { color: '#64748B', fontSize: 11, marginTop: 7 },
-  allowanceBox: { backgroundColor: '#EFF6FF', borderRadius: 9, padding: 10, marginTop: 10 },
-  allowanceText: { color: NAVY, fontSize: 13, fontWeight: '900' },
-  allowanceHint: { color: '#475569', fontSize: 11, lineHeight: 16, marginTop: 3 },
-  registerLink: { minHeight: 36, alignSelf: 'flex-start', justifyContent: 'center' },
-  registerLinkText: { color: BLUE, fontWeight: '800', fontSize: 12 },
+  refreshState: { marginTop: 10, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  refreshStateText: { color: '#64748B', fontSize: 11, flexShrink: 1 },
+  refreshWarning: { borderRadius: 8, backgroundColor: '#FFFBEB', padding: 9 },
+  refreshWarningText: { color: '#92400E', flex: 1 },
+  retryButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 },
+  retryText: { color: NAVY, fontSize: 11, fontWeight: '800' },
+  allowanceBox: { marginTop: 10 },
   cancelButton: { alignSelf: 'flex-start', minHeight: 44, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
   cancelText: { color: '#B91C1C', fontSize: 13, fontWeight: '800' },
   removeButton: { alignSelf: 'flex-start', minHeight: 44, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },

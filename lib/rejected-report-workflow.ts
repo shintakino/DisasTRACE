@@ -3,7 +3,7 @@ export const MAX_REJECTION_REASON_LENGTH = 250;
 export type VerificationRequestStatus = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'DUPLICATE';
 export type VerificationIncidentStatus = 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'RESOLVED';
 export type VerificationQueueClassification = 'ACTIVE' | 'REJECTED' | 'CASE_CLOSED';
-export type ActiveVerificationBucket = 'ACTION' | 'REVIEW';
+export type ActiveVerificationBucket = 'ACTION' | 'REVIEW' | 'AWAITING';
 
 interface VerificationQueueState {
   requestStatus: VerificationRequestStatus;
@@ -37,6 +37,12 @@ export function classifyActiveVerificationBucket(
 ): ActiveVerificationBucket | null {
   if (classifyVerificationQueueItem(input) !== 'ACTIVE') return null;
 
+  const awaitingResponder = input.requestStatus === 'VERIFIED'
+    && input.incidentStatus === 'DISPATCHED'
+    && !input.responderId
+    && Boolean(input.currentOfferResponderId);
+  if (awaitingResponder) return 'AWAITING';
+
   const needsDispatch = input.requiresPaccReassignment === true || (
     input.requestStatus === 'VERIFIED'
     && input.incidentStatus === 'DISPATCHED'
@@ -67,6 +73,16 @@ export function projectReporterReportStatus(input: {
   const rejectionReason = normalizeRequiredRejectionReason(input.rejectionReason);
 
   if (outcome === 'REJECTED') {
+    const cancelledByReporter = rejectionReason?.startsWith('Cancelled by the reporter') === true;
+    if (cancelledByReporter) {
+      return {
+        status: input.requestStatus,
+        outcome: 'CANCELLED',
+        terminal: true,
+        rejectionReason,
+        responseStatus: 'You cancelled this report before response started. PACC will not dispatch it, and you may submit a new report.',
+      } as const;
+    }
     const reasonText = rejectionReason
       ? ` Reason: ${rejectionReason}`
       : ' Please contact PACC if you need the rejection reason.';

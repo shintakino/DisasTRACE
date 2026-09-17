@@ -59,6 +59,10 @@ const expectedColumns = [
   ['users', 'location_geom'],
   ['users', 'duty_status'],
   ['users', 'responder_type'],
+  ['users', 'privacy_consent_at'],
+  ['users', 'privacy_policy_version'],
+  ['audit_logs', 'actor_name'],
+  ['audit_logs', 'actor_role'],
   ['verification_requests', 'reporter_type'],
   ['verification_requests', 'guest_access_token'],
   ['verification_requests', 'guest_device_hash'],
@@ -136,6 +140,7 @@ async function audit() {
       'on_verification_request_notification',
       'on_incident_notification',
       'on_user_verification_notification',
+      'on_audit_actor_snapshot',
     ]
       .filter((trigger) => !triggerSet.has(trigger));
 

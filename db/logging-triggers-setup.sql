@@ -168,70 +168,11 @@ begin
 end;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 3. Trigger function for public.verification_requests (Triage & Merges audit logs)
-CREATE OR REPLACE FUNCTION public.handle_request_triage_log()
-RETURNS trigger AS $$
-declare
-  performing_user_id varchar;
-  parent_req_id varchar;
-begin
-  -- Identify performing dispatcher
-  performing_user_id := auth.uid()::text;
-  if performing_user_id is null or not exists (select 1 from public.users where id = performing_user_id) then
-    select id into performing_user_id from public.users where role = 'pacc_admin' order by created_at asc limit 1;
-  end if;
-  if performing_user_id is null then
-    select id into performing_user_id from public.users where role = 'cdrrmo_super_admin' order by created_at asc limit 1;
-  end if;
-
-  if TG_OP = 'UPDATE' then
-    -- Verification
-    if new.status = 'VERIFIED' and old.status <> 'VERIFIED' then
-      insert into public.audit_logs (id, user_id, action, entity_type, entity_id, created_at)
-      values (
-        gen_random_uuid()::text,
-        performing_user_id,
-        'Verified incident report: ' || new.request_id || ' (' || new.type || ')',
-        'INCIDENT',
-        new.id,
-        now()
-      );
-    end if;
-
-    -- Rejection
-    if new.status = 'REJECTED' and old.status <> 'REJECTED' then
-      insert into public.audit_logs (id, user_id, action, entity_type, entity_id, created_at)
-      values (
-        gen_random_uuid()::text,
-        performing_user_id,
-        'Rejected incident report: ' || new.request_id,
-        'INCIDENT',
-        new.id,
-        now()
-      );
-    end if;
-
-    -- Merge Duplicate
-    if new.status = 'DUPLICATE' and old.status <> 'DUPLICATE' then
-      select request_id into parent_req_id 
-      from public.verification_requests 
-      where id = new.parent_request_id;
-
-      insert into public.audit_logs (id, user_id, action, entity_type, entity_id, created_at)
-      values (
-        gen_random_uuid()::text,
-        performing_user_id,
-        'Merged duplicate report: ' || new.request_id || ' into parent: ' || coalesce(parent_req_id, 'unknown'),
-        'INCIDENT',
-        new.id,
-        now()
-      );
-    end if;
-  end if;
-
-  return new;
-end;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Verification audit events are written by the authenticated API routes in the
+-- same transaction as each PACC action. Keep the legacy trigger removed: it
+-- guessed an actor when auth.uid() was unavailable and could duplicate events.
+drop trigger if exists on_request_triage_log on public.verification_requests;
+drop function if exists public.handle_request_triage_log();
 
 -- 4. Register triggers on tables
 -- Incidents trigger
@@ -246,8 +187,7 @@ create trigger on_user_status_log_change
     after update of verification_status, status, duty_status on public.users
     for each row execute procedure public.handle_user_status_log_change();
 
--- Verification requests trigger
+-- Verification requests intentionally have no generic audit trigger. Route-owned
+-- events preserve the actual actor plus structured before/after details.
 drop trigger if exists on_request_triage_log on public.verification_requests;
-create trigger on_request_triage_log
-    after update of status on public.verification_requests
-    for each row execute procedure public.handle_request_triage_log();
+drop function if exists public.handle_request_triage_log();

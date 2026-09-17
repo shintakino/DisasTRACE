@@ -31,6 +31,7 @@ export function syncChatbotReportToEmergencyStore(input: {
       victimCondition: draft.victimCondition,
       reporterMode: activeReport.reporterMode === 'guest' ? 'guest' : 'resident',
       guestAccessToken: activeReport.guestAccessToken,
+      guestReportsRemaining: activeReport.reportsRemaining,
       triageClassification: activeReport.triageClassification as never,
       isMergedDuplicate: activeReport.isMergedDuplicate,
       chatbotOrigin: true,

@@ -42,6 +42,10 @@ export function AuditTable({ data }: AuditTableProps) {
           <div className="flex flex-col">
             <span className="font-bold text-slate-800 text-sm leading-tight">{action}</span>
             <span className="text-[10px] font-medium text-slate-400 uppercase tracking-tighter mt-0.5">{contextPath}</span>
+            {row.original.entityId ? <span className="mt-1 text-xs font-medium text-slate-500">Record: {row.original.entityId}</span> : null}
+            {row.original.details && Object.keys(row.original.details).length > 0 ? (
+              <span className="mt-1 break-words text-xs text-slate-600">{JSON.stringify(row.original.details)}</span>
+            ) : null}
           </div>
         );
       },

@@ -425,25 +425,38 @@ export default function PendingScreen() {
           style: "destructive", 
           onPress: async () => {
             try {
+              if (!report.id) {
+                throw new Error('This report has no server reference. Return to the report screen and try again.');
+              }
               if (report.id) {
                 const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
                 const { data: { session } } = await supabase.auth.getSession();
                 
-                await fetch(`${apiUrl}/verification/cancel`, {
+                const response = await fetchWithTimeout(`${apiUrl}/verification/cancel`, {
                   method: 'PATCH',
                   headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session?.access_token}`
                   },
                   body: JSON.stringify({ id: report.id })
-                });
+                }, 10_000, 'Report cancellation');
+                const result = await response.json().catch(() => null);
+                if (!response.ok) {
+                  throw new Error(result?.error || 'PACC could not cancel this report.');
+                }
               }
+              useEmergencyReportStore.getState().resetReport();
+              Alert.alert(
+                'Report cancelled',
+                'The report was cancelled before response started. PACC will not dispatch it, and you may submit a new report.',
+                [{ text: 'Return home', onPress: () => router.replace(homeRoute as any) }],
+              );
             } catch (err) {
               console.error('[PendingScreen] Failed to cancel report:', err);
-            } finally {
-              // Clean up and return to home
-              useEmergencyReportStore.getState().resetReport();
-              router.replace(homeRoute as any);
+              Alert.alert(
+                'Unable to cancel report',
+                `${err instanceof Error ? err.message : 'Please try again.'}\n\nYour report remains active.`,
+              );
             }
           }
         }

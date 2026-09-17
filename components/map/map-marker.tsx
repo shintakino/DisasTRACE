@@ -8,6 +8,7 @@ interface MapMarkerProps {
   status: string;
   label: string;
   isSelected?: boolean;
+  isPriority?: boolean;
   hospitalAddress?: string;
   hospitalPhone?: string | null;
   caters?: boolean;
@@ -25,6 +26,7 @@ export function MapMarker({
   status, 
   label, 
   isSelected,
+  isPriority = false,
   hospitalAddress,
   hospitalPhone,
   caters = true,
@@ -78,7 +80,7 @@ export function MapMarker({
   if (type === "incident") {
     const isCritical = severity === "Critical";
     const isEmergency = nature === "EMERGENCY";
-    const needsPriorityIndicator = (isCritical || isEmergency) && status !== "COMPLETED";
+    const needsUrgentColor = (isCritical || isEmergency) && status !== "COMPLETED";
 
     return (
       <div className="relative group cursor-pointer flex flex-col items-center">
@@ -118,17 +120,17 @@ export function MapMarker({
         </div>
 
         {/* Pulse Effect for Active Incidents */}
-        {needsPriorityIndicator ? (
+        {isPriority ? (
           <div className="absolute inset-0 m-auto w-8 h-8 rounded-full bg-red-500/30 animate-ping" />
         ) : null}
 
         {/* Marker Icon */}
         <div className={cn(
           "relative z-10 p-1 rounded-full border-2 transition-transform",
-          isSelected ? "scale-125 border-primary bg-primary text-primary-foreground" : needsPriorityIndicator ? "bg-red-600 border-red-200 text-white" : "bg-amber-500 border-amber-200 text-white",
+          isSelected ? "scale-125 border-primary bg-primary text-primary-foreground" : needsUrgentColor ? "bg-red-600 border-red-200 text-white" : "bg-amber-500 border-amber-200 text-white",
           status === "COMPLETED" && !isSelected && "bg-green-500 border-green-200"
         )}>
-          {needsPriorityIndicator ? <Siren size={16} fill="currentColor" /> : <MapPin size={16} fill="currentColor" />}
+          {needsUrgentColor ? <Siren size={16} fill="currentColor" /> : <MapPin size={16} fill="currentColor" />}
         </div>
       </div>
     );

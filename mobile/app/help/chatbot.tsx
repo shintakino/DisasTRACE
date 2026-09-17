@@ -428,8 +428,13 @@ export default function EmergencyChatbotScreen() {
         isMergedDuplicate: false,
         reportsRemaining: result.guestAllowance?.remaining,
       };
+      // The server has already committed the report. Record that truth before
+      // optional device history so a local storage failure never invites a
+      // duplicate retry or tells the reporter that PACC did not receive it.
+      markSubmitted(report);
       if (reporterMode === 'guest') {
-        await archiveGuestReport({
+        try {
+          await archiveGuestReport({
           id: report.id,
           displayId: report.displayId,
           incidentType: completeDraft.incidentType,
@@ -440,9 +445,12 @@ export default function EmergencyChatbotScreen() {
           reportsRemaining: result.guestAllowance?.remaining,
           messages: messages.map(({ role, text }) => ({ role, text })),
           accessToken: report.guestAccessToken,
-        });
+          });
+        } catch (historyError) {
+          console.error('Report confirmed but guest history could not be saved:', historyError);
+          Alert.alert('Report sent', 'PACC received your report, but this device could not save its local history. Keep the report number shown on the status screen.');
+        }
       }
-      markSubmitted(report);
       syncChatbotReportToEmergencyStore({ draft: completeDraft, activeReport: report, submissionId });
       router.replace((result.autoDispatched ? '/help/response-status' : '/help/chatbot-pending') as never);
     } catch (error) {

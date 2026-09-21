@@ -616,7 +616,7 @@ export function IncidentReportForm() {
                 className="flex-1 bg-yellow-50 border border-yellow-100 rounded-2xl py-4 flex-row justify-center items-center shadow-sm"
               >
                 <FolderDown size={18} color="#92400E" />
-                <Text className="text-[#92400E] font-bold ml-2 text-base">Save as Draft</Text>
+                <Text className="text-[#92400E] font-bold ml-2 text-base">Save Draft &amp; Become Available</Text>
               </TouchableOpacity>
             
               <TouchableOpacity

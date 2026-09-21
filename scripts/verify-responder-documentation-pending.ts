@@ -50,6 +50,10 @@ const hospitalSheet = read('mobile/components/responder/HospitalDocumentationShe
 assert.match(hospitalSheet, /Save Draft &amp; Become Available/);
 assert.match(hospitalSheet, /void deferDocumentation/);
 
+const incidentReportForm = read('mobile/components/responder/IncidentReportForm.tsx');
+assert.match(incidentReportForm, /Save Draft &amp; Become Available/);
+assert.match(incidentReportForm, /void deferDocumentation/);
+
 const selector = read('mobile/components/responder/SelectIncidentModal.tsx');
 assert.match(selector, /\.eq\('status', 'DOCUMENTATION_PENDING'\)/);
 

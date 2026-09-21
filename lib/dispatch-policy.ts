@@ -50,6 +50,12 @@ export type ManualDispatchEligibility =
 // short recovery window without leaving a switched-off device dispatchable.
 export const RESPONDER_HEARTBEAT_FRESHNESS_MS = 90 * 1000;
 
+// The mobile client closes its visible Accept action shortly before the
+// deadline. Keep a small server grace window for a request that was already
+// in flight during a weak-network handoff; the scheduler uses this same value
+// before cascading the offer to another responder.
+export const DISPATCH_ACCEPTANCE_GRACE_MS = 4 * 1000;
+
 export function isResponderHeartbeatFresh(
   lastLocationUpdatedAt: Date | string | null,
   now = new Date(),
@@ -174,7 +180,7 @@ export function canResponderAcceptDispatchOffer(
     && incident.responderId === null
     && incident.offerExpiresAt !== null
     && incident.offerExpiresAt !== undefined
-    && new Date(incident.offerExpiresAt).getTime() > now.getTime();
+    && new Date(incident.offerExpiresAt).getTime() > now.getTime() - DISPATCH_ACCEPTANCE_GRACE_MS;
 }
 
 export function canCascadeDispatchOffer(

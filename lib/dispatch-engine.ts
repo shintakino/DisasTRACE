@@ -8,6 +8,7 @@ import { sendDispatchOfferExpiredPush, sendDispatchOfferPush } from "@/lib/push-
 import { eq, and, or, sql, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import {
   canCascadeDispatchOffer,
+  DISPATCH_ACCEPTANCE_GRACE_MS,
   RESPONDER_HEARTBEAT_FRESHNESS_MS,
   shouldRetryAutomaticDispatch,
 } from "@/lib/dispatch-policy";
@@ -680,8 +681,6 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
 
 // The offer deadline is a server-side contract. A responder must accept before
 // this timestamp; the scheduler, not a paused mobile timer, releases it.
-const DISPATCH_GRACE_PERIOD_MS = 0;
-
 export async function checkAndCascadeExpiredOffers(): Promise<DispatchMaintenanceResult> {
   try {
     const now = new Date();
@@ -706,7 +705,7 @@ export async function checkAndCascadeExpiredOffers(): Promise<DispatchMaintenanc
       }
 
       // Allow a leeway grace period for the responder to submit the accept request
-      const offerExpiresAtWithGrace = new Date(incident.offerExpiresAt.getTime() + DISPATCH_GRACE_PERIOD_MS);
+      const offerExpiresAtWithGrace = new Date(incident.offerExpiresAt.getTime() + DISPATCH_ACCEPTANCE_GRACE_MS);
       if (offerExpiresAtWithGrace > now) {
         continue;
       }

@@ -3,6 +3,7 @@ import {
   canCascadeDispatchOffer,
   canClaimAutomaticDispatchTurn,
   canResponderAcceptDispatchOffer,
+  DISPATCH_ACCEPTANCE_GRACE_MS,
   evaluateManualDispatchEligibility,
   isResponderHeartbeatFresh,
   prioritizeAutomaticDispatchRequests,
@@ -95,8 +96,24 @@ check('accepts only the responder who owns an unassigned dispatch offer', () => 
     status: 'DISPATCHED',
     currentOfferResponderId: responderId,
     responderId: null,
-    offerExpiresAt: new Date('2026-09-11T10:00:00.000Z'),
+    offerExpiresAt: new Date('2026-09-11T09:59:55.999Z'),
   }, responderId, now), false);
+
+  assert.equal(canResponderAcceptDispatchOffer({
+    status: 'DISPATCHED',
+    currentOfferResponderId: responderId,
+    responderId: null,
+    offerExpiresAt: new Date('2026-09-11T09:59:56.001Z'),
+  }, responderId, now), true);
+
+  assert.equal(canResponderAcceptDispatchOffer({
+    status: 'DISPATCHED',
+    currentOfferResponderId: responderId,
+    responderId: null,
+    offerExpiresAt: new Date('2026-09-11T09:59:56.000Z'),
+  }, responderId, now), false);
+
+  assert.equal(DISPATCH_ACCEPTANCE_GRACE_MS, 4_000);
 
   assert.equal(canResponderAcceptDispatchOffer({
     status: 'DISPATCHED',

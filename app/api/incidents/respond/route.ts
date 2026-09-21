@@ -7,7 +7,11 @@ import { eq, and, gt, isNull } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import { cascadeIncident, calculateHaversineDistance, checkAndCascadeExpiredOffers, notifyPaccAndCdrrmo } from "@/lib/dispatch-engine";
-import { canCascadeDispatchOffer, canResponderAcceptDispatchOffer } from "@/lib/dispatch-policy";
+import {
+  canCascadeDispatchOffer,
+  canResponderAcceptDispatchOffer,
+  DISPATCH_ACCEPTANCE_GRACE_MS,
+} from "@/lib/dispatch-policy";
 
 const RespondSchema = z.object({
   incidentId: z.string().min(1, "Incident ID is required"),
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest) {
             eq(incidents.status, 'DISPATCHED'),
             eq(incidents.currentOfferResponderId, user.id),
             isNull(incidents.responderId),
-            gt(incidents.offerExpiresAt, new Date()),
+            gt(incidents.offerExpiresAt, new Date(Date.now() - DISPATCH_ACCEPTANCE_GRACE_MS)),
           ))
           .returning();
 

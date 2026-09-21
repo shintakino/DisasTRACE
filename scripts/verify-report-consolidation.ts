@@ -79,7 +79,7 @@ check('keeps a PACC-review candidate from becoming another primary report', () =
 check('makes PACC review decisions and primary coordination visible to operators and reporters', () => {
   const details = readFileSync(join(process.cwd(), 'components/verification/verification-details.tsx'), 'utf8');
   const status = readFileSync(join(process.cwd(), 'app/api/emergency-intake/status/route.ts'), 'utf8');
-  assert.match(details, /Confirm same request/);
+  assert.match(details, /Confirm same incident/);
   assert.match(details, /Keep separate/);
   assert.match(status, /const agencies = trackingReport\.coordinationAgencies/);
 });

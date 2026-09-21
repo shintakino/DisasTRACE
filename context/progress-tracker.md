@@ -1,5 +1,10 @@
 # Progress Tracker
 
+## 2026-09-22 - Dispatch deadline network tolerance and consolidation regression repair
+
+- Restored one shared four-second server acceptance grace window for responder dispatch offers. Both the authenticated Accept mutation and the background expiry scheduler now use the same policy value, so an already in-flight Accept request is not rejected solely because a weak-network handoff crossed the displayed deadline.
+- Extended the dispatch regression contract to cover the grace-window boundary and corrected the report-consolidation regression assertion to the current PACC wording, **Confirm same incident**.
+
 ## 2026-09-20 - CDRRMO operations-dashboard hierarchy refresh
 
 - Reworked the CDRRMO Super Admin dashboard into a compact operations-center layout: contextual shift welcome, five real operational indicators, readable incident-type summary, responder availability, recent activity, and direct Analytics/Audit/Roster paths. The underlying authenticated APIs and PACC dashboard layout remain unchanged.

@@ -41,6 +41,11 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
         const lng = location.coords.longitude;
         const accuracy = location.coords.accuracy;
         const isMockedLocationSignal = isMockedLocation(location);
+        const responderState = useResponderStore.getState();
+        const trackingHospital = responderState.status === 'to_hospital'
+          && isEligibleHospitalDestination(responderState.targetHospital)
+          ? responderState.targetHospital
+          : null;
         
         console.log(isMockedLocationSignal
           ? '[Background GPS Task] Mock location signal detected.'
@@ -61,6 +66,9 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
               longitude: lng,
               accuracy,
               isMockedLocation: isMockedLocationSignal,
+              responderStatus: responderState.status === 'to_hospital' ? 'to_hospital' : responderState.status === 'en_route' ? 'en_route' : undefined,
+              incidentId: responderState.activeDispatch?.id,
+              targetHospitalId: trackingHospital?.id,
             })
           });
         } catch (err) {
@@ -294,7 +302,8 @@ export function useBroadcastTracker(
               lat,
               lng
             );
-            if (secondsElapsed >= 30 || distanceMoved >= 50 || transportContext !== lastTransportContextRef.current) {
+            const needsArrivalSample = statusRef.current === 'en_route' || statusRef.current === 'to_hospital';
+            if (secondsElapsed >= (needsArrivalSample ? 10 : 30) || distanceMoved >= 50 || transportContext !== lastTransportContextRef.current) {
               shouldUpdateDb = true;
             }
           }
@@ -358,6 +367,14 @@ export function useBroadcastTracker(
                     targetHospitalId: targetHospitalRef.current?.id ?? null,
                   })
                 });
+                if (response.ok) {
+                  const result = await response.json().catch(() => null) as { autoArrivedHospitalIncidentId?: string | null } | null;
+                  if (result?.autoArrivedHospitalIncidentId === incidentId) {
+                    useResponderStore.setState({ status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL', isHospitalArrivalConfirmVisible: false });
+                    Alert.alert('Hospital arrival confirmed', 'Trusted GPS confirmed arrival at the selected hospital. Choose whether to finish documentation now or save it for later.');
+                  }
+                  return;
+                }
                 if (!response.ok) {
                   if (
                     statusRef.current === 'to_hospital'
@@ -471,7 +488,7 @@ export function useBroadcastTracker(
             }
 
             try {
-              const response = await fetch(`${apiUrl}/api/responder/location`, {
+            const response = await fetch(`${apiUrl}/api/responder/location`, {
                 method: 'POST',
                 headers: reqHeaders,
                 body: JSON.stringify({
@@ -482,8 +499,16 @@ export function useBroadcastTracker(
                   incidentId,
                   targetHospitalId: targetHospital?.id ?? null,
                 })
-              });
-              if (!response.ok) {
+            });
+            if (response.ok) {
+              const result = await response.json().catch(() => null) as { autoArrivedHospitalIncidentId?: string | null } | null;
+              if (result?.autoArrivedHospitalIncidentId === incidentId) {
+                useResponderStore.setState({ status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL', isHospitalArrivalConfirmVisible: false });
+                Alert.alert('Hospital arrival confirmed', 'Trusted GPS confirmed arrival at the selected hospital. Choose whether to finish documentation now or save it for later.');
+              }
+              return;
+            }
+            if (!response.ok) {
                 if (
                   responderStatus === 'to_hospital'
                   && await handleTransportContextRejection(response)

@@ -1,273 +1,46 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
-import { Textarea } from "@/components/ui/textarea"
-import { MAX_REJECTION_REASON_LENGTH, normalizeRequiredRejectionReason } from "@/lib/rejected-report-workflow"
-import { VerificationRequest } from "@/types/verification"
-import { CheckCircle2, Phone, MapPin, History, ShieldCheck, XCircle, Check, GitMerge, HelpCircle } from "lucide-react"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { useState } from "react";
+import { Check, CheckCircle2, GitMerge, History, MapPin, Phone, ShieldCheck, XCircle } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { RejectIncidentDialog } from "@/components/verification/reject-incident-dialog";
+import type { VerificationRequest } from "@/types/verification";
 
 interface ResidentPanelProps {
-  request: VerificationRequest | null
-  onAccept: (id: string) => void
-  onReject: (id: string, rejectionReason: string) => Promise<boolean>
-  onMerge?: (id: string) => void
-  isProcessing: boolean
+  request: VerificationRequest | null;
+  onAccept: (id: string) => void;
+  onReject: (id: string, rejectionReason: string) => Promise<boolean>;
+  onMerge?: (id: string) => void;
+  isProcessing: boolean;
+}
+
+function standingFor(request: VerificationRequest) {
+  if (request.resident.priorReports === 0) return "New reporter";
+  if ((request.resident.reliabilityScore ?? 100) >= 80) return "Good standing";
+  if ((request.resident.reliabilityScore ?? 100) >= 50) return "Review with care";
+  return "Low-confidence history";
 }
 
 export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessing }: ResidentPanelProps) {
-  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
-  const [rejectionReason, setRejectionReason] = useState("")
-  const normalizedReason = normalizeRequiredRejectionReason(rejectionReason)
+  const [rejectOpen, setRejectOpen] = useState(false);
+  if (!request) return <aside className="flex w-[300px] shrink-0 items-center justify-center border-l border-slate-200 bg-white p-5 text-center text-sm text-slate-500">Select an incident to review available actions and reporter context.</aside>;
 
-  if (!request) {
-    return (
-      <div className="w-80 shrink-0 border-l bg-white p-4 flex flex-col items-center justify-center text-slate-400 text-sm italic">
-        No resident selected
-      </div>
-    )
-  }
+  const needsManualDispatch = request.requiresPaccReassignment === true || (request.status === "VERIFIED" && request.incident?.status === "DISPATCHED" && !request.incident.responderId && !request.incident.currentOfferResponderId);
+  const canMergeDuplicate = request.status === "PENDING" && request.nature === "EMERGENCY" && !request.incident;
+  const terminal = request.status === "REJECTED" || request.status === "DUPLICATE" || request.incident?.status === "RESOLVED";
+  const canAccept = !terminal && !isProcessing && !(request.status === "VERIFIED" && request.incident && Boolean(request.incident.responderId || request.incident.currentOfferResponderId));
+  const canReject = !terminal && !isProcessing && (request.status === "PENDING" || needsManualDispatch);
+  const initials = request.resident.fullName.split(/\s|,/).filter(Boolean).slice(0, 2).map((name) => name[0]).join("").toUpperCase();
+  const statusText = request.incident?.status === "RESOLVED" ? "Case closed" : request.status === "REJECTED" ? "Rejected with public feedback" : request.incident?.responderId ? "Responder assigned" : needsManualDispatch ? "PACC reassignment required" : request.status === "VERIFIED" ? "Awaiting response workflow" : "Awaiting PACC decision";
 
-  const { resident } = request
-  const initials = resident.fullName
-    .split(", ")
-    .reverse()
-    .map((n) => n[0])
-    .join("")
-
-  const needsManualDispatch = request.requiresPaccReassignment === true || (
-    request.status === "VERIFIED" &&
-    request.incident &&
-    request.incident.status === "DISPATCHED" &&
-    !request.incident.responderId &&
-    !request.incident.currentOfferResponderId
-  );
-
-  const canMergeDuplicate =
-    request.status === "PENDING" &&
-    request.nature === "EMERGENCY" &&
-    !request.incident;
-
-  const isTerminal = request.status === "REJECTED" || request.incident?.status === "RESOLVED"
-
-  const handleReject = async () => {
-    if (!normalizedReason) return
-    if (await onReject(request.id, normalizedReason)) {
-      setIsRejectDialogOpen(false)
-      setRejectionReason("")
-    }
-  }
-
-  return (
-    <div className="w-80 shrink-0 border-l bg-white p-4 flex flex-col gap-6">
-      {!isTerminal && <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            variant="secondary"
-            className="w-full flex items-center justify-center gap-2"
-            onClick={() => setIsRejectDialogOpen(true)}
-            disabled={
-              isProcessing ||
-              !(request.status === "PENDING" || needsManualDispatch)
-            }
-          >
-            <XCircle className="w-4 h-4" />
-            Reject
-          </Button>
-          <Button
-            className="w-full bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 text-white flex items-center justify-center gap-2"
-            onClick={() => onAccept(request.id)}
-            disabled={
-              isProcessing ||
-              (request.status === "REJECTED") ||
-              (request.status === "VERIFIED" && request.incident ? !!(request.incident.responderId || request.incident.currentOfferResponderId) : false)
-            }
-          >
-            <Check className="w-4 h-4" />
-            {request.status === "VERIFIED" ? "Dispatch" : "Accept"}
-          </Button>
-        </div>
-        {canMergeDuplicate && (
-          <Button
-            className="w-full bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2"
-            onClick={() => onMerge?.(request.id)}
-            disabled={isProcessing}
-          >
-            <GitMerge className="w-4 h-4" />
-            Merge Duplicate
-          </Button>
-        )}
-      </div>}
-
-      {request.status === "REJECTED" && (
-        <Card className="border-red-200 bg-red-50 p-4 text-red-900">
-          <div className="flex items-center gap-2 text-sm font-bold">
-            <XCircle className="h-4 w-4" />
-            Rejected
-          </div>
-          <p className="mt-2 text-xs leading-relaxed">
-            {request.rejectionReason || "No rejection reason was recorded for this legacy report."}
-          </p>
-        </Card>
-      )}
-
-      <Separator />
-
-      <div className="space-y-6">
-        <div className="flex flex-col items-center text-center">
-          <Avatar className="w-20 h-20 mb-3 border-2 border-white shadow-sm">
-            <AvatarFallback className="bg-[#1E3A8A] text-white text-xl font-bold">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <h3 className="font-bold text-lg">{resident.fullName}</h3>
-          {resident.isVerified && (
-            <div className="flex items-center gap-1.5 text-blue-600 text-xs font-semibold mt-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Verified account
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-start gap-3">
-            <Phone className="w-4 h-4 text-muted-foreground mt-0.5" />
-            <div className="text-sm">
-              <div className="text-muted-foreground text-[10px] uppercase font-bold">Phone Number</div>
-              <div className="font-medium">{resident.phone}</div>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-            <div className="text-sm">
-              <div className="text-muted-foreground text-[10px] uppercase font-bold">Home Address</div>
-              <div className="font-medium">{resident.address}</div>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <History className="w-4 h-4 text-muted-foreground mt-0.5" />
-            <div className="text-sm">
-              <div className="text-muted-foreground text-[10px] uppercase font-bold flex items-center gap-1">
-                Account Standing
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-muted-foreground cursor-help transition-colors" />
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-slate-950 border border-slate-800 text-white p-3 rounded-lg text-xs max-w-[280px] shadow-lg leading-relaxed z-50">
-                    <div className="space-y-2 text-left">
-                      <p className="font-bold border-b border-white/10 pb-1 text-[11px] uppercase tracking-wide text-blue-400">Account Standing Levels</p>
-                      <div className="space-y-1 text-[10px] text-slate-200">
-                        <p><strong className="text-green-400">Good Standing (≥80%):</strong> User has zero rejected reports. Fully reliable.</p>
-                        <p><strong className="text-amber-400">Fair Standing (50-79%):</strong> User has 1 rejected false report. Validated with caution.</p>
-                        <p><strong className="text-red-400">Poor Standing (&lt;50%):</strong> User has 2+ rejected false reports. Highly likely spam/fake.</p>
-                        <p className="text-slate-400 mt-1.5 italic pt-1 border-t border-white/5">Note: Rejection reduces reliability by 33% per report.</p>
-                      </div>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="font-medium">
-                {resident.priorReports === 0 ? (
-                  "New Account"
-                ) : (
-                  resident.reliabilityScore !== undefined ? (
-                    resident.reliabilityScore >= 80 ? "Good Standing" :
-                    resident.reliabilityScore >= 50 ? "Fair Standing" : "Poor Standing"
-                  ) : (
-                    "New Account"
-                  )
-                )} ({resident.priorReports} reports)
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <Card className="p-4 bg-white/50 border-blue-100">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle2 className="w-4 h-4 text-green-600" />
-            <span className="text-xs font-bold">Reliability Score</span>
-          </div>
-          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full ${
-                resident.priorReports === 0 ? "bg-slate-300" :
-                (resident.reliabilityScore ?? 100) >= 80 ? "bg-green-500" :
-                (resident.reliabilityScore ?? 100) >= 50 ? "bg-amber-500" : "bg-red-500"
-              }`}
-              style={{ width: `${resident.priorReports === 0 ? 0 : (resident.reliabilityScore ?? 100)}%` }}
-            />
-          </div>
-          <div className="text-[10px] text-muted-foreground mt-2 text-center italic">
-            {resident.priorReports === 0 ? (
-              "No historical reports submitted yet"
-            ) : (
-              `Based on historical accuracy of reports (${resident.reliabilityScore ?? 100}% reliable)`
-            )}
-          </div>
-
-          <div className="mt-3 pt-3 border-t border-slate-150 grid grid-cols-3 gap-1 text-[9px] font-bold text-slate-500">
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-              <span>Good (≥80%)</span>
-            </div>
-            <div className="flex items-center gap-1 justify-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-              <span>Fair (50-79%)</span>
-            </div>
-            <div className="flex items-center gap-1 justify-end">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-              <span>Poor (&lt;50%)</span>
-            </div>
-          </div>
-        </Card>
-      </div>
-      <Dialog
-        open={isRejectDialogOpen}
-        onOpenChange={(open) => {
-          if (isProcessing) return
-          setIsRejectDialogOpen(open)
-          if (!open) setRejectionReason("")
-        }}
-      >
-        <DialogContent className="max-w-md rounded-2xl bg-white">
-          <DialogHeader>
-            <DialogTitle>Reject report</DialogTitle>
-            <DialogDescription>
-              Give a clear reason. This exact feedback will be shown to the public reporter.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Textarea
-              value={rejectionReason}
-              onChange={(event) => setRejectionReason(event.target.value)}
-              maxLength={MAX_REJECTION_REASON_LENGTH}
-              placeholder="Example: The submitted location and details could not be verified."
-              className="min-h-28 resize-none"
-              disabled={isProcessing}
-              autoFocus
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{normalizedReason ? "Reason ready to send" : "A rejection reason is required"}</span>
-              <span>{rejectionReason.length}/{MAX_REJECTION_REASON_LENGTH}</span>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)} disabled={isProcessing}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleReject} disabled={!normalizedReason || isProcessing}>
-              {isProcessing ? "Rejecting…" : "Reject report"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
+  return <aside className="flex w-[300px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-slate-200 bg-white p-4">
+    {!terminal ? <><div className="grid grid-cols-2 gap-2"><Button type="button" variant="destructive" className="gap-2 font-bold" onClick={() => setRejectOpen(true)} disabled={!canReject}><XCircle className="size-4" />Reject</Button><Button type="button" className="gap-2 bg-[#1E3A8A] font-bold hover:bg-[#172F6E]" onClick={() => onAccept(request.id)} disabled={!canAccept}><Check className="size-4" />{request.status === "VERIFIED" ? "Dispatch" : "Accept"}</Button></div>{canMergeDuplicate ? <Button type="button" variant="outline" className="w-full gap-2 border-amber-200 bg-amber-50 font-bold text-amber-900 hover:bg-amber-100" onClick={() => onMerge?.(request.id)} disabled={isProcessing}><GitMerge className="size-4" />Merge duplicate</Button> : null}</> : null}
+    {request.status === "REJECTED" ? <Card className="border-red-200 bg-red-50 p-4 text-red-900"><div className="flex items-center gap-2 text-sm font-bold"><XCircle className="size-4" />Rejected</div><p className="mt-2 text-xs leading-5">{request.rejectionReason ?? "No rejection reason was recorded for this legacy report."}</p></Card> : null}
+    <Card className="border-blue-100 bg-blue-50/50 p-4"><p className="text-xs font-black uppercase tracking-wide text-[#1E3A8A]">Decision support</p><p className="mt-2 text-sm font-bold text-slate-900">{standingFor(request)}</p><p className="mt-1 text-xs leading-5 text-slate-600">{request.triageReasons?.join(" ") || "Review the report evidence, location, and reporter context before deciding."}</p></Card>
+    <section className="border-t border-slate-100 pt-4"><div className="flex items-center gap-3"><Avatar className="size-10"><AvatarFallback className="bg-[#1E3A8A] text-xs font-black text-white">{initials || "GR"}</AvatarFallback></Avatar><div className="min-w-0"><p className="truncate text-sm font-black text-slate-900">{request.resident.fullName}</p><p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">{request.resident.isVerified ? <><ShieldCheck className="size-3 text-emerald-600" />Verified account</> : "Guest reporter"}</p></div></div><div className="mt-4 space-y-3 text-xs"><p className="flex gap-2 text-slate-600"><Phone className="size-3.5 shrink-0 text-[#1E3A8A]" /><span>{request.resident.phone}</span></p><p className="flex gap-2 text-slate-600"><MapPin className="size-3.5 shrink-0 text-[#1E3A8A]" /><span>{request.resident.address}</span></p><p className="flex gap-2 text-slate-600"><History className="size-3.5 shrink-0 text-[#1E3A8A]" /><span>{request.resident.priorReports} prior report{request.resident.priorReports === 1 ? "" : "s"}</span></p></div></section>
+    <section className="border-t border-slate-100 pt-4"><p className="text-xs font-black uppercase tracking-wide text-[#1E3A8A]">Dispatch log</p><div className="mt-3 space-y-3"><div className="flex gap-3 text-xs"><CheckCircle2 className="size-4 shrink-0 text-emerald-600" /><div><p className="font-bold text-slate-800">Report received</p><p className="text-slate-500">{new Date(request.receivedAt).toLocaleString()}</p></div></div><div className="flex gap-3 text-xs"><CheckCircle2 className="size-4 shrink-0 text-blue-600" /><div><p className="font-bold text-slate-800">Triage recorded</p><p className="text-slate-500">{request.triageClassification.replaceAll("_", " ")}</p></div></div><div className="flex gap-3 text-xs"><span className="mt-0.5 size-3.5 shrink-0 rounded-full border-2 border-slate-300" /><div><p className="font-bold text-slate-800">{statusText}</p><p className="text-slate-500">Continue with the applicable PACC action.</p></div></div></div></section>
+    <RejectIncidentDialog open={rejectOpen} onOpenChange={setRejectOpen} onConfirm={(reason) => onReject(request.id, reason)} isProcessing={isProcessing} />
+  </aside>;
 }

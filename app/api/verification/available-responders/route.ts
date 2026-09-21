@@ -40,7 +40,7 @@ export async function GET() {
     const mappedResponders = activeResponders.map((r) => {
       const isDevResponder = isDevMode && r.email === "responder@disastrace.com";
       const isRecent = isResponderHeartbeatFresh(r.lastLocationUpdatedAt);
-      const status = (isDevResponder || isRecent) ? "STANDBY" as const : "OFFLINE" as const;
+      const status = (isDevResponder || isRecent) ? "STANDBY" as const : "LOCATION_SYNC_DELAYED" as const;
       const selectable = status === "STANDBY";
 
       return {
@@ -52,7 +52,7 @@ export async function GET() {
         selectable,
         unavailableReason: selectable
           ? null
-          : "Location heartbeat is stale. Ask the responder to reopen the app and go on duty.",
+          : "Responder is still marked on duty, but their location has not synced recently enough to dispatch safely. Ask them to check signal and keep the app open.",
         lat: r.lastLatitude,
         lng: r.lastLongitude,
         responderType: r.responderType,

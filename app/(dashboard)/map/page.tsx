@@ -7,24 +7,32 @@ import { MapContainer } from "@/components/map/map-container";
 import { useMapData } from "@/hooks/use-map-data";
 import { MapIncident } from "@/types/map";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, MapPinned } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
+import { CommandMapOverlays, type CommandMapLayers } from "@/components/map/command-map-overlays";
 
 import { WebPreloader } from "@/components/ui/web-preloader";
 
 function MapPageContent() {
-  const { incidents, responders, hospitals, summary, isLoading, error, refresh } = useMapData();
+  const { incidents, responders, hospitals, demandZones, summary, isLoading, error, refresh } = useMapData();
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
   const [filter, setFilter] = useState("ALL");
   const [category, setCategory] = useState<"user" | "responder">("user");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [priorityIncidentId, setPriorityIncidentId] = useState<string | undefined>();
   
-  // Layer visibility state (requests vs reports)
-  const [showReports, setShowReports] = useState(true);
-  const [showRequests, setShowRequests] = useState(true);
+  const [layers, setLayers] = useState<CommandMapLayers>({
+    critical: true,
+    high: true,
+    moderate: true,
+    requests: true,
+    reports: true,
+    responders: true,
+    rejected: false,
+    demandZones: true,
+  });
 
   // Full Report Detail Modal State
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
@@ -41,11 +49,8 @@ function MapPageContent() {
         setCategory(incident.category);
         
         // Ensure layer is visible
-        if (incident.category === "user") {
-          setShowRequests(true);
-        } else if (incident.category === "responder") {
-          setShowReports(true);
-        }
+        if (incident.category === "user") setLayers((current) => ({ ...current, requests: true }));
+        else if (incident.category === "responder") setLayers((current) => ({ ...current, reports: true }));
       }
     }
   }, [selectParam, incidents]);
@@ -58,11 +63,8 @@ function MapPageContent() {
     const found = incidents.find((i) => i.id === id);
     if (found) {
       setCategory(found.category);
-      if (found.category === "user") {
-        setShowRequests(true);
-      } else if (found.category === "responder") {
-        setShowReports(true);
-      }
+      if (found.category === "user") setLayers((current) => ({ ...current, requests: true }));
+      else if (found.category === "responder") setLayers((current) => ({ ...current, reports: true }));
     }
   };
 
@@ -71,10 +73,13 @@ function MapPageContent() {
     setIsReportSheetOpen(true);
   };
 
-  // Filter incidents based on checkbox visibility toggles
   const displayedIncidents = incidents.filter((incident) => {
-    if (incident.category === "user") return showRequests;
-    if (incident.category === "responder") return showReports;
+    if (incident.category === "user" && !layers.requests) return false;
+    if (incident.category === "responder" && !layers.reports) return false;
+    if ((incident.status === "REJECTED" || incident.status === "DUPLICATE") && !layers.rejected) return false;
+    if (incident.severity === "Critical" && !layers.critical) return false;
+    if (incident.severity === "High" && !layers.high) return false;
+    if ((incident.severity === "Medium" || incident.severity === "Low") && !layers.moderate) return false;
     return true;
   });
 
@@ -93,16 +98,26 @@ function MapPageContent() {
     );
   }
 
+  const activeIncidentCount = incidents.filter((incident) => !['COMPLETED', 'REJECTED', 'DUPLICATE'].includes(incident.status)).length;
+
   return (
-    <div className="flex-1 min-h-0 flex overflow-hidden relative">
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-blue-100 bg-[#EAF1FF] px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="grid size-10 place-items-center rounded-lg bg-[#1E3A8A] text-white"><MapPinned className="size-5" /></div>
+          <div><h1 className="text-lg font-black text-[#1E3A8A]">Live Operations Map</h1><p className="mt-0.5 text-xs text-slate-600">Monitor current reports, active responses, and available ambulance units.</p></div>
+        </div>
+        <div className="flex items-center gap-4 text-xs font-semibold text-[#1E3A8A]"><span className="inline-flex items-center gap-1.5"><Activity className="size-3.5" /> {activeIncidentCount} active incidents</span><span>{responders.filter((responder) => responder.status === 'AVAILABLE').length} responders available</span></div>
+      </header>
+      <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       {isLoading ? (
-        <div className="w-full h-full p-4 flex items-center justify-center bg-[#0B132B]">
+        <div className="flex h-full w-full items-center justify-center bg-slate-50 p-4">
           <WebPreloader title="Loading Interactive Emergency Map..." subtitle="Fetching real-time GPS responder telemetry, active emergency pins, and hospital routes" />
         </div>
       ) : (
         <>
           <div className={cn(
-            "transition-all duration-300 ease-in-out overflow-hidden flex h-full",
+            "z-10 flex h-full overflow-hidden border-r border-slate-200 transition-all duration-300 ease-in-out",
             isSidebarOpen ? "w-[400px]" : "w-0"
           )}>
             <IncidentPanel
@@ -123,42 +138,25 @@ function MapPageContent() {
             variant="outline"
             size="icon"
             className={cn(
-              "absolute top-4 z-20 transition-all duration-300 shadow-md bg-background",
+              "absolute top-4 z-20 border-slate-200 bg-white shadow-sm transition-all duration-300",
               isSidebarOpen ? "left-[386px]" : "left-4"
             )}
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            aria-label={isSidebarOpen ? "Hide incident panel" : "Show incident panel"}
           >
             {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
 
-          {/* Layer Visibility Control Bar */}
-          <div className="absolute top-4 right-4 z-20 flex gap-3 bg-white/95 backdrop-blur-md p-2 px-3 rounded-full shadow-lg border border-slate-200 text-xs font-bold text-slate-700 items-center">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-r pr-2 border-slate-200">Layers</span>
-            <label className="flex items-center gap-1.5 cursor-pointer select-none">
-              <input 
-                type="checkbox" 
-                checked={showReports} 
-                onChange={(e) => setShowReports(e.target.checked)}
-                className="rounded border-slate-300 text-[#1E3A8A] focus:ring-[#1E3A8A] size-3.5"
-              />
-              <span>Reports</span>
-            </label>
-            <label className="flex items-center gap-1.5 cursor-pointer select-none border-l pl-3 border-slate-200">
-              <input 
-                type="checkbox" 
-                checked={showRequests} 
-                onChange={(e) => setShowRequests(e.target.checked)}
-                className="rounded border-slate-300 text-[#1E3A8A] focus:ring-[#1E3A8A] size-3.5"
-              />
-              <span>Requests</span>
-            </label>
-          </div>
+          <CommandMapOverlays layers={layers} onLayerChange={(layer, checked) => setLayers((current) => ({ ...current, [layer]: checked }))} zones={demandZones} />
 
-          <div className="flex-1 h-full relative">
+          <div className="relative h-full flex-1">
             <MapContainer
               incidents={displayedIncidents}
               responders={responders}
               hospitals={hospitals}
+              demandZones={demandZones}
+              showDemandZones={layers.demandZones}
+              showResponders={layers.responders}
               selectedIncidentId={selectedIncidentId}
               priorityIncidentId={priorityIncidentId}
               onSelectIncident={handleSelectIncident}
@@ -173,6 +171,7 @@ function MapPageContent() {
           />
         </>
       )}
+      </div>
     </div>
   );
 }

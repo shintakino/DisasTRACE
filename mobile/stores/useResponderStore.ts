@@ -7,6 +7,8 @@ import {
   canStartHospitalTransport,
   isEligibleHospitalDestination,
 } from '../lib/hospital-destination-policy';
+import { fetchWithTimeout } from '../lib/network-timeout';
+import { normalizeResponderDistanceKm } from '../lib/responder-report-summary';
 
 const DRAFTS_FILE_PATH = `${FileSystem.documentDirectory}disas_trace_drafts.json`;
 
@@ -34,7 +36,8 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
   return R * c; // in metres
 }
 
-export type DispatchState = 'idle' | 'dispatch_offered' | 'en_route' | 'on_scene' | 'to_hospital' | 'report_filling';
+export type DispatchState = 'idle' | 'dispatch_offered' | 'en_route' | 'on_scene' | 'to_hospital' | 'at_hospital' | 'report_filling';
+export type FieldOutcome = 'HANDLED_ON_SCENE' | 'PATIENT_REFUSED' | 'HOSPITAL_ARRIVAL';
 
 export interface QueueAction {
   id: string; // unique timestamp/uuid
@@ -75,6 +78,8 @@ export interface DispatchDetails {
   dispatchOfferDurationSeconds?: number; // Configurable duration in seconds
   offerExpiresAt?: string; // Server timestamp used for the responder countdown
   assignedAmbulance?: string; // e.g. "AMB-001"
+  documentationPending?: boolean;
+  fieldOutcome?: FieldOutcome | null;
 }
 
 export interface DraftForm {
@@ -96,6 +101,7 @@ interface ResponderState {
   sceneTimeSeconds: number;
   elapsedTimeSeconds: number;
   isArrivalConfirmVisible: boolean;
+  isHospitalArrivalConfirmVisible: boolean;
   isSubmittingReport: boolean;
   showReportSuccess: boolean;
   lastReportDelivery: 'CONFIRMED' | 'QUEUED_OFFLINE' | null;
@@ -111,6 +117,7 @@ interface ResponderState {
     distanceKm: number;
   } | null;
   currentLocation: [number, number] | null;
+  fieldOutcome: FieldOutcome | null;
   
   drafts: DraftForm[];
   submittedIncidentIds: string[];
@@ -120,6 +127,7 @@ interface ResponderState {
   
   // Actions
   setStatus: (status: DispatchState) => void;
+  setFieldOutcome: (fieldOutcome: FieldOutcome | null) => void;
   setActiveDispatch: (dispatch: DispatchDetails | null) => void;
   setTargetHospital: (hospital: HospitalDetails | null) => void;
   setHospitalRouteMetrics: (distanceKm: number | null, etaMins: number | null) => void;
@@ -131,9 +139,13 @@ interface ResponderState {
   acceptDispatch: () => void;
   confirmArrival: () => void;
   hideArrivalConfirm: () => void;
+  confirmHospitalArrival: () => void;
+  hideHospitalArrivalConfirm: () => void;
+  arriveAtHospital: () => Promise<void>;
   arriveAtScene: () => Promise<void>;
   transportToHospital: () => void;
   startReport: () => Promise<void>;
+  deferDocumentation: (formData?: Record<string, unknown>) => Promise<boolean>;
   submitReport: (incidentId?: string, formData?: any) => Promise<void>;
   finishAndClose: () => void;
   completeIncident: () => void;
@@ -186,6 +198,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
   sceneTimeSeconds: 0,
   elapsedTimeSeconds: 0,
   isArrivalConfirmVisible: false,
+  isHospitalArrivalConfirmVisible: false,
   isSubmittingReport: false,
   showReportSuccess: false,
   lastReportDelivery: null,
@@ -197,6 +210,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
   initialDistanceKm: 0,
   lastSubmittedSummary: null,
   currentLocation: null,
+  fieldOutcome: null,
   drafts: [],
   submittedIncidentIds: [],
   offlineQueue: [],
@@ -204,6 +218,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
   lastQueueError: null,
 
   setStatus: (status) => set({ status }),
+  setFieldOutcome: (fieldOutcome) => set({ fieldOutcome }),
   setActiveDispatch: (activeDispatch) => set({ activeDispatch }),
   setTargetHospital: (targetHospital) => {
     if (targetHospital !== null && !isEligibleHospitalDestination(targetHospital)) {
@@ -254,6 +269,10 @@ export const useResponderStore = create<ResponderState>((set) => ({
   hideArrivalConfirm: () => set({
     isArrivalConfirmVisible: false
   }),
+
+  confirmHospitalArrival: () => set({ isHospitalArrivalConfirmVisible: true }),
+
+  hideHospitalArrivalConfirm: () => set({ isHospitalArrivalConfirmVisible: false }),
 
   arriveAtScene: async () => {
     const activeDispatch = useResponderStore.getState().activeDispatch;
@@ -331,12 +350,77 @@ export const useResponderStore = create<ResponderState>((set) => ({
     });
   },
 
+  arriveAtHospital: async () => {
+    const currentState = useResponderStore.getState();
+    const activeDispatch = currentState.activeDispatch;
+    const targetHospital = currentState.targetHospital;
+    if (!activeDispatch || !isEligibleHospitalDestination(targetHospital) || !currentState.currentLocation) {
+      alert('Select an available hospital and keep live GPS active before confirming hospital arrival.');
+      return;
+    }
+
+    let confirmed = false;
+    try {
+      const isOnline = await checkConnectivity();
+      if (isOnline) {
+        const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+        const { data: { session } } = await supabase.auth.getSession();
+        const response = await fetch(`${apiUrl}/api/responder/location`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({
+            latitude: currentState.currentLocation[1],
+            longitude: currentState.currentLocation[0],
+            responderStatus: 'to_hospital',
+            incidentId: activeDispatch.id,
+            targetHospitalId: targetHospital.id,
+            confirmHospitalArrival: true,
+          }),
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || result?.held) {
+          alert(result?.message || 'Hospital arrival could not be confirmed. Keep GPS active or contact PACC.');
+          return;
+        }
+        confirmed = true;
+      }
+    } catch (error) {
+      console.error('[useResponderStore] Hospital arrival confirmation failed:', error);
+    }
+
+    if (!confirmed) {
+      await useResponderStore.getState().enqueueAction({
+        type: 'TELEMETRY_SYNC',
+        endpoint: '/api/responder/location',
+        method: 'POST',
+        payload: {
+          latitude: currentState.currentLocation[1],
+          longitude: currentState.currentLocation[0],
+          responderStatus: 'to_hospital',
+          incidentId: activeDispatch.id,
+          targetHospitalId: targetHospital.id,
+          confirmHospitalArrival: true,
+        },
+      });
+      alert('Hospital arrival was saved on this device and will sync with PACC after reconnection.');
+    }
+
+    set({
+      status: 'at_hospital',
+      fieldOutcome: 'HOSPITAL_ARRIVAL',
+      isHospitalArrivalConfirmVisible: false,
+    });
+  },
+
   startReport: async () => {
     const currentState = useResponderStore.getState();
     const activeDispatch = currentState.activeDispatch;
     if (!canEnterHospitalReport(currentState.status, currentState.targetHospital)) {
       alert(currentState.status === 'to_hospital'
-        ? 'Select an available emergency-receiving hospital before continuing to the report.'
+        ? 'Confirm arrival at the selected hospital before continuing to the report.'
         : 'The incident report becomes available after arrival at the scene.');
       return;
     }
@@ -407,6 +491,97 @@ export const useResponderStore = create<ResponderState>((set) => ({
     });
   },
 
+  deferDocumentation: async (formData = {}) => {
+    const currentState = useResponderStore.getState();
+    const activeDispatch = currentState.activeDispatch;
+    if (!activeDispatch) {
+      alert('Confirm the field outcome before saving documentation for later.');
+      return false;
+    }
+
+    await useResponderStore.getState().saveDraft(activeDispatch, formData, true);
+
+    if (activeDispatch.documentationPending) {
+      set({ status: 'idle', activeDispatch: null, fieldOutcome: null });
+      alert('Draft updated. This incident is already pending documentation, so you remain available for dispatch.');
+      return true;
+    }
+    if (!currentState.fieldOutcome) {
+      alert('Confirm the field outcome before saving documentation for later.');
+      return false;
+    }
+
+    const documentationRelease = {
+      incidentId: activeDispatch.id,
+      status: 'DOCUMENTATION_PENDING' as const,
+      fieldOutcome: currentState.fieldOutcome,
+    };
+    const queueDocumentationRelease = async () => {
+      await useResponderStore.getState().enqueueAction({
+        type: 'STATE_CHANGE',
+        endpoint: '/api/incidents/status',
+        method: 'POST',
+        payload: documentationRelease,
+      });
+      return useResponderStore.getState().offlineQueue.some((action) => (
+        action.type === 'STATE_CHANGE'
+        && action.endpoint === '/api/incidents/status'
+        && action.payload?.incidentId === activeDispatch.id
+        && action.payload?.status === 'DOCUMENTATION_PENDING'
+      ));
+    };
+
+    try {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetchWithTimeout(`${apiUrl}/api/incidents/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify(documentationRelease),
+      }, 12_000, 'field response confirmation');
+      const result = await response.json().catch(() => null);
+      if (result?.code === 'INCIDENT_REASSIGNED') {
+        alert(result.error);
+        useResponderStore.getState().completeIncident();
+        return false;
+      }
+      if (!response.ok) {
+        if (response.status >= 500 && await queueDocumentationRelease()) {
+          alert('Your draft is saved. The field response will automatically be sent when the connection is restored. You remain assigned until it is confirmed.');
+          return false;
+        }
+        alert(result?.error || 'Your draft is saved on this device, but you remain assigned until PACC confirms the field response.');
+        return false;
+      }
+
+      set({
+        status: 'idle',
+        activeDispatch: null,
+        targetHospital: null,
+        fieldOutcome: null,
+        sceneTimeSeconds: 0,
+        elapsedTimeSeconds: 0,
+        isArrivalConfirmVisible: false,
+        isHospitalArrivalConfirmVisible: false,
+        hospitalDistanceKm: null,
+        hospitalEtaMins: null,
+      });
+      alert('Field response completed. Your documentation is saved for later and you are now available for another dispatch.');
+      return true;
+    } catch (error) {
+      console.error('[useResponderStore] Could not defer documentation:', error);
+      if (await queueDocumentationRelease()) {
+        alert('Your draft is saved. The field response will automatically be sent when the connection is restored. You remain assigned until it is confirmed.');
+        return false;
+      }
+      alert('Your draft is saved on this device, but the field response could not be queued. Reconnect and try again before taking another dispatch.');
+      return false;
+    }
+  },
+
   submitReport: async (incidentId?: string, formData?: any) => {
     set({ isSubmittingReport: true, lastReportDelivery: null });
     const idToSubmit = incidentId || useResponderStore.getState().activeDispatch?.id;
@@ -427,7 +602,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       }
     }
 
-    let initialDist = useResponderStore.getState().initialDistanceKm;
+    let initialDist = normalizeResponderDistanceKm(useResponderStore.getState().initialDistanceKm);
     if (initialDist === 0) {
       const currentDispatch = useResponderStore.getState().activeDispatch;
       const currentLoc = useResponderStore.getState().currentLocation;
@@ -441,7 +616,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
         initialDist = Number((meters / 1000).toFixed(1));
       }
     }
-    const hospDist = useResponderStore.getState().hospitalDistanceKm || 0;
+    const hospDist = normalizeResponderDistanceKm(useResponderStore.getState().hospitalDistanceKm);
     const totalDistance = initialDist + hospDist;
 
     const summary = {
@@ -535,6 +710,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
     currentSpeedKph: 0,
     hospitalDistanceKm: null,
     hospitalEtaMins: null,
+    fieldOutcome: null,
     lastSubmittedSummary: null
   }),
 
@@ -550,6 +726,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
     currentSpeedKph: 0,
     hospitalDistanceKm: null,
     hospitalEtaMins: null,
+    fieldOutcome: null,
     lastSubmittedSummary: null
   }),
 
@@ -591,6 +768,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
   openFormForIncident: (incident) => set({
     activeDispatch: incident,
+    fieldOutcome: incident.fieldOutcome ?? null,
     status: 'report_filling'
   }),
 
@@ -604,6 +782,13 @@ export const useResponderStore = create<ResponderState>((set) => ({
     let updatedQueue: QueueAction[] = [];
     const currentQueue = useResponderStore.getState().offlineQueue;
     const telemetryIndex = currentQueue.findIndex(a => a.type === 'TELEMETRY_SYNC' && a.ownerUserId === session.user.id);
+    const documentationReleaseIndex = currentQueue.findIndex((queuedAction) => (
+      queuedAction.type === 'STATE_CHANGE'
+      && queuedAction.ownerUserId === session.user.id
+      && queuedAction.endpoint === '/api/incidents/status'
+      && queuedAction.payload?.status === 'DOCUMENTATION_PENDING'
+      && queuedAction.payload?.incidentId === action.payload?.incidentId
+    ));
 
     if (action.type === 'TELEMETRY_SYNC' && telemetryIndex !== -1) {
       updatedQueue = [...currentQueue];
@@ -613,6 +798,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
         payload: action.payload,
         timestamp: new Date().toISOString()
       };
+    } else if (documentationReleaseIndex !== -1) {
+      return;
     } else {
       const newAction: QueueAction = {
         ...action,

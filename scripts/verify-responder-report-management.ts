@@ -23,6 +23,8 @@ check('normalizes bounded responder list query values', () => {
     status: 'all',
     archive: 'active',
     sort: 'newest',
+    createdAfter: undefined,
+    createdBefore: undefined,
     page: 1,
     limit: 15,
   });
@@ -33,6 +35,8 @@ check('normalizes bounded responder list query values', () => {
     status: 'completed',
     archive: 'archived',
     sort: 'oldest',
+    createdAfter: '2026-09-01T00:00:00.000Z',
+    createdBefore: '2026-10-01T00:00:00.000Z',
     page: '3',
     limit: '25',
   })), {
@@ -41,6 +45,8 @@ check('normalizes bounded responder list query values', () => {
     status: 'completed',
     archive: 'archived',
     sort: 'oldest',
+    createdAfter: '2026-09-01T00:00:00.000Z',
+    createdBefore: '2026-10-01T00:00:00.000Z',
     page: 3,
     limit: 25,
   });
@@ -54,6 +60,9 @@ check('rejects unbounded and unsupported list query values', () => {
   assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ archive: 'all' })));
   assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ status: 'RESOLVED' })));
   assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ search: 'x'.repeat(81) })));
+  assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ createdAfter: 'not-a-date', createdBefore: '2026-10-01T00:00:00.000Z' })));
+  assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ createdAfter: '2026-10-01T00:00:00.000Z', createdBefore: '2026-09-01T00:00:00.000Z' })));
+  assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ createdAfter: '2026-09-01T00:00:00.000Z' })));
 });
 
 check('accepts only an explicit archive boolean', () => {
@@ -84,6 +93,8 @@ check('executes responder filtering, count, sorting, and pagination in SQL', () 
   assert.match(route, /asc\(reports\.id\)[\s\S]*desc\(reports\.id\)/);
   assert.match(route, /isNull\(reports\.archivedAt\)/);
   assert.match(route, /isNotNull\(reports\.archivedAt\)/);
+  assert.match(route, /gte\(reports\.createdAt/);
+  assert.match(route, /lt\(reports\.createdAt/);
 });
 
 check('gates completion and keeps public report projections redacted', () => {
@@ -123,6 +134,8 @@ check('uses a bounded responder list with visible controls and protected archive
   assert.match(screen, /'active', 'archived'/);
   assert.match(screen, /'all', 'completed', 'ongoing'/);
   assert.match(screen, /Newest first/);
+  assert.match(screen, /Last 7 days/);
+  assert.match(screen, /createdAfter/);
   assert.match(screen, /method: 'PATCH'/);
   assert.match(screen, /archiveUpdatingId/);
   assert.match(screen, /AbortController/);

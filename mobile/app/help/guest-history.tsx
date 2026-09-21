@@ -28,7 +28,7 @@ export default function GuestHistoryScreen() {
     setRefreshingId(entry.id);
     try {
       const token = await getGuestReportAccessToken(entry.id);
-      if (!token) throw new Error('The secure report credential is no longer available on this device.');
+      if (!token) throw new Error('This saved report has no private refresh credential on this device. Its saved status and conversation are still available.');
       const latest = await getChatbotReportStatus({ reporterMode: 'guest', requestId: entry.id, guestAccessToken: token });
       await updateGuestReportHistory(entry.id, {
         status: latest.outcome === 'CASE_CLOSED' ? 'RESOLVED' : latest.outcome === 'CANCELLED' ? 'CANCELLED' : latest.status,

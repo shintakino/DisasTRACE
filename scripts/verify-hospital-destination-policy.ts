@@ -71,9 +71,10 @@ assert.equal(getAutomaticHospitalRecommendation({
   origin,
 }), null);
 
-assert.equal(canEnterHospitalReport('to_hospital', hospitals[0]), true);
-assert.equal(canEnterHospitalReport('to_hospital', hospitals[1]), false);
-assert.equal(canEnterHospitalReport('to_hospital', null), false);
+assert.equal(canEnterHospitalReport('to_hospital', hospitals[0]), false);
+assert.equal(canEnterHospitalReport('at_hospital', hospitals[0]), true);
+assert.equal(canEnterHospitalReport('at_hospital', hospitals[1]), false);
+assert.equal(canEnterHospitalReport('at_hospital', null), false);
 assert.equal(canEnterHospitalReport('on_scene', hospitals[0]), true);
 assert.equal(canEnterHospitalReport('en_route', hospitals[0]), false);
 assert.equal(canStartHospitalTransport('on_scene'), true);
@@ -88,6 +89,8 @@ assert.match(locationRoute, /HOSPITAL_DESTINATION_UNAVAILABLE/);
 assert.match(locationRoute, /eq\(incidents\.id, incidentId\)/);
 assert.match(locationRoute, /eq\(incidents\.status, 'ARRIVED'\)/);
 assert.match(locationRoute, /transportHospitalId: currentHospital\.id/);
+assert.match(locationRoute, /confirmHospitalArrival/);
+assert.match(locationRoute, /autoArrivedHospitalIncidentId/);
 assert.match(locationRoute, /dbUser\.status !== 'ACTIVE'/);
 assert.match(locationRoute, /dbUser\.verificationStatus !== 'APPROVED'/);
 assert.ok(

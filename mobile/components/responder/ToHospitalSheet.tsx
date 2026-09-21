@@ -7,7 +7,7 @@ import { useResponderStore } from '../../stores/useResponderStore';
 import { isEligibleHospitalDestination } from '../../lib/hospital-destination-policy';
 
 export function ToHospitalSheet() {
-  const { status, elapsedTimeSeconds, targetHospital, startReport, hospitalDistanceKm, hospitalEtaMins } = useResponderStore();
+  const { status, elapsedTimeSeconds, targetHospital, confirmHospitalArrival, hospitalDistanceKm, hospitalEtaMins } = useResponderStore();
   const bottomSheetRef = useRef<BottomSheet>(null);
   const hasEligibleDestination = isEligibleHospitalDestination(targetHospital);
 
@@ -96,13 +96,10 @@ export function ToHospitalSheet() {
               ? 'bg-[#1E3A8A] shadow-lg shadow-blue-900/20 active:bg-blue-900'
               : 'bg-slate-300'
           }`}
-          onPress={() => {
-            // For now, arriving at hospital just opens the report form.
-            startReport();
-          }}
+          onPress={confirmHospitalArrival}
         >
           <Text className={`font-bold text-lg ${hasEligibleDestination ? 'text-white' : 'text-slate-500'}`}>
-            Arrived at Hospital
+            Confirm Hospital Arrival
           </Text>
         </TouchableOpacity>
         {!hasEligibleDestination && (

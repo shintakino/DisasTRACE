@@ -8,12 +8,15 @@ export const incidents = pgTable('incidents', {
   id: varchar('id', { length: 255 }).primaryKey(), // Server-generated UUID
   requestId: varchar('request_id', { length: 255 }).references(() => verificationRequests.id).notNull(),
   responderId: varchar('responder_id', { length: 255 }).references(() => users.id), // Nullable during negotiation
-  status: text('status', { enum: ['DISPATCHED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED'] }).default('DISPATCHED').notNull(),
+  status: text('status', { enum: ['DISPATCHED', 'EN_ROUTE', 'ARRIVED', 'DOCUMENTATION_PENDING', 'RESOLVED'] }).default('DISPATCHED').notNull(),
+  fieldOutcome: text('field_outcome', { enum: ['HANDLED_ON_SCENE', 'PATIENT_REFUSED', 'HOSPITAL_ARRIVAL'] }),
+  fieldResponseCompletedAt: timestamp('field_response_completed_at', { withTimezone: true }),
   assignedAmbulance: varchar('assigned_ambulance', { length: 50 }),
   etaMinutes: integer('eta_minutes'),
-  transportStatus: text('transport_status', { enum: ['NONE', 'TO_HOSPITAL'] }).default('NONE').notNull(),
+  transportStatus: text('transport_status', { enum: ['NONE', 'TO_HOSPITAL', 'ARRIVED_AT_HOSPITAL'] }).default('NONE').notNull(),
   transportHospitalId: varchar('transport_hospital_id', { length: 50 }).references(() => hospitals.id),
   transportStartedAt: timestamp('transport_started_at', { withTimezone: true }),
+  transportArrivedAt: timestamp('transport_arrived_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   

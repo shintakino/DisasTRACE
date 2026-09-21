@@ -63,7 +63,7 @@ export async function GET() {
     });
     const acceptedResponderIds = new Set(
       activeIncidents
-        .filter((incident) => incident.responderId && incident.status !== 'RESOLVED')
+        .filter((incident) => incident.responderId && !['RESOLVED', 'DOCUMENTATION_PENDING'].includes(incident.status))
         .map((incident) => incident.responderId as string),
     );
     const pendingOfferResponderIds = new Set(

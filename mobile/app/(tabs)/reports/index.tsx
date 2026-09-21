@@ -46,6 +46,26 @@ const TYPE_FILTERS = [
 type StatusFilter = 'all' | 'completed' | 'ongoing';
 type ArchiveFilter = 'active' | 'archived';
 type SortOrder = 'newest' | 'oldest';
+type DateFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days';
+
+const DATE_FILTERS: Array<{ label: string; value: DateFilter }> = [
+  { label: 'All dates', value: 'all' },
+  { label: 'Today', value: 'today' },
+  { label: 'Last 7 days', value: 'last_7_days' },
+  { label: 'Last 30 days', value: 'last_30_days' },
+];
+
+function responderDateBounds(filter: DateFilter, now = new Date()) {
+  if (filter === 'all') return null;
+  const end = new Date(now);
+  end.setHours(0, 0, 0, 0);
+  end.setDate(end.getDate() + 1);
+  const start = new Date(end);
+  if (filter === 'today') start.setDate(start.getDate() - 1);
+  if (filter === 'last_7_days') start.setDate(start.getDate() - 7);
+  if (filter === 'last_30_days') start.setDate(start.getDate() - 30);
+  return { createdAfter: start.toISOString(), createdBefore: end.toISOString() };
+}
 
 type Pagination = {
   page: number;
@@ -108,6 +128,7 @@ export default function MyReportsScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active');
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [pagination, setPagination] = useState<Pagination>({ page: 1, total: 0, totalPages: 1 });
   const [reloadVersion, setReloadVersion] = useState(0);
   const requestSequence = useRef(0);
@@ -150,6 +171,11 @@ export default function MyReportsScreen() {
         params.set('status', statusFilter);
         params.set('archive', archiveFilter);
         params.set('sort', sortOrder);
+        const dateBounds = responderDateBounds(dateFilter);
+        if (dateBounds) {
+          params.set('createdAfter', dateBounds.createdAfter);
+          params.set('createdBefore', dateBounds.createdBefore);
+        }
         params.set('page', String(pagination.page));
         params.set('limit', String(RESPONDER_PAGE_SIZE));
       }
@@ -218,7 +244,7 @@ export default function MyReportsScreen() {
         setRefreshing(false);
       }
     }
-  }, [archiveFilter, isResponder, pagination.page, search, sortOrder, statusFilter, typeFilter]);
+  }, [archiveFilter, dateFilter, isResponder, pagination.page, search, sortOrder, statusFilter, typeFilter]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -290,6 +316,11 @@ export default function MyReportsScreen() {
     if (value === 'archived') setStatusFilter('completed');
     setPagination((current) => ({ ...current, page: 1 }));
     setActionMessage(null);
+  };
+
+  const chooseDate = (value: DateFilter) => {
+    setDateFilter(value);
+    setPagination((current) => ({ ...current, page: 1 }));
   };
 
   const toggleSort = () => {
@@ -442,6 +473,21 @@ export default function MyReportsScreen() {
             className={`px-4 py-2 rounded-full mr-2 border ${typeFilter === option.value ? 'bg-[#1E3A8A] border-[#1E3A8A]' : 'bg-white border-slate-200'}`}
           >
             <Text className={`text-xs font-bold ${typeFilter === option.value ? 'text-white' : 'text-slate-600'}`}>{option.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
+        {DATE_FILTERS.map((option) => (
+          <TouchableOpacity
+            key={option.value}
+            onPress={() => chooseDate(option.value)}
+            className={`px-4 py-2 rounded-full mr-2 border ${dateFilter === option.value ? 'bg-[#1E3A8A] border-[#1E3A8A]' : 'bg-white border-slate-200'}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: dateFilter === option.value }}
+            accessibilityLabel={`Show reports from ${option.label.toLowerCase()}`}
+          >
+            <Text className={`text-xs font-bold ${dateFilter === option.value ? 'text-white' : 'text-slate-600'}`}>{option.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>

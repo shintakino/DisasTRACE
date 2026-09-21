@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { AlertTriangle, FolderCheck } from 'lucide-react-native';
+import { formatResponderDistanceKm } from '../../lib/responder-report-summary';
 
 export function ReportSubmittedModal() {
   const { showReportSuccess, activeDispatch, lastSubmittedSummary, lastReportDelivery, finishAndClose } = useResponderStore();
@@ -49,9 +50,7 @@ export function ReportSubmittedModal() {
               
               <View className="items-center flex-1">
                 <Text className="text-[#1E3A8A] font-bold text-2xl mb-1">
-                  {lastSubmittedSummary !== null && lastSubmittedSummary !== undefined
-                    ? lastSubmittedSummary.distanceKm.toFixed(1)
-                    : '1.7'}
+                  {formatResponderDistanceKm(lastSubmittedSummary?.distanceKm)}
                 </Text>
                 <Text className="text-slate-400 font-bold text-[8px] tracking-widest uppercase">KM</Text>
               </View>

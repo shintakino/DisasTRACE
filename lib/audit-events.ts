@@ -4,6 +4,8 @@ export const PACC_AUDIT_ACTIONS = {
   coordination: 'PACC_COORDINATION_UPDATED',
   dispatch: 'PACC_MANUAL_DISPATCH_OFFERED',
   merged: 'PACC_REPORT_MERGED_DUPLICATE',
+  relatedConfirmed: 'PACC_RELATED_REPORT_CONFIRMED',
+  relatedSeparated: 'PACC_RELATED_REPORT_SEPARATED',
 } as const;
 
 export interface AuditActor {

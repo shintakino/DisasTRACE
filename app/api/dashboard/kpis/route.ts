@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, and, gte, ne, sql } from "drizzle-orm";
+import { verificationRequests } from "@/db/schema/verification_requests";
 import { createClient } from "@/lib/supabase-server";
 
 export async function GET() {
@@ -26,33 +27,14 @@ export async function GET() {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    // 1. Total Incidents Today
-    const [incidentsCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(incidents)
-      .where(gte(incidents.createdAt, todayStart));
-
-    // 2. Total Responders (Clocked in / active)
-    const [respondersCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(users)
-      .where(
-        and(
-          eq(users.role, "ambulance_responder"),
-          eq(users.status, "ACTIVE")
-        )
-      );
-
-    // 3. Resolved Today
-    const [resolvedCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(incidents)
-      .where(
-        and(
-          eq(incidents.status, "RESOLVED"),
-          gte(incidents.resolvedAt, todayStart)
-        )
-      );
+    const [[incidentsCount], [activeIncidentsCount], [pendingVerificationCount], [respondersCount], [resolvedCount], [rejectedCount]] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(incidents).where(gte(incidents.createdAt, todayStart)),
+      db.select({ count: sql<number>`count(*)` }).from(incidents).where(ne(incidents.status, "RESOLVED")),
+      db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "PENDING")),
+      db.select({ count: sql<number>`count(*)` }).from(users).where(and(eq(users.role, "ambulance_responder"), eq(users.status, "ACTIVE"))),
+      db.select({ count: sql<number>`count(*)` }).from(incidents).where(and(eq(incidents.status, "RESOLVED"), gte(incidents.resolvedAt, todayStart))),
+      db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(and(eq(verificationRequests.status, "REJECTED"), gte(verificationRequests.createdAt, todayStart))),
+    ]);
 
     // 4. Avg Response Time Today (in minutes)
     const avgResponse = await db
@@ -83,8 +65,11 @@ export async function GET() {
     return NextResponse.json({
       data: {
         totalIncidentsToday: Number(incidentsCount?.count) || 0,
+        activeIncidents: Number(activeIncidentsCount?.count) || 0,
+        pendingVerification: Number(pendingVerificationCount?.count) || 0,
         totalResponders: Number(respondersCount?.count) || 0,
         totalResolvedToday: Number(resolvedCount?.count) || 0,
+        totalRejectedToday: Number(rejectedCount?.count) || 0,
         avgResponseTime: String(avgMinutes),
       }
     });

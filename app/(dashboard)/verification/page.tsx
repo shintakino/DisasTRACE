@@ -535,6 +535,44 @@ export default function VerificationPage() {
     }
   }
 
+  const handleRelatedReportDecision = async (relatedId: string, action: 'CONFIRM_LINK' | 'KEEP_SEPARATE') => {
+    const primary = selectedRequest
+    const related = primary?.relatedReports.find((report) => report.id === relatedId)
+    setIsProcessing(true)
+    setActionFeedback(createActionProcessingFeedback(
+      action === 'CONFIRM_LINK' ? `Linking ${related?.requestId ?? relatedId}` : `Separating ${related?.requestId ?? relatedId}`,
+      action === 'CONFIRM_LINK'
+        ? 'PACC is confirming that both reports describe one request.'
+        : 'PACC is returning this report to the active queue for independent review.',
+    ))
+    try {
+      const response = await fetch(`/api/verification/${relatedId}/related`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(payload?.error || 'Unable to decide the related report')
+      const feedback = createActionSuccessFeedback({
+        title: action === 'CONFIRM_LINK' ? `${related?.requestId ?? relatedId} linked` : `${related?.requestId ?? relatedId} kept separate`,
+        detail: action === 'CONFIRM_LINK'
+          ? 'The reporter now follows this primary response. No duplicate dispatch will be created.'
+          : 'The report has returned to the active queue for its own PACC review and response.',
+        nextStep: action === 'CONFIRM_LINK' ? 'Continue coordinating the primary request.' : 'Review the newly separate report when it reaches priority.',
+        userAction: 'Continue PACC triage.',
+      })
+      setActionFeedback(feedback)
+      toast.success(feedback.title)
+      await fetchRequestsSilent()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to decide the related report'
+      setActionFeedback(createActionErrorFeedback(`${related?.requestId ?? relatedId} was not updated`, message))
+      toast.error(message)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   const handleDispatchSuccess = async (outcome: 'DISPATCHED' | 'STALE' = 'DISPATCHED') => {
     const dispatchedId = dispatchReqId;
     if (dispatchedId) {
@@ -747,7 +785,14 @@ export default function VerificationPage() {
           filter={filter}
           onFilterChange={setFilter}
         />
-        <VerificationDetails request={selectedRequest} onOverrideClassification={handleClassificationOverride} onUpdateCoordination={handleCoordinationUpdate} isProcessing={isProcessing} />
+        <VerificationDetails
+          request={selectedRequest}
+          onOverrideClassification={handleClassificationOverride}
+          onUpdateCoordination={handleCoordinationUpdate}
+          onConfirmRelatedReport={(id) => void handleRelatedReportDecision(id, 'CONFIRM_LINK')}
+          onKeepRelatedReportSeparate={(id) => void handleRelatedReportDecision(id, 'KEEP_SEPARATE')}
+          isProcessing={isProcessing}
+        />
         <ResidentPanel
           request={selectedRequest}
           onAccept={handleAccept}

@@ -14,7 +14,7 @@ interface Responder {
   fullName: string
   phone: string
   address: string
-  status: "STANDBY" | "OFFLINE"
+  status: "STANDBY" | "LOCATION_SYNC_DELAYED"
   selectable: boolean
   unavailableReason: string | null
 }
@@ -226,9 +226,9 @@ export function ManualDispatchModal({
                   <div className="shrink-0 ml-2">
                     <span className={cn(
                       "text-[10px] tracking-widest font-black uppercase px-2.5 py-1 rounded-full shadow-sm",
-                      resp.status === "OFFLINE" ? "bg-rose-100 text-rose-700" : "bg-green-100 text-green-700"
+                      resp.status === "LOCATION_SYNC_DELAYED" ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-700"
                     )}>
-                      {resp.status}
+                      {resp.status === "LOCATION_SYNC_DELAYED" ? "SYNC DELAYED" : "STANDBY"}
                     </span>
                   </div>
                 </button>

@@ -73,7 +73,9 @@ const expectedColumns = [
   ['verification_requests', 'photo_longitude'],
   ['verification_requests', 'barangay'],
   ['verification_requests', 'barangay_psgc_code'],
+  ['verification_requests', 'possible_duplicate_of_id'],
   ['incidents', 'dispatch_offer_duration_seconds'],
+  ['incidents', 'transport_arrived_at'],
   ['system_settings', 'deduplication_radius_meters'],
 ] as const;
 
@@ -120,6 +122,7 @@ async function audit() {
       'verification_requests_guest_access_token_unique',
       'verification_requests_guest_device_hash_idx',
       'verification_requests_barangay_idx',
+      'verification_requests_possible_duplicate_of_idx',
     ];
     const indexes = await sql<{ indexname: string }[]>`
       SELECT indexname

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useCallback, useRef, useEffect, useState } from "react";
+import React, { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import Map, { NavigationControl, Marker, MapRef, Source, Layer } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MapIncident, MapResponder, MapHospital } from "@/types/map";
+import { MapDemandZone, MapIncident, MapResponder, MapHospital } from "@/types/map";
 import { MapMarker } from "./map-marker";
 
 interface RouteGeometry {
@@ -29,6 +29,9 @@ interface MapContainerProps {
   incidents: MapIncident[];
   responders: MapResponder[];
   hospitals: MapHospital[];
+  demandZones?: MapDemandZone[];
+  showDemandZones?: boolean;
+  showResponders?: boolean;
   selectedIncidentId?: string;
   priorityIncidentId?: string;
   onSelectIncident: (id: string) => void;
@@ -58,6 +61,9 @@ export function MapContainer({
   incidents,
   responders,
   hospitals,
+  demandZones = [],
+  showDemandZones = false,
+  showResponders = true,
   selectedIncidentId,
   priorityIncidentId,
   onSelectIncident,
@@ -65,6 +71,14 @@ export function MapContainer({
   const mapRef = useRef<MapRef>(null);
   const routeCacheRef = useRef<globalThis.Map<string, RouteCacheEntry>>(new globalThis.Map());
   const [routeGeometries, setRouteGeometries] = useState<RouteGeometry[]>([]);
+  const demandZoneFeatures = useMemo(() => ({
+    type: "FeatureCollection" as const,
+    features: demandZones.map((zone) => ({
+      type: "Feature" as const,
+      properties: { id: zone.id, count: zone.count, riskLevel: zone.riskLevel },
+      geometry: { type: "Point" as const, coordinates: [zone.longitude, zone.latitude] },
+    })),
+  }), [demandZones]);
 
   // Fly to incident when selected from the list
   useEffect(() => {
@@ -175,6 +189,23 @@ export function MapContainer({
           </Source>
         ))}
 
+        {showDemandZones && demandZoneFeatures.features.length > 0 ? (
+          <Source id="historical-demand-zones" type="geojson" data={demandZoneFeatures}>
+            <Layer
+              id="historical-demand-zones-fill"
+              type="circle"
+              paint={{
+                "circle-radius": ["interpolate", ["linear"], ["get", "count"], 3, 60, 5, 90, 8, 130],
+                "circle-color": "#8B5CF6",
+                "circle-opacity": 0.16,
+                "circle-stroke-color": "#7C3AED",
+                "circle-stroke-width": 2,
+                "circle-stroke-opacity": 0.7,
+              }}
+            />
+          </Source>
+        ) : null}
+
         {/* Incident Markers */}
         {incidents.map((incident) => (
           <Marker
@@ -203,7 +234,7 @@ export function MapContainer({
         ))}
 
         {/* Live Standby & Active Responder Markers */}
-        {responders
+        {showResponders && responders
           .filter((r) => r.status === "AVAILABLE" || r.status === "DISPATCHED")
           .map((responder) => (
             <Marker

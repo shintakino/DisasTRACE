@@ -73,6 +73,8 @@ export function IncidentReportForm() {
   const isSubmittingReport = useResponderStore((state) => state.isSubmittingReport);
   const submitReport = useResponderStore((state) => state.submitReport);
   const saveDraft = useResponderStore((state) => state.saveDraft);
+  const deferDocumentation = useResponderStore((state) => state.deferDocumentation);
+  const fieldOutcome = useResponderStore((state) => state.fieldOutcome);
   const { profile } = useAuthStatus();
   
   const [natureOfCall, setNatureOfCall] = useState('Emergency');
@@ -186,9 +188,28 @@ export function IncidentReportForm() {
 
   const handleSaveDraft = () => {
     if (activeDispatch) {
-      // This is distinct from the background recovery save. The home map can
-      // safely stop prompting once the responder deliberately saved the form.
-      saveDraft(activeDispatch, { natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, location: dispatchLocation, tripTicketData }, true);
+      void deferDocumentation({
+        natureOfCall,
+        typeOfEmergency,
+        severityLevel,
+        patients,
+        crewNotes,
+        location: dispatchLocation,
+        tripTicketData,
+      });
+    }
+  };
+
+  const returnToFieldWorkflow = () => {
+    if (activeDispatch?.documentationPending) {
+      setStatus('idle');
+    } else if (fieldOutcome === 'HOSPITAL_ARRIVAL') {
+      setStatus('at_hospital');
+    } else if (fieldOutcome) {
+      setStatus('on_scene');
+    } else {
+      // A documentation-pending draft is already server-released, so closing
+      // it must preserve that availability rather than recreate field work.
       setStatus('idle');
     }
   };
@@ -321,14 +342,14 @@ export function IncidentReportForm() {
       animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
       presentationStyle={Platform.OS === 'ios' ? 'formSheet' : undefined}
       hardwareAccelerated
-      onRequestClose={() => setStatus('to_hospital')}
+      onRequestClose={returnToFieldWorkflow}
     >
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SafeAreaView className="flex-1 bg-[#16203A]">
         {/* Header */}
         <View className="px-4 py-4 flex-row items-center border-b border-blue-800/50">
           <TouchableOpacity 
-            onPress={() => setStatus('to_hospital')}
+            onPress={returnToFieldWorkflow}
             className="w-10 h-10 items-center justify-center"
           >
             <ChevronLeft color="white" size={24} />

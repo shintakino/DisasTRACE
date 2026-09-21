@@ -38,7 +38,7 @@ export async function GET() {
 
     const activeIncidentByResponder = new Map(
       activeIncidents
-        .filter((incident) => incident.responderId && incident.status !== "RESOLVED")
+        .filter((incident) => incident.responderId && !['RESOLVED', 'DOCUMENTATION_PENDING'].includes(incident.status))
         .map((incident) => [incident.responderId as string, incident])
     );
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { Activity, Truck, ThumbsDown, Info } from 'lucide-react-native';
+import { Activity, Truck, ThumbsDown, Info, FileText, FolderDown } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
 
@@ -33,14 +33,16 @@ const OUTCOMES = [
 ];
 
 export function OnSceneSheet() {
-  const { status, completeIncident, sceneTimeSeconds } = useResponderStore();
+  const { status, activeDispatch, sceneTimeSeconds, setFieldOutcome, deferDocumentation, startReport } = useResponderStore();
   const bottomSheetRef = useRef<BottomSheet>(null);
 
   const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null);
+  const [showNextStep, setShowNextStep] = useState(false);
 
   useEffect(() => {
     if (status === 'on_scene') {
       setSelectedOutcome(null);
+      setShowNextStep(false);
     } else {
       bottomSheetRef.current?.close();
     }
@@ -60,6 +62,11 @@ export function OnSceneSheet() {
   };
 
   const snapPoints = useMemo(() => ['15%', '50%', '90%'], []);
+  const fieldOutcome = selectedOutcome === 'handled'
+    ? 'HANDLED_ON_SCENE' as const
+    : selectedOutcome === 'refused'
+      ? 'PATIENT_REFUSED' as const
+      : null;
 
   return (
     <BottomSheet
@@ -84,6 +91,28 @@ export function OnSceneSheet() {
           <Text className="text-[#1E3A8A] font-black text-2xl">{formatTime(sceneTimeSeconds)}</Text>
         </View>
 
+        {showNextStep ? <View>
+          <Text className="text-slate-400 text-xs font-bold tracking-widest uppercase mb-4">WHAT HAPPENS NEXT?</Text>
+          <View className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <Text className="font-bold text-[#1E3A8A]">Outcome recorded: {selectedOutcome === 'handled' ? 'Handled on Scene' : 'Patient Refused / Other'}</Text>
+            <Text className="mt-1 text-xs leading-5 text-slate-600">Choose whether to complete the pre-filled PCR and Driver&apos;s Trip Ticket now or preserve a draft for later.</Text>
+          </View>
+          <TouchableOpacity className="mt-5 flex-row items-center justify-center rounded-2xl bg-[#1E3A8A] py-4" onPress={() => {
+            if (!fieldOutcome) return;
+            setFieldOutcome(fieldOutcome);
+            bottomSheetRef.current?.close();
+            setTimeout(() => { void startReport(); }, 300);
+          }}>
+            <FileText color="white" size={18} /><Text className="ml-2 text-base font-bold text-white">Proceed to Forms</Text>
+          </TouchableOpacity>
+          <TouchableOpacity className="mt-3 flex-row items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 py-4" onPress={() => {
+            if (!activeDispatch || !fieldOutcome) return;
+            setFieldOutcome(fieldOutcome);
+            void deferDocumentation({ outcome: selectedOutcome, location: activeDispatch.locationName });
+          }}>
+            <FolderDown color="#92400E" size={18} /><Text className="ml-2 text-base font-bold text-[#92400E]">Save Draft &amp; Become Available</Text>
+          </TouchableOpacity>
+        </View> : <>
         <Text className="text-slate-400 text-xs font-bold tracking-widest uppercase mb-4">WHAT IS THE OUTCOME?</Text>
         
         <View className="mb-6">
@@ -149,10 +178,7 @@ export function OnSceneSheet() {
                 useResponderStore.getState().transportToHospital();
               }, 300);
             } else if (selectedOutcome) {
-              bottomSheetRef.current?.close();
-              setTimeout(() => {
-                useResponderStore.getState().startReport();
-              }, 300);
+              setShowNextStep(true);
             }
           }}
         >
@@ -160,6 +186,7 @@ export function OnSceneSheet() {
             {getButtonText()}
           </Text>
         </TouchableOpacity>
+        </>}
 
       </BottomSheetScrollView>
     </BottomSheet>

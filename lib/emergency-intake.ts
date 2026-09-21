@@ -1,17 +1,18 @@
 import crypto from 'crypto';
-import { and, eq, gte } from 'drizzle-orm';
+import { and, eq, gte, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { incidents } from '@/db/schema/incidents';
 import { retryPendingAutomaticDispatches } from '@/lib/dispatch-engine';
 import { ChatbotSubmissionIdSchema } from '@/lib/chatbot/contracts';
-import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS, isLikelyDuplicateIncident } from '@/lib/incident-deduplication';
+import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS } from '@/lib/incident-deduplication';
 import { isWithinOfficialBaliwagBoundary, resolveBaliwagBarangay } from '@/lib/barangay-boundaries';
 import { systemSettings } from '@/db/schema/system_settings';
 import { distanceBetweenCoordinatesMeters } from '@/lib/location-integrity';
 import { isObviouslySyntheticPhilippineMobileNumber, normalizePhilippineMobileNumber, samePhilippineMobileNumber } from '@/lib/phone-number';
 import { createPublicRequestId, deriveInitialTriage } from '@/lib/initial-triage-policy';
+import { selectReportConsolidation, type ReportConsolidation } from '@/lib/report-consolidation-policy';
 
 const IncidentTypeSchema = z.enum([
   'Medical Emergency',
@@ -136,6 +137,39 @@ function isConsistent(input: EmergencyIntake) {
   return input.peopleInvolved > 0 && input.victimCondition !== 'Unknown / cannot assess';
 }
 
+export async function findReportConsolidation(
+  input: Pick<EmergencyIntake, 'incidentType' | 'nature' | 'latitude' | 'longitude'>,
+  radiusMeters: number,
+): Promise<ReportConsolidation> {
+  const candidates = await db
+    .select({
+      id: verificationRequests.id,
+      type: verificationRequests.type,
+      nature: verificationRequests.nature,
+      status: verificationRequests.status,
+      incidentStatus: incidents.status,
+      parentRequestId: verificationRequests.parentRequestId,
+      latitude: verificationRequests.latitude,
+      longitude: verificationRequests.longitude,
+      createdAt: verificationRequests.createdAt,
+    })
+    .from(verificationRequests)
+    .leftJoin(incidents, eq(incidents.requestId, verificationRequests.id))
+    .where(and(
+      gte(verificationRequests.createdAt, new Date(Date.now() - INCIDENT_DEDUPLICATION_WINDOW_MS)),
+      eq(verificationRequests.type, input.incidentType),
+      eq(verificationRequests.nature, input.nature),
+      isNull(verificationRequests.parentRequestId),
+      isNull(verificationRequests.possibleDuplicateOfId),
+    ));
+  return selectReportConsolidation({
+    type: input.incidentType,
+    nature: input.nature,
+    latitude: input.latitude,
+    longitude: input.longitude,
+  }, candidates, { radiusMeters });
+}
+
 export async function submitEmergencyIntake(input: EmergencyIntake, actor: IntakeActor) {
   // The mobile chatbot selector contains only the existing emergency types.
   // Only the explicit non-emergency categories may bypass emergency dispatch.
@@ -152,15 +186,13 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
 
   const recentReports = await db.query.verificationRequests.findMany({
     where: and(gte(verificationRequests.createdAt, new Date(Date.now() - INCIDENT_DEDUPLICATION_WINDOW_MS))),
-    columns: { latitude: true, longitude: true, type: true, contactNumber: true },
+    columns: { contactNumber: true },
   });
   const settings = await db.query.systemSettings.findFirst({ where: eq(systemSettings.id, 'current'), columns: { deduplicationRadiusMeters: true } });
   const deduplicationRadiusMeters = settings?.deduplicationRadiusMeters ?? INCIDENT_DEDUPLICATION_RADIUS_METERS;
+  const consolidation = await findReportConsolidation(input, deduplicationRadiusMeters);
 
-  const nearbyDuplicate = recentReports.some((report) => isLikelyDuplicateIncident(
-    { type: input.incidentType, latitude: input.latitude, longitude: input.longitude },
-    report, deduplicationRadiusMeters,
-  ));
+  const nearbyDuplicate = consolidation.kind !== 'NONE';
   const repeatedContact = recentReports.filter((report) => samePhilippineMobileNumber(report.contactNumber, input.contactNumber)).length >= 2;
   const reasons: string[] = [];
   const barangay = resolveBaliwagBarangay(input.latitude, input.longitude);
@@ -170,7 +202,9 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
   const consistent = isConsistent(input);
 
   if (!consistent) reasons.push('The incident answers need clarification.');
-  if (nearbyDuplicate) reasons.push('A similar report was submitted nearby in the last 20 minutes.');
+  if (consolidation.kind === 'AUTO_LINK_EMERGENCY') reasons.push('Automatically linked to an active emergency response with the same type, location range, and time window.');
+  else if (consolidation.kind === 'PACC_REVIEW_NON_EMERGENCY') reasons.push('A similar non-emergency request is awaiting PACC confirmation before any reports are linked.');
+  else if (nearbyDuplicate) reasons.push('A similar report was submitted nearby in the last 20 minutes.');
   if (repeatedContact) reasons.push('This contact number has repeated recent submissions.');
   const photoLocationConflict = input.photoLatitude !== undefined
     && input.photoLongitude !== undefined
@@ -188,7 +222,7 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
     incidentType: input.incidentType,
     requestedNature: input.nature,
     answersConsistent: consistent,
-    suspicious: nearbyDuplicate || repeatedContact || photoLocationConflict,
+    suspicious: (consolidation.kind !== 'AUTO_LINK_EMERGENCY' && nearbyDuplicate) || repeatedContact || photoLocationConflict,
   });
   input = { ...input, nature: triage.nature };
   const triageClassification: TriageClassification = triage.classification;
@@ -209,7 +243,9 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
       contactNumber: input.contactNumber,
       guestDeviceHash: actor.reporterType === 'GUEST' ? actor.guestDeviceHash ?? null : null,
       guestAccessToken,
-      status: 'PENDING',
+      status: consolidation.kind === 'AUTO_LINK_EMERGENCY' ? 'DUPLICATE' : 'PENDING',
+      parentRequestId: consolidation.kind === 'AUTO_LINK_EMERGENCY' ? consolidation.parentRequestId : null,
+      possibleDuplicateOfId: consolidation.kind === 'PACC_REVIEW_NON_EMERGENCY' ? consolidation.parentRequestId : null,
       nature: input.nature,
       type: input.incidentType,
       peopleInvolved: String(input.peopleInvolved),
@@ -234,12 +270,14 @@ export async function submitEmergencyIntake(input: EmergencyIntake, actor: Intak
   }
 
   let incident = null;
-  if (triageClassification === 'HIGH_CONFIDENCE_EMERGENCY') {
+  if (consolidation.kind === 'AUTO_LINK_EMERGENCY') {
+    incident = await db.query.incidents.findFirst({ where: eq(incidents.requestId, consolidation.parentRequestId) });
+  } else if (triageClassification === 'HIGH_CONFIDENCE_EMERGENCY') {
     const nextIncident = await retryPendingAutomaticDispatches();
     // A newly submitted report can advance an older waiting emergency. Only
     // expose an automatic dispatch to the reporter who owns that incident.
     incident = nextIncident?.requestId === request.id ? nextIncident : null;
   }
 
-  return { request, incident, guestAccessToken, autoDispatched: Boolean(incident), replayed: false };
+  return { request, incident, guestAccessToken, autoDispatched: Boolean(incident), consolidation, replayed: false };
 }

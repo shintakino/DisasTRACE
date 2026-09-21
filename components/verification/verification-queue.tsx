@@ -107,7 +107,14 @@ export function VerificationQueue({
   };
 
   return (
-    <div className="flex h-full w-80 shrink-0 flex-col gap-2 border-r bg-white p-3">
+    <aside className="flex h-full w-[300px] shrink-0 flex-col gap-3 border-r border-slate-200 bg-slate-50/80 p-3">
+      <div className="flex items-center justify-between px-1 pt-1">
+        <div>
+          <h2 className="text-base font-black text-[#123B82]">Incident Queue</h2>
+          <p className="text-[11px] text-slate-500">Live operational reports</p>
+        </div>
+        <Badge variant="outline" className="border-blue-100 bg-blue-50 text-xs font-bold text-[#1E3A8A]">Total: {requests.length}</Badge>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <SummaryCard
           label="For Action"
@@ -146,7 +153,7 @@ export function VerificationQueue({
         />
       </div>
 
-      <div className="font-semibold text-sm mt-2">
+      <div className="border-t border-slate-200 pt-3 font-semibold text-sm">
         {filter === 'ACTION'
           ? 'Active Queue · For Action'
           : filter === 'REVIEW'
@@ -172,8 +179,8 @@ export function VerificationQueue({
             <Card
               key={request.id}
               className={cn(
-                "cursor-pointer transition-colors hover:bg-accent",
-                isPriority ? "border-red-200 bg-red-50/60 p-4 shadow-sm" : "p-3",
+                "cursor-pointer border-slate-200 bg-white transition-colors hover:border-blue-200 hover:bg-blue-50/30",
+                isPriority ? "border-red-200 bg-red-50/60 p-3 shadow-sm" : "p-3",
                 selectedId === request.id && "border-primary ring-1 ring-primary"
               )}
               onClick={() => onSelect(request)}
@@ -208,12 +215,17 @@ export function VerificationQueue({
                 </div>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <div className={cn("truncate font-bold leading-tight", isPriority ? "text-lg" : "text-sm")}>{request.type}</div>
+                <div className={cn("truncate font-bold leading-tight text-[#123B82]", isPriority ? "text-base" : "text-sm")}>{request.type}</div>
                 <div className="whitespace-nowrap text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(request.receivedAt), { addSuffix: true })}
                 </div>
               </div>
               <div className="truncate text-xs font-semibold text-[#1E3A8A]">{classificationLabel(request)}</div>
+              {request.relatedReports.length > 0 ? (
+                <div className="mt-1 text-xs font-bold text-violet-800">
+                  {request.relatedReports.length} related report{request.relatedReports.length === 1 ? '' : 's'}{request.relatedReports.some((related) => related.relation === 'PACC_REVIEW') ? ' awaiting review' : ''}
+                </div>
+              ) : null}
               {filter === 'AWAITING' ? (
                 <div className="mt-1 text-xs font-semibold text-sky-800">
                   Offer pending{request.incident?.offerExpiresAt ? ` · expires ${new Date(request.incident.offerExpiresAt).toLocaleTimeString()}` : ''}. You may continue other work.
@@ -242,6 +254,6 @@ export function VerificationQueue({
           )}
         </div>
       </div>
-    </div>
+    </aside>
   )
 }

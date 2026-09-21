@@ -224,6 +224,7 @@ export default function DashboardLayout({
   const navItems = getNavItems(role as UserRole);
 
   const getPageTitle = (path: string) => {
+    if (path === '/map') return 'Incident Command Center';
     const item = navItems.find((item) => item.url === path);
     return item ? item.title : "Dashboard";
   };
@@ -243,9 +244,12 @@ export default function DashboardLayout({
         <header className="flex h-[88px] shrink-0 items-center justify-between gap-2 px-10 border-b bg-white transition-all">
           <div className="flex items-center gap-6">
             <SidebarTrigger className="-ml-1 h-10 w-10 text-[#64748B]" />
-            <h1 className="text-3xl font-bold tracking-tight text-[#1E3A8A]">
-              {getPageTitle(pathname)}
-            </h1>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-[#1E3A8A]">
+                {getPageTitle(pathname)}
+              </h1>
+              {pathname === '/map' ? <p className="mt-0.5 text-xs font-medium text-slate-500">Baliwag City CDRRMO</p> : null}
+            </div>
           </div>
           <div className="flex items-center gap-8">
             <NotificationDropdown />

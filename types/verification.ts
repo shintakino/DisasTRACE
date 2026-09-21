@@ -33,6 +33,18 @@ export const VerificationIncidentSchema = z.object({
   dispatchMethod: z.string().nullable().optional(),
 }).nullable().optional();
 
+export const RelatedVerificationReportSchema = z.object({
+  id: z.string(),
+  requestId: z.string(),
+  status: VerificationStatusSchema,
+  relation: z.enum(['LINKED', 'PACC_REVIEW']),
+  receivedAt: z.string(),
+  reporterName: z.string(),
+  contactNumber: z.string(),
+  location: z.string(),
+  imageUrl: z.string().url().optional(),
+});
+
 export const VerificationRequestSchema = z.object({
   id: z.string(),
   requestId: z.string(), // e.g., REQ-2026-0047
@@ -54,5 +66,6 @@ export const VerificationRequestSchema = z.object({
   resident: ResidentInfoSchema,
   incident: VerificationIncidentSchema,
   requiresPaccReassignment: z.boolean().optional(),
+  relatedReports: z.array(RelatedVerificationReportSchema).default([]),
 });
 export type VerificationRequest = z.infer<typeof VerificationRequestSchema>;

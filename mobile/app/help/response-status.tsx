@@ -12,7 +12,7 @@ import { GuestAllowanceBanner } from '../../components/guest/GuestAllowanceBanne
 import { updateGuestReportHistory } from '../../lib/guest-report-history';
 
 interface IncidentStatus {
-  status: 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'RESOLVED';
+  status: 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'DOCUMENTATION_PENDING' | 'RESOLVED';
   responderId: string | null;
 }
 
@@ -29,6 +29,7 @@ function messageFor(incident: IncidentStatus | null, agencies: string[], recover
     return `${coordination ? `${coordination}. ` : ''}PACC is arranging another available responder.`;
   }
   if (incident?.status === 'ARRIVED') return 'Responders have arrived at your location.';
+  if (incident?.status === 'DOCUMENTATION_PENDING') return 'The field response has been completed. The responder is finishing incident documentation for PACC.';
   if (incident?.status === 'RESOLVED') return 'Response coordination has been completed.';
   if (incident?.status === 'EN_ROUTE' || incident?.responderId) return `${coordination ? `${coordination}. ` : ''}Responders are on the way.`;
   return coordination || 'Coordinating the nearest available responder.';

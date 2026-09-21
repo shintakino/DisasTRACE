@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
-import { IncidentTrends, IncidentDistribution } from "@/components/dashboard/incident-charts";
+import { IncidentDistribution } from "@/components/dashboard/incident-charts";
 import { RecentReports } from "@/components/dashboard/recent-reports";
-import { ResponderStatus } from "@/components/dashboard/responder-status";
 import { PACCResponderGrid } from "@/components/dashboard/pacc-responder-grid";
+import { CDRRMOOperationsDashboard } from "@/components/dashboard/cdrrmo-operations-dashboard";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -189,30 +189,20 @@ export default function DashboardPage() {
 
   // Render CDRRMO Super Admin Layout
   if (role?.toLowerCase() === 'cdrrmo_super_admin') {
+    const displayName = typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()
+      ? user.user_metadata.full_name.trim()
+      : 'CDRRMO Super Admin';
     return (
-      <>
-        <div className="h-full min-h-0 overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:flex lg:flex-col lg:gap-4 lg:space-y-0 lg:scrollbar-default">
-          <div className="shrink-0">
-            <KpiCards data={data.kpis} />
-          </div>
-          <div className="grid grid-cols-1 gap-6 pb-4 md:grid-cols-2 lg:min-h-[736px] lg:flex-1 lg:grid-rows-2 lg:gap-4 lg:pb-0">
-            <IncidentTrends 
-              data={data.trends} 
-              filter={trendFilter}
-              onFilterChange={setTrendFilter}
-              className="lg:h-full"
-            />
-            <IncidentDistribution 
-              data={data.distribution} 
-              filter={distFilter}
-              onFilterChange={setDistFilter}
-              className="lg:h-full"
-            />
-            <RecentReports className="lg:h-full" reports={data.reports} onReportClick={handleReportClick} />
-            <ResponderStatus className="lg:h-full" responders={data.responders} />
-          </div>
-        </div>
-      </>
+      <CDRRMOOperationsDashboard
+        data={data}
+        displayName={displayName}
+        distributionFilter={distFilter}
+        onDistributionFilterChange={setDistFilter}
+        onSelectReport={handleReportClick}
+        onViewAnalytics={() => router.push('/analytics')}
+        onViewAudit={() => router.push('/audit')}
+        onViewRoster={() => router.push('/roster')}
+      />
     );
   }
 

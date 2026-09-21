@@ -4,164 +4,64 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { TriageClassification, VerificationRequest } from "@/types/verification"
 import { formatDistanceToNow } from "date-fns"
-import { MapPin, Info } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Info, MapPin, ShieldAlert, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { ReactNode } from "react"
 
 interface VerificationDetailsProps {
   request: VerificationRequest | null
   onOverrideClassification: (id: string, value: TriageClassification) => void
   onUpdateCoordination: (id: string, agencies: string[]) => void
+  onConfirmRelatedReport: (id: string) => void
+  onKeepRelatedReportSeparate: (id: string) => void
   isProcessing: boolean
 }
 
-const AGENCIES = ['PNP', 'BFP', 'CDRRMO', 'Barangay', 'DSWD', 'Hospital'];
+const AGENCIES = ["PNP", "BFP", "CDRRMO", "Barangay", "DSWD", "Hospital"]
 
-export function VerificationDetails({ request, onOverrideClassification, onUpdateCoordination, isProcessing }: VerificationDetailsProps) {
-  if (!request) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-muted-foreground italic">
-        Select a verification request to view details
-      </div>
-    )
-  }
+function supportFor(classification: TriageClassification) {
+  if (classification === "SUSPICIOUS_POSSIBLE_PRANK") return { title: "This report has signals that require careful verification.", detail: "Review the evidence, location, and reporter context before accepting or rejecting it.", className: "border-red-200 bg-red-50 text-red-900", icon: ShieldAlert }
+  if (classification === "HIGH_CONFIDENCE_EMERGENCY") return { title: "This report appears internally consistent.", detail: "Confirm the details, then continue the emergency-response workflow.", className: "border-emerald-200 bg-emerald-50 text-emerald-900", icon: CheckCircle2 }
+  return { title: "This report needs further verification.", detail: "Check supporting information and coordinate with the reporter when needed.", className: "border-amber-200 bg-amber-50 text-amber-950", icon: AlertTriangle }
+}
 
-  const isPendingDispatch = request.requiresPaccReassignment === true || (
-    request.status === "VERIFIED" &&
-    request.incident && 
-    request.incident.status === "DISPATCHED" &&
-    !request.incident.responderId &&
-    !request.incident.currentOfferResponderId
-  );
-  const isAwaitingResponder = request.status === 'VERIFIED'
-    && request.incident?.status === 'DISPATCHED'
-    && !request.incident.responderId
-    && Boolean(request.incident.currentOfferResponderId);
-  const isTerminal = request.status === 'REJECTED'
-    || request.status === 'DUPLICATE'
-    || request.incident?.status === 'RESOLVED';
-  const controlsDisabled = isProcessing || isTerminal || isAwaitingResponder;
+function severityClass(severity: VerificationRequest["severity"]) {
+  if (severity === "Critical") return "bg-red-700"
+  if (severity === "High") return "bg-rose-600"
+  if (severity === "Medium") return "bg-amber-500"
+  return "bg-emerald-600"
+}
 
-  const displayStatus = isPendingDispatch ? "PACC REASSIGNMENT REQUIRED" : isAwaitingResponder ? 'AWAITING RESPONDER' : request.incident?.status === 'RESOLVED' ? 'CASE CLOSED' : request.status;
-  const classification = request.triageClassification || "UNCERTAIN_INCOMPLETE";
-  const triageReasons = request.triageReasons?.length
-    ? request.triageReasons
-    : ["No automated verification details were recorded."];
-  const coordinationAgencies = request.coordinationAgencies ?? [];
-  const recommendedAction = isPendingDispatch
-    ? 'Dispatch an eligible responder now.'
-    : request.status === 'PENDING'
-      ? 'Verify the incident details, then accept, reject, or merge this report.'
-      : request.status === 'REJECTED'
-        ? 'Review the recorded reason; no dispatch action is available.'
-        : isAwaitingResponder
-          ? `Continue other work while the responder offer is pending${request.incident?.offerExpiresAt ? ` until ${new Date(request.incident.offerExpiresAt).toLocaleTimeString()}` : ''}.`
-          : request.incident?.status === 'RESOLVED'
-            ? 'This response is Case Closed. Review the record; operational actions are disabled.'
-            : 'Monitor the active response and coordination status.';
+export function VerificationDetails({ request, onOverrideClassification, onUpdateCoordination, onConfirmRelatedReport, onKeepRelatedReportSeparate, isProcessing }: VerificationDetailsProps) {
+  if (!request) return <main className="flex flex-1 items-center justify-center bg-slate-50 p-6 text-sm italic text-slate-500">Select an incident from the queue to start verification.</main>
 
-  return (
-    <div className="flex-1 flex flex-col p-6 overflow-y-auto bg-white">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">{request.requestId}</h2>
-          <div className="flex items-center gap-2 text-muted-foreground text-sm mt-1">
-            <span>Received {formatDistanceToNow(new Date(request.receivedAt), { addSuffix: true })}</span>
-            <span>•</span>
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "font-semibold uppercase text-xs",
-                isPendingDispatch && "bg-red-100 text-red-800 border-red-200"
-              )}
-            >
-              {displayStatus}
-            </Badge>
-          </div>
-        </div>
-      </div>
+  const isPendingDispatch = request.requiresPaccReassignment === true || (request.status === "VERIFIED" && request.incident?.status === "DISPATCHED" && !request.incident.responderId && !request.incident.currentOfferResponderId)
+  const isAwaitingResponder = request.status === "VERIFIED" && request.incident?.status === "DISPATCHED" && !request.incident.responderId && Boolean(request.incident.currentOfferResponderId)
+  const isTerminal = request.status === "REJECTED" || request.status === "DUPLICATE" || request.incident?.status === "RESOLVED"
+  const controlsDisabled = isProcessing || isTerminal || isAwaitingResponder
+  const classification = request.triageClassification || "UNCERTAIN_INCOMPLETE"
+  const support = supportFor(classification)
+  const SupportIcon = support.icon
+  const coordinationAgencies = request.coordinationAgencies ?? []
+  const workflow = isPendingDispatch ? "PACC reassignment required" : isAwaitingResponder ? "Awaiting responder" : request.incident?.status === "RESOLVED" ? "Case closed" : request.status === "REJECTED" ? "Rejected" : request.status === "VERIFIED" ? "Response in progress" : "For PACC decision"
 
-      <Card className="mb-6 shrink-0 border-slate-200 bg-slate-50 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Incident essentials</div>
-            <h3 className="mt-1 text-xl font-black text-slate-950">{request.type}</h3>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Badge className={cn(
-                request.severity === 'Critical' ? 'bg-red-700' : request.severity === 'High' ? 'bg-orange-600' : 'bg-slate-600',
-              )}>{request.severity} severity</Badge>
-              <Badge variant="outline">{request.nature}</Badge>
-              <Badge variant="outline">{request.peopleInvolved} affected</Badge>
-            </div>
-          </div>
-          <div className="max-w-sm rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
-            <div className="text-xs font-bold uppercase tracking-wide text-blue-700">Recommended next action</div>
-            <p className="mt-1 font-semibold">{recommendedAction}</p>
-          </div>
-        </div>
-        <div className="mt-4 flex items-start gap-2 border-t border-slate-200 pt-4 text-sm font-medium text-slate-700">
-          <MapPin className="mt-0.5 size-4 shrink-0 text-[#1E3A8A]" />
-          <span>{request.location}</span>
-        </div>
-      </Card>
+  return <main className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-5"><section className="mx-auto max-w-6xl space-y-4">
+    <header className="border-b border-slate-200 pb-4"><div className="flex flex-wrap items-center gap-2"><Badge className={cn("border-0 px-2.5 py-1 text-[11px] font-black uppercase", severityClass(request.severity))}>{request.severity} severity</Badge><Badge variant="outline" className="border-blue-100 bg-blue-50 font-mono text-xs font-bold text-[#1E3A8A]">{request.requestId}</Badge></div><div className="mt-3 flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-black tracking-tight text-[#123B82] lg:text-3xl">{request.type}</h1><p className="mt-1 text-sm text-slate-500">Reported by <span className="font-semibold text-slate-700">{request.resident.fullName}</span> · {request.reporterType === "GUEST" ? "Guest Mode" : "Registered account"}</p></div><div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600"><span className="flex items-center gap-1.5"><MapPin className="size-4 text-rose-600" />{request.location}</span><span className="font-medium">Received {formatDistanceToNow(new Date(request.receivedAt), { addSuffix: true })}</span></div></div></header>
 
-      <Card className="mb-6 shrink-0 p-4 border-amber-200 bg-amber-50/50">
-        <div className="text-xs font-bold uppercase tracking-wider text-amber-900">Automated initial verification</div>
-        <div className="mt-1 font-bold text-sm text-slate-900">{classification.replaceAll('_', ' ')}</div>
-        <div className="mt-1 text-xs text-slate-600">{triageReasons.join(' ')}</div>
-        <label className="mt-3 block text-xs font-semibold text-slate-700">PACC override</label>
-        <select disabled={controlsDisabled} aria-disabled={controlsDisabled} value={classification} onChange={(event) => onOverrideClassification(request.id, event.target.value as TriageClassification)} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
-          <option value="HIGH_CONFIDENCE_EMERGENCY">High-confidence emergency</option>
-          <option value="HIGH_CONFIDENCE_NON_EMERGENCY">High-confidence non-emergency</option>
-          <option value="UNCERTAIN_INCOMPLETE">Uncertain / incomplete</option>
-          <option value="SUSPICIOUS_POSSIBLE_PRANK">Suspicious / possible prank</option>
-        </select>
-      </Card>
+    <div role="status" className={cn("flex gap-3 rounded-lg border px-4 py-3", support.className)}><SupportIcon className="mt-0.5 size-6 shrink-0" /><div><p className="font-bold">{support.title}</p><p className="mt-0.5 text-sm opacity-80">{support.detail}</p></div></div>
 
-      <Card className="mb-6 shrink-0 p-4 border-blue-200 bg-blue-50/50">
-        <div className="text-xs font-bold uppercase tracking-wider text-blue-900">PACC agency coordination</div>
-        <p className="mt-1 text-xs text-slate-600">Select every agency PACC is actively coordinating with. The reporter sees this status immediately.</p>
-        <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Agencies being coordinated by PACC">
-          {AGENCIES.map((agency) => {
-            const active = coordinationAgencies.includes(agency)
-            return <label key={agency} className={cn('flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-bold transition-colors', active ? 'border-[#1E3A8A] bg-[#1E3A8A] text-white' : 'border-blue-300 bg-white text-[#1E3A8A] hover:bg-blue-100', controlsDisabled && 'cursor-not-allowed opacity-60')}>
-              <input
-                type="checkbox"
-                checked={active}
-                disabled={controlsDisabled}
-                onChange={() => onUpdateCoordination(request.id, active ? coordinationAgencies.filter((item) => item !== agency) : [...coordinationAgencies, agency])}
-                className="size-4 shrink-0 accent-[#1E3A8A]"
-              />
-              <span>{agency}</span>
-            </label>
-          })}
-        </div>
-      </Card>
+    <div className="grid gap-3 sm:grid-cols-2"><Metric icon={<Users className="size-5" />} label="People involved" value={String(request.peopleInvolved)} /><Metric icon={<AlertTriangle className="size-5" />} label="Priority" value={request.severity} color={severityClass(request.severity)} /><Card className="border-slate-200 bg-white p-4 shadow-none"><p className="text-xs font-semibold text-slate-500">Incident type</p><p className="mt-1 text-lg font-black text-[#123B82]">{request.type}</p><Badge variant="outline" className="mt-2 text-[10px]">{request.nature}</Badge></Card><Card className="border-slate-200 bg-white p-4 shadow-none"><p className="text-xs font-semibold text-slate-500">Workflow status</p><p className="mt-1 text-lg font-black text-[#123B82]">{workflow}</p><p className="mt-2 text-xs text-slate-500">{isAwaitingResponder ? "The offer remains in the background; you can continue reviewing other reports." : "Status is updated from the server."}</p></Card></div>
 
-      <div className="relative mb-8 max-h-80 shrink-0 overflow-hidden rounded-xl border bg-muted shadow-sm aspect-video">
-        {request.imageUrl ? (
-          <img
-            src={request.imageUrl}
-            alt="User submitted scene"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground flex-col gap-2">
-            <Info className="w-8 h-8 opacity-20" />
-            <span>No image submitted</span>
-          </div>
-        )}
-        <div className="absolute top-4 right-4">
-          <Badge className="bg-black/60 backdrop-blur-md text-white border-none px-3 py-1">
-            USER SUBMITTED
-          </Badge>
-        </div>
-        {request.photoLatitude !== undefined && request.photoLongitude !== undefined && (
-          <Badge className="absolute bottom-4 left-4 bg-[#1E3A8A]/90 text-white border-none px-3 py-1">
-            Photo GPS {request.photoLatitude.toFixed(5)}, {request.photoLongitude.toFixed(5)}
-          </Badge>
-        )}
-      </div>
+    <div className="grid gap-4 lg:grid-cols-[1.35fr_.85fr]"><div className="relative min-h-56 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm">{request.imageUrl ? <img src={request.imageUrl} alt="User-submitted incident evidence" className="h-full min-h-56 w-full object-cover" /> : <div className="flex min-h-56 flex-col items-center justify-center gap-2 text-sm text-slate-500"><Info className="size-7 opacity-40" />No evidence photo submitted</div>}<Badge className="absolute left-3 top-3 border-0 bg-[#1E3A8A] text-xs font-bold">User submitted</Badge></div><Card className="flex min-h-56 flex-col justify-between border-slate-200 bg-white p-5 shadow-none"><div><p className="text-xs font-black uppercase tracking-wide text-[#1E3A8A]">Location review</p><MapPin className="mt-5 size-8 text-rose-600" /><p className="mt-3 font-bold text-slate-900">{request.location}</p><p className="mt-1 text-sm text-slate-500">Use the Command Map for the report pin and active response context.</p></div>{request.photoLatitude !== undefined && request.photoLongitude !== undefined ? <p className="mt-4 text-xs text-slate-500">Evidence GPS: {request.photoLatitude.toFixed(5)}, {request.photoLongitude.toFixed(5)}</p> : null}</Card></div>
 
-    </div>
-  )
+    {request.relatedReports.length > 0 ? <Card className="border-violet-200 bg-violet-50/60 p-4 shadow-none"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-violet-950">Related reports</p><p className="text-sm text-violet-900/70">Review whether these reports refer to the same incident before coordinating a separate response.</p></div><Badge className="bg-violet-700">{request.relatedReports.length} related</Badge></div><div className="mt-3 space-y-2">{request.relatedReports.map((related) => <div key={related.id} className="rounded-lg border border-violet-200 bg-white p-3"><div className="flex flex-wrap justify-between gap-2"><p className="font-mono text-xs font-bold text-slate-800">{related.requestId}</p><Badge variant="outline" className="text-xs">{related.relation === "PACC_REVIEW" ? "PACC review required" : "Linked"}</Badge></div><p className="mt-1 text-xs text-slate-600">{related.reporterName} · {related.location} · {formatDistanceToNow(new Date(related.receivedAt), { addSuffix: true })}</p>{related.relation === "PACC_REVIEW" ? <div className="mt-3 flex gap-2"><button type="button" disabled={controlsDisabled} onClick={() => onConfirmRelatedReport(related.id)} className="rounded-md bg-violet-700 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300">Confirm same incident</button><button type="button" disabled={controlsDisabled} onClick={() => onKeepRelatedReportSeparate(related.id)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:text-slate-400">Keep separate</button></div> : null}</div>)}</div></Card> : null}
+
+    <Card className="border-amber-200 bg-amber-50/60 p-4 shadow-none"><p className="text-xs font-black uppercase tracking-wide text-amber-900">Automated initial verification</p><p className="mt-1 font-bold text-slate-900">{classification.replaceAll("_", " ")}</p><p className="mt-1 text-sm text-slate-600">{request.triageReasons?.join(" ") || "No automated verification details were recorded."}</p><label className="mt-4 block text-xs font-bold text-slate-700" htmlFor="pacc-classification">PACC classification override</label><select id="pacc-classification" disabled={controlsDisabled} value={classification} onChange={(event) => onOverrideClassification(request.id, event.target.value as TriageClassification)} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"><option value="HIGH_CONFIDENCE_EMERGENCY">High-confidence emergency</option><option value="HIGH_CONFIDENCE_NON_EMERGENCY">High-confidence non-emergency</option><option value="UNCERTAIN_INCOMPLETE">Uncertain / incomplete</option><option value="SUSPICIOUS_POSSIBLE_PRANK">Suspicious / possible prank</option></select></Card>
+
+    <Card className="border-blue-200 bg-blue-50/50 p-4 shadow-none"><p className="text-xs font-black uppercase tracking-wide text-[#1E3A8A]">PACC agency coordination</p><p className="mt-1 text-sm text-slate-600">The reporter sees the agencies PACC is actively coordinating with.</p><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{AGENCIES.map((agency) => { const active = coordinationAgencies.includes(agency); return <label key={agency} className={cn("flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-bold", active ? "border-[#1E3A8A] bg-[#1E3A8A] text-white" : "border-blue-200 bg-white text-[#1E3A8A]", controlsDisabled && "cursor-not-allowed opacity-60")}><input type="checkbox" checked={active} disabled={controlsDisabled} onChange={() => onUpdateCoordination(request.id, active ? coordinationAgencies.filter((item) => item !== agency) : [...coordinationAgencies, agency])} className="size-4 accent-[#1E3A8A]" />{agency}</label>})}</div></Card>
+  </section></main>
+}
+
+function Metric({ icon, label, value, color }: { icon: ReactNode; label: string; value: string; color?: string }) {
+  return <Card className="border-slate-200 bg-white p-4 shadow-none"><div className="flex items-center gap-3"><span className={cn("grid size-10 place-items-center rounded-full bg-blue-50 text-[#1E3A8A]", color && `${color} text-white`)}>{icon}</span><div><p className="text-xs font-semibold text-slate-500">{label}</p><p className="text-xl font-black text-slate-900">{value}</p></div></div></Card>
 }

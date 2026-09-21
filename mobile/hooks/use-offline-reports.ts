@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { useResponderStore } from '../stores/useResponderStore';
 import { supabase } from '../lib/supabase';
+import { fetchWithTimeout } from '../lib/network-timeout';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 
@@ -133,11 +134,11 @@ export function useOfflineReports() {
               if (action.type === 'STATE_CHANGE') {
                 // Replay through authenticated server routes so authorization,
                 // ownership and workflow transition checks remain authoritative.
-                const response = await fetch(`${apiUrl}${action.endpoint}`, {
+                const response = await fetchWithTimeout(`${apiUrl}${action.endpoint}`, {
                   method: action.method,
                   headers,
                   body: JSON.stringify(action.payload),
-                });
+                }, 12_000, 'queued responder update');
                 const result = await response.json().catch(() => null);
                 if (!response.ok) {
                   if ([400, 403, 404, 409].includes(response.status)) {
@@ -163,6 +164,25 @@ export function useOfflineReports() {
                   }));
                 } else if (action.endpoint === '/api/incidents/status' && action.payload.status === 'ARRIVED') {
                   useResponderStore.setState({ lastArrivalDelivery: 'CONFIRMED' });
+                } else if (action.endpoint === '/api/incidents/status' && action.payload.status === 'DOCUMENTATION_PENDING') {
+                  const incidentId = action.payload.incidentId;
+                  useResponderStore.setState((state) => {
+                    if (state.activeDispatch?.id !== incidentId) return { lastQueueError: null };
+                    return {
+                      status: 'idle',
+                      activeDispatch: null,
+                      targetHospital: null,
+                      fieldOutcome: null,
+                      sceneTimeSeconds: 0,
+                      elapsedTimeSeconds: 0,
+                      isArrivalConfirmVisible: false,
+                      isHospitalArrivalConfirmVisible: false,
+                      hospitalDistanceKm: null,
+                      hospitalEtaMins: null,
+                      lastQueueError: null,
+                    };
+                  });
+                  alert('Field response synced. Your documentation remains saved, and you are now available for another dispatch.');
                 }
               } else if (action.type === 'TELEMETRY_SYNC') {
                 // Fire a standard REST location update via fetch against the specified endpoint

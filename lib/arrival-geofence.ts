@@ -1,7 +1,10 @@
 import { distanceBetweenCoordinatesMeters } from '@/lib/location-integrity';
 
-export const ARRIVAL_RADIUS_METERS = 75;
-export const ARRIVAL_MAX_ACCURACY_METERS = 50;
+// A 15 m arrival radius is only safe when the device is reporting a notably
+// tighter accuracy estimate. A responder can always use the explicit manual
+// confirmation path when urban cover or weather prevents this condition.
+export const ARRIVAL_RADIUS_METERS = 15;
+export const ARRIVAL_MAX_ACCURACY_METERS = 12;
 export const ARRIVAL_SAMPLE_MAX_AGE_MS = 30_000;
 
 interface ArrivalSample {

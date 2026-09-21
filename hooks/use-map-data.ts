@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapIncident, MapResponder, MapSummary, MapHospital, MapIncidentSchema, MapResponderSchema, MapSummarySchema, MapHospitalSchema } from "@/types/map";
+import { MapDemandZone, MapDemandZoneSchema, MapIncident, MapResponder, MapSummary, MapHospital, MapIncidentSchema, MapResponderSchema, MapSummarySchema, MapHospitalSchema } from "@/types/map";
 import { z } from "zod";
 import { createClientBrowser } from "@/lib/supabase";
 
@@ -16,6 +16,7 @@ export function useMapData() {
   const [incidents, setIncidents] = useState<MapIncident[]>([]);
   const [responders, setResponders] = useState<MapResponder[]>([]);
   const [hospitals, setHospitals] = useState<MapHospital[]>([]);
+  const [demandZones, setDemandZones] = useState<MapDemandZone[]>([]);
   const [summary, setSummary] = useState<MapSummary>({ new: 0, ongoing: 0, completed: 0, standby: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,14 +30,15 @@ export function useMapData() {
     if (showSkeleton) setIsLoading(true);
     setError(null);
     try {
-      const [incidentsRes, respondersRes, summaryRes, hospitalsRes] = await Promise.all([
+      const [incidentsRes, respondersRes, summaryRes, hospitalsRes, hotspotsRes] = await Promise.all([
         fetch("/api/map/incidents"),
         fetch("/api/map/responders"),
         fetch("/api/map/summary"),
         fetch("/api/map/hospitals"),
+        fetch("/api/map/hotspots"),
       ]);
 
-      if (!incidentsRes.ok || !respondersRes.ok || !summaryRes.ok || !hospitalsRes.ok) {
+      if (!incidentsRes.ok || !respondersRes.ok || !summaryRes.ok || !hospitalsRes.ok || !hotspotsRes.ok) {
         throw new Error("Failed to fetch map data");
       }
 
@@ -44,11 +46,13 @@ export function useMapData() {
       const respondersData = await respondersRes.json();
       const summaryData = await summaryRes.json();
       const hospitalsData = await hospitalsRes.json();
+      const hotspotsData = await hotspotsRes.json();
 
       setIncidents(z.array(MapIncidentSchema).parse(incidentsData));
       setResponders(z.array(MapResponderSchema).parse(respondersData));
       setSummary(MapSummarySchema.parse(summaryData));
       setHospitals(z.array(MapHospitalSchema).parse(hospitalsData));
+      setDemandZones(z.array(MapDemandZoneSchema).parse(hotspotsData.data));
       setError(null);
       if (showSkeleton) setIsLoading(false);
     } catch (err) {
@@ -142,5 +146,5 @@ export function useMapData() {
     };
   }, [activeDispatchKey]);
 
-  return { incidents, responders, hospitals, summary, isLoading, error, refresh: () => fetchData(true) };
+  return { incidents, responders, hospitals, demandZones, summary, isLoading, error, refresh: () => fetchData(true) };
 }

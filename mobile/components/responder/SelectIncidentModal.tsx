@@ -26,12 +26,13 @@ export function SelectIncidentModal({ visible, onClose }: SelectIncidentModalPro
 
       const userId = session.user.id;
 
-      // 1. Fetch all resolved incidents assigned to this responder
+      // 1. Fetch only incidents whose field response was server-confirmed and
+      // explicitly released for later documentation.
       const { data: unresolvedIncidents, error: incError } = await supabase
         .from('incidents')
-        .select('id, status, created_at, assigned_ambulance, request_id')
+        .select('id, status, created_at, assigned_ambulance, request_id, field_outcome')
         .eq('responder_id', userId)
-        .in('status', ['RESOLVED', 'ARRIVED']);
+        .eq('status', 'DOCUMENTATION_PENDING');
 
       if (incError) throw incError;
 
@@ -100,7 +101,9 @@ export function SelectIncidentModal({ visible, onClose }: SelectIncidentModalPro
             longitude: vReq?.longitude ? Number(vReq.longitude) : 120.9011 
           },
           typeOfEmergency: vReq?.type || 'Medical Emergency',
-          assignedAmbulance: inc.assigned_ambulance || 'AMB-001'
+          assignedAmbulance: inc.assigned_ambulance || 'AMB-001',
+          documentationPending: true,
+          fieldOutcome: inc.field_outcome || null,
         };
       });
 

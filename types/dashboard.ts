@@ -2,8 +2,11 @@ import { z } from "zod";
 
 export const KpiDataSchema = z.object({
   totalIncidentsToday: z.coerce.number(),
+  activeIncidents: z.coerce.number(),
+  pendingVerification: z.coerce.number(),
   totalResponders: z.coerce.number(),
   totalResolvedToday: z.coerce.number(),
+  totalRejectedToday: z.coerce.number(),
   avgResponseTime: z.string(),
 });
 

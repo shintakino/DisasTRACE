@@ -11,6 +11,8 @@ import { DispatchSheet } from './DispatchSheet';
 import { EnRouteSheet } from './EnRouteSheet';
 import { OnSceneSheet } from './OnSceneSheet';
 import { ArrivalConfirmDialog } from './ArrivalConfirmDialog';
+import { HospitalArrivalConfirmDialog } from './HospitalArrivalConfirmDialog';
+import { HospitalDocumentationSheet } from './HospitalDocumentationSheet';
 import { ToHospitalSheet } from './ToHospitalSheet';
 import { IncidentReportForm } from './IncidentReportForm';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1518,6 +1520,8 @@ export function ResponderHome() {
       {status === 'on_scene' && <OnSceneSheet />}
       {status === 'to_hospital' && <ToHospitalSheet />}
       <ArrivalConfirmDialog />
+      <HospitalArrivalConfirmDialog />
+      <HospitalDocumentationSheet />
       <IncidentReportForm />
     </View>
   );

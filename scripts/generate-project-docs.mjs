@@ -188,7 +188,7 @@ function writeSystemDoc() {
   d.h1("5. Dispatch, Tracking, and Recovery");
   d.h2("Dispatch lifecycle");
   [
-    "Confirmed emergencies are considered oldest-first (FIFO). Automatic selection uses eligible active, approved, on-duty responders with a trusted location heartbeat no older than one minute.",
+    "Confirmed emergencies are considered oldest-first (FIFO). Automatic selection uses eligible active, approved, on-duty responders with a trusted location heartbeat no older than 90 seconds.",
     "A responder offer has a countdown and is protected until it expires. Acceptance atomically changes the incident to EN_ROUTE.",
     "Expiry is driven by the Supabase Cron/pg_net scheduler and is also reconciled by scoped status reads; it does not depend on a responder phone remaining online.",
     "If no alternate unit is available, the report remains visible as PACC reassignment required. PACC can use guarded Override Dispatch for a fresh eligible responder.",
@@ -273,7 +273,7 @@ function writeDeveloperDoc() {
   d.text("The configurable lifetime limit applies to both normalized Philippine phone and app-scoped device digest. Same phone/device retries for the same submission are idempotent. New reports return 429 when either quota is exhausted. Obvious synthetic numbers are rejected at client and API boundaries.");
 
   d.h1("5. Dispatch State and Concurrency Contract");
-  d.text("Automatic dispatch is FIFO over confirmed pending emergencies. Eligibility requires active, approved, on-duty responder status and a trusted location heartbeat no older than one minute. The scheduler runs every five seconds through Supabase Cron/pg_net and is the authority for expiry, with API reconciliation as a recovery path.");
+  d.text("Automatic dispatch is FIFO over confirmed pending emergencies. Eligibility requires active, approved, on-duty responder status and a trusted location heartbeat no older than 90 seconds. The scheduler runs every five seconds through Supabase Cron/pg_net and is the authority for expiry, with API reconciliation as a recovery path.");
   d.h2("Race prevention");
   [
     "Automatic dispatch, Override Dispatch, PACC rejection, expiry cascading, and acceptance re-read state inside a transaction and lock the verification-request row.",

@@ -21,6 +21,7 @@ const LocationSchema = z.object({
   responderStatus: z.enum(['en_route', 'on_scene', 'to_hospital', 'report_filling']).optional(),
   incidentId: z.string().min(1).max(50).optional().nullable(),
   targetHospitalId: z.string().min(1).max(50).optional().nullable(),
+  confirmHospitalArrival: z.boolean().optional().default(false),
 });
 
 function isPersistableHospitalDestination(hospital: {
@@ -121,6 +122,10 @@ export async function POST(req: NextRequest) {
       incidentId: string;
       hospitalId: string;
       transportStartedAt: Date | null;
+      transportArrivedAt: Date | null;
+      transportStatus: 'NONE' | 'TO_HOSPITAL' | 'ARRIVED_AT_HOSPITAL';
+      hospitalLatitude: number;
+      hospitalLongitude: number;
     } | null = null;
     let transportValidationError: {
       status: 409 | 422;
@@ -172,6 +177,10 @@ export async function POST(req: NextRequest) {
             incidentId: activeIncident.id,
             hospitalId: hospital.id,
             transportStartedAt: activeIncident.transportStartedAt,
+            transportArrivedAt: activeIncident.transportArrivedAt,
+            transportStatus: activeIncident.transportStatus,
+            hospitalLatitude: hospital.lat,
+            hospitalLongitude: hospital.lng,
           };
         }
       }
@@ -221,6 +230,7 @@ export async function POST(req: NextRequest) {
     }
 
     let autoArrivedIncidentId: string | null = null;
+    let autoArrivedHospitalIncidentId: string | null = null;
     if (accuracy !== undefined && accuracy !== null) {
       const [activeResponse] = await db
         .select({
@@ -257,6 +267,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const automaticHospitalArrival = Boolean(
+      verifiedTransportContext
+      && verifiedTransportContext.transportStartedAt
+      && verifiedTransportContext.transportStatus !== 'ARRIVED_AT_HOSPITAL'
+      && accuracy !== undefined
+      && accuracy !== null
+      && shouldAutomaticallyMarkArrived({
+        incidentLatitude: verifiedTransportContext.hospitalLatitude,
+        incidentLongitude: verifiedTransportContext.hospitalLongitude,
+        incidentCreatedAt: verifiedTransportContext.transportStartedAt,
+        previous: {
+          latitude: dbUser.lastLatitude,
+          longitude: dbUser.lastLongitude,
+          accuracy: dbUser.lastLocationAccuracy,
+          observedAt: dbUser.lastLocationUpdatedAt,
+        },
+        current: { latitude, longitude, accuracy, observedAt },
+      })
+    );
+
     // A transport destination must survive responder/public app backgrounding.
     // Location heartbeats are the authenticated responder channel already used
     // during the trip, so persist only the active responder's transport context.
@@ -275,19 +305,25 @@ export async function POST(req: NextRequest) {
           return 'hospital_unavailable' as const;
         }
 
+        const hospitalArrivalConfirmed = result.data.confirmHospitalArrival
+          || automaticHospitalArrival
+          || verifiedTransportContext.transportStatus === 'ARRIVED_AT_HOSPITAL';
         const [transported] = await tx.update(incidents)
           .set({
-            transportStatus: 'TO_HOSPITAL',
+            transportStatus: hospitalArrivalConfirmed ? 'ARRIVED_AT_HOSPITAL' : 'TO_HOSPITAL',
             transportHospitalId: currentHospital.id,
             transportStartedAt: verifiedTransportContext.transportStartedAt ?? observedAt,
+            transportArrivedAt: hospitalArrivalConfirmed
+              ? (verifiedTransportContext.transportArrivedAt ?? observedAt)
+              : null,
           })
           .where(and(
             eq(incidents.id, verifiedTransportContext.incidentId),
             eq(incidents.responderId, user.id),
             eq(incidents.status, 'ARRIVED'),
           ))
-          .returning({ id: incidents.id });
-        return transported ? 'persisted' as const : 'state_changed' as const;
+          .returning({ id: incidents.id, transportStatus: incidents.transportStatus });
+        return transported ? { kind: 'persisted' as const, incident: transported } : { kind: 'state_changed' as const };
       });
 
       if (transportPersistence === 'hospital_unavailable') {
@@ -297,12 +333,15 @@ export async function POST(req: NextRequest) {
           message: 'That hospital became unavailable. Contact PACC or select another available destination.',
         }, { status: 422 });
       }
-      if (transportPersistence === 'state_changed') {
+      if (transportPersistence.kind === 'state_changed') {
         return NextResponse.json({
           error: 'Transport is no longer available',
           code: 'TRANSPORT_STATE_CHANGED',
           message: 'The active incident changed before hospital transport could be saved. Refresh the dispatch before continuing.',
         }, { status: 409 });
+      }
+      if (transportPersistence.kind === 'persisted' && automaticHospitalArrival) {
+        autoArrivedHospitalIncidentId = transportPersistence.incident.id;
       }
     }
 
@@ -316,6 +355,7 @@ export async function POST(req: NextRequest) {
         ? 'Responder telemetry cached and arrival confirmed.'
         : 'Responder telemetry successfully cached.',
       autoArrivedIncidentId,
+      autoArrivedHospitalIncidentId,
     });
   } catch (error) {
     console.error("Error in responder location cache API:", error);

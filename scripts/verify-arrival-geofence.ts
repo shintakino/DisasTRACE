@@ -11,7 +11,9 @@ const sample = (latitude: number, accuracy = 10, seconds = 10) => ({
 const base = { incidentLatitude: 14.951, incidentLongitude: 120.901, incidentCreatedAt: createdAt };
 
 assert.equal(shouldAutomaticallyMarkArrived({ ...base, previous: sample(14.9511, 10, 5), current: sample(14.95105, 10, 10) }), true);
+assert.equal(shouldAutomaticallyMarkArrived({ ...base, previous: sample(14.95114, 10, 5), current: sample(14.95105, 10, 10) }), false);
 assert.equal(shouldAutomaticallyMarkArrived({ ...base, previous: sample(14.9511, 80, 5), current: sample(14.95105, 10, 10) }), false);
+assert.equal(shouldAutomaticallyMarkArrived({ ...base, previous: sample(14.9511, 13, 5), current: sample(14.95105, 10, 10) }), false);
 assert.equal(shouldAutomaticallyMarkArrived({ ...base, previous: sample(14.952, 10, 5), current: sample(14.95105, 10, 10) }), false);
 assert.equal(shouldAutomaticallyMarkArrived({ ...base, previous: sample(14.9511, 10, 5), current: sample(14.95105, 10, 40) }), false);
 

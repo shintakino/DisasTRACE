@@ -14,6 +14,9 @@ export const verificationRequests = pgTable('verification_requests', {
   status: text('status', { enum: ['PENDING', 'VERIFIED', 'REJECTED', 'DUPLICATE'] }).default('PENDING').notNull(),
   rejectionReason: text('rejection_reason'),
   parentRequestId: varchar('parent_request_id', { length: 255 }).references((): AnyPgColumn => verificationRequests.id),
+  // A non-emergency possible match stays separately reviewable until PACC
+  // confirms it. Confirmed links always use parentRequestId above.
+  possibleDuplicateOfId: varchar('possible_duplicate_of_id', { length: 255 }).references((): AnyPgColumn => verificationRequests.id),
   nature: text('nature', { enum: ['EMERGENCY', 'NON-EMERGENCY'] }).default('EMERGENCY').notNull(),
   type: text('type', { enum: ['Medical Emergency', 'Vehicular Collision', 'Fire Emergency', 'Structural Failure', 'Flood/Water', 'Unknown Cause', 'Patient Transport', 'Other / non-emergency request'] }).notNull(),
   peopleInvolved: text('people_involved').default('None').notNull(),
@@ -42,6 +45,10 @@ export const verificationRequestsRelations = relations(verificationRequests, ({ 
   }),
   parentRequest: one(verificationRequests, {
     fields: [verificationRequests.parentRequestId],
+    references: [verificationRequests.id],
+  }),
+  possibleDuplicateOf: one(verificationRequests, {
+    fields: [verificationRequests.possibleDuplicateOfId],
     references: [verificationRequests.id],
   }),
 }));

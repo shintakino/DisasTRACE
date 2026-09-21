@@ -172,6 +172,7 @@ check('manual dispatch requires a fresh approved standby responder', () => {
   };
 
   assert.equal(isResponderHeartbeatFresh(eligibleResponder.lastLocationUpdatedAt, now), true);
+  assert.equal(isResponderHeartbeatFresh(new Date('2026-09-07T09:58:31.000Z'), now), true);
   assert.deepEqual(evaluateManualDispatchEligibility({
     requestStatus: 'PENDING',
     incident: null,
@@ -184,7 +185,7 @@ check('manual dispatch requires a fresh approved standby responder', () => {
     incident: null,
     responder: {
       ...eligibleResponder,
-      lastLocationUpdatedAt: new Date('2026-09-07T09:58:59.000Z'),
+      lastLocationUpdatedAt: new Date('2026-09-07T09:58:29.000Z'),
     },
     now,
   }), {

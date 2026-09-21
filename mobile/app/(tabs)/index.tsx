@@ -371,7 +371,7 @@ export default function HomeScreen() {
             .from('incidents')
             .select('*')
             .eq('responder_id', user.id)
-            .neq('status', 'RESOLVED')
+            .in('status', ['DISPATCHED', 'EN_ROUTE', 'ARRIVED'])
             .maybeSingle();
 
           if (error) throw error;

@@ -45,10 +45,10 @@ export type ManualDispatchEligibility =
     message: string;
   };
 
-// On-duty telemetry is sent every few seconds. A one-minute limit lets a
-// transient network interruption recover while releasing a switched-off device
-// quickly enough that it cannot remain dispatchable as standby.
-export const RESPONDER_HEARTBEAT_FRESHNESS_MS = 60 * 1000;
+// On-duty telemetry is sent every few seconds, but GPS and background-network
+// handoffs can briefly delay a successful write. Ninety seconds covers that
+// short recovery window without leaving a switched-off device dispatchable.
+export const RESPONDER_HEARTBEAT_FRESHNESS_MS = 90 * 1000;
 
 export function isResponderHeartbeatFresh(
   lastLocationUpdatedAt: Date | string | null,

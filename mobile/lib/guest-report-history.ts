@@ -1,8 +1,8 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
+import { guestReportAccessTokenKey } from './guest-report-history-key';
 
 const HISTORY_FILE = `${FileSystem.documentDirectory}disastrace-guest-report-history-v1.json`;
-const TOKEN_PREFIX = 'disastrace-guest-report-token-v1:';
 const MAX_HISTORY = 10;
 const MAX_MESSAGES = 40;
 
@@ -64,10 +64,19 @@ export async function archiveGuestReport(input: GuestReportHistoryEntry & { acce
     ].slice(0, MAX_HISTORY);
     return { entries: next, result: entries.filter((entry) => !next.some((kept) => kept.id === entry.id)) };
   });
-  if (accessToken) await SecureStore.setItemAsync(`${TOKEN_PREFIX}${input.id}`, accessToken);
-  for (const entry of removed) {
-    await SecureStore.deleteItemAsync(`${TOKEN_PREFIX}${entry.id}`).catch(() => undefined);
+  let refreshCredentialSaved = true;
+  if (accessToken) {
+    try {
+      await SecureStore.setItemAsync(guestReportAccessTokenKey(input.id), accessToken);
+    } catch (error) {
+      refreshCredentialSaved = false;
+      console.warn('Guest report was saved locally, but its refresh credential could not be saved:', error);
+    }
   }
+  for (const entry of removed) {
+    await SecureStore.deleteItemAsync(guestReportAccessTokenKey(entry.id)).catch(() => undefined);
+  }
+  return { refreshCredentialSaved };
 }
 
 export async function appendGuestReportMessages(id: string, messages: GuestHistoryMessage[]) {
@@ -94,10 +103,10 @@ export async function updateGuestReportHistory(id: string, updates: Partial<Gues
 }
 
 export async function getGuestReportAccessToken(id: string) {
-  return SecureStore.getItemAsync(`${TOKEN_PREFIX}${id}`);
+  return SecureStore.getItemAsync(guestReportAccessTokenKey(id));
 }
 
 export async function removeGuestReportHistory(id: string) {
   await mutateEntries((entries) => ({ entries: entries.filter((entry) => entry.id !== id), result: undefined }));
-  await SecureStore.deleteItemAsync(`${TOKEN_PREFIX}${id}`).catch(() => undefined);
+  await SecureStore.deleteItemAsync(guestReportAccessTokenKey(id)).catch(() => undefined);
 }

@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
   if (!report) return NextResponse.json({ data: null, error: 'Report not found.', message: 'Report not found.' }, { status: 404 });
 
   const trackingRequestId = report.status === 'DUPLICATE' && report.parentRequestId ? report.parentRequestId : report.id;
+  const trackingReport = trackingRequestId === report.id
+    ? report
+    : await db.query.verificationRequests.findFirst({ where: eq(verificationRequests.id, trackingRequestId) }) ?? report;
   let incident = await db.query.incidents.findFirst({ where: eq(incidents.requestId, trackingRequestId) });
 
   // The scheduler is the normal expiry mechanism, but a reporter's status
@@ -64,7 +67,7 @@ export async function GET(request: NextRequest) {
       columns: { id: true, name: true, lat: true, lng: true },
     })
     : null;
-  const agencies = report.coordinationAgencies;
+  const agencies = trackingReport.coordinationAgencies;
   const coordinationText = agencies.length > 0
     ? `Coordinating with ${agencies.length === 1 ? agencies[0] : `${agencies.slice(0, -1).join(', ')} and ${agencies.at(-1)}`}.`
     : null;
@@ -78,20 +81,24 @@ export async function GET(request: NextRequest) {
   const responseStatus = report.status === 'REJECTED'
     ? rejectionProjection.responseStatus
     : report.status === 'DUPLICATE' && !incident
-      ? 'PACC linked this report to another report of the same event and is reviewing the primary response.'
+      ? 'Your report is linked to an existing incident. PACC is reviewing the primary response.'
       : needsPaccReassignment
         ? `${coordinationText ? `${coordinationText} ` : ''}PACC is arranging another available responder. Please remain available for updates.`
       : incident?.status === 'RESOLVED'
         ? 'Response coordination for this incident has been completed.'
+        : incident?.status === 'DOCUMENTATION_PENDING'
+          ? 'The field response has been completed. The responder is finishing incident documentation for PACC.'
+        : incident?.transportStatus === 'ARRIVED_AT_HOSPITAL'
+          ? `${coordinationText ? `${coordinationText} ` : ''}Responder has arrived at the selected hospital and is completing the incident report.`
         : incident?.transportStatus === 'TO_HOSPITAL'
           ? `${coordinationText ? `${coordinationText} ` : ''}Responder is transporting the patient to the selected hospital.`
         : incident?.status === 'ARRIVED'
           ? 'Responders have arrived at your location.'
           : incident?.status === 'EN_ROUTE' || incident?.responderId
       ? `${coordinationText ? `${coordinationText} ` : ''}Responders are on the way. Please remain available for further instructions.`
-      : report.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY'
+      : trackingReport.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY'
         ? coordinationText || 'PACC is coordinating your non-emergency report.'
-        : report.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY'
+        : trackingReport.triageClassification === 'HIGH_CONFIDENCE_EMERGENCY'
           ? coordinationText || 'PACC is securing the nearest available responder.'
           : 'PACC is reviewing your report.';
   let guestAllowance: { limit: number; used: number; remaining: number } | undefined;
@@ -119,7 +126,7 @@ export async function GET(request: NextRequest) {
       status: report.status,
       outcome,
       rejectionReason: report.status === 'REJECTED' ? rejectionProjection.rejectionReason : null,
-      triageClassification: report.triageClassification,
+      triageClassification: trackingReport.triageClassification,
       coordinationAgencies: agencies,
       responseStatus,
       incident: incident ? {

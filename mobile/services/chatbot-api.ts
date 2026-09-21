@@ -26,6 +26,7 @@ const IntakeResponseSchema = z.object({
     id: z.string().uuid(),
     requestId: z.string().min(1),
     status: z.string().min(1),
+    parentRequestId: z.string().uuid().nullable().optional(),
     triageClassification: z.string().optional(),
   }).passthrough(),
   incident: z.object({ id: z.string() }).passthrough().nullable(),
@@ -37,6 +38,10 @@ const IntakeResponseSchema = z.object({
   }).optional(),
   autoDispatched: z.boolean(),
   replayed: z.boolean(),
+  consolidation: z.object({
+    kind: z.enum(['NONE', 'AUTO_LINK_EMERGENCY', 'PACC_REVIEW_NON_EMERGENCY']),
+    parentRequestId: z.string().uuid().optional(),
+  }).optional(),
 }).passthrough();
 
 export type IntakeResult = z.infer<typeof IntakeResponseSchema>;

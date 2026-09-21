@@ -6,7 +6,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
-import { eq, and, asc, count, desc, ilike, inArray, isNotNull, isNull, ne, or, sql, type SQL } from "drizzle-orm";
+import { eq, and, asc, count, desc, gte, ilike, inArray, isNotNull, isNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import crypto from "crypto";
@@ -238,6 +238,12 @@ export async function GET(req: NextRequest) {
           ilike(verificationRequests.barangay, `%${responderQuery.search}%`),
         );
         if (searchCondition) whereConditions.push(searchCondition);
+      }
+      if (responderQuery.createdAfter && responderQuery.createdBefore) {
+        whereConditions.push(
+          gte(reports.createdAt, new Date(responderQuery.createdAfter)),
+          lt(reports.createdAt, new Date(responderQuery.createdBefore)),
+        );
       }
     }
 
@@ -531,7 +537,7 @@ export async function POST(req: NextRequest) {
         return { kind: 'existing' as const, report: concurrentReport };
       }
 
-      if (lockedIncident.status !== 'ARRIVED') {
+      if (!['ARRIVED', 'DOCUMENTATION_PENDING'].includes(lockedIncident.status)) {
         return { kind: 'not_ready' as const };
       }
 

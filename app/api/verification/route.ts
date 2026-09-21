@@ -6,7 +6,8 @@ import { users } from "@/db/schema/users";
 import { createClient } from "@/lib/supabase-server";
 import { and, count, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
-import { INCIDENT_DEDUPLICATION_RADIUS_METERS, INCIDENT_DEDUPLICATION_WINDOW_MS, isLikelyDuplicateIncident } from "@/lib/incident-deduplication";
+import { INCIDENT_DEDUPLICATION_RADIUS_METERS } from "@/lib/incident-deduplication";
+import { findReportConsolidation } from '@/lib/emergency-intake';
 import { resolveBaliwagBarangay } from "@/lib/barangay-boundaries";
 import { systemSettings } from "@/db/schema/system_settings";
 import { requiresPaccReassignment } from "@/lib/dispatch-policy";
@@ -31,7 +32,7 @@ export async function GET() {
         .from(verificationRequests)
         .leftJoin(incidents, eq(incidents.requestId, verificationRequests.id))
         .where(or(
-          eq(verificationRequests.status, 'PENDING'),
+          and(eq(verificationRequests.status, 'PENDING'), isNull(verificationRequests.possibleDuplicateOfId)),
           and(
             eq(verificationRequests.status, 'VERIFIED'),
             eq(incidents.status, 'DISPATCHED'),
@@ -71,7 +72,7 @@ export async function GET() {
     // Resolve all related incidents and resident history in bounded queries.
     // The former implementation issued up to three queries for every queue
     // item, which could exhaust the connection pool and stall PACC loading.
-    const [requestIncidents, residentReportCounts, residentRejectedCounts] = await Promise.all([
+    const [requestIncidents, residentReportCounts, residentRejectedCounts, relatedRequests] = await Promise.all([
       requestIds.length
         ? db.select().from(incidents).where(inArray(incidents.requestId, requestIds))
         : Promise.resolve([]),
@@ -90,6 +91,16 @@ export async function GET() {
           ))
           .groupBy(verificationRequests.residentId)
         : Promise.resolve([]),
+      requestIds.length
+        ? db.query.verificationRequests.findMany({
+          where: or(
+            inArray(verificationRequests.parentRequestId, requestIds),
+            inArray(verificationRequests.possibleDuplicateOfId, requestIds),
+          ),
+          orderBy: [desc(verificationRequests.createdAt)],
+          with: { resident: true },
+        })
+        : Promise.resolve([]),
     ]);
 
     const incidentByRequestId = new Map(requestIncidents.map((incident) => [incident.requestId, incident]));
@@ -99,6 +110,34 @@ export async function GET() {
     const rejectedCountByResidentId = new Map(
       residentRejectedCounts.flatMap((row) => row.residentId ? [[row.residentId, Number(row.total)] as const] : []),
     );
+    const relatedReportsByParentId = new Map<string, Array<{
+      id: string;
+      requestId: string;
+      status: string;
+      relation: 'LINKED' | 'PACC_REVIEW';
+      receivedAt: string;
+      reporterName: string;
+      contactNumber: string;
+      location: string;
+      imageUrl?: string;
+    }>>();
+    for (const related of relatedRequests) {
+      const parentId = related.parentRequestId ?? related.possibleDuplicateOfId;
+      if (!parentId) continue;
+      const entries = relatedReportsByParentId.get(parentId) ?? [];
+      entries.push({
+        id: related.id,
+        requestId: related.requestId,
+        status: related.status,
+        relation: related.parentRequestId ? 'LINKED' : 'PACC_REVIEW',
+        receivedAt: related.createdAt.toISOString(),
+        reporterName: related.resident?.fullName || 'Guest Reporter',
+        contactNumber: related.resident?.phone || related.contactNumber || 'No phone provided',
+        location: formatOfficialBaliwagLocation(related.barangay),
+        imageUrl: related.imageUrl || undefined,
+      });
+      relatedReportsByParentId.set(parentId, entries);
+    }
 
     const mappedRequests = requests.map((r) => {
       const incident = incidentByRequestId.get(r.id);
@@ -167,6 +206,7 @@ export async function GET() {
         // Keep an exhausted automatic offer in the action queue. It is not a
         // completed verification: PACC must choose the next available unit.
         requiresPaccReassignment: needsPaccReassignment,
+        relatedReports: relatedReportsByParentId.get(r.id) ?? [],
       };
     });
 
@@ -223,35 +263,35 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // This older report form does not use the chatbot intake service. Keep the
-    // same duplicate protection here so it cannot create another ambulance
-    // offer for the same type of incident in the same place.
-    const recentReports = await db.query.verificationRequests.findMany({
-      where: gte(verificationRequests.createdAt, new Date(Date.now() - INCIDENT_DEDUPLICATION_WINDOW_MS)),
-      columns: { type: true, latitude: true, longitude: true },
-    });
-    const settings = await db.query.systemSettings.findFirst({ where: eq(systemSettings.id, 'current'), columns: { deduplicationRadiusMeters: true } });
-    const nearbyDuplicate = recentReports.some((report) => isLikelyDuplicateIncident(
-      { type: incidentType, latitude: reportLatitude, longitude: reportLongitude },
-      report, settings?.deduplicationRadiusMeters ?? INCIDENT_DEDUPLICATION_RADIUS_METERS,
-    ));
-
     const databaseId = crypto.randomUUID();
     const requestIdStr = createPublicRequestId(databaseId);
 
     // Nature and initial classification are server-owned. In particular,
     // Unknown Cause always waits for PACC to identify the coordinating agency.
     const severityLevel = severity || 'Medium';
+    const initialTriage = deriveInitialTriage({
+      incidentType,
+      requestedNature: nature,
+    });
+    const requestNature = initialTriage.nature;
+    const settings = await db.query.systemSettings.findFirst({ where: eq(systemSettings.id, 'current'), columns: { deduplicationRadiusMeters: true } });
+    const consolidation = await findReportConsolidation({
+      incidentType,
+      nature: requestNature,
+      latitude: reportLatitude,
+      longitude: reportLongitude,
+    }, settings?.deduplicationRadiusMeters ?? INCIDENT_DEDUPLICATION_RADIUS_METERS);
     const triage = deriveInitialTriage({
       incidentType,
       requestedNature: nature,
-      suspicious: nearbyDuplicate,
+      suspicious: consolidation.kind === 'PACC_REVIEW_NON_EMERGENCY',
     });
-    const requestNature = triage.nature;
     const triageReasons = [
       ...triage.reasons,
-      ...(nearbyDuplicate && triage.classification === 'SUSPICIOUS_POSSIBLE_PRANK'
-        ? ['A similar report was submitted nearby in the last 20 minutes. PACC review is required before dispatch.']
+      ...(consolidation.kind === 'AUTO_LINK_EMERGENCY'
+        ? ['Automatically linked to an active emergency response with the same type, location range, and time window.']
+        : consolidation.kind === 'PACC_REVIEW_NON_EMERGENCY'
+          ? ['A similar non-emergency request is awaiting PACC confirmation before any reports are linked.']
         : []),
     ];
 
@@ -260,7 +300,9 @@ export async function POST(req: NextRequest) {
       id: databaseId,
       requestId: requestIdStr,
       residentId: user.id,
-      status: 'PENDING',
+      status: consolidation.kind === 'AUTO_LINK_EMERGENCY' ? 'DUPLICATE' : 'PENDING',
+      parentRequestId: consolidation.kind === 'AUTO_LINK_EMERGENCY' ? consolidation.parentRequestId : null,
+      possibleDuplicateOfId: consolidation.kind === 'PACC_REVIEW_NON_EMERGENCY' ? consolidation.parentRequestId : null,
       nature: requestNature,
       type: incidentType,
       peopleInvolved: peopleInvolved || 'None',
@@ -274,6 +316,19 @@ export async function POST(req: NextRequest) {
       longitude: reportLongitude,
       imageUrl: imageUrl || null,
     }).returning();
+
+    // An emergency linked to an active primary must never create another
+    // incident or responder offer. The reporter follows that primary instead.
+    if (consolidation.kind === 'AUTO_LINK_EMERGENCY') {
+      const incident = await db.query.incidents.findFirst({ where: eq(incidents.requestId, consolidation.parentRequestId) });
+      return NextResponse.json({
+        success: true,
+        request: newRequest,
+        incident: incident ?? null,
+        autoDispatched: Boolean(incident),
+        consolidation,
+      });
+    }
 
     // Auto Dispatch Logic
     if (triage.classification === 'HIGH_CONFIDENCE_EMERGENCY') {
@@ -294,7 +349,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       request: newRequest,
-      autoDispatched: false
+      autoDispatched: false,
+      consolidation,
     });
   } catch (error) {
     console.error('Error in POST /api/verification:', error);

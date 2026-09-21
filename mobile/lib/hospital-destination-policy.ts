@@ -96,7 +96,7 @@ export function canEnterHospitalReport(
   status: string,
   targetHospital: HospitalDestinationCandidate | null | undefined,
 ): boolean {
-  if (status === 'to_hospital') return isEligibleHospitalDestination(targetHospital);
+  if (status === 'at_hospital') return isEligibleHospitalDestination(targetHospital);
   return status === 'on_scene' || status === 'report_filling';
 }
 

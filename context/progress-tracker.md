@@ -1,5 +1,25 @@
 # Progress Tracker
 
+## 2026-09-20 - CDRRMO operations-dashboard hierarchy refresh
+
+- Reworked the CDRRMO Super Admin dashboard into a compact operations-center layout: contextual shift welcome, five real operational indicators, readable incident-type summary, responder availability, recent activity, and direct Analytics/Audit/Roster paths. The underlying authenticated APIs and PACC dashboard layout remain unchanged.
+- Extended dashboard KPIs with authoritative active-incident, pending-verification, and rejected-today counts so the redesigned overview does not display derived or placeholder totals.
+- Reworked the CDRRMO map into an incident command-center surface with a collapsible report feed, map legend, accessible layer controls, resource visibility, and optional historical-demand zones. Zones are computed only from verified reports over 90 days and are visibly labelled as descriptive planning support, never a current-warning or incident forecast.
+
+## 2026-09-20 - Emergency consolidation and PACC-related report review
+
+- Added a forward-only `0028_report_consolidation.sql` migration and self-reference to preserve a possible primary report separately from an approved duplicate link.
+- Strong emergency matches now link to one active same-type primary within the configured deduplication radius/time window before dispatch, so no second incident or responder offer is created. The secondary reporter follows the primary report status, coordination agencies, responder, and resolution.
+- Patient Transport and other non-emergency matches remain PACC-review candidates. They are grouped below one primary queue item, expose reporter/contact/location/evidence details, and require an audited PACC decision to either confirm one coordinated response or return the report to the active queue as separate work.
+
+## 2026-09-20 - Guest history and responder reliability repair
+
+- Replaced the invalid colon-delimited Expo SecureStore guest-report token key with an Android-safe key. Guest submissions now retain their saved local history without a false failure warning, and history refresh no longer throws a raw SecureStore key error. If a device ever cannot retain the private refresh credential, the reporter receives an accurate, non-blocking explanation while their saved history remains available.
+- Guarded responder completion summaries against missing or invalid distance data, so finishing a report and returning to the dashboard cannot crash while rendering the completion modal.
+- Added server-backed Responder My Reports date windows (Today, Last 7 days, Last 30 days, All dates) that compose with the existing search, type, status, archive, sort, and pagination controls.
+- Changed a stale on-duty responder from a misleading PACC `OFFLINE` state to a non-dispatchable `SYNC DELAYED` state, extended the trusted heartbeat grace window to 90 seconds, and preserved the safety requirement that only a fresh location can receive a dispatch.
+- Added focused mobile reliability/date-query regression checks. `npx tsc --noEmit`, responder management, dispatch recovery, and mobile reliability verification pass.
+
 ## 2026-09-17 - Consistent Guest Mode allowance visibility
 
 - Added one shared Guest Mode allowance banner with singular, plural, and exhausted states plus a direct registration action.
@@ -734,6 +754,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - None
 
 ## Latest Changes
+
+- Added responder **Documentation Pending** release workflow. Once an assigned responder confirms a handled-on-scene/refusal outcome or a verified hospital arrival, the server atomically records the field outcome, changes the incident to `DOCUMENTATION_PENDING`, returns the responder to `ON_DUTY`, and immediately retries eligible pending dispatches. The PCR/Driver's Trip Ticket remains an incident-bound draft, may be reopened from Forms, and later resolves only its own incident without releasing a responder who is handling a newer one. The mobile app now offers **Save Draft & Become Available** or **Proceed to Forms** after field completion; offline/failed confirmation saves a local draft but deliberately retains assignment. A failed or timed-out release is now persisted as one authenticated, deduplicated FIFO action and automatically retried after connectivity returns; only its successful response releases the device for a new dispatch. The server recognizes a replay of the same responder/outcome as an idempotent confirmation, so a dropped response after a committed transition cannot leave the responder stuck. Migration `0030_responder_documentation_pending.sql` is applied to the configured development database, and root/mobile TypeScript, migration audit, whitespace, and focused workflow verification pass.
+
+- Implemented trusted 15 m responder arrival workflow. Scene and hospital arrival now require two recent, strong-accuracy GPS samples within the 15 m radius before automatic confirmation; unreliable GPS always retains responder confirmation. Hospital arrival is persisted as `ARRIVED_AT_HOSPITAL` with an arrival timestamp through migration `0029_trusted_hospital_arrival`, and public tracking states that the responder is completing the incident report. The responder app now has a hospital-arrival confirmation dialog, queues that confirmation safely when offline, enters PCR/Trip Ticket only after hospital arrival is confirmed, and presents explicit **Proceed to Forms** or **Continue Later** choices after handled-on-scene/refusal outcomes. The configured nearest eligible hospital remains recommended, with eligible manual override preserved.
+
+- Rebuilt the PACC Verification screen as an operational triage workspace: a compact, priority-sorted incident queue, selected-report evidence and location review, classification-aware decision-support guidance, and an action/reporter/dispatch-log rail. Rejection now opens a guided accessible dialog with explicit public-facing reason categories and optional operator notes; the selected explanation continues through the existing server-validated rejection path, immediately leaves the active queue, and remains distinct from Case Closed records. Existing duplicate consolidation, PACC classification override, agency coordination, manual dispatch, and background responder-offer workflows remain connected.
 
 - Closed the requirements 12-15 review findings: public report detail responses now redact clinical/trip/signature/duplicate-reporter data, report completion requires an owned `ARRIVED` incident and cannot release a responder who has another unresolved call, parsed payload bounds are enforced, numeric range errors remain visible instead of being clamped into plausible measurements, and trusted GPS telemetry remains cached even when hospital context needs correction. Migration `0025_responder_report_security_and_pcr_fields.sql` persists PCR pain/GCS fields and replaces broad report/PCR/trip-ticket client access with owner/admin read-only policies; it is applied and verified in the configured database.
 - Added responder-owned report management with SQL-backed search, incident/status filters, newest/oldest sorting, 15-record pages, and reversible Active/Archived filing. Migration `0024_fancy_cerise.sql` adds the nullable archive timestamp and responder/archive/date index without deleting or hiding records from administrator audit access; it has been applied to the configured development database. The mobile responder list now uses bounded `FlatList` pages with protected Archive/Restore actions, while resident report history retains its existing behavior.

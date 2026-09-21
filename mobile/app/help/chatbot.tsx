@@ -420,12 +420,16 @@ export default function EmergencyChatbotScreen() {
         reporterMode,
         guestAccessToken: result.guestAccessToken ?? undefined,
         incidentId: result.incident?.id,
-        trackingRequestId: result.request.id,
+        trackingRequestId: result.request.parentRequestId ?? result.request.id,
         status: result.request.status,
-        responseStatus: result.incident ? 'PACC has started emergency response coordination.' : 'PACC is reviewing your report.',
+        responseStatus: result.request.status === 'DUPLICATE'
+          ? 'Your report was linked to an existing incident. Follow the current response status here.'
+          : result.consolidation?.kind === 'PACC_REVIEW_NON_EMERGENCY'
+            ? 'PACC is checking whether this request is related to an existing transport or non-emergency request.'
+            : result.incident ? 'PACC has started emergency response coordination.' : 'PACC is reviewing your report.',
         triageClassification: result.request.triageClassification,
         hasIncident: Boolean(result.incident),
-        isMergedDuplicate: false,
+        isMergedDuplicate: result.request.status === 'DUPLICATE',
         reportsRemaining: result.guestAllowance?.remaining,
       };
       // The server has already committed the report. Record that truth before
@@ -434,7 +438,7 @@ export default function EmergencyChatbotScreen() {
       markSubmitted(report);
       if (reporterMode === 'guest') {
         try {
-          await archiveGuestReport({
+          const historyResult = await archiveGuestReport({
           id: report.id,
           displayId: report.displayId,
           incidentType: completeDraft.incidentType,
@@ -446,6 +450,9 @@ export default function EmergencyChatbotScreen() {
           messages: messages.map(({ role, text }) => ({ role, text })),
           accessToken: report.guestAccessToken,
           });
+          if (!historyResult.refreshCredentialSaved) {
+            Alert.alert('Report sent', 'PACC received your report and it is saved in this device history. This device could not save the private refresh credential, so keep the report number shown on the status screen.');
+          }
         } catch (historyError) {
           console.error('Report confirmed but guest history could not be saved:', historyError);
           Alert.alert('Report sent', 'PACC received your report, but this device could not save its local history. Keep the report number shown on the status screen.');

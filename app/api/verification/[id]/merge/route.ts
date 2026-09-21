@@ -84,7 +84,7 @@ export async function POST(
       }
 
       const [merged] = await tx.update(verificationRequests)
-        .set({ status: 'DUPLICATE', parentRequestId, updatedAt: new Date() })
+        .set({ status: 'DUPLICATE', parentRequestId, possibleDuplicateOfId: null, updatedAt: new Date() })
         .where(and(
           eq(verificationRequests.id, id),
           eq(verificationRequests.status, 'PENDING'),

@@ -53,6 +53,18 @@ export const MapSummarySchema = z.object({
 });
 export type MapSummary = z.infer<typeof MapSummarySchema>;
 
+export const DemandZoneRiskSchema = z.enum(["EMERGING", "MODERATE", "HIGH"]);
+export type DemandZoneRisk = z.infer<typeof DemandZoneRiskSchema>;
+
+export const MapDemandZoneSchema = z.object({
+  id: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  count: z.number().int().nonnegative(),
+  riskLevel: DemandZoneRiskSchema,
+});
+export type MapDemandZone = z.infer<typeof MapDemandZoneSchema>;
+
 export const MapHospitalSchema = z.object({
   id: z.string(),
   name: z.string(),

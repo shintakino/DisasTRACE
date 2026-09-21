@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { and, gte, inArray } from 'drizzle-orm';
+import { and, eq, gte } from 'drizzle-orm';
 import { db } from '@/db';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { createClient } from '@/lib/supabase-server';
 
-const HOTSPOT_LOOKBACK_DAYS = 30;
+const HOTSPOT_LOOKBACK_DAYS = 90;
 const HOTSPOT_CELL_SIZE = 0.01;
 const HOTSPOT_MIN_REPORTS = 3;
 
@@ -13,6 +13,7 @@ interface IncidentHotspot {
   latitude: number;
   longitude: number;
   count: number;
+  riskLevel: 'EMERGING' | 'MODERATE' | 'HIGH';
 }
 
 export async function GET() {
@@ -33,7 +34,7 @@ export async function GET() {
       .from(verificationRequests)
       .where(and(
         gte(verificationRequests.createdAt, since),
-        inArray(verificationRequests.status, ['PENDING', 'VERIFIED']),
+        eq(verificationRequests.status, 'VERIFIED'),
       ));
 
     const cells = new Map<string, { latitudeTotal: number; longitudeTotal: number; count: number }>();
@@ -53,12 +54,16 @@ export async function GET() {
 
     const hotspots: IncidentHotspot[] = Array.from(cells.entries())
       .filter(([, cell]) => cell.count >= HOTSPOT_MIN_REPORTS)
-      .map(([id, cell]) => ({
-        id,
-        latitude: cell.latitudeTotal / cell.count,
-        longitude: cell.longitudeTotal / cell.count,
-        count: cell.count,
-      }))
+      .map(([id, cell]) => {
+        const riskLevel: IncidentHotspot['riskLevel'] = cell.count >= 8 ? 'HIGH' : cell.count >= 5 ? 'MODERATE' : 'EMERGING';
+        return {
+          id,
+          latitude: cell.latitudeTotal / cell.count,
+          longitude: cell.longitudeTotal / cell.count,
+          count: cell.count,
+          riskLevel,
+        };
+      })
       .sort((a, b) => b.count - a.count)
       .slice(0, 30);
 

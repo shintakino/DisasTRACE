@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 import Map, { Marker, NavigationControl, MapRef } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { configureMapLibreWorker } from "@/components/map/maplibre-worker";
+
+configureMapLibreWorker();
 
 interface HospitalItem {
   id: string;

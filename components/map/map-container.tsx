@@ -5,6 +5,9 @@ import Map, { NavigationControl, Marker, MapRef, Source, Layer } from "react-map
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MapDemandZone, MapIncident, MapResponder, MapHospital } from "@/types/map";
 import { MapMarker } from "./map-marker";
+import { configureMapLibreWorker } from "./maplibre-worker";
+
+configureMapLibreWorker();
 
 interface RouteGeometry {
   id: string;

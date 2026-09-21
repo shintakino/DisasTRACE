@@ -1,5 +1,11 @@
 # Progress Tracker
 
+## 2026-09-22 - Mobile Expo security and compatibility maintenance
+
+- Applied Expo's supported in-SDK dependency repair, bringing the managed runtime to Expo `~54.0.37` while retaining the existing SDK and native configuration.
+- Mobile strict TypeScript, Expo Doctor (18/18 checks), and the Android production export pass. `npm audit --prefix mobile --omit=dev` now reports zero production vulnerabilities.
+- The Android export still reports one pre-existing NativeWind ambiguous utility warning for `shadow-[#E2E8F0]`; it does not affect the bundle, but remains a small visual-style cleanup item rather than a release blocker.
+
 ## 2026-09-22 - Dispatch deadline network tolerance and consolidation regression repair
 
 - Restored one shared four-second server acceptance grace window for responder dispatch offers. Both the authenticated Accept mutation and the background expiry scheduler now use the same policy value, so an already in-flight Accept request is not rejected solely because a weak-network handoff crossed the displayed deadline.

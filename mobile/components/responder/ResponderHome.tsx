@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { View, Text, Platform, StatusBar, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StatusBar, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Play, Pause, LogOut } from 'lucide-react-native';
@@ -26,6 +26,7 @@ import { useLiveBarangay } from '../../hooks/use-live-barangay';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
 import * as Notifications from 'expo-notifications';
+import { ensureResponderEmergencyAlertChannels, getResponderEmergencyAlert } from '../../lib/push-notifications';
 import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 import {
@@ -92,17 +93,7 @@ export function ResponderHome() {
         } as any),
       });
 
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('emergency-alerts', {
-          name: 'Emergency Alerts',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250, 250, 250],
-          lightColor: '#EF4444',
-          enableLights: true,
-          enableVibrate: true,
-          showBadge: true,
-        });
-      }
+      await ensureResponderEmergencyAlertChannels();
     }
 
     configureNotifications();
@@ -556,11 +547,11 @@ export function ResponderHome() {
               content: {
                 title: '🚨 EMERGENCY DISPATCH OFFER',
                 body: `New emergency request: ${typeOfEmergency} at ${locationName}. Tap to open the offer; you have ${inc.dispatch_offer_duration_seconds || 30}s to accept.`,
-                sound: true,
+                sound: getResponderEmergencyAlert(typeOfEmergency).sound,
                 priority: Notifications.AndroidNotificationPriority.MAX,
                 data: { kind: 'dispatch_offer', incidentId: inc.id },
                 android: {
-                  channelId: 'emergency-alerts',
+                  channelId: getResponderEmergencyAlert(typeOfEmergency).channelId,
                 },
               } as any,
               trigger: null,
@@ -660,11 +651,11 @@ export function ResponderHome() {
               content: {
                 title: '🚨 DIRECT EMERGENCY DISPATCH',
                 body: `You have been dispatched to: ${typeOfEmergency} at ${locationName}. Proceed immediately!`,
-                sound: true,
+                sound: getResponderEmergencyAlert(typeOfEmergency).sound,
                 priority: Notifications.AndroidNotificationPriority.MAX,
                 data: { kind: 'active_dispatch', incidentId: inc.id },
                 android: {
-                  channelId: 'emergency-alerts',
+                  channelId: getResponderEmergencyAlert(typeOfEmergency).channelId,
                 },
               } as any,
               trigger: null,

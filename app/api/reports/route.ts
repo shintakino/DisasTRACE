@@ -230,6 +230,9 @@ export async function GET(req: NextRequest) {
       if (responderQuery.type) {
         whereConditions.push(ilike(verificationRequests.type, `%${responderQuery.type}%`));
       }
+      if (responderQuery.barangay) {
+        whereConditions.push(eq(verificationRequests.barangay, responderQuery.barangay));
+      }
       if (responderQuery.search) {
         const searchCondition = or(
           ilike(reports.id, `%${responderQuery.search}%`),

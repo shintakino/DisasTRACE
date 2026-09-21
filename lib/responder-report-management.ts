@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BALIWAG_BARANGAYS } from '@/lib/barangay-boundaries';
 
 const optionalTrimmedText = (maxLength: number) => z.preprocess(
   (value) => {
@@ -9,9 +10,24 @@ const optionalTrimmedText = (maxLength: number) => z.preprocess(
   z.string().max(maxLength).optional(),
 );
 
+const officialBarangayNames = new Set(BALIWAG_BARANGAYS.map(({ name }) => name));
+
+const optionalOfficialBarangay = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  },
+  z.string().refine(
+    (value) => officialBarangayNames.has(value),
+    'barangay must be an official City of Baliwag barangay.',
+  ).optional(),
+);
+
 const ResponderReportListQuerySchema = z.object({
   search: optionalTrimmedText(80),
   type: optionalTrimmedText(80),
+  barangay: optionalOfficialBarangay,
   status: z.enum(['all', 'ongoing', 'completed']).default('all'),
   archive: z.enum(['active', 'archived']).default('active'),
   sort: z.enum(['newest', 'oldest']).default('newest'),
@@ -42,6 +58,7 @@ export function parseResponderReportListQuery(searchParams: URLSearchParams): Re
   return ResponderReportListQuerySchema.parse({
     search: searchParams.get('search') ?? undefined,
     type: searchParams.get('type') ?? undefined,
+    barangay: searchParams.get('barangay') ?? undefined,
     status: searchParams.get('status') ?? undefined,
     archive: searchParams.get('archive') ?? undefined,
     sort: searchParams.get('sort') ?? undefined,

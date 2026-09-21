@@ -20,6 +20,7 @@ check('normalizes bounded responder list query values', () => {
   assert.deepEqual(parseResponderReportListQuery(new URLSearchParams()), {
     search: undefined,
     type: undefined,
+    barangay: undefined,
     status: 'all',
     archive: 'active',
     sort: 'newest',
@@ -32,6 +33,7 @@ check('normalizes bounded responder list query values', () => {
   assert.deepEqual(parseResponderReportListQuery(new URLSearchParams({
     search: '  REP-2026  ',
     type: ' Medical Emergency ',
+    barangay: ' Poblacion ',
     status: 'completed',
     archive: 'archived',
     sort: 'oldest',
@@ -42,6 +44,7 @@ check('normalizes bounded responder list query values', () => {
   })), {
     search: 'REP-2026',
     type: 'Medical Emergency',
+    barangay: 'Poblacion',
     status: 'completed',
     archive: 'archived',
     sort: 'oldest',
@@ -60,6 +63,7 @@ check('rejects unbounded and unsupported list query values', () => {
   assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ archive: 'all' })));
   assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ status: 'RESOLVED' })));
   assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ search: 'x'.repeat(81) })));
+  assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ barangay: 'Outside Baliwag' })));
   assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ createdAfter: 'not-a-date', createdBefore: '2026-10-01T00:00:00.000Z' })));
   assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ createdAfter: '2026-10-01T00:00:00.000Z', createdBefore: '2026-09-01T00:00:00.000Z' })));
   assert.throws(() => parseResponderReportListQuery(new URLSearchParams({ createdAfter: '2026-09-01T00:00:00.000Z' })));
@@ -86,6 +90,7 @@ check('keeps archive reversible, owner scoped, and non-destructive in the report
 check('executes responder filtering, count, sorting, and pagination in SQL', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/reports/route.ts'), 'utf8');
   assert.match(route, /ilike\(/);
+  assert.match(route, /eq\(verificationRequests\.barangay, responderQuery\.barangay\)/);
   assert.match(route, /count\(\)/);
   assert.match(route, /\.limit\(responderQuery\.limit\)/);
   assert.match(route, /\.offset\(/);
@@ -100,7 +105,7 @@ check('executes responder filtering, count, sorting, and pagination in SQL', () 
 check('gates completion and keeps public report projections redacted', () => {
   const listRoute = readFileSync(join(process.cwd(), 'app/api/reports/route.ts'), 'utf8');
   const detailRoute = readFileSync(join(process.cwd(), 'app/api/reports/[id]/route.ts'), 'utf8');
-  assert.match(listRoute, /lockedIncident\.status !== 'ARRIVED'/);
+  assert.match(listRoute, /\['ARRIVED', 'DOCUMENTATION_PENDING'\]\.includes\(lockedIncident\.status\)/);
   assert.match(listRoute, /patientCareReports: submittedPatientCareReports/);
   assert.doesNotMatch(listRoute, /body\.patientCareReports/);
   assert.match(listRoute, /Residents must use their report-history view/);

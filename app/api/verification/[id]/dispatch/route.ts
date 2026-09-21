@@ -232,6 +232,7 @@ export async function POST(
       responderId: result.responder.id,
       incidentId: result.incident.id,
       offerExpiresAt: result.incident.offerExpiresAt,
+      incidentType: result.verificationRequest.type,
     });
 
     return NextResponse.json({

@@ -8,6 +8,16 @@ export type BaliwagLocation = {
   barangayPsgcCode: string;
 };
 
+// Kept in the mobile bundle so responders can choose a stable, official
+// barangay filter without needing a separate network request first.
+export const BALIWAG_BARANGAY_NAMES = [
+  'Bagong Nayon', 'Barangca', 'Calantipay', 'Catulinan', 'Concepcion',
+  'Hinukay', 'Makinabang', 'Matangtubig', 'Pagala', 'Paitan', 'Piel',
+  'Pinagbarilan', 'Poblacion', 'Sabang', 'San Jose', 'San Roque',
+  'Santa Barbara', 'Santo Cristo', 'Santo Niño', 'Subic', 'Sulivan',
+  'Tangos', 'Tarcan', 'Tiaong', 'Tibag', 'Tilapayong', 'Virgen delas Flores',
+] as const;
+
 function displayBarangayName(barangay: string) {
   const value = barangay.trim();
   // Registration values are historically uppercase, while official boundary

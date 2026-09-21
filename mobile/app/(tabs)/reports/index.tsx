@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Platform,
   RefreshControl,
   ScrollView,
@@ -17,6 +18,8 @@ import {
   AlertTriangle,
   Archive,
   CarFront,
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Flame,
@@ -28,7 +31,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import { useAuthStatus } from '../../../hooks/use-auth-status';
 import { ReportDetailModal } from '../../../components/responder/ReportDetailModal';
 import { supabase } from '../../../lib/supabase';
-import { formatBaliwagLocation } from '../../../lib/baliwag-location';
+import { BALIWAG_BARANGAY_NAMES, formatBaliwagLocation } from '../../../lib/baliwag-location';
 
 const RESPONDER_PAGE_SIZE = 15;
 const TYPE_FILTERS = [
@@ -125,6 +128,8 @@ export default function MyReportsScreen() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [barangayFilter, setBarangayFilter] = useState('');
+  const [barangayPickerVisible, setBarangayPickerVisible] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active');
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
@@ -168,6 +173,7 @@ export default function MyReportsScreen() {
       if (isResponder) {
         if (search) params.set('search', search);
         if (typeFilter) params.set('type', typeFilter);
+        if (barangayFilter) params.set('barangay', barangayFilter);
         params.set('status', statusFilter);
         params.set('archive', archiveFilter);
         params.set('sort', sortOrder);
@@ -244,7 +250,7 @@ export default function MyReportsScreen() {
         setRefreshing(false);
       }
     }
-  }, [archiveFilter, dateFilter, isResponder, pagination.page, search, sortOrder, statusFilter, typeFilter]);
+  }, [archiveFilter, barangayFilter, dateFilter, isResponder, pagination.page, search, sortOrder, statusFilter, typeFilter]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -302,6 +308,12 @@ export default function MyReportsScreen() {
 
   const chooseType = (value: string) => {
     setTypeFilter(value);
+    setPagination((current) => ({ ...current, page: 1 }));
+  };
+
+  const chooseBarangay = (value: string) => {
+    setBarangayFilter(value);
+    setBarangayPickerVisible(false);
     setPagination((current) => ({ ...current, page: 1 }));
   };
 
@@ -465,7 +477,8 @@ export default function MyReportsScreen() {
         ))}
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
+      <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Incident type</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
         {TYPE_FILTERS.map((option) => (
           <TouchableOpacity
             key={option.label}
@@ -476,6 +489,22 @@ export default function MyReportsScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Barangay</Text>
+      <TouchableOpacity
+        onPress={() => setBarangayPickerVisible(true)}
+        className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex-row items-center justify-between mb-4"
+        accessibilityRole="button"
+        accessibilityLabel={`Filter reports by barangay. Current selection: ${barangayFilter || 'all barangays'}`}
+      >
+        <View className="flex-row items-center flex-1">
+          <MapPin size={18} color="#1E3A8A" />
+          <Text className="ml-3 text-sm font-bold text-slate-700" numberOfLines={1}>
+            {barangayFilter || 'All barangays'}
+          </Text>
+        </View>
+        <ChevronDown size={18} color="#64748B" />
+      </TouchableOpacity>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
         {DATE_FILTERS.map((option) => (
@@ -610,6 +639,50 @@ export default function MyReportsScreen() {
       )}
 
       <ReportDetailModal visible={!!selectedReport} report={selectedReport} onClose={() => setSelectedReport(null)} />
+      <Modal
+        transparent
+        animationType="slide"
+        visible={barangayPickerVisible}
+        onRequestClose={() => setBarangayPickerVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/40">
+          <View className="bg-white rounded-t-3xl px-6 pt-5 pb-8 max-h-[78%]">
+            <View className="flex-row items-start justify-between mb-4">
+              <View className="flex-1 pr-4">
+                <Text className="text-xl font-bold text-[#1E3A8A]">Filter by barangay</Text>
+                <Text className="text-sm text-slate-500 mt-1">Show only your reports from one official Baliwag barangay.</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setBarangayPickerVisible(false)}
+                className="px-3 py-2 rounded-xl bg-slate-100"
+                accessibilityRole="button"
+                accessibilityLabel="Close barangay filter"
+              >
+                <Text className="text-sm font-bold text-slate-600">Done</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {['', ...BALIWAG_BARANGAY_NAMES].map((barangay) => {
+                const selected = barangayFilter === barangay;
+                const label = barangay || 'All barangays';
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    onPress={() => chooseBarangay(barangay)}
+                    className={`flex-row items-center justify-between py-4 border-b border-slate-100 ${selected ? 'bg-blue-50 -mx-2 px-2 rounded-xl border-b-0 mb-1' : ''}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Show reports from ${label}`}
+                  >
+                    <Text className={`text-base ${selected ? 'font-bold text-[#1E3A8A]' : 'font-medium text-slate-700'}`}>{label}</Text>
+                    {selected && <Check size={20} color="#1E3A8A" strokeWidth={3} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

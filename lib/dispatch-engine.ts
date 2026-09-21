@@ -293,6 +293,7 @@ export async function autoDispatchIncident(
         responderId: result.currentOfferResponderId,
         incidentId: result.id,
         offerExpiresAt: result.offerExpiresAt,
+        incidentType: request.type,
       });
     }
 
@@ -569,7 +570,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
       // Iterate through candidates and atomically reserve the first available one
       const nextOfferDuration = incident.dispatchOfferDurationSeconds || 30;
       let cascaded = false;
-      let pushTarget: { responderId: string; incidentId: string; offerExpiresAt: Date | null } | null = null;
+      let pushTarget: { responderId: string; incidentId: string; offerExpiresAt: Date | null; incidentType: string } | null = null;
 
       for (const nextItem of sortedResponders) {
         const nextResponder = nextItem.responder;
@@ -625,6 +626,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
             responderId: nextResponder.id,
             incidentId: updatedOffer.id,
             offerExpiresAt: updatedOffer.offerExpiresAt,
+            incidentType: request.type,
           };
         } else {
           // A PACC/manual action won after the expired offer was claimed. Do

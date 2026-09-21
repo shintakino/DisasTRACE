@@ -84,6 +84,7 @@
           "color": "#2E43B8"
         }
       ],
+      "./plugins/with-responder-emergency-sounds",
       [
         "expo-build-properties",
         {

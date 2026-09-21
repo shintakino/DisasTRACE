@@ -141,6 +141,7 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 - Report rejection notifications use the distinct `incident_rejected` type and include only the owned request identifier and the PACC-provided reason. Guest reports do not create user notification rows; their reason is returned only by the token-scoped report-status endpoint.
 - Both all/unread filtering is supported in the notification panel.
 - While the responder process is running, a dispatch offer also raises a maximum-priority Android local notification with sound and vibration. Tapping it returns to the server-backed offer screen, which retains explicit responder confirmation. Guaranteed delivery after Android has killed the app requires a future push-notification service.
+- Android responder dispatch alerts use separate native notification channels for fire/explosion, medical, vehicular collision, flood/water, and a general fallback. The server includes the authoritative incident type when sending an offer so foreground and background alerts select the same channel, bundled tone, and vibration pattern. These tones are packaged during the Android native build; changing them requires distributing a new Android build, while user channel-level overrides remain under Android system control.
 
 ## Location Integrity
 

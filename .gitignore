@@ -46,6 +46,6 @@ next-env.d.ts
 .expo
 .vscode
 *.log
-package-lock.json
+!package-lock.json
 /scratch
 

@@ -14,6 +14,11 @@
 - Upgraded MapLibre GL JS from `5.24.0` to `6.10.0`, removing the direct critical map-rendering dependency advisory. Added the official Next.js-compatible ESM worker setup: both MapLibre worker modules are copied from the installed package before development and production builds, and the command-map and hospital-map clients configure the shared same-origin worker URL.
 - Added a focused worker-configuration regression check. The MapLibre check, strict TypeScript check, and Next.js production build pass after the migration.
 
+## 2026-09-22 - Production dependency audit remediation
+
+- Applied npm's non-breaking production dependency remediation and regenerated the tracked lockfile. `npm audit --omit=dev` now reports zero low, moderate, high, or critical production vulnerabilities. Local development tooling was restored with a standard install after the production-only audit command pruned it from `node_modules`.
+- The remaining full-audit findings are development-tooling transitive dependencies (four moderate and one high, headed by a major-version Drizzle Kit update); they do not ship in the Vercel production runtime and require a separately reviewed tooling migration.
+
 ## 2026-09-20 - CDRRMO operations-dashboard hierarchy refresh
 
 - Reworked the CDRRMO Super Admin dashboard into a compact operations-center layout: contextual shift welcome, five real operational indicators, readable incident-type summary, responder availability, recent activity, and direct Analytics/Audit/Roster paths. The underlying authenticated APIs and PACC dashboard layout remain unchanged.

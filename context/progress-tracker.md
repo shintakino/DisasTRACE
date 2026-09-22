@@ -797,6 +797,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Added the PACC dashboard shift header to match the CDRRMO command dashboard hierarchy. It identifies the signed-in PACC administrator and presents live pending-review and active-incident counts before the dashboard KPIs.
+
 - Completed Super Admin table consistency work: User Accounts, Responder Roster, Audit Logs, Responder Status & Logs, and Reports titles now have a larger hierarchy than their table content. Standardized table state colors to blue for active/in-progress work, green for completed/available, amber for attention states, red for rejected/deactivated, and neutral gray for inactive states.
 
 - Completed the remaining portal-wide Super Admin flat-surface cleanup: verification queue and dispatch dialogs, CDRRMO map summary cards, and account-approval surfaces now use solid semantic colors. An audit confirms no gradient utilities remain in dashboard routes or shared admin components; the remaining recovery-dialog gradient is authentication-only and outside the Super Admin portal.

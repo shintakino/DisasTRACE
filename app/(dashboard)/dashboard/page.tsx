@@ -8,7 +8,7 @@ import { RecentReports } from "@/components/dashboard/recent-reports";
 import { PACCResponderGrid } from "@/components/dashboard/pacc-responder-grid";
 import { CDRRMOOperationsDashboard } from "@/components/dashboard/cdrrmo-operations-dashboard";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { Activity, AlertCircle, Clock3, MapPinned, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardData, DashboardDataSchema } from "@/types/dashboard";
 import { useRouter } from "next/navigation";
@@ -214,9 +214,25 @@ export default function DashboardPage() {
 
   // Render PACC Admin Layout
   if (role?.toLowerCase() === 'pacc_admin') {
+    const displayName = typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()
+      ? user.user_metadata.full_name.trim()
+      : 'PACC Admin';
+
     return (
-      <>
-        <div className="h-full min-h-0 overflow-y-auto pr-2 space-y-6 animate-in fade-in duration-500 scrollbar-hide lg:flex lg:flex-col lg:gap-4 lg:space-y-0 lg:scrollbar-default">
+      <div className="h-full min-h-0 overflow-y-auto pr-2 space-y-5 animate-in fade-in duration-500 scrollbar-hide lg:flex lg:flex-col lg:gap-4 lg:space-y-0 lg:scrollbar-default">
+        <section className="relative shrink-0 overflow-hidden rounded-xl border border-blue-100 bg-[#EAF1FF] px-6 py-5">
+          <div className="relative z-10 max-w-xl">
+            <h1 className="text-lg font-black text-[#1E3A8A]">Welcome back, {displayName}!</h1>
+            <p className="mt-1 text-xs leading-5 text-slate-600">Review incoming reports, coordinate verified emergencies, and keep dispatch operations moving this shift.</p>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-[#1E3A8A]">
+              <span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" /> {data.kpis.pendingVerification} reports awaiting review</span>
+              <span className="inline-flex items-center gap-1.5"><Activity className="size-3.5" /> {data.kpis.activeIncidents} active incidents</span>
+            </div>
+          </div>
+          <div className="absolute right-7 top-1/2 grid size-16 -translate-y-1/2 place-items-center rounded-full bg-blue-100 text-[#1E3A8A] ring-8 ring-blue-100/50"><MapPinned className="size-8" /></div>
+        </section>
+
+        <div className="min-h-0 space-y-6 lg:flex lg:flex-1 lg:flex-col lg:gap-4 lg:space-y-0">
           <div className="shrink-0">
             <KpiCards data={data.kpis} />
           </div>
@@ -232,7 +248,7 @@ export default function DashboardPage() {
             <PACCResponderGrid className="md:col-span-2 lg:h-full" responders={data.responders} />
           </div>
         </div>
-      </>
+      </div>
     );
   }
 

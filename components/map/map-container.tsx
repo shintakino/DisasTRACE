@@ -46,6 +46,8 @@ const BALIWAG_CENTER = {
   zoom: 13,
 };
 
+const BALIWAG_CAMERA_BOUNDS: [number, number, number, number] = [120.78, 14.85, 121.04, 15.08];
+
 // OpenFreeMap Light style
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
@@ -72,6 +74,7 @@ export function MapContainer({
   onSelectIncident,
 }: MapContainerProps) {
   const mapRef = useRef<MapRef>(null);
+  const lastFocusedIncidentIdRef = useRef<string | undefined>(undefined);
   const routeCacheRef = useRef<globalThis.Map<string, RouteCacheEntry>>(new globalThis.Map());
   const [routeGeometries, setRouteGeometries] = useState<RouteGeometry[]>([]);
   const demandZoneFeatures = useMemo(() => ({
@@ -85,9 +88,14 @@ export function MapContainer({
 
   // Fly to incident when selected from the list
   useEffect(() => {
-    if (selectedIncidentId) {
+    if (!selectedIncidentId) {
+      lastFocusedIncidentIdRef.current = undefined;
+      return;
+    }
+    if (lastFocusedIncidentIdRef.current !== selectedIncidentId) {
       const selectedIncident = incidents.find((i) => i.id === selectedIncidentId);
       if (selectedIncident) {
+        lastFocusedIncidentIdRef.current = selectedIncidentId;
         mapRef.current?.flyTo({
           center: [selectedIncident.lng, selectedIncident.lat],
           zoom: 15,
@@ -177,6 +185,10 @@ export function MapContainer({
         style={{ width: "100%", height: "100%" }}
         mapStyle={MAP_STYLE}
         attributionControl={false}
+        minZoom={11}
+        maxZoom={18}
+        maxBounds={BALIWAG_CAMERA_BOUNDS}
+        renderWorldCopies={false}
       >
         <NavigationControl position="bottom-right" />
 

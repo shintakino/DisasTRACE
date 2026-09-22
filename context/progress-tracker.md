@@ -20,6 +20,14 @@
 
 ## 2026-09-22 - Map camera resize compatibility repair
 
+- Bounded the shared PACC/CDRRMO MapLibre camera to the Baliwag service area
+  and changed selected-report focusing to run only on a new selection, rather
+  than on every live data refresh. Dispatcher zoom controls now retain their
+  intended direction and position.
+- Enlarged the PACC verification workspace's decision, evidence, metrics,
+  coordination, and classification text, and widened the rejection dialog to
+  a responsive 94% / 64rem maximum. External-unit coordination remains live
+  PACC data rather than misleading dummy operational assignments.
 - Upgraded `react-map-gl` and its MapLibre adapter from `8.1.1` to `8.1.2`, the upstream release that adds MapLibre GL JS v6 support. This replaces the incompatible direct camera-transform access that threw during `ResizeObserver` map resize events.
 - Extended the MapLibre regression check to pin the v6-compatible wrapper floor, preventing a future dependency resolution from restoring the crash-prone combination.
 

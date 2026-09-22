@@ -7,6 +7,8 @@ import { systemSettings } from "@/db/schema/system_settings";
 import { sendDispatchOfferExpiredPush, sendDispatchOfferPush } from "@/lib/push-notifications";
 import { eq, and, or, sql, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import {
+  AUTO_DISPATCH_RADIUS_KM,
+  AUTO_DISPATCH_RADIUS_METERS,
   canCascadeDispatchOffer,
   DISPATCH_ACCEPTANCE_GRACE_MS,
   RESPONDER_HEARTBEAT_FRESHNESS_MS,
@@ -147,13 +149,13 @@ export async function autoDispatchIncident(
             sql`ST_DWithin(
               ${users.locationGeom}::geography,
               ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography,
-              15000 -- 15 km
+              ${AUTO_DISPATCH_RADIUS_METERS}
             )`
           )
         );
     }
 
-    // 3. Compute distance vectors and filter responders within 2km radius
+    // 3. Compute distance vectors and enforce the same radius as PostGIS.
     const respondersWithDistance = eligibleResponders
       .map((item) => {
         if ('distanceMeters' in item) {
@@ -185,11 +187,11 @@ export async function autoDispatchIncident(
         );
         return { responder, distanceKm };
       })
-      .filter((item) => item.distanceKm <= 2.0) // Only within 2km radius
+      .filter((item) => item.distanceKm <= AUTO_DISPATCH_RADIUS_KM)
       .sort((a, b) => a.distanceKm - b.distanceKm); // Sort nearest first
 
     if (respondersWithDistance.length === 0) {
-      console.log(`No eligible responders within 2km found for request ${requestId}`);
+      console.log(`No eligible responders within ${AUTO_DISPATCH_RADIUS_KM}km found for request ${requestId}`);
       return null;
     }
 
@@ -285,7 +287,7 @@ export async function autoDispatchIncident(
       }
 
       // All candidates were already reserved by concurrent dispatches
-      console.log(`[AutoDispatch] All ${respondersWithDistance.length} candidate(s) within 2km were already reserved for request ${requestId}`);
+      console.log(`[AutoDispatch] All ${respondersWithDistance.length} candidate(s) within ${AUTO_DISPATCH_RADIUS_KM}km were already reserved for request ${requestId}`);
       return null;
     });
 
@@ -524,7 +526,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
             sql`ST_DWithin(
               ${users.locationGeom}::geography,
               ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography,
-              15000 -- 15 km
+              ${AUTO_DISPATCH_RADIUS_METERS}
             )`
           )
         );
@@ -564,7 +566,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         );
         return { responder, distanceKm };
       })
-      .filter((item) => item.distanceKm <= 2.0)
+      .filter((item) => item.distanceKm <= AUTO_DISPATCH_RADIUS_KM)
       .sort((a, b) => a.distanceKm - b.distanceKm);
 
     if (sortedResponders.length > 0) {
@@ -649,7 +651,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
         // Preserve the incident and skipped-responder record. Deleting this row
         // made the report disappear and allowed the same responder to be
         // offered repeatedly after a burst race.
-        console.log(`[Cascade] All candidates within 2km are reserved for incident ${incident.id}. Keeping it for PACC reassignment.`);
+        console.log(`[Cascade] All candidates within ${AUTO_DISPATCH_RADIUS_KM}km are reserved for incident ${incident.id}. Keeping it for PACC reassignment.`);
         await notifyPaccAndCdrrmo({
           title: 'Automatic Dispatch Re-assignment Required',
           body: `No available alternate responder for Request #${request.requestId || request.id}. PACC reassignment is required.`,

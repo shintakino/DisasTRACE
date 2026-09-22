@@ -50,6 +50,25 @@ export type ManualDispatchEligibility =
 // short recovery window without leaving a switched-off device dispatchable.
 export const RESPONDER_HEARTBEAT_FRESHNESS_MS = 90 * 1000;
 
+// Keep the spatial database filter and the in-memory candidate check on one
+// documented policy. The previous 15 km query followed by a hidden 2 km
+// filter made otherwise eligible responders appear to be skipped.
+export const MIN_AUTO_DISPATCH_RADIUS_METERS = 1_000;
+export const MAX_AUTO_DISPATCH_RADIUS_METERS = 15_000;
+export const DEFAULT_AUTO_DISPATCH_RADIUS_METERS = 15_000;
+
+export function resolveAutoDispatchRadiusMeters(rawValue = process.env.AUTO_DISPATCH_RADIUS_METERS) {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return DEFAULT_AUTO_DISPATCH_RADIUS_METERS;
+  const rounded = Math.round(parsed);
+  return rounded >= MIN_AUTO_DISPATCH_RADIUS_METERS && rounded <= MAX_AUTO_DISPATCH_RADIUS_METERS
+    ? rounded
+    : DEFAULT_AUTO_DISPATCH_RADIUS_METERS;
+}
+
+export const AUTO_DISPATCH_RADIUS_METERS = resolveAutoDispatchRadiusMeters();
+export const AUTO_DISPATCH_RADIUS_KM = AUTO_DISPATCH_RADIUS_METERS / 1_000;
+
 // The mobile client closes its visible Accept action shortly before the
 // deadline. Keep a small server grace window for a request that was already
 // in flight during a weak-network handoff; the scheduler uses this same value

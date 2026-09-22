@@ -4,13 +4,22 @@ import {
   canClaimAutomaticDispatchTurn,
   canResponderAcceptDispatchOffer,
   DISPATCH_ACCEPTANCE_GRACE_MS,
+  DEFAULT_AUTO_DISPATCH_RADIUS_METERS,
   evaluateManualDispatchEligibility,
   isResponderHeartbeatFresh,
   prioritizeAutomaticDispatchRequests,
   requiresPaccReassignment,
+  resolveAutoDispatchRadiusMeters,
   selectNextDispatchableRequest,
   shouldRetryAutomaticDispatch,
 } from '../lib/dispatch-policy';
+
+check('uses one bounded automatic dispatch radius policy', () => {
+  assert.equal(resolveAutoDispatchRadiusMeters(undefined), DEFAULT_AUTO_DISPATCH_RADIUS_METERS);
+  assert.equal(resolveAutoDispatchRadiusMeters('500'), DEFAULT_AUTO_DISPATCH_RADIUS_METERS);
+  assert.equal(resolveAutoDispatchRadiusMeters('5000'), 5000);
+  assert.equal(resolveAutoDispatchRadiusMeters('16000'), DEFAULT_AUTO_DISPATCH_RADIUS_METERS);
+});
 
 function check(name: string, assertion: () => void) {
   try {

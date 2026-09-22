@@ -10,7 +10,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { DetailedIncidentReport } from "@/types/reports";
-import { Truck, MoreVertical, X, FileDown, Loader2 } from "lucide-react";
+import { Truck, Maximize2, X, FileDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -236,6 +236,7 @@ export function ReportDetailSheet({
                           type="button"
                           onClick={() => setExpandedImage(report.residentPhotoUrl || null)}
                           className="relative rounded-[20px] overflow-hidden h-[140px] w-full mt-5 bg-slate-100 group block text-left"
+                          aria-label="Expand resident attachment"
                         >
                           <img 
                             src={report.residentPhotoUrl} 
@@ -245,7 +246,7 @@ export function ReportDetailSheet({
                           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-12 pb-3 px-4 flex justify-between items-end">
                             <span className="text-white text-xs font-medium tracking-wide">RESIDENT_ATTACHMENT.jpg</span>
                             <div className="text-white bg-white/20 p-1 rounded-full group-hover:bg-white/30 transition-colors">
-                              <MoreVertical className="h-4 w-4" />
+                              <Maximize2 className="h-4 w-4" aria-hidden="true" />
                             </div>
                           </div>
                         </button>

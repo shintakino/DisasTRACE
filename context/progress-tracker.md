@@ -797,6 +797,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Replaced the ambiguous vertical-ellipsis attachment affordance in CDRRMO report details with the standard expand icon and accessible label; attachments still open the same full-screen viewer.
+
 - Added a CDRRMO floating live-operation confirmation when an active incident offer is successfully passed from one responder to another. It appears only for an actual offer-to-offer reassignment and links directly to the live map, avoiding noise for initial offers or PACC’s existing triage alerts.
 
 - Extended CDRRMO Reports filtering with an inclusive custom From/To date range while retaining the existing quick date presets, incident-type, status, reporter-source, and search filters.

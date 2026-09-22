@@ -130,7 +130,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
   return (
     <div className="flex flex-col border border-slate-200/80 shadow-sm rounded-xl overflow-hidden bg-white">
       <div className="bg-[#2B4C9B] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div><h2 className="text-xl font-bold text-white tracking-tight">Responder Roster</h2><p className="mt-1 text-xs font-medium uppercase tracking-wider text-blue-200">Personnel access and availability management</p></div>
+        <div><h2 className="text-2xl font-bold text-white tracking-tight">Responder Roster</h2><p className="mt-1 text-xs font-medium uppercase tracking-wider text-blue-200">Personnel access and availability management</p></div>
         <div className="flex items-center gap-3">
           {searchComponent}
           {filterComponent}

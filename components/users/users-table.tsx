@@ -33,7 +33,7 @@ interface UsersTableProps {
 const StatusBadge = ({ status }: { status: UserStatus }) => {
   const styles: Record<UserStatus, string> = {
     ACTIVE: "bg-green-100 text-green-700 border-green-200",
-    SUSPENDED: "bg-orange-100 text-orange-700 border-orange-200",
+    SUSPENDED: "bg-amber-100 text-amber-800 border-amber-200",
     DEACTIVATED: "bg-red-100 text-red-700 border-red-200",
     PENDING: "bg-gray-100 text-gray-700 border-gray-200",
   };

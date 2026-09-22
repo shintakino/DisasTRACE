@@ -2,7 +2,7 @@ import { db } from '@/db';
 import { incidents } from '@/db/schema/incidents';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { eq } from 'drizzle-orm';
-import { normalizeRequiredRejectionReason } from '@/lib/rejected-report-workflow';
+import { canPaccRejectVerificationRequest, normalizeRequiredRejectionReason } from '@/lib/rejected-report-workflow';
 import { auditLogs } from '@/db/schema/audit_logs';
 import { createAuditEvent, PACC_AUDIT_ACTIONS, type AuditActor } from '@/lib/audit-events';
 
@@ -52,17 +52,14 @@ export async function rejectVerificationRequest(
       .limit(1)
       .for('update');
 
-    const isUnassignedPaccPlaceholder = Boolean(
-      lockedIncident
-      && lockedIncident.status === 'DISPATCHED'
-      && lockedIncident.dispatchMethod === 'PACC_MANUAL'
-      && !lockedIncident.responderId
-      && !lockedIncident.currentOfferResponderId,
-    );
-    const canReject = lockedIncident
-      ? isUnassignedPaccPlaceholder
-        && (lockedRequest.status === 'PENDING' || lockedRequest.status === 'VERIFIED')
-      : lockedRequest.status === 'PENDING';
+    const canReject = canPaccRejectVerificationRequest({
+      requestStatus: lockedRequest.status,
+      incident: lockedIncident ? {
+        incidentStatus: lockedIncident.status,
+        responderId: lockedIncident.responderId,
+        currentOfferResponderId: lockedIncident.currentOfferResponderId,
+      } : null,
+    });
 
     if (!canReject) {
       return {

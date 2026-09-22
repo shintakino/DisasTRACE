@@ -2,6 +2,11 @@
 
 ## 2026-09-22 - Responder availability and live-offer recovery
 
+- Corrected PACC rejection eligibility for a responder offer that fully expired
+  without acceptance. It is now rejectable once there is neither a current
+  offer nor an assigned responder, while active offers and accepted responses
+  remain protected. The rejected-report workflow regression script covers each
+  state.
 - Unified automatic dispatch and timeout-cascade candidate radius under one bounded server policy (1-15 km, default 15 km), removing the former hidden 2 km post-filter after a 15 km spatial search.
 - PACC manual dispatch now exposes a responder's precise trusted-GPS sync reason and age, so `SYNC DELAYED` explains the corrective action rather than resembling a failed responder assignment.
 - The responder's On Duty action now immediately attempts an authenticated, bounded trusted-GPS heartbeat and tells the responder whether PACC can offer live emergencies. Availability state is shared with a tab-level telemetry owner, so opening Profile or Forms does not stop heartbeats. The same action confirms whether Android background dispatch notifications are registered.

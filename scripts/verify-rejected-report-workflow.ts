@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  canPaccRejectVerificationRequest,
   classifyActiveVerificationBucket,
   classifyVerificationQueueItem,
   normalizeRequiredRejectionReason,
@@ -58,6 +59,21 @@ check('requires and normalizes a meaningful PACC rejection reason', () => {
     normalizeRequiredRejectionReason('  The evidence photo   does not show the reported incident.  '),
     'The evidence photo does not show the reported incident.',
   );
+});
+
+check('allows rejection after an unanswered offer is fully released, but never during an active response', () => {
+  assert.equal(canPaccRejectVerificationRequest({
+    requestStatus: 'VERIFIED',
+    incident: { incidentStatus: 'DISPATCHED', responderId: null, currentOfferResponderId: null },
+  }), true);
+  assert.equal(canPaccRejectVerificationRequest({
+    requestStatus: 'VERIFIED',
+    incident: { incidentStatus: 'DISPATCHED', responderId: null, currentOfferResponderId: 'offered-responder' },
+  }), false);
+  assert.equal(canPaccRejectVerificationRequest({
+    requestStatus: 'VERIFIED',
+    incident: { incidentStatus: 'EN_ROUTE', responderId: 'accepted-responder', currentOfferResponderId: null },
+  }), false);
 });
 
 check('projects rejection as a terminal reporter status with the exact reason', () => {

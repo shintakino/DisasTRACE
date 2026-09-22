@@ -18,6 +18,23 @@ interface ActionableVerificationQueueState extends VerificationQueueState {
 }
 
 /**
+ * PACC may reject a report until a responder has accepted it. An unanswered
+ * offer is not an active response: once the dispatcher releases the offer it
+ * leaves a DISPATCHED incident with no assigned responder and no current offer.
+ */
+export function canPaccRejectVerificationRequest(input: {
+  requestStatus: VerificationRequestStatus;
+  incident?: Pick<ActionableVerificationQueueState, 'incidentStatus' | 'responderId' | 'currentOfferResponderId'> | null;
+}) {
+  if (input.requestStatus !== 'PENDING' && input.requestStatus !== 'VERIFIED') return false;
+  if (!input.incident) return input.requestStatus === 'PENDING';
+
+  return input.incident.incidentStatus === 'DISPATCHED'
+    && !input.incident.responderId
+    && !input.incident.currentOfferResponderId;
+}
+
+/**
  * Rejection is a PACC triage outcome. Case Closed means that an accepted
  * report completed its response lifecycle. A rejected report always remains
  * rejected even if inconsistent legacy data still points at a resolved case.

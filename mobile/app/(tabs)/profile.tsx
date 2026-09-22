@@ -8,9 +8,11 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadAvatar } from '../../lib/storage';
 import { signOutFromMobile } from '../../lib/mobile-auth';
+import { syncResponderAvailabilityLocation } from '../../lib/responder-availability';
+import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
 
 export default function ProfileScreen() {
-  const { user, role, profile } = useAuthStatus();
+  const { user, role, profile, refreshStatus } = useAuthStatus();
   const [logoutVisible, setLogoutVisible] = useState(false);
   const router = useRouter();
   const isResponder = role === 'ambulance_responder';
@@ -19,6 +21,7 @@ export default function ProfileScreen() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [updatingDuty, setUpdatingDuty] = useState(false);
+  const [dutySyncMessage, setDutySyncMessage] = useState<string | null>(null);
 
   const handleToggleDutyStatus = async () => {
     if (!profile) return;
@@ -45,6 +48,19 @@ export default function ProfileScreen() {
       const res = await response.json();
       if (!response.ok) {
         Alert.alert('Status Error', res.error || 'Failed to update duty status.');
+        return;
+      }
+
+      useResponderDutyStore.getState().setDutyStatus(nextDuty);
+      if (nextDuty === 'ON_DUTY') {
+        setDutySyncMessage('Syncing GPS with PACC...');
+        const sync = await syncResponderAvailabilityLocation();
+        setDutySyncMessage(sync.message);
+        await refreshStatus();
+        Alert.alert(sync.success ? 'You are available' : 'GPS sync needed', sync.message);
+      } else {
+        setDutySyncMessage('You are off duty and will not receive new emergency offers.');
+        await refreshStatus();
       }
     } catch (err) {
       console.error('[Profile] Failed to update duty status:', err);
@@ -318,6 +334,11 @@ export default function ProfileScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
+                {dutySyncMessage && (
+                  <Text className="mt-2 max-w-[250px] text-[11px] leading-4 text-blue-100">
+                    {dutySyncMessage}
+                  </Text>
+                )}
               </View>
             ) : (
               <>

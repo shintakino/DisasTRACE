@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { verifyMobileSession } from '../lib/mobile-auth';
+import { useResponderDutyStore } from '../stores/useResponderDutyStore';
 
 const VerificationStatusSchema = z.enum(['pending', 'approved', 'rejected']);
 type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
@@ -31,6 +32,7 @@ export function useAuthStatus() {
         setUser(null);
         setSession(null);
         setRole(null);
+        useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
         setVerificationStatus('loading');
         setIsLoaded(true);
         return;
@@ -77,6 +79,7 @@ export function useAuthStatus() {
         dutyStatus: dbUser.duty_status || 'OFF_DUTY',
       };
       setProfile(userProfile);
+      useResponderDutyStore.getState().setDutyStatus(userProfile.dutyStatus);
       
       // Save profile to local cache for offline use
       SecureStore.setItemAsync(`profile_${currentUser.id}`, JSON.stringify(userProfile)).catch(() => {});
@@ -115,7 +118,9 @@ export function useAuthStatus() {
       SecureStore.getItemAsync(`profile_${currentUser.id}`).then((cached) => {
         if (cached) {
           try {
-            setProfile(JSON.parse(cached));
+            const cachedProfile = JSON.parse(cached);
+            setProfile(cachedProfile);
+            useResponderDutyStore.getState().setDutyStatus(cachedProfile.dutyStatus);
           } catch (e) {
             setProfile({
               fullName: currentUser.user_metadata?.full_name || 'Resident',
@@ -123,6 +128,7 @@ export function useAuthStatus() {
               barangay: currentUser.user_metadata?.barangay || '',
               phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
             });
+            useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
           }
         } else {
           setProfile({
@@ -131,6 +137,7 @@ export function useAuthStatus() {
             barangay: currentUser.user_metadata?.barangay || '',
               phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
           });
+          useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
         }
       }).catch(() => {
         setProfile({
@@ -139,6 +146,7 @@ export function useAuthStatus() {
           barangay: currentUser.user_metadata?.barangay || '',
           phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
         });
+        useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
       });
     }
   };
@@ -166,6 +174,7 @@ export function useAuthStatus() {
         checkVerification(session.user, session);
       } else {
         setRole('public_user');
+        useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
         setVerificationStatus('loading');
         setIsLoaded(true);
       }
@@ -219,13 +228,15 @@ export function useAuthStatus() {
           }
           
           if (payload.new.full_name || payload.new.address || payload.new.barangay || payload.new.phone || payload.new.duty_status) {
-            setProfile({
+            const updatedProfile = {
               fullName: payload.new.full_name || '',
               address: payload.new.address || '',
               barangay: payload.new.barangay || '',
               phone: payload.new.phone || '',
               dutyStatus: payload.new.duty_status || 'OFF_DUTY',
-            });
+            };
+            setProfile(updatedProfile);
+            useResponderDutyStore.getState().setDutyStatus(updatedProfile.dutyStatus);
           }
         }
       )

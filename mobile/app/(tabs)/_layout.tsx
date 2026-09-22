@@ -3,9 +3,35 @@ import { Tabs, useRouter } from 'expo-router';
 import { Home2, FolderOpen, Map, User, CalendarAdd } from 'iconsax-react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useResponderStore } from '../../stores/useResponderStore';
+import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
+import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocationPermission } from '../../hooks/use-location-permission';
 import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
+
+function ResponderAvailabilityTracker() {
+  const { role } = useAuthStatus();
+  const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
+  const responderStatus = useResponderStore((state) => state.status);
+  const activeDispatch = useResponderStore((state) => state.activeDispatch);
+  const targetHospital = useResponderStore((state) => state.targetHospital);
+  const shouldTrack = role === 'ambulance_responder' && (
+    dutyStatus === 'ON_DUTY'
+    || dutyStatus === 'ACTIVE_DISPATCH'
+    || responderStatus === 'en_route'
+    || responderStatus === 'on_scene'
+    || responderStatus === 'to_hospital'
+  );
+
+  useBroadcastTracker(
+    activeDispatch?.id || null,
+    shouldTrack,
+    responderStatus,
+    targetHospital,
+    activeDispatch,
+  );
+  return null;
+}
 
 export default function TabLayout() {
   const router = useRouter();
@@ -25,6 +51,7 @@ export default function TabLayout() {
 
   return (
     <>
+      <ResponderAvailabilityTracker />
       <Tabs screenOptions={{
       tabBarActiveTintColor: '#FFFFFF',
       tabBarInactiveTintColor: '#94A3B8',

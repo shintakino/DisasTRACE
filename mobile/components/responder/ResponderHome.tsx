@@ -21,7 +21,6 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { signOutFromMobile } from '../../lib/mobile-auth';
 import * as Location from 'expo-location';
-import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
 import { useLiveBarangay } from '../../hooks/use-live-barangay';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
@@ -801,22 +800,8 @@ export function ResponderHome() {
   ]);
 
 
-  // 1. Activate live GPS telemetry tracking
-  useBroadcastTracker(
-    activeDispatch?.id || null,
-    !isSimulating && (
-      status === 'en_route' || 
-      status === 'on_scene' || 
-      status === 'to_hospital' || 
-      profile?.dutyStatus === 'ON_DUTY' ||
-      profile?.dutyStatus === 'ACTIVE_DISPATCH'
-    ),
-    status,
-    targetHospital,
-    activeDispatch
-  );
-
-  // 2. Track current location of the responder via GPS
+  // Track the map position of the responder via GPS. The tab-layout tracker
+  // owns server telemetry so it remains active while Profile or Forms is open.
   useEffect(() => {
     let subscription: any;
     

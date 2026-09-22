@@ -166,6 +166,25 @@ export default function DashboardLayout({
 
           const noResponder = !newInc.responder_id && !newInc.current_offer_responder_id && !newInc.responderId && !newInc.currentOfferResponderId;
           const hadResponder = oldInc.responder_id || oldInc.current_offer_responder_id || oldInc.responderId || oldInc.currentOfferResponderId;
+          const previousOfferId = oldInc.current_offer_responder_id || oldInc.currentOfferResponderId;
+          const nextOfferId = newInc.current_offer_responder_id || newInc.currentOfferResponderId;
+
+          if (
+            role === 'cdrrmo_super_admin'
+            && newInc.status === 'DISPATCHED'
+            && previousOfferId
+            && nextOfferId
+            && previousOfferId !== nextOfferId
+          ) {
+            toast.success('Incident passed to another responder', {
+              duration: 10_000,
+              description: 'The previous offer was released. A new available responder has received the incident offer.',
+              action: {
+                label: 'Monitor',
+                onClick: () => router.push(`/map?select=${newInc.id}`),
+              },
+            });
+          }
           
           if (newInc.status === 'DISPATCHED' && noResponder && hadResponder) {
             playAlert('critical');

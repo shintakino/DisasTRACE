@@ -270,8 +270,7 @@ export default function RosterPage() {
 
       <Dialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
         <DialogContent className="max-w-md p-0 border-0 shadow-2xl rounded-[24px] overflow-hidden bg-white flex flex-col" showCloseButton={true}>
-          <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+          <div className="bg-[#1E3A8A] p-6 text-white shrink-0">
             <div className="relative z-10 flex items-center gap-3">
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
                 <Trash2 className="w-6 h-6 text-white" />
@@ -322,7 +321,7 @@ export default function RosterPage() {
               <div>
                 <DialogTitle className="text-2xl font-bold text-white mb-1 tracking-tight">Manage Responder</DialogTitle>
                 <DialogDescription className="text-blue-100 text-sm font-medium">
-                  Change status or suspend account for <span className="font-bold text-white">{userToBan?.fullName}</span>
+                  Choose a direct account action for <span className="font-bold text-white">{userToBan?.fullName}</span>
                 </DialogDescription>
               </div>
             </div>
@@ -336,18 +335,10 @@ export default function RosterPage() {
             
             <div className="w-full text-left">
               <p className="text-[#1E3A8A] font-bold text-xs mb-2 uppercase tracking-widest">Action</p>
-              <Select value={banAction} onValueChange={(v: 'SUSPENDED' | 'DEACTIVATED' | null) => { if (v) setBanAction(v); }}>
-                <SelectTrigger className="w-full h-11 rounded-xl border-slate-200 bg-white focus:ring-[#2B4C9B] px-4 font-bold text-slate-700">
-                  <SelectValue placeholder="Select an action">
-                    {banAction === "SUSPENDED" && "Suspend User"}
-                    {banAction === "DEACTIVATED" && "Deactivate User"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SUSPENDED">Suspend User</SelectItem>
-                  <SelectItem value="DEACTIVATED">Deactivate User</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <Button type="button" variant="outline" onClick={() => setBanAction('SUSPENDED')} className={banAction === 'SUSPENDED' ? 'border-amber-500 bg-amber-50 text-amber-900' : 'border-slate-200 text-slate-700'}>Suspend</Button>
+                <Button type="button" variant="outline" onClick={() => setBanAction('DEACTIVATED')} className={banAction === 'DEACTIVATED' ? 'border-red-500 bg-red-50 text-red-800' : 'border-slate-200 text-slate-700'}>Block</Button>
+              </div>
             </div>
 
             <div className="w-full text-left">
@@ -384,7 +375,7 @@ export default function RosterPage() {
               className="w-full bg-[#1e1b4b] hover:bg-[#1e1b4b]/90 text-white rounded-xl py-5 h-auto font-bold text-sm"
               onClick={confirmBan}
             >
-              {banAction === 'SUSPENDED' ? 'Suspend' : 'Deactivate'}
+              {banAction === 'SUSPENDED' ? 'Suspend responder' : 'Block responder'}
             </Button>
           </DialogFooter>
         </DialogContent>

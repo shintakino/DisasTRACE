@@ -20,6 +20,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("query")?.toLowerCase();
     const role = searchParams.get("role");
+    const from = searchParams.get("from");
+    const to = searchParams.get("to");
 
     // Query real audit logs from the database
     const queryBuilder = db
@@ -67,8 +69,19 @@ export async function GET(request: Request) {
       mapped = mapped.filter(
         (log) =>
           log.userName.toLowerCase().includes(query) ||
-          log.action.toLowerCase().includes(query)
+          log.action.toLowerCase().includes(query) ||
+          log.contextPath.toLowerCase().includes(query) ||
+          log.actorRole.toLowerCase().includes(query)
       );
+    }
+
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+    if (fromDate && !Number.isNaN(fromDate.getTime())) {
+      mapped = mapped.filter((log) => new Date(log.timestamp) >= fromDate);
+    }
+    if (toDate && !Number.isNaN(toDate.getTime())) {
+      mapped = mapped.filter((log) => new Date(log.timestamp) <= toDate);
     }
 
     return NextResponse.json(mapped);

@@ -26,22 +26,31 @@ interface AuditHeaderProps {
 export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
   const [search, setSearch] = React.useState("");
   const [role, setRole] = React.useState<string>("all");
+  const [from, setFrom] = React.useState("");
+  const [to, setTo] = React.useState("");
+
+  const publishFilters = (next: { search?: string; role?: string; from?: string; to?: string }) => {
+    const start = next.from ?? from;
+    const end = next.to ?? to;
+    onFilterChange({
+      search: (next.search ?? search) || undefined,
+      role: (next.role ?? role) === "all" ? undefined : (next.role ?? role),
+      dateRange: start || end ? {
+        from: start ? new Date(`${start}T00:00:00`) : undefined,
+        to: end ? new Date(`${end}T23:59:59.999`) : undefined,
+      } : undefined,
+    });
+  };
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
-    onFilterChange({
-      search: val || undefined,
-      userId: role === "all" ? undefined : role, // Reusing role as a filter for now
-    });
+    publishFilters({ search: val });
   };
 
   const handleRoleChange = (val: string | null) => {
     const value = val || "all";
     setRole(value);
-    onFilterChange({
-      search: search || undefined,
-      userId: value === "all" ? undefined : value,
-    });
+    publishFilters({ role: value });
   };
 
   return (
@@ -83,6 +92,16 @@ export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
                     <SelectItem value="public_user">Public User</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3 border-t pt-4">
+                <div className="space-y-2">
+                  <label htmlFor="audit-from" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">From</label>
+                  <Input id="audit-from" type="date" value={from} onChange={(event) => { setFrom(event.target.value); publishFilters({ from: event.target.value }); }} />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="audit-to" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">To</label>
+                  <Input id="audit-to" type="date" min={from || undefined} value={to} onChange={(event) => { setTo(event.target.value); publishFilters({ to: event.target.value }); }} />
+                </div>
               </div>
             </div>
           </PopoverContent>

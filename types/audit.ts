@@ -16,7 +16,7 @@ export type AuditLogEntry = z.infer<typeof AuditLogEntrySchema>;
 
 export const AuditFilterSchema = z.object({
   search: z.string().optional(),
-  userId: z.string().optional(),
+  role: z.string().optional(),
   dateRange: z.object({
     from: z.date().optional(),
     to: z.date().optional(),

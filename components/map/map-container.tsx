@@ -199,9 +199,9 @@ export function MapContainer({
               type="circle"
               paint={{
                 "circle-radius": ["interpolate", ["linear"], ["get", "count"], 3, 60, 5, 90, 8, 130],
-                "circle-color": "#8B5CF6",
+                "circle-color": ["match", ["get", "riskLevel"], "HIGH", "#DC2626", "MODERATE", "#D97706", "#2563EB"],
                 "circle-opacity": 0.16,
-                "circle-stroke-color": "#7C3AED",
+                "circle-stroke-color": ["match", ["get", "riskLevel"], "HIGH", "#B91C1C", "MODERATE", "#B45309", "#1D4ED8"],
                 "circle-stroke-width": 2,
                 "circle-stroke-opacity": 0.7,
               }}

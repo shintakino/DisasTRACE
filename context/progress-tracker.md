@@ -797,6 +797,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Made CDRRMO historical demand-zone colors data-driven: high-frequency clusters (8+ verified reports in 90 days) render red, moderate clusters (5–7) amber, and emerging clusters (3–4) blue. The map legend now previews those thresholds and reiterates that they are historical planning indicators, not real-time hazards.
+
 - Replaced the Responder Roster management action dropdown with direct, clearly styled Suspend and Block controls. The server still maps Block to the existing deactivated account state and retains its authenticated update/audit path.
 
 - Added Super Admin–only editing of registered public-user profile information from Manage User: full name, email, validated 11-digit Philippine mobile number, and home address. The update is synchronized to the profile and Supabase Auth metadata and produces a non-sensitive audit event; credentials remain non-readable and must use reset flows.

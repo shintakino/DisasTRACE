@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { isSameDay } from "date-fns";
 import { IncidentPanel } from "@/components/map/incident-panel";
 import { MapContainer } from "@/components/map/map-container";
 import { useMapData } from "@/hooks/use-map-data";
@@ -22,6 +23,7 @@ function MapPageContent() {
   const [category, setCategory] = useState<"user" | "responder">("user");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [priorityIncidentId, setPriorityIncidentId] = useState<string | undefined>();
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   
   const [layers, setLayers] = useState<CommandMapLayers>({
     critical: true,
@@ -73,7 +75,12 @@ function MapPageContent() {
     setIsReportSheetOpen(true);
   };
 
-  const displayedIncidents = incidents.filter((incident) => {
+  const dateFilteredIncidents = useMemo(() => selectedDate
+    ? incidents.filter((incident) => isSameDay(new Date(incident.createdAt), selectedDate))
+    : incidents,
+  [incidents, selectedDate]);
+
+  const displayedIncidents = dateFilteredIncidents.filter((incident) => {
     if (incident.category === "user" && !layers.requests) return false;
     if (incident.category === "responder" && !layers.reports) return false;
     if ((incident.status === "REJECTED" || incident.status === "DUPLICATE") && !layers.rejected) return false;
@@ -131,6 +138,8 @@ function MapPageContent() {
               category={category}
               onCategoryChange={setCategory}
               onPriorityChange={setPriorityIncidentId}
+              selectedDate={selectedDate}
+              onSelectedDateChange={setSelectedDate}
             />
           </div>
 
@@ -147,7 +156,12 @@ function MapPageContent() {
             {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
 
-          <CommandMapOverlays layers={layers} onLayerChange={(layer, checked) => setLayers((current) => ({ ...current, [layer]: checked }))} zones={demandZones} />
+          <CommandMapOverlays
+            layers={layers}
+            onLayerChange={(layer, checked) => setLayers((current) => ({ ...current, [layer]: checked }))}
+            zones={demandZones}
+            isIncidentPanelOpen={isSidebarOpen}
+          />
 
           <div className="relative h-full flex-1">
             <MapContainer

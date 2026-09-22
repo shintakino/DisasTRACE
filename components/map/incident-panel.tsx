@@ -22,6 +22,8 @@ interface IncidentPanelProps {
   category?: "user" | "responder";
   onCategoryChange?: (category: "user" | "responder") => void;
   onPriorityChange?: (incidentId: string | undefined) => void;
+  selectedDate?: Date;
+  onSelectedDateChange?: (date: Date | undefined) => void;
 }
 
 export function IncidentPanel({
@@ -34,10 +36,21 @@ export function IncidentPanel({
   category: externalCategory,
   onCategoryChange,
   onPriorityChange,
+  selectedDate: externalSelectedDate,
+  onSelectedDateChange,
 }: IncidentPanelProps) {
   const [internalCategory, setInternalCategory] = React.useState<"user" | "responder">("user");
   const category = externalCategory !== undefined ? externalCategory : internalCategory;
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(undefined);
+  const [internalSelectedDate, setInternalSelectedDate] = React.useState<Date | undefined>(undefined);
+  const selectedDate = externalSelectedDate ?? internalSelectedDate;
+
+  const handleSelectedDateChange = (date: Date | undefined) => {
+    if (onSelectedDateChange) {
+      onSelectedDateChange(date);
+      return;
+    }
+    setInternalSelectedDate(date);
+  };
 
   // Auto-scroll list when an incident pin is selected on the map
   React.useEffect(() => {
@@ -141,7 +154,7 @@ export function IncidentPanel({
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider pl-1">Filter by Date</span>
                 {selectedDate && (
                   <button 
-                    onClick={() => setSelectedDate(undefined)} 
+                    onClick={() => handleSelectedDateChange(undefined)}
                     className="text-[9px] font-bold text-red-500 hover:text-red-700 uppercase pr-1 cursor-pointer"
                   >
                     Clear
@@ -151,7 +164,7 @@ export function IncidentPanel({
               <UICalendar
                 mode="single"
                 selected={selectedDate}
-                onSelect={setSelectedDate}
+                onSelect={handleSelectedDateChange}
               />
             </PopoverContent>
           </Popover>

@@ -797,6 +797,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Reworked the shared PACC/CDRRMO command-map controls: selecting a date now filters both report cards and map pins to that local calendar day, the historical-demand outlook shifts clear of the expanded report drawer, and Map Legend/Layers are compact accessible drop-down controls. The legend now documents the actual red/amber/green/blue incident markers, blue hospital marker, responder-navigation markers, and demand-zone thresholds rendered on the map.
+
 - Fixed resident-request detail resolution from PACC/CDRRMO map and dashboard cards. When an emergency has an incident record but no responder clinical report yet, the protected detail endpoint now resolves the linked verification request instead of returning a false not-found result.
 
 - Added the PACC dashboard shift header to match the CDRRMO command dashboard hierarchy. It identifies the signed-in PACC administrator and presents live pending-review and active-incident counts before the dashboard KPIs.

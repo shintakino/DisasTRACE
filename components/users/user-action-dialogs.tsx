@@ -28,25 +28,33 @@ interface ManageUserDialogProps {
   user: UserManagementEntry | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate: (id: string, updates: { status?: UserStatus; role?: UserRole; reason?: string }) => void;
+  onUpdate: (id: string, updates: { status?: UserStatus; role?: UserRole; reason?: string; fullName?: string; email?: string; phone?: string; address?: string }) => void;
 }
 
 export function ManageUserDialog({ user, isOpen, onClose, onUpdate }: ManageUserDialogProps) {
   const [status, setStatus] = React.useState<UserStatus>("ACTIVE");
   const [role, setRole] = React.useState<UserRole>("public_user");
   const [reason, setReason] = React.useState("");
+  const [fullName, setFullName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [address, setAddress] = React.useState("");
 
   React.useEffect(() => {
     if (user) {
       setStatus(user.status);
       setRole(user.role);
       setReason("");
+      setFullName(user.fullName);
+      setEmail(user.email);
+      setPhone(user.phone || "");
+      setAddress(user.address || "");
     }
   }, [user]);
 
   const handleUpdate = () => {
     if (!user) return;
-    onUpdate(user.id, { status, role, reason });
+    onUpdate(user.id, { status, role, reason, ...(user.role === "public_user" ? { fullName, email, ...(phone ? { phone } : {}), address } : {}) });
     onClose();
   };
 
@@ -89,6 +97,15 @@ export function ManageUserDialog({ user, isOpen, onClose, onUpdate }: ManageUser
               </SelectContent>
             </Select>}
           </div>
+
+          {user.role === "public_user" && (
+            <fieldset className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+              <legend className="px-1 text-xs font-black uppercase tracking-widest text-slate-400">Registered user profile</legend>
+              <div className="grid gap-2"><Label htmlFor="managed-full-name">Full name</Label><Input id="managed-full-name" value={fullName} onChange={(event) => setFullName(event.target.value)} /></div>
+              <div className="grid gap-2 md:grid-cols-2"><div className="grid gap-2"><Label htmlFor="managed-email">Email</Label><Input id="managed-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></div><div className="grid gap-2"><Label htmlFor="managed-phone">Mobile number</Label><Input id="managed-phone" inputMode="numeric" maxLength={11} value={phone} onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 11))} /></div></div>
+              <div className="grid gap-2"><Label htmlFor="managed-address">Home address</Label><Textarea id="managed-address" value={address} onChange={(event) => setAddress(event.target.value)} className="min-h-20 resize-y" /></div>
+            </fieldset>
+          )}
 
           <div className="grid gap-2 text-left">
             <Label htmlFor="status" className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Account Status</Label>

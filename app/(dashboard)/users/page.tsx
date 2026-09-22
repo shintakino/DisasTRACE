@@ -73,7 +73,7 @@ export default function UsersPage() {
     setFilteredUsers(result);
   };
 
-  const handleUpdateUser = async (id: string, updates: { status?: UserStatus; role?: UserRole; reason?: string }) => {
+  const handleUpdateUser = async (id: string, updates: { status?: UserStatus; role?: UserRole; reason?: string; fullName?: string; email?: string; phone?: string; address?: string }) => {
     try {
       const response = await fetch("/api/users", {
         method: "PATCH",
@@ -82,7 +82,11 @@ export default function UsersPage() {
           id,
           status: updates.status,
           role: updates.role,
-          rejectionReason: updates.reason
+          rejectionReason: updates.reason,
+          fullName: updates.fullName,
+          email: updates.email,
+          phone: updates.phone,
+          address: updates.address,
         }),
       });
 

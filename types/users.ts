@@ -19,6 +19,8 @@ export const UserManagementEntrySchema = z.object({
   role: UserRoleSchema,
   joinedDate: z.string(),
   lastActive: z.string(),
+  phone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
 });
 export type UserManagementEntry = z.infer<typeof UserManagementEntrySchema>;
 
@@ -26,5 +28,9 @@ export const UserFilterSchema = z.object({
   search: z.string().optional(),
   role: UserRoleSchema.optional(),
   status: UserStatusSchema.optional(),
+  fullName: z.string().optional(),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
 });
 export type UserFilter = z.infer<typeof UserFilterSchema>;

@@ -797,6 +797,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Added Super Admin–only editing of registered public-user profile information from Manage User: full name, email, validated 11-digit Philippine mobile number, and home address. The update is synchronized to the profile and Supabase Auth metadata and produces a non-sensitive audit event; credentials remain non-readable and must use reset flows.
+
 - Replaced the ambiguous vertical-ellipsis attachment affordance in CDRRMO report details with the standard expand icon and accessible label; attachments still open the same full-screen viewer.
 
 - Added a CDRRMO floating live-operation confirmation when an active incident offer is successfully passed from one responder to another. It appears only for an actual offer-to-offer reassignment and links directly to the live map, avoiding noise for initial offers or PACC’s existing triage alerts.

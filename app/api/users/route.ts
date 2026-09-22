@@ -13,12 +13,17 @@ import { createClient, createAdminClient } from "@/lib/supabase-server";
 import { getUserRole } from "@/lib/auth";
 import { z } from "zod";
 import crypto from "crypto";
+import { isValidPhilippinePhone, normalizePhilippinePhone } from "@/lib/phone";
 
 const UpdateUserSchema = z.object({
   id: z.string(),
   status: z.enum(["ACTIVE", "SUSPENDED", "DEACTIVATED", "PENDING"]).optional(),
   role: z.enum(["public_user", "ambulance_responder", "pacc_admin", "cdrrmo_super_admin"]).optional(),
   rejectionReason: z.string().optional(),
+  fullName: z.string().trim().min(2).max(200).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  address: z.string().trim().max(500).optional(),
 });
 
 export async function GET() {
@@ -47,6 +52,8 @@ export async function GET() {
         day: 'numeric'
       }) : "Unknown",
       lastActive: u.updatedAt ? "Active recently" : "Never",
+      phone: u.phone,
+      address: u.address,
     }));
 
     return NextResponse.json({
@@ -189,14 +196,32 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Invalid payload", details: result.error.format() }, { status: 400 });
     }
 
-    const { id, status, role, rejectionReason } = result.data;
+    const { id, status, role, rejectionReason, fullName, email, phone, address } = result.data;
     const adminClient = createAdminClient();
+
+    const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
+    if (!existingUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if ((fullName !== undefined || email !== undefined || phone !== undefined || address !== undefined) && existingUser.role !== 'public_user') {
+      return NextResponse.json({ error: "Only registered public-user profile information can be edited here." }, { status: 400 });
+    }
+    if (email && email.toLowerCase() !== existingUser.email.toLowerCase()) {
+      const emailOwner = await db.query.users.findFirst({ where: eq(users.email, email.toLowerCase()) });
+      if (emailOwner) return NextResponse.json({ error: "Email already in use" }, { status: 400 });
+    }
+    const normalizedPhone = phone === undefined ? undefined : normalizePhilippinePhone(phone);
+    if (phone !== undefined && !isValidPhilippinePhone(phone)) {
+      return NextResponse.json({ error: "Enter a valid Philippine mobile number." }, { status: 400 });
+    }
 
     // Perform database update
     const updatePayload: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
     if (status) updatePayload.status = status;
     if (role) updatePayload.role = role;
     if (rejectionReason) updatePayload.rejectionReason = rejectionReason;
+    if (fullName !== undefined) updatePayload.fullName = fullName;
+    if (email !== undefined) updatePayload.email = email.toLowerCase();
+    if (normalizedPhone !== undefined) updatePayload.phone = normalizedPhone;
+    if (address !== undefined) updatePayload.address = address;
 
     const [updatedUser] = await db.update(users)
       .set(updatePayload)
@@ -204,15 +229,18 @@ export async function PATCH(req: NextRequest) {
       .returning();
 
     // Side effect: If role or status changes, sync to Supabase Auth metadata using adminClient
-    if (role || status) {
+    if (role || status || fullName !== undefined || email !== undefined || normalizedPhone !== undefined || address !== undefined) {
       const { data: { user: targetUser } } = await adminClient.auth.admin.getUserById(id);
       if (targetUser) {
         await adminClient.auth.admin.updateUserById(id, {
-          app_metadata: {
-            ...targetUser.app_metadata,
-            ...(role ? { role } : {}),
-            ...(status ? { status } : {}),
-          }
+          ...(email !== undefined ? { email: email.toLowerCase(), email_confirm: true } : {}),
+          app_metadata: { ...targetUser.app_metadata, ...(role ? { role } : {}), ...(status ? { status } : {}) },
+          user_metadata: {
+            ...targetUser.user_metadata,
+            ...(fullName !== undefined ? { full_name: fullName } : {}),
+            ...(normalizedPhone !== undefined ? { phone: normalizedPhone } : {}),
+            ...(address !== undefined ? { address } : {}),
+          },
         });
       }
     }
@@ -221,7 +249,7 @@ export async function PATCH(req: NextRequest) {
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(),
       userId: user.id,
-      action: `Updated user: ${updatedUser?.fullName || id} (Role: ${role || 'unchanged'}, Status: ${status || 'unchanged'})`,
+      action: `Updated user: ${updatedUser?.fullName || id} (Role: ${role || 'unchanged'}, Status: ${status || 'unchanged'}${fullName !== undefined || email !== undefined || phone !== undefined || address !== undefined ? ', Profile: updated' : ''})`,
       entityType: "USER",
       entityId: id,
     });

@@ -10,6 +10,11 @@ interface ResponderEmergencyAlert {
   vibrationPattern: number[];
 }
 
+export interface ResponderPushRegistrationResult {
+  registered: boolean;
+  message: string;
+}
+
 const GENERIC_EMERGENCY_ALERT: ResponderEmergencyAlert = {
   channelId: 'emergency-alerts',
   channelName: 'Emergency Alerts',
@@ -92,16 +97,24 @@ async function postCurrentPushToken(pushToken: string) {
   }
 }
 
-export async function registerResponderPushNotifications() {
-  if (Platform.OS !== 'android') return;
+export async function registerResponderPushNotifications(): Promise<ResponderPushRegistrationResult> {
+  if (Platform.OS !== 'android') {
+    return { registered: false, message: 'Dispatch alerts require the Android responder app.' };
+  }
   await ensureResponderEmergencyAlertChannels();
   const existing = await Notifications.getPermissionsAsync();
   const permission = existing.status === 'granted' ? existing : await Notifications.requestPermissionsAsync();
-  if (permission.status !== 'granted') return;
+  if (permission.status !== 'granted') {
+    return {
+      registered: false,
+      message: 'Notifications are off. Keep DisasTRACE open for live offers, or enable notifications to receive offers in the background.',
+    };
+  }
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) throw new Error('Expo project ID is missing.');
   const pushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   await postCurrentPushToken(pushToken);
+  return { registered: true, message: 'Dispatch alerts are enabled for this device.' };
 }
 
 export function subscribeToPushTokenChanges() {

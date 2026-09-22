@@ -1,5 +1,12 @@
 # Progress Tracker
 
+## 2026-09-22 - Responder availability and live-offer recovery
+
+- Unified automatic dispatch and timeout-cascade candidate radius under one bounded server policy (1-15 km, default 15 km), removing the former hidden 2 km post-filter after a 15 km spatial search.
+- PACC manual dispatch now exposes a responder's precise trusted-GPS sync reason and age, so `SYNC DELAYED` explains the corrective action rather than resembling a failed responder assignment.
+- The responder's On Duty action now immediately attempts an authenticated, bounded trusted-GPS heartbeat and tells the responder whether PACC can offer live emergencies. Availability state is shared with a tab-level telemetry owner, so opening Profile or Forms does not stop heartbeats. The same action confirms whether Android background dispatch notifications are registered.
+- Root/mobile strict TypeScript, focused dispatch recovery checks, and whitespace checks pass for the implemented increments. Live device verification remains required for Android location, notification, and background lifecycle permissions.
+
 ## 2026-09-22 - Map camera resize compatibility repair
 
 - Upgraded `react-map-gl` and its MapLibre adapter from `8.1.1` to `8.1.2`, the upstream release that adds MapLibre GL JS v6 support. This replaces the incompatible direct camera-transform access that threw during `ResizeObserver` map resize events.

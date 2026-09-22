@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadAvatar } from '../../lib/storage';
 import { signOutFromMobile } from '../../lib/mobile-auth';
 import { syncResponderAvailabilityLocation } from '../../lib/responder-availability';
+import { registerResponderPushNotifications } from '../../lib/push-notifications';
 import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
 
 export default function ProfileScreen() {
@@ -55,9 +56,16 @@ export default function ProfileScreen() {
       if (nextDuty === 'ON_DUTY') {
         setDutySyncMessage('Syncing GPS with PACC...');
         const sync = await syncResponderAvailabilityLocation();
-        setDutySyncMessage(sync.message);
+        const push = await registerResponderPushNotifications().catch(() => ({
+          registered: false,
+          message: 'GPS is synced, but dispatch alert registration could not be confirmed. Keep DisasTRACE open for live offers.',
+        }));
+        const combinedMessage = sync.success
+          ? `${sync.message} ${push.message}`
+          : sync.message;
+        setDutySyncMessage(combinedMessage);
         await refreshStatus();
-        Alert.alert(sync.success ? 'You are available' : 'GPS sync needed', sync.message);
+        Alert.alert(sync.success ? 'You are available' : 'GPS sync needed', combinedMessage);
       } else {
         setDutySyncMessage('You are off duty and will not receive new emergency offers.');
         await refreshStatus();

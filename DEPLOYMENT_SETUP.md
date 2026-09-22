@@ -34,6 +34,10 @@ APP_URL=https://disas-trace.vercel.app
 # Server-only scheduler credential. Never expose this to the mobile app.
 DISPATCH_SCHEDULER_SECRET=generate_a_long_random_secret
 
+# Optional automatic-dispatch radius in metres (1,000-15,000). Defaults to
+# 15,000 m and is applied consistently to initial offers and offer cascading.
+AUTO_DISPATCH_RADIUS_METERS=15000
+
 # Production SMS OTP gateway
 TEXTBEE_API_KEY=your_textbee_api_key
 TEXTBEE_DEVICE_ID=your_textbee_device_id

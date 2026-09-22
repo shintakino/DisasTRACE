@@ -1,5 +1,10 @@
 # Progress Tracker
 
+## 2026-09-22 - Map camera resize compatibility repair
+
+- Upgraded `react-map-gl` and its MapLibre adapter from `8.1.1` to `8.1.2`, the upstream release that adds MapLibre GL JS v6 support. This replaces the incompatible direct camera-transform access that threw during `ResizeObserver` map resize events.
+- Extended the MapLibre regression check to pin the v6-compatible wrapper floor, preventing a future dependency resolution from restoring the crash-prone combination.
+
 ## 2026-09-22 - Dashboard incident-status contract repair
 
 - Fixed the command dashboard refresh failure caused by the valid responder-deferred `DOCUMENTATION_PENDING` incident status being absent from its Zod response schemas. Dashboard and verification contracts now share the full server lifecycle, including that status.

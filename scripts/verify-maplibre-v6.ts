@@ -13,6 +13,7 @@ const commandMap = readFileSync(join(root, 'components/map/map-container.tsx'), 
 const hospitalMap = readFileSync(join(root, 'components/account/hospital-settings.tsx'), 'utf8');
 
 assert.match(packageJson.dependencies['maplibre-gl'], /^\^6\./);
+assert.match(packageJson.dependencies['react-map-gl'], /^\^8\.1\.2$/);
 assert.equal(packageJson.scripts.prebuild, 'node ./scripts/copy-maplibre-worker.mjs');
 assert.equal(packageJson.scripts.predev, 'node ./scripts/copy-maplibre-worker.mjs');
 assert.match(copyWorker, /maplibre-gl-worker\.mjs/);

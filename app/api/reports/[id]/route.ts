@@ -96,7 +96,7 @@ export async function GET(
       const verificationAccessCondition = userProfile.role === 'public_user'
         ? eq(verificationRequests.residentId, user.id)
         : undefined;
-      const userReq = await db.query.verificationRequests.findFirst({
+      let userReq = await db.query.verificationRequests.findFirst({
         where: and(
           or(
             eq(verificationRequests.id, id),
@@ -108,6 +108,29 @@ export async function GET(
           resident: true,
         }
       });
+
+      // Dashboard and map cards use the incident ID as their stable selection
+      // key once dispatch has begun. Before a responder submits a clinical
+      // report, that ID has no matching `reports` row, so resolve its linked
+      // resident request before declaring the report unavailable.
+      if (!userReq) {
+        const linkedIncident = await db.query.incidents.findFirst({
+          columns: { requestId: true },
+          where: eq(incidents.id, id),
+        });
+
+        if (linkedIncident) {
+          userReq = await db.query.verificationRequests.findFirst({
+            where: and(
+              eq(verificationRequests.id, linkedIncident.requestId),
+              ...(verificationAccessCondition ? [verificationAccessCondition] : []),
+            ),
+            with: {
+              resident: true,
+            },
+          });
+        }
+      }
 
       if (!userReq) {
         return NextResponse.json({ error: "Report not found" }, { status: 404 });

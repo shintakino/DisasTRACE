@@ -797,6 +797,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Fixed resident-request detail resolution from PACC/CDRRMO map and dashboard cards. When an emergency has an incident record but no responder clinical report yet, the protected detail endpoint now resolves the linked verification request instead of returning a false not-found result.
+
 - Added the PACC dashboard shift header to match the CDRRMO command dashboard hierarchy. It identifies the signed-in PACC administrator and presents live pending-review and active-incident counts before the dashboard KPIs.
 
 - Completed Super Admin table consistency work: User Accounts, Responder Roster, Audit Logs, Responder Status & Logs, and Reports titles now have a larger hierarchy than their table content. Standardized table state colors to blue for active/in-progress work, green for completed/available, amber for attention states, red for rejected/deactivated, and neutral gray for inactive states.

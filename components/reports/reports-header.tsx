@@ -39,6 +39,13 @@ export function ReportsHeader({
   const [search, setSearch] = React.useState("");
   const [type, setType] = React.useState<IncidentType | "all">("all");
   const [datePreset, setDatePreset] = React.useState<DatePreset>("all");
+  const [dateFrom, setDateFrom] = React.useState("");
+  const [dateTo, setDateTo] = React.useState("");
+
+  const dateRange = (from = dateFrom, to = dateTo) => from || to ? {
+    from: from ? new Date(`${from}T00:00:00`) : undefined,
+    to: to ? new Date(`${to}T23:59:59.999`) : undefined,
+  } : undefined;
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
@@ -47,6 +54,7 @@ export function ReportsHeader({
       search: val || undefined,
       type: type === "all" ? undefined : type,
       datePreset: datePreset === "all" ? undefined : datePreset,
+      dateRange: dateRange(),
     }));
   };
 
@@ -58,6 +66,7 @@ export function ReportsHeader({
       search: search || undefined,
       type: newType === "all" ? undefined : newType,
       datePreset: datePreset === "all" ? undefined : datePreset,
+      dateRange: dateRange(),
     }));
   };
 
@@ -69,6 +78,7 @@ export function ReportsHeader({
       search: search || undefined,
       type: type === "all" ? undefined : type,
       datePreset: newPreset === "all" ? undefined : newPreset,
+      dateRange: dateRange(),
     }));
   };
 
@@ -123,6 +133,24 @@ export function ReportsHeader({
                     <SelectItem value="Unknown Cause">Unknown Cause</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3 border-t pt-4">
+                <div className="space-y-2">
+                  <label htmlFor="report-date-from" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">From</label>
+                  <Input id="report-date-from" type="date" value={dateFrom} onChange={(event) => {
+                    const value = event.target.value;
+                    setDateFrom(value);
+                    onFilterChange((prev) => ({ ...prev, dateRange: dateRange(value, dateTo) }));
+                  }} />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="report-date-to" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">To</label>
+                  <Input id="report-date-to" type="date" min={dateFrom || undefined} value={dateTo} onChange={(event) => {
+                    const value = event.target.value;
+                    setDateTo(value);
+                    onFilterChange((prev) => ({ ...prev, dateRange: dateRange(dateFrom, value) }));
+                  }} />
+                </div>
               </div>
 
               <div className="space-y-2">

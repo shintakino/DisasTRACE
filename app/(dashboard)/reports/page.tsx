@@ -118,8 +118,18 @@ export default function ReportsPage() {
       });
     }
 
+    if (filters.dateRange?.from || filters.dateRange?.to) {
+      const from = filters.dateRange.from;
+      const to = filters.dateRange.to;
+      result = result.filter((item) => {
+        const itemDate = new Date(item.date);
+        if (Number.isNaN(itemDate.getTime())) return true;
+        return (!from || itemDate >= from) && (!to || itemDate <= to);
+      });
+    }
+
     return result;
-  }, [data, filters.datePreset]);
+  }, [data, filters.datePreset, filters.dateRange]);
 
   const handleViewDetails = (id: string) => {
     setSelectedReportId(id);

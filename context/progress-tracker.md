@@ -797,6 +797,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Extended CDRRMO Reports filtering with an inclusive custom From/To date range while retaining the existing quick date presets, incident-type, status, reporter-source, and search filters.
+
 - Added an inclusive date-range filter to the CDRRMO Status and Activity Logs, carried from the filter UI to the protected API alongside the existing search and responder-status criteria.
 
 - Repaired CDRRMO Audit Log search and filter behavior: actor-role selection now uses a correctly named role filter, search covers actor, action, context, and role, and the filter includes an inclusive date range. Audit rows now use readable operational context and larger text instead of exposing raw record identifiers or serialized database payload characters.

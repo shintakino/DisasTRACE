@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 
 import { toast } from "sonner"
 
@@ -566,9 +567,9 @@ export default function RosterPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Password <span className="text-red-500">*</span></label>
-                    <Input 
+                    <PasswordInput 
                       required
-                      type="password"
+                      id="responder-password"
                       placeholder="••••••••"
                       value={newResponder.password}
                       onChange={(e) => setNewResponder({ ...newResponder, password: e.target.value })}
@@ -577,9 +578,9 @@ export default function RosterPage() {
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Confirm Password <span className="text-red-500">*</span></label>
-                    <Input 
+                    <PasswordInput 
                       required
-                      type="password"
+                      id="responder-confirm-password"
                       placeholder="••••••••"
                       value={newResponder.confirmPassword}
                       onChange={(e) => setNewResponder({ ...newResponder, confirmPassword: e.target.value })}

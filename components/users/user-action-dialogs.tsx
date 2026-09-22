@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UserManagementEntry, UserStatus, UserRole } from "@/types/users";
 import { AlertTriangle, ShieldCheck, UserPlus, Ban, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Checkbox } from "@/components/ui/checkbox";
 interface ManageUserDialogProps {
   user: UserManagementEntry | null;
@@ -349,9 +350,8 @@ export function CreateUserDialog({ isOpen, onClose, defaultRole, onCreate }: Cre
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="grid gap-2 text-left">
               <Label htmlFor="password" className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -361,9 +361,8 @@ export function CreateUserDialog({ isOpen, onClose, defaultRole, onCreate }: Cre
             
             <div className="grid gap-2 text-left">
               <Label htmlFor="confirmPassword" className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Confirm Password</Label>
-              <Input
+              <PasswordInput
                 id="confirmPassword"
-                type="password"
                 placeholder="Confirm password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

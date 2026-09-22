@@ -42,6 +42,12 @@ export async function GET() {
       const isRecent = isResponderHeartbeatFresh(r.lastLocationUpdatedAt);
       const status = (isDevResponder || isRecent) ? "STANDBY" as const : "LOCATION_SYNC_DELAYED" as const;
       const selectable = status === "STANDBY";
+      const heartbeatAgeSeconds = r.lastLocationUpdatedAt
+        ? Math.max(0, Math.floor((Date.now() - r.lastLocationUpdatedAt.getTime()) / 1_000))
+        : null;
+      const unavailableReason = !r.lastLocationUpdatedAt
+        ? "Responder is on duty but has not yet shared a trusted GPS location. Ask them to open DisasTRACE, allow location access, and retry GPS sync."
+        : `Responder is on duty, but their last trusted GPS sync was ${heartbeatAgeSeconds}s ago. Ask them to check signal, allow location access, and keep DisasTRACE open.`;
 
       return {
         id: r.id,
@@ -50,9 +56,9 @@ export async function GET() {
         address: r.address || "Baliwag City",
         status,
         selectable,
-        unavailableReason: selectable
-          ? null
-          : "Responder is still marked on duty, but their location has not synced recently enough to dispatch safely. Ask them to check signal and keep the app open.",
+        unavailableReason: selectable ? null : unavailableReason,
+        lastLocationUpdatedAt: r.lastLocationUpdatedAt?.toISOString() ?? null,
+        heartbeatAgeSeconds,
         lat: r.lastLatitude,
         lng: r.lastLongitude,
         responderType: r.responderType,

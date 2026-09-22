@@ -17,6 +17,8 @@ interface Responder {
   status: "STANDBY" | "LOCATION_SYNC_DELAYED"
   selectable: boolean
   unavailableReason: string | null
+  lastLocationUpdatedAt: string | null
+  heartbeatAgeSeconds: number | null
 }
 
 interface DispatchApiResponse {
@@ -222,6 +224,11 @@ export function ManualDispatchModal({
                       <MapPin className="w-3 h-3 text-slate-400" />
                       <span className="truncate">{resp.address}</span>
                     </div>
+                    {!resp.selectable && resp.unavailableReason && (
+                      <p className="mt-2 text-[11px] leading-4 text-amber-800">
+                        {resp.unavailableReason}
+                      </p>
+                    )}
                   </div>
                   <div className="shrink-0 ml-2">
                     <span className={cn(

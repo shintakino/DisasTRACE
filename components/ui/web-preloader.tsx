@@ -17,7 +17,7 @@ export function WebPreloader({
 }: WebPreloaderProps) {
   return (
     <div className={cn(
-      "w-full h-full min-h-[400px] flex flex-col items-center justify-center p-8 bg-gradient-to-br from-[#0B132B] via-[#1C2541] to-[#0B132B] text-white relative overflow-hidden rounded-2xl shadow-2xl border border-blue-900/40 animate-in fade-in duration-500",
+      "w-full h-full min-h-[400px] flex flex-col items-center justify-center p-8 bg-[#0B132B] text-white relative overflow-hidden rounded-2xl shadow-xl border border-blue-900/40 animate-in fade-in duration-500",
       className
     )}>
       {/* Ambient background glow rings */}

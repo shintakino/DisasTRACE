@@ -41,9 +41,8 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0 bg-mesh-gradient text-white overflow-hidden shadow-2xl transition-all duration-300">
+    <Sidebar collapsible="icon" className="border-r-0 bg-[#0B132B] text-white overflow-hidden shadow-xl transition-all duration-300">
       <div className="absolute inset-0 bg-black/20 backdrop-blur-[3px] -z-10" />
-      <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none -z-5" />
       <SidebarHeader className="flex items-center justify-center p-0 py-[3vh] min-h-[70px] group-data-[state=expanded]:px-8 group-data-[state=expanded]:justify-start relative z-10 transition-all">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="relative h-16 w-16 group-data-[collapsible=icon]:h-14 group-data-[collapsible=icon]:w-14 shrink-0 transition-all">

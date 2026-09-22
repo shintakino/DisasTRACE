@@ -84,8 +84,7 @@ export function ReportDetailSheet({
         ) : report ? (
           <>
             {/* Standardized Header */}
-            <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 text-white shrink-0 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+            <div className="bg-[#1E3A8A] p-6 text-white shrink-0">
               
               <div className="relative z-10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -243,7 +242,7 @@ export function ReportDetailSheet({
                             alt="Scene photo" 
                             className="w-full h-full object-contain transition-opacity duration-200 group-hover:opacity-90"
                           />
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-12 pb-3 px-4 flex justify-between items-end">
+                          <div className="absolute inset-x-0 bottom-0 bg-black/75 py-3 px-4 flex justify-between items-end">
                             <span className="text-white text-xs font-medium tracking-wide">RESIDENT_ATTACHMENT.jpg</span>
                             <div className="text-white bg-white/20 p-1 rounded-full group-hover:bg-white/30 transition-colors">
                               <Maximize2 className="h-4 w-4" aria-hidden="true" />
@@ -387,7 +386,7 @@ export function ReportDetailSheet({
                               alt={`Scene photo ${idx + 1}`}
                               className="w-full h-full object-contain transition-opacity duration-200 group-hover:opacity-90"
                             />
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pt-8 pb-2 px-3">
+                            <div className="absolute inset-x-0 bottom-0 bg-black/75 py-2 px-3">
                               <span className="text-white text-[10px] font-medium tracking-wide">SCENE_PHOTO_{idx + 1}.jpg</span>
                             </div>
                           </button>

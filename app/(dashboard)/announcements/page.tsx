@@ -215,7 +215,7 @@ export default function AnnouncementsPage() {
     <div className="flex-1 flex flex-col p-6 space-y-6 bg-[#F8FAFC] overflow-y-auto">
       
       {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-gradient-to-r from-[#1A237E] to-[#15286A] text-white p-4 sm:p-6 rounded-3xl shadow-lg relative overflow-hidden shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#1E3A8A] text-white p-4 sm:p-6 rounded-3xl shadow-sm relative overflow-hidden shrink-0">
         <div className="hidden sm:flex absolute right-0 top-0 bottom-0 opacity-10 items-center pr-6 md:pr-10 pointer-events-none">
           <Megaphone className="size-36 md:size-48" />
         </div>

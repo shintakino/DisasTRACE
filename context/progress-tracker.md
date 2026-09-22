@@ -797,6 +797,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Began the portal-wide Super Admin flat-surface cleanup: removed gradient styling from the shared admin sidebar and preloader, roster management/create flows, report-detail header and attachment labels, announcements, and message-detail dialog. The remaining verification, map, and approval surfaces are tracked in the next incremental slice.
+
 - Made CDRRMO historical demand-zone colors data-driven: high-frequency clusters (8+ verified reports in 90 days) render red, moderate clusters (5–7) amber, and emerging clusters (3–4) blue. The map legend now previews those thresholds and reiterates that they are historical planning indicators, not real-time hazards.
 
 - Replaced the Responder Roster management action dropdown with direct, clearly styled Suspend and Block controls. The server still maps Block to the existing deactivated account state and retains its authenticated update/audit path.

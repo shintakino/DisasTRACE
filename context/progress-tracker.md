@@ -797,6 +797,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Latest Changes
 
+- Completed the remaining portal-wide Super Admin flat-surface cleanup: verification queue and dispatch dialogs, CDRRMO map summary cards, and account-approval surfaces now use solid semantic colors. An audit confirms no gradient utilities remain in dashboard routes or shared admin components; the remaining recovery-dialog gradient is authentication-only and outside the Super Admin portal.
+
 - Began the portal-wide Super Admin flat-surface cleanup: removed gradient styling from the shared admin sidebar and preloader, roster management/create flows, report-detail header and attachment labels, announcements, and message-detail dialog. The remaining verification, map, and approval surfaces are tracked in the next incremental slice.
 
 - Made CDRRMO historical demand-zone colors data-driven: high-frequency clusters (8+ verified reports in 90 days) render red, moderate clusters (5–7) amber, and emerging clusters (3–4) blue. The map legend now previews those thresholds and reiterates that they are historical planning indicators, not real-time hazards.

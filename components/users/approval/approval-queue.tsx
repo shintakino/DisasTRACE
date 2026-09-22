@@ -27,12 +27,12 @@ export function ApprovalQueue({
       <div className="p-4 border-b bg-white">
         <h2 className="text-lg font-bold text-[#1E3A8A] mb-4">Verification Gate</h2>
         <div className="grid grid-cols-2 gap-3">
-          <div className="relative h-24 overflow-hidden rounded-2xl bg-gradient-to-br from-[#4776E6] to-[#3843D0] p-4 text-white shadow-sm">
+          <div className="relative h-24 overflow-hidden rounded-xl border border-[#1E3A8A] bg-[#1E3A8A] p-4 text-white shadow-sm">
             <div className="absolute inset-0 bg-black/5" />
             <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-white/80">Pending</p>
             <p className="relative z-10 mt-1 text-2xl font-black leading-none">{summary.pending}</p>
           </div>
-          <div className="relative h-24 overflow-hidden rounded-2xl bg-gradient-to-br from-[#11998e] to-[#38ef7d] p-4 text-white shadow-sm">
+          <div className="relative h-24 overflow-hidden rounded-xl border border-emerald-700 bg-emerald-700 p-4 text-white shadow-sm">
             <div className="absolute inset-0 bg-black/5" />
             <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-white/80">Reviewed Today</p>
             <p className="relative z-10 mt-1 text-2xl font-black leading-none">{summary.reviewedToday}</p>

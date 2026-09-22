@@ -14,19 +14,18 @@ import { compareActiveVerificationItems, getVerificationPriorityReason, isNewVer
 interface SummaryCardProps {
   label: string
   count: number
-  gradient: string
+  activeClassName: string
   isActive: boolean
   onClick: () => void
 }
 
-function SummaryCard({ label, count, gradient, isActive, onClick }: SummaryCardProps) {
+function SummaryCard({ label, count, activeClassName, isActive, onClick }: SummaryCardProps) {
   return (
     <Card
       className={cn(
         "p-3 cursor-pointer transition-all relative overflow-hidden flex flex-col rounded-xl",
-        gradient,
         isActive 
-          ? "border-transparent bg-gradient-to-br text-white shadow-md ring-2 ring-offset-1 ring-[#1E3A8A]/30"
+          ? cn("border-transparent text-white shadow-md ring-2 ring-offset-1 ring-[#1E3A8A]/30", activeClassName)
           : "border-slate-200 bg-white text-slate-700 shadow-none hover:border-slate-300 hover:bg-slate-50"
       )}
       onClick={onClick}
@@ -119,35 +118,35 @@ export function VerificationQueue({
         <SummaryCard
           label="For Action"
           count={counts.ACTION}
-          gradient="from-[#4776E6] to-[#3843D0]"
+          activeClassName="bg-[#1E3A8A]"
           isActive={filter === "ACTION"}
           onClick={() => onFilterChange("ACTION")}
         />
         <SummaryCard
           label="For Review"
           count={counts.REVIEW}
-          gradient="from-[#F97316] to-[#FB923C]"
+          activeClassName="bg-[#C2410C]"
           isActive={filter === "REVIEW"}
           onClick={() => onFilterChange("REVIEW")}
         />
         <SummaryCard
           label="Awaiting"
           count={counts.AWAITING}
-          gradient="from-[#0369A1] to-[#0284C7]"
+          activeClassName="bg-[#0369A1]"
           isActive={filter === "AWAITING"}
           onClick={() => onFilterChange("AWAITING")}
         />
         <SummaryCard
           label="Rejected"
           count={counts.REJECTED}
-          gradient="from-[#DC2626] to-[#EF4444]"
+          activeClassName="bg-[#B91C1C]"
           isActive={filter === "REJECTED"}
           onClick={() => onFilterChange("REJECTED")}
         />
         <SummaryCard
           label="Case Closed"
           count={counts.CASE_CLOSED}
-          gradient="from-[#15803D] to-[#22C55E]"
+          activeClassName="bg-[#15803D]"
           isActive={filter === "CASE_CLOSED"}
           onClick={() => onFilterChange("CASE_CLOSED")}
         />

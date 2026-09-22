@@ -194,22 +194,22 @@ export function IncidentPanel({
             <SummaryCard
               label="PENDING"
               count={stats.user.PENDING}
-              gradient="from-[#4776E6] to-[#3843D0]"
+              tone="bg-[#1E3A8A]"
             />
             <SummaryCard
               label="VERIFIED"
               count={stats.user.VERIFIED}
-              gradient="from-[#11998e] to-[#38ef7d]"
+              tone="bg-[#047857]"
             />
             <SummaryCard
               label="REJECTED"
               count={stats.user.REJECTED}
-              gradient="from-[#FF416C] to-[#FF4B2B]"
+              tone="bg-[#B91C1C]"
             />
             <SummaryCard
               label="DUPLICATE"
               count={stats.user.DUPLICATE}
-              gradient="from-[#f09819] to-[#edde5d]"
+              tone="bg-[#B45309]"
             />
           </div>
         ) : (
@@ -217,12 +217,12 @@ export function IncidentPanel({
             <SummaryCard
               label="ONGOING"
               count={stats.responder.ONGOING}
-              gradient="from-[#FF416C] to-[#FF4B2B]"
+              tone="bg-[#B91C1C]"
             />
             <SummaryCard
               label="COMPLETED"
               count={stats.responder.COMPLETED}
-              gradient="from-[#11998e] to-[#38ef7d]"
+              tone="bg-[#047857]"
             />
           </div>
         )}
@@ -291,9 +291,9 @@ export function IncidentPanel({
   );
 }
 
-function SummaryCard({ label, count, gradient }: { label: string; count: number; gradient: string }) {
+function SummaryCard({ label, count, tone }: { label: string; count: number; tone: string }) {
   return (
-    <div className={cn("relative flex h-16 flex-col items-start justify-center overflow-hidden rounded-xl border-none bg-gradient-to-br px-3 text-white shadow-sm", gradient)}>
+    <div className={cn("relative flex h-16 flex-col items-start justify-center overflow-hidden rounded-xl border px-3 text-white shadow-sm", tone)}>
       <div className="absolute inset-0 bg-black/5" />
       <span className="relative z-10 text-2xl font-black leading-none tracking-tight">{count}</span>
       <span className="relative z-10 mt-1 text-[10px] font-black uppercase tracking-wide opacity-85">{label}</span>

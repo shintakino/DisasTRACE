@@ -55,8 +55,7 @@ export function ManageUserDialog({ user, isOpen, onClose, onUpdate }: ManageUser
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
-        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+        <div className="bg-[#1E3A8A] p-6 text-white shrink-0">
           <div className="relative z-10 flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
               <ShieldCheck className="h-6 w-6 text-white" />
@@ -73,22 +72,22 @@ export function ManageUserDialog({ user, isOpen, onClose, onUpdate }: ManageUser
         <div className="p-6 bg-slate-50/30 flex-1 overflow-y-auto space-y-5">
           <div className="grid gap-2 text-left">
             <Label htmlFor="role" className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">System Role</Label>
-            <Select value={role} onValueChange={(val) => val && setRole(val as UserRole)}>
+            {user.role === "public_user" ? (
+              <div className="flex h-11 items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm font-bold text-slate-600">Public User</div>
+            ) : <Select value={role} onValueChange={(val) => val && setRole(val as UserRole)}>
               <SelectTrigger id="role" className="h-11 font-bold text-slate-700 bg-white border-slate-200">
                 <SelectValue placeholder="Select Role">
-                  {role === "public_user" && "Public User"}
                   {role === "ambulance_responder" && "Responder"}
                   {role === "pacc_admin" && "PACC Admin"}
                   {role === "cdrrmo_super_admin" && "CDRRMO Super Admin"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="public_user" className="font-medium">Public User</SelectItem>
                 <SelectItem value="ambulance_responder" className="font-medium">Responder</SelectItem>
                 <SelectItem value="pacc_admin" className="font-medium">PACC Admin</SelectItem>
                 <SelectItem value="cdrrmo_super_admin" className="font-medium">CDRRMO Super Admin</SelectItem>
               </SelectContent>
-            </Select>
+            </Select>}
           </div>
 
           <div className="grid gap-2 text-left">
@@ -182,8 +181,7 @@ export function BanUserDialog({ user, isOpen, onClose, onConfirm }: BanUserDialo
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
-        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+        <div className="bg-[#1E3A8A] p-6 text-white shrink-0">
           <div className="relative z-10 flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
               <Ban className="w-6 h-6 text-white" />
@@ -292,8 +290,7 @@ export function CreateUserDialog({ isOpen, onClose, defaultRole, onCreate }: Cre
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl p-0 border-0 shadow-2xl rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden bg-white" showCloseButton={true}>
-        <div className="bg-gradient-to-r from-[#1e1b4b] to-[#2B4C9B] p-6 pb-8 text-white shrink-0 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+        <div className="bg-[#1E3A8A] p-6 text-white shrink-0">
           <div className="relative z-10 flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
               <UserPlus className="w-6 h-6 text-white" />

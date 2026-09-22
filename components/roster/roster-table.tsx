@@ -94,13 +94,17 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
         return (
           <div className="flex items-center gap-3">
             <button 
-              className="text-gray-500 hover:text-gray-900 transition-colors"
+              aria-label={`Manage ${row.original.fullName}`}
+              title="Manage responder"
+              className="rounded-md p-2 text-gray-500 transition-colors hover:bg-blue-50 hover:text-[#1E3A8A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E3A8A]"
               onClick={() => onManage?.(row.original.id)}
             >
               <UserX className="size-5" />
             </button>
             <button 
-              className="text-gray-500 hover:text-red-600 transition-colors"
+              aria-label={`Remove ${row.original.fullName}`}
+              title="Remove responder"
+              className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
               onClick={() => onDelete?.(row.original.id)}
             >
               <Trash2 className="size-5" />
@@ -126,7 +130,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
   return (
     <div className="flex flex-col border border-slate-200/80 shadow-sm rounded-xl overflow-hidden bg-white">
       <div className="bg-[#2B4C9B] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold text-white tracking-wide">Responders</h2>
+        <div><h2 className="text-xl font-bold text-white tracking-tight">Responder Roster</h2><p className="mt-1 text-xs font-medium uppercase tracking-wider text-blue-200">Personnel access and availability management</p></div>
         <div className="flex items-center gap-3">
           {searchComponent}
           {filterComponent}

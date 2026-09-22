@@ -26,22 +26,32 @@ interface LogsHeaderProps {
 export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<LogStatus | "all">("all");
+  const [from, setFrom] = React.useState("");
+  const [to, setTo] = React.useState("");
+
+  const publishFilters = (next: { search?: string; status?: LogStatus | "all"; from?: string; to?: string }) => {
+    const start = next.from ?? from;
+    const end = next.to ?? to;
+    const nextStatus = next.status ?? status;
+    onFilterChange({
+      search: (next.search ?? search) || undefined,
+      status: nextStatus === "all" ? undefined : nextStatus,
+      dateRange: start || end ? {
+        from: start ? new Date(`${start}T00:00:00`) : undefined,
+        to: end ? new Date(`${end}T23:59:59.999`) : undefined,
+      } : undefined,
+    });
+  };
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
-    onFilterChange({
-      search: val || undefined,
-      status: status === "all" ? undefined : status,
-    });
+    publishFilters({ search: val });
   };
 
   const handleStatusChange = (val: string | null) => {
     const newStatus = (val || "all") as LogStatus | "all";
     setStatus(newStatus);
-    onFilterChange({
-      search: search || undefined,
-      status: newStatus === "all" ? undefined : newStatus,
-    });
+    publishFilters({ status: newStatus });
   };
 
   return (
@@ -84,6 +94,16 @@ export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-2 gap-3 border-t pt-4">
+                <div className="space-y-2">
+                  <label htmlFor="status-log-from" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">From</label>
+                  <Input id="status-log-from" type="date" value={from} onChange={(event) => { setFrom(event.target.value); publishFilters({ from: event.target.value }); }} />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="status-log-to" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">To</label>
+                  <Input id="status-log-to" type="date" min={from || undefined} value={to} onChange={(event) => { setTo(event.target.value); publishFilters({ to: event.target.value }); }} />
+                </div>
+              </div>
             </div>
           </PopoverContent>
         </Popover>
@@ -93,6 +113,8 @@ export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
           onClick={() => {
             setSearch("");
             setStatus("all");
+            setFrom("");
+            setTo("");
             onFilterChange({});
           }}
           className="h-10 text-blue-200 hover:text-white hover:bg-white/10"

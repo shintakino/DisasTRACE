@@ -25,6 +25,8 @@ export default function LogsPage() {
       const queryParams = new URLSearchParams()
       if (filters.search) queryParams.append("search", filters.search)
       if (filters.status) queryParams.append("status", filters.status)
+      if (filters.dateRange?.from) queryParams.append("from", filters.dateRange.from.toISOString())
+      if (filters.dateRange?.to) queryParams.append("to", filters.dateRange.to.toISOString())
       queryParams.append("_t", Date.now().toString()) // Bypass browser cache
 
       const response = await fetch(`/api/logs?${queryParams.toString()}`, {

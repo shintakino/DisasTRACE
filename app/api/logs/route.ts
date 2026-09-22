@@ -18,6 +18,8 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const search = searchParams.get("search")?.toLowerCase();
     const status = searchParams.get("status");
+    const from = searchParams.get("from");
+    const to = searchParams.get("to");
 
     // Query active status logs from the database
     const dbLogs = await db
@@ -61,6 +63,15 @@ export async function GET(req: NextRequest) {
 
     if (status && status !== "all") {
       filtered = filtered.filter((l) => l.status === status);
+    }
+
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+    if (fromDate && !Number.isNaN(fromDate.getTime())) {
+      filtered = filtered.filter((log) => new Date(log.timestamp) >= fromDate);
+    }
+    if (toDate && !Number.isNaN(toDate.getTime())) {
+      filtered = filtered.filter((log) => new Date(log.timestamp) <= toDate);
     }
 
     return NextResponse.json(filtered);

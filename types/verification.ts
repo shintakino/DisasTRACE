@@ -10,6 +10,13 @@ export type IncidentNature = z.infer<typeof IncidentNatureSchema>;
 export const IncidentSeveritySchema = z.enum(["Low", "Medium", "High", "Critical"]);
 export type IncidentSeverity = z.infer<typeof IncidentSeveritySchema>;
 
+/**
+ * Server-authoritative incident lifecycle. Keep dashboard, verification, and
+ * responder views aligned when a responder safely defers final documentation.
+ */
+export const IncidentStatusSchema = z.enum(['DISPATCHED', 'EN_ROUTE', 'ARRIVED', 'DOCUMENTATION_PENDING', 'RESOLVED']);
+export type IncidentStatus = z.infer<typeof IncidentStatusSchema>;
+
 export const TriageClassificationSchema = z.enum(['HIGH_CONFIDENCE_EMERGENCY', 'HIGH_CONFIDENCE_NON_EMERGENCY', 'UNCERTAIN_INCOMPLETE', 'SUSPICIOUS_POSSIBLE_PRANK']);
 export type TriageClassification = z.infer<typeof TriageClassificationSchema>;
 
@@ -26,7 +33,7 @@ export type ResidentInfo = z.infer<typeof ResidentInfoSchema>;
 
 export const VerificationIncidentSchema = z.object({
   id: z.string(),
-  status: z.enum(['DISPATCHED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED']),
+  status: IncidentStatusSchema,
   responderId: z.string().nullable().optional(),
   currentOfferResponderId: z.string().nullable().optional(),
   offerExpiresAt: z.string().nullable().optional(),

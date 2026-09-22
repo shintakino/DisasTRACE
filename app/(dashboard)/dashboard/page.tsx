@@ -14,6 +14,7 @@ import { DashboardData, DashboardDataSchema } from "@/types/dashboard";
 import { useRouter } from "next/navigation";
 import { WebPreloader } from "@/components/ui/web-preloader";
 import { createClientBrowser } from "@/lib/supabase";
+import { z } from "zod";
 
 export default function DashboardPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -125,8 +126,13 @@ export default function DashboardPage() {
         }
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
-        setError("A network error occurred while loading dashboard data.");
-        setErrorKind('NETWORK');
+        if (err instanceof z.ZodError) {
+          setError("The dashboard received data in an unsupported format. Please retry; contact system support if it continues.");
+          setErrorKind('DATA');
+        } else {
+          setError("A network error occurred while loading dashboard data.");
+          setErrorKind('NETWORK');
+        }
       } finally {
         setLoading(false);
       }

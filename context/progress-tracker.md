@@ -1,5 +1,10 @@
 # Progress Tracker
 
+## 2026-09-22 - Dashboard incident-status contract repair
+
+- Fixed the command dashboard refresh failure caused by the valid responder-deferred `DOCUMENTATION_PENDING` incident status being absent from its Zod response schemas. Dashboard and verification contracts now share the full server lifecycle, including that status.
+- Corrected dashboard error feedback so an unexpected response schema is presented as a data-contract problem instead of a misleading network failure. Added a focused status-contract regression check.
+
 ## 2026-09-22 - Mobile Expo security and compatibility maintenance
 
 - Applied Expo's supported in-SDK dependency repair, bringing the managed runtime to Expo `~54.0.37` while retaining the existing SDK and native configuration.

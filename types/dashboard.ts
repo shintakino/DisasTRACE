@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { IncidentStatusSchema } from "./verification";
 
 export const KpiDataSchema = z.object({
   totalIncidentsToday: z.coerce.number(),
@@ -42,7 +43,7 @@ export const RecentReportSchema = z.object({
   severity: z.enum(["Low", "Medium", "High", "Critical"]),
   nature: z.enum(["EMERGENCY", "NON-EMERGENCY"]),
   requestStatus: z.enum(["PENDING", "VERIFIED", "REJECTED", "DUPLICATE"]),
-  incidentStatus: z.enum(["DISPATCHED", "EN_ROUTE", "ARRIVED", "RESOLVED"]).nullable(),
+  incidentStatus: IncidentStatusSchema.nullable(),
   requiresPaccReassignment: z.boolean(),
 });
 

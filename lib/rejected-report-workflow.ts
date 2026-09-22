@@ -1,7 +1,7 @@
 export const MAX_REJECTION_REASON_LENGTH = 250;
 
 export type VerificationRequestStatus = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'DUPLICATE';
-export type VerificationIncidentStatus = 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'RESOLVED';
+export type VerificationIncidentStatus = 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'DOCUMENTATION_PENDING' | 'RESOLVED';
 export type VerificationQueueClassification = 'ACTIVE' | 'REJECTED' | 'CASE_CLOSED';
 export type ActiveVerificationBucket = 'ACTION' | 'REVIEW' | 'AWAITING';
 

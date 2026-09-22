@@ -9,6 +9,7 @@ import {
 } from '../lib/hospital-destination-policy';
 import { fetchWithTimeout } from '../lib/network-timeout';
 import { normalizeResponderDistanceKm } from '../lib/responder-report-summary';
+import { getMobileApiBaseUrl } from '../lib/api-base-url';
 
 const DRAFTS_FILE_PATH = `${FileSystem.documentDirectory}disas_trace_drafts.json`;
 
@@ -287,7 +288,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       let dbSuccess = false;
       if (isOnline) {
         try {
-          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+          const apiUrl = getMobileApiBaseUrl();
           const { data: { session } } = await supabase.auth.getSession();
           const response = await fetch(`${apiUrl}/api/incidents/status`, {
             method: 'POST',
@@ -363,7 +364,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
     try {
       const isOnline = await checkConnectivity();
       if (isOnline) {
-        const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+        const apiUrl = getMobileApiBaseUrl();
         const { data: { session } } = await supabase.auth.getSession();
         const response = await fetch(`${apiUrl}/api/responder/location`, {
           method: 'POST',
@@ -434,7 +435,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
       if (isOnline) {
         try {
-          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+          const apiUrl = getMobileApiBaseUrl();
           const { data: { session } } = await supabase.auth.getSession();
           const authorizationHeaders: Record<string, string> = {};
           if (session?.access_token) {
@@ -532,7 +533,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
     };
 
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = getMobileApiBaseUrl();
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetchWithTimeout(`${apiUrl}/api/incidents/status`, {
         method: 'POST',
@@ -626,7 +627,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
     };
 
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = getMobileApiBaseUrl();
       const { data: { session } } = await supabase.auth.getSession();
       const reqHeaders: any = { 'Content-Type': 'application/json' };
       if (session?.access_token) {

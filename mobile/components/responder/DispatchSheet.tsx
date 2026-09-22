@@ -13,10 +13,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { canAttemptDispatchAcceptance } from '../../lib/dispatch-offer-window';
-
-const apiBaseUrl = () => (process.env.EXPO_PUBLIC_API_URL
-  || process.env.EXPO_PUBLIC_MOBILE_API_URL?.replace(/\/api$/, '')
-  || 'https://disas-trace.vercel.app').replace(/\/$/, '');
+import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 
 export function DispatchSheet() {
   const { status, activeDispatch, acceptDispatch, completeIncident } = useResponderStore();
@@ -55,7 +52,7 @@ export function DispatchSheet() {
 
     expiryHandledRef.current = true;
     try {
-      const apiUrl = apiBaseUrl();
+      const apiUrl = getMobileApiBaseUrl();
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
@@ -122,7 +119,7 @@ export function DispatchSheet() {
     const syncServerClock = async () => {
       const requestStartedAt = Date.now();
       try {
-        const apiUrl = apiBaseUrl();
+        const apiUrl = getMobileApiBaseUrl();
         const { data: { session } } = await supabase.auth.getSession();
         const response = await fetch(`${apiUrl}/api/dispatch-clock`, {
           headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
@@ -361,7 +358,7 @@ export function DispatchSheet() {
                 acceptingRef.current = true;
                 setAccepting(true);
                 try {
-                  const apiUrl = apiBaseUrl();
+                  const apiUrl = getMobileApiBaseUrl();
                   const { data: { session } } = await supabase.auth.getSession();
                   const reqHeaders: any = { 'Content-Type': 'application/json' };
                   if (session?.access_token) {

@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { fetchWithTimeout } from '../lib/network-timeout';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
+import { getMobileApiBaseUrl } from '../lib/api-base-url';
 
 const OFFLINE_REPORTS_KEY = 'disas_trace_offline_reports';
 const DRAFT_REMINDER_NOTIFICATION_KEY = 'disas_trace_draft_reminder_notification_id';
@@ -107,7 +108,7 @@ export function useOfflineReports() {
       setSyncing(true);
       setSyncingQueue(true);
 
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = getMobileApiBaseUrl();
       let queueSuccess = true;
 
       try {

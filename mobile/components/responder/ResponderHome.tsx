@@ -28,6 +28,7 @@ import * as Notifications from 'expo-notifications';
 import { ensureResponderEmergencyAlertChannels, getResponderEmergencyAlert } from '../../lib/push-notifications';
 import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
+import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 import {
   getAutomaticHospitalRecommendation,
   isEligibleHospitalDestination,
@@ -315,7 +316,7 @@ export function ResponderHome() {
         lastDbUpdateRef.current = now;
         lastDbLocationRef.current = { latitude: currentCoord[1], longitude: currentCoord[0] };
 
-        const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+        const apiUrl = getMobileApiBaseUrl();
         const { data: { session } } = await supabase.auth.getSession();
         const reqHeaders: any = { 'Content-Type': 'application/json' };
         if (session?.access_token) {
@@ -741,7 +742,7 @@ export function ResponderHome() {
         if (session?.access_token) {
           reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
         }
-        const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3000';
+        const baseUrl = getMobileApiBaseUrl();
         const res = await fetch(`${baseUrl}/api/map/hospitals`, {
           headers: reqHeaders
         });

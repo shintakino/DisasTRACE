@@ -19,6 +19,7 @@ import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { shouldResumeResidentRequest } from '../../lib/active-incident';
 import { useLiveBarangay } from '../../hooks/use-live-barangay';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
+import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 
 import * as Notifications from 'expo-notifications';
 import { Platform, Vibration } from 'react-native';
@@ -45,10 +46,6 @@ function formatIncidentTimestamp(value: string): string {
   });
 }
 
-const apiBaseUrl = () => (process.env.EXPO_PUBLIC_API_URL
-  || process.env.EXPO_PUBLIC_MOBILE_API_URL?.replace(/\/api$/, '')
-  || 'https://disas-trace.vercel.app').replace(/\/$/, '');
-
 export default function HomeScreen() {
   const router = useRouter();
   const { dispatchOfferId } = useLocalSearchParams<{ dispatchOfferId?: string | string[] }>();
@@ -69,7 +66,7 @@ export default function HomeScreen() {
     const hydrateOffer = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
-      const response = await fetch(`${apiBaseUrl()}/api/incidents/offer?incidentId=${encodeURIComponent(notificationOfferId)}`, {
+      const response = await fetch(`${getMobileApiBaseUrl()}/api/incidents/offer?incidentId=${encodeURIComponent(notificationOfferId)}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const result = await response.json().catch(() => null);

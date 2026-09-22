@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { useResponderStore, checkConnectivity } from '../stores/useResponderStore';
 import { isMockedLocation } from '../lib/location-integrity';
 import { isEligibleHospitalDestination } from '../lib/hospital-destination-policy';
+import { getMobileApiBaseUrl } from '../lib/api-base-url';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 let lastTransportContextAlertAt = 0;
@@ -52,7 +53,7 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
           : '[Background GPS Task] Live background coordinate sync.');
         
         try {
-          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+          const apiUrl = getMobileApiBaseUrl();
           const { data: { session } } = await supabase.auth.getSession();
           const reqHeaders: any = { 'Content-Type': 'application/json' };
           if (session?.access_token) {
@@ -219,7 +220,7 @@ export function useBroadcastTracker(
     };
 
     const signalMockLocation = async (position: { latitude: number; longitude: number }) => {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = getMobileApiBaseUrl();
       const { data: { session } } = await supabase.auth.getSession();
       await fetch(`${apiUrl}/api/responder/location`, {
         method: 'POST',
@@ -313,7 +314,7 @@ export function useBroadcastTracker(
             lastDbLocationRef.current = { latitude: lat, longitude: lng };
             lastTransportContextRef.current = transportContext;
 
-            const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+            const apiUrl = getMobileApiBaseUrl();
             const { data: { session } } = await supabase.auth.getSession();
             const reqHeaders: any = { 'Content-Type': 'application/json' };
             if (session?.access_token) {
@@ -449,7 +450,7 @@ export function useBroadcastTracker(
             ? `to_hospital:${targetHospital?.id || ''}`
             : null;
 
-          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+          const apiUrl = getMobileApiBaseUrl();
           const { data: { session } } = await supabase.auth.getSession();
           const reqHeaders: any = { 'Content-Type': 'application/json' };
           if (session?.access_token) {

@@ -1,10 +1,7 @@
 import * as Location from 'expo-location';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from './location-integrity';
 import { supabase } from './supabase';
-
-const apiBaseUrl = () => (process.env.EXPO_PUBLIC_API_URL
-  || process.env.EXPO_PUBLIC_MOBILE_API_URL?.replace(/\/api$/, '')
-  || 'https://disas-trace.vercel.app').replace(/\/$/, '');
+import { getMobileApiBaseUrl } from './api-base-url';
 
 export interface ResponderAvailabilitySyncResult {
   success: boolean;
@@ -50,7 +47,7 @@ export async function syncResponderAvailabilityLocation(): Promise<ResponderAvai
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
-    const response = await fetch(`${apiBaseUrl()}/api/responder/location`, {
+    const response = await fetch(`${getMobileApiBaseUrl()}/api/responder/location`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

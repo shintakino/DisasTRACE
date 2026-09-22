@@ -11,6 +11,7 @@ import { signOutFromMobile } from '../../lib/mobile-auth';
 import { syncResponderAvailabilityLocation } from '../../lib/responder-availability';
 import { registerResponderPushNotifications } from '../../lib/push-notifications';
 import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
+import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 
 export default function ProfileScreen() {
   const { user, role, profile, refreshStatus } = useAuthStatus();
@@ -31,7 +32,7 @@ export default function ProfileScreen() {
     
     setUpdatingDuty(true);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
+      const apiUrl = getMobileApiBaseUrl();
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',

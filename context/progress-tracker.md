@@ -10,6 +10,12 @@
 - Unified automatic dispatch and timeout-cascade candidate radius under one bounded server policy (1-15 km, default 15 km), removing the former hidden 2 km post-filter after a 15 km spatial search.
 - PACC manual dispatch now exposes a responder's precise trusted-GPS sync reason and age, so `SYNC DELAYED` explains the corrective action rather than resembling a failed responder assignment.
 - The responder's On Duty action now immediately attempts an authenticated, bounded trusted-GPS heartbeat and tells the responder whether PACC can offer live emergencies. Availability state is shared with a tab-level telemetry owner, so opening Profile or Forms does not stop heartbeats. The same action confirms whether Android background dispatch notifications are registered.
+- Unified mobile API-origin resolution across responder telemetry, duty updates,
+  dispatch actions, offline replay, session actions, and push registration.
+  Production builds now use the deployed API when no explicit origin is set,
+  while Android development continues to use the emulator-local origin. This
+  prevents later heartbeats from silently posting to `localhost` after the
+  initial PACC GPS sync succeeds.
 - Root/mobile strict TypeScript, focused dispatch recovery checks, and whitespace checks pass for the implemented increments. Live device verification remains required for Android location, notification, and background lifecycle permissions.
 
 ## 2026-09-22 - Map camera resize compatibility repair

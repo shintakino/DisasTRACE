@@ -1,5 +1,11 @@
 # Progress Tracker
 
+## 2026-09-23 - PACC operations dashboard alignment
+
+- Kept PACC's existing **Welcome back** operational header and rebuilt the dashboard body around the CDRRMO-style flat operations layout: five compact semantic metric cards, an **Attention Required** panel, and a live **Response Resource Status** panel. The view uses solid surfaces only—no gradients—and retains PACC's existing reports, dispatch, and responder data sources.
+- Actionable attention rows open their selected report in the existing PACC map workflow. Resource counts and responder labels remain derived from the live dashboard response rather than static dashboard-only values.
+- Root strict TypeScript, ESLint, and whitespace checks pass.
+
 ## 2026-09-23 - Mobile Home navigation stability and lifecycle audit
 
 - Corrected CDRRMO/PACC operational-data boundaries. Dashboard daily KPIs now use an inclusive/exclusive Asia/Manila SQL day range rather than Vercel's process-local midnight; rejected-today uses the terminal status timestamp (`updated_at`), and user cancellation updates that timestamp. Live-map default requests are limited to current incident/request states and usable on-duty/dispatched responders with real coordinates; selected dates issue a bounded server-side Manila-day query instead of loading the archive into every browser. Map summary values now use database aggregates. Trip-ticket exports now interpolate the report ID in their official filename correctly. Focused regression, root TypeScript, and whitespace checks pass.

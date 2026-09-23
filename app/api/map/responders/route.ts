@@ -4,7 +4,7 @@ import { MapResponderSchema } from "@/types/map";
 import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { isResponderHeartbeatFresh } from "@/lib/dispatch-policy";
 
@@ -14,7 +14,9 @@ export async function GET() {
   }
 
   try {
-    // Query active ambulance responders from the users table
+    // Never publish every responder as a live unit. Only an on-duty or
+    // dispatched responder with a real coordinate can appear on the command
+    // map; old/off-duty records remain available in roster/history views.
     const dbResponders = await db
       .select({
         id: users.id,
@@ -25,7 +27,12 @@ export async function GET() {
         lastLocationUpdatedAt: users.lastLocationUpdatedAt,
       })
       .from(users)
-      .where(eq(users.role, "ambulance_responder"));
+      .where(and(
+        eq(users.role, "ambulance_responder"),
+        inArray(users.dutyStatus, ['ON_DUTY', 'ACTIVE_DISPATCH']),
+        isNotNull(users.lastLatitude),
+        isNotNull(users.lastLongitude),
+      ));
 
     const activeIncidents = await db
       .select({
@@ -34,7 +41,8 @@ export async function GET() {
         assignedAmbulance: incidents.assignedAmbulance,
         status: incidents.status,
       })
-      .from(incidents);
+      .from(incidents)
+      .where(inArray(incidents.status, ['DISPATCHED', 'EN_ROUTE', 'ARRIVED']));
 
     const activeIncidentByResponder = new Map(
       activeIncidents
@@ -42,7 +50,9 @@ export async function GET() {
         .map((incident) => [incident.responderId as string, incident])
     );
 
-    const mapped = dbResponders.map((r, i) => {
+    const mapped = dbResponders.filter((responder) => (
+      responder.dutyStatus === 'ACTIVE_DISPATCH' || isResponderHeartbeatFresh(responder.lastLocationUpdatedAt)
+    )).map((r, i) => {
       const isRecent = isResponderHeartbeatFresh(r.lastLocationUpdatedAt);
 
       let mappedStatus: "AVAILABLE" | "DISPATCHED" | "OFF_DUTY" = "OFF_DUTY";
@@ -69,9 +79,8 @@ export async function GET() {
         responderName: r.fullName,
         vehicleId: activeIncident?.assignedAmbulance || vehicleId,
         status: mappedStatus,
-        // Fallback to CDRRMO HQ coordinates if not yet updated
-        lat: r.lastLatitude ?? 14.9516,
-        lng: r.lastLongitude ?? 120.9011,
+        lat: r.lastLatitude!,
+        lng: r.lastLongitude!,
         heading: 0,
         lastUpdated: r.lastLocationUpdatedAt
           ? r.lastLocationUpdatedAt.toISOString()

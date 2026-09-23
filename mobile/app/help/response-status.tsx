@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Clock3, MapPinned, Radio, RefreshCw, WifiOff } from 'lucide-react-native';
@@ -10,10 +10,14 @@ import { fetchWithTimeout } from '../../lib/network-timeout';
 import { reportRefreshCopy } from '../../lib/report-status-feedback';
 import { GuestAllowanceBanner } from '../../components/guest/GuestAllowanceBanner';
 import { updateGuestReportHistory } from '../../lib/guest-report-history';
+import { getMobileApiBaseUrl } from '../../lib/api-base-url';
+import { getPublicResponseMode, type PublicTransportStatus } from '../../lib/public-response-lifecycle';
 
 interface IncidentStatus {
   status: 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'DOCUMENTATION_PENDING' | 'RESOLVED';
   responderId: string | null;
+  transportStatus: PublicTransportStatus;
+  transportHospitalName: string | null;
 }
 
 type DispatchRecoveryState = 'PACC_REASSIGNMENT_REQUIRED' | null;
@@ -28,7 +32,10 @@ function messageFor(incident: IncidentStatus | null, agencies: string[], recover
   if (recoveryState === 'PACC_REASSIGNMENT_REQUIRED') {
     return `${coordination ? `${coordination}. ` : ''}PACC is arranging another available responder.`;
   }
-  if (incident?.status === 'ARRIVED') return 'Responders have arrived at your location.';
+  const mode = getPublicResponseMode({ incidentStatus: incident?.status, transportStatus: incident?.transportStatus, hasResponder: Boolean(incident?.responderId) });
+  if (mode === 'TRANSPORT_COMPLETE') return 'Patient transport is complete.';
+  if (mode === 'TRANSPORT_TRACKING') return `Patient transport is in progress${incident?.transportHospitalName ? ` to ${incident.transportHospitalName}` : ''}.`;
+  if (mode === 'HELP_ARRIVED') return 'Help has arrived. The responder is assisting at the scene.';
   if (incident?.status === 'DOCUMENTATION_PENDING') return 'The field response has been completed. The responder is finishing incident documentation for PACC.';
   if (incident?.status === 'RESOLVED') return 'Response coordination has been completed.';
   if (incident?.status === 'EN_ROUTE' || incident?.responderId) return `${coordination ? `${coordination}. ` : ''}Responders are on the way.`;
@@ -48,6 +55,14 @@ export default function EmergencyResponseStatusScreen() {
   const [retryNonce, setRetryNonce] = useState(0);
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
   const { handleRejectedReport } = useRejectedReportRecovery(isGuest ? 'guest' : 'registered');
+  const hasRedirectedGuestRef = useRef(false);
+
+  useEffect(() => {
+    if (isGuest && report.chatbotOrigin && !hasRedirectedGuestRef.current) {
+      hasRedirectedGuestRef.current = true;
+      router.replace('/help/chatbot-pending' as never);
+    }
+  }, [isGuest, report.chatbotOrigin, router]);
 
   const returnToWaiting = useCallback(() => {
     setIncident(null);
@@ -83,7 +98,7 @@ export default function EmergencyResponseStatusScreen() {
       if (refreshing) return;
       refreshing = true;
       try {
-        const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+        const apiUrl = getMobileApiBaseUrl();
         const query = new URLSearchParams({ requestId });
         const headers: Record<string, string> = {};
         if (isGuest && report.guestAccessToken) {
@@ -98,7 +113,7 @@ export default function EmergencyResponseStatusScreen() {
         // remains reliable when mobile realtime is suspended during a PACC
         // coordination update or a responder accepts from a push notification.
         const response = await fetchWithTimeout(
-          `${apiUrl}/emergency-intake/status?${query.toString()}`,
+          `${apiUrl}/api/emergency-intake/status?${query.toString()}`,
           { headers },
           10_000,
           'Response status refresh',
@@ -115,10 +130,12 @@ export default function EmergencyResponseStatusScreen() {
           return;
         }
 
-        const remoteIncident = result.data.incident as { id: string; status: IncidentStatus['status']; responderId?: string | null; responder_id?: string | null } | null;
+        const remoteIncident = result.data.incident as { id: string; status: IncidentStatus['status']; responderId?: string | null; responder_id?: string | null; transportStatus?: PublicTransportStatus } | null;
         const nextIncident = remoteIncident ? {
           status: remoteIncident.status,
           responderId: remoteIncident.responderId ?? remoteIncident.responder_id ?? null,
+          transportStatus: remoteIncident.transportStatus ?? result.data.transport?.status ?? 'NONE',
+          transportHospitalName: result.data.transport?.hospital?.name ?? null,
         } : null;
 
         setIncident(nextIncident);
@@ -131,6 +148,8 @@ export default function EmergencyResponseStatusScreen() {
           incidentId: remoteIncident?.id,
           trackingRequestId: result.data.trackingRequestId,
           responderFullName: result.data.responder?.fullName,
+          latitude: result.data.incidentLocation?.latitude,
+          longitude: result.data.incidentLocation?.longitude,
           guestReportsRemaining: reportsRemaining,
         });
         if (isGuest && reportsRemaining !== undefined) {
@@ -155,6 +174,7 @@ export default function EmergencyResponseStatusScreen() {
     };
   }, [handleRejectedReport, isGuest, report.guestAccessToken, report.id, returnToWaiting, retryNonce]);
 
+  const mode = getPublicResponseMode({ incidentStatus: incident?.status, transportStatus: incident?.transportStatus, hasResponder: Boolean(incident?.responderId) });
   const message = useMemo(() => messageFor(incident, agencies, recoveryState), [agencies, incident, recoveryState]);
   const refreshCopy = reportRefreshCopy({ lastCheckedAt, error: refreshError });
   return <ScrollView style={styles.page} contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
@@ -164,16 +184,23 @@ export default function EmergencyResponseStatusScreen() {
       <Text style={[styles.refreshText, refreshCopy.tone === 'warning' && styles.refreshWarningText]}>{refreshCopy.text}</Text>
       {refreshCopy.tone === 'warning' ? <TouchableOpacity style={styles.retryButton} onPress={() => setRetryNonce((value) => value + 1)}><Text style={styles.retryText}>Retry now</Text></TouchableOpacity> : null}
     </View>
-    {isGuest ? <GuestAllowanceBanner remaining={report.guestReportsRemaining ?? chatbotActiveReport?.reportsRemaining} style={styles.allowanceBanner} /> : null}
+    {isGuest ? (
+      <GuestAllowanceBanner
+        remaining={report.guestReportsRemaining ?? chatbotActiveReport?.reportsRemaining}
+        style={styles.allowanceBanner}
+        showReminder={false}
+        showRegistrationAction={false}
+      />
+    ) : null}
     <View style={styles.card}>
       <StatusStep icon={<CheckCircle2 color="#16A34A" size={21} />} title="Report received" subtitle="Your incident details and location were recorded." active />
       <StatusStep icon={<Clock3 color={agencies.length > 0 || recoveryState ? '#16A34A' : '#F97316'} size={21} />} title="Response coordination" subtitle={recoveryState ? 'PACC is selecting another available responder after the previous offer expired.' : coordinationText(agencies) || 'PACC is coordinating the appropriate response.'} active={agencies.length > 0 || Boolean(recoveryState)} />
-      <StatusStep icon={<MapPinned color={incident?.responderId ? '#16A34A' : '#94A3B8'} size={21} />} title="Responder movement" subtitle={incident?.responderId ? 'Responders are on the way. Please remain available for further instructions.' : 'This updates when a responder is assigned.'} active={Boolean(incident?.responderId)} />
+      <StatusStep icon={<MapPinned color={mode === 'WAITING' ? '#94A3B8' : '#16A34A'} size={21} />} title={mode === 'HELP_ARRIVED' ? 'Help has arrived' : mode === 'DOCUMENTATION_PENDING' ? 'Field response complete' : mode === 'TRANSPORT_TRACKING' ? 'Patient transport' : mode === 'TRANSPORT_COMPLETE' ? 'Patient transport complete' : 'Responder movement'} subtitle={mode === 'HELP_ARRIVED' ? 'The responder is assisting at the scene. Live inbound tracking has ended.' : mode === 'DOCUMENTATION_PENDING' ? 'The field response is complete. The responder is finishing incident documentation for PACC.' : mode === 'TRANSPORT_TRACKING' ? `The responder is travelling${incident?.transportHospitalName ? ` to ${incident.transportHospitalName}` : ' to hospital'}.` : mode === 'TRANSPORT_COMPLETE' ? 'The responder has arrived at the selected hospital.' : incident?.responderId ? 'Responders are on the way. Please remain available for further instructions.' : 'This updates when a responder is assigned.'} active={mode !== 'WAITING'} />
     </View>
-    <TouchableOpacity style={styles.mapButton} onPress={() => router.replace('/help/tracking' as any)} disabled={!incident?.responderId}><Text style={styles.mapButtonText}>{incident?.responderId ? 'Open live ambulance map' : 'Waiting for responder assignment'}</Text></TouchableOpacity>
+    {mode === 'TRANSPORT_COMPLETE' ? <TouchableOpacity style={[styles.mapButton, styles.completeButton]} onPress={() => router.replace('/help/resolution?completion=transport' as any)}><Text style={styles.mapButtonText}>View transport completion</Text></TouchableOpacity> : mode === 'INBOUND_TRACKING' || mode === 'TRANSPORT_TRACKING' ? <TouchableOpacity style={styles.mapButton} onPress={() => router.replace('/help/tracking' as any)}><Text style={styles.mapButtonText}>{mode === 'TRANSPORT_TRACKING' ? 'Track patient transport' : 'Open live ambulance map'}</Text></TouchableOpacity> : null}
   </ScrollView>;
 }
 
 function StatusStep({ icon, title, subtitle, active }: { icon: React.ReactNode; title: string; subtitle: string; active: boolean }) { return <View style={styles.step}><View style={[styles.icon, active && styles.iconActive]}>{icon}</View><View style={styles.stepCopy}><Text style={styles.stepTitle}>{title}</Text><Text style={styles.stepSubtitle}>{subtitle}</Text></View></View>; }
 
-const styles = StyleSheet.create({ page: { flex: 1, backgroundColor: '#F3F4F6' }, pageContent: { paddingBottom: 24 }, hero: { backgroundColor: '#1E3A8A', paddingTop: 72, paddingHorizontal: 24, paddingBottom: 44, alignItems: 'center' }, eyebrow: { color: '#BFDBFE', marginTop: 14, fontSize: 11, fontWeight: '800', letterSpacing: 1.4 }, title: { color: '#FFF', fontSize: 24, fontWeight: '800', textAlign: 'center', marginTop: 10, lineHeight: 31 }, caseId: { color: '#DBEAFE', marginTop: 10, fontWeight: '600' }, refreshCard: { marginHorizontal: 20, marginTop: 16, borderRadius: 10, backgroundColor: '#FFF', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#E2E8F0' }, refreshWarning: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }, refreshText: { flex: 1, color: '#475569', fontSize: 12, lineHeight: 17 }, refreshWarningText: { color: '#92400E' }, retryButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 6 }, retryText: { color: '#1E3A8A', fontWeight: '800', fontSize: 12 }, allowanceBanner: { marginHorizontal: 20, marginTop: 12 }, card: { margin: 20, backgroundColor: '#FFF', borderRadius: 12, padding: 18, gap: 18, shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }, step: { flexDirection: 'row', gap: 13 }, icon: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' }, iconActive: { backgroundColor: '#ECFDF5' }, stepCopy: { flex: 1 }, stepTitle: { color: '#0F172A', fontWeight: '800', fontSize: 15 }, stepSubtitle: { color: '#64748B', fontSize: 13, marginTop: 3, lineHeight: 19 }, mapButton: { backgroundColor: '#EF4444', marginHorizontal: 20, borderRadius: 8, padding: 16, alignItems: 'center' }, mapButtonText: { color: '#FFF', fontWeight: '800' } });
+const styles = StyleSheet.create({ page: { flex: 1, backgroundColor: '#F3F4F6' }, pageContent: { paddingBottom: 24 }, hero: { backgroundColor: '#1E3A8A', paddingTop: 72, paddingHorizontal: 24, paddingBottom: 44, alignItems: 'center' }, eyebrow: { color: '#BFDBFE', marginTop: 14, fontSize: 11, fontWeight: '800', letterSpacing: 1.4 }, title: { color: '#FFF', fontSize: 24, fontWeight: '800', textAlign: 'center', marginTop: 10, lineHeight: 31 }, caseId: { color: '#DBEAFE', marginTop: 10, fontWeight: '600' }, refreshCard: { marginHorizontal: 20, marginTop: 16, borderRadius: 10, backgroundColor: '#FFF', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#E2E8F0' }, refreshWarning: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }, refreshText: { flex: 1, color: '#475569', fontSize: 12, lineHeight: 17 }, refreshWarningText: { color: '#92400E' }, retryButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 6 }, retryText: { color: '#1E3A8A', fontWeight: '800', fontSize: 12 }, allowanceBanner: { marginHorizontal: 20, marginTop: 12 }, card: { margin: 20, backgroundColor: '#FFF', borderRadius: 12, padding: 18, gap: 18, shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }, step: { flexDirection: 'row', gap: 13 }, icon: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' }, iconActive: { backgroundColor: '#ECFDF5' }, stepCopy: { flex: 1 }, stepTitle: { color: '#0F172A', fontWeight: '800', fontSize: 15 }, stepSubtitle: { color: '#64748B', fontSize: 13, marginTop: 3, lineHeight: 19 }, mapButton: { backgroundColor: '#1E3A8A', marginHorizontal: 20, borderRadius: 8, padding: 16, alignItems: 'center' }, completeButton: { backgroundColor: '#15803D' }, mapButtonText: { color: '#FFF', fontWeight: '800' } });

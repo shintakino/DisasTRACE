@@ -4,7 +4,7 @@ import { MapSummarySchema } from "@/types/map";
 import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
-import { eq } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 export async function GET() {
   if (!(await isAdmin())) {
@@ -12,17 +12,18 @@ export async function GET() {
   }
 
   try {
-    const allIncidents = await db.select({ status: incidents.status }).from(incidents);
-    const pendingVerifications = await db
-      .select({ id: verificationRequests.id })
-      .from(verificationRequests)
-      .where(eq(verificationRequests.status, "PENDING"));
+    const [[newIncidents], [ongoingIncidents], [completedIncidents], [pendingVerifications]] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(incidents).where(eq(incidents.status, 'DISPATCHED')),
+      db.select({ count: sql<number>`count(*)` }).from(incidents).where(inArray(incidents.status, ['EN_ROUTE', 'ARRIVED'])),
+      db.select({ count: sql<number>`count(*)` }).from(incidents).where(eq(incidents.status, 'RESOLVED')),
+      db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, 'PENDING')),
+    ]);
 
     const summary = {
-      new: allIncidents.filter((i) => i.status === "DISPATCHED").length,
-      ongoing: allIncidents.filter((i) => i.status === "EN_ROUTE" || i.status === "ARRIVED").length,
-      completed: allIncidents.filter((i) => i.status === "RESOLVED").length,
-      standby: pendingVerifications.length,
+      new: Number(newIncidents?.count) || 0,
+      ongoing: Number(ongoingIncidents?.count) || 0,
+      completed: Number(completedIncidents?.count) || 0,
+      standby: Number(pendingVerifications?.count) || 0,
     };
 
     const validatedData = MapSummarySchema.parse(summary);

@@ -48,6 +48,15 @@ export function OnSceneSheet() {
     }
   }, [status]);
 
+  useEffect(() => {
+    if (status === 'on_scene') {
+      // The completion choices must never be pushed below the fold on shorter
+      // Android screens. Keep the compact outcome picker at mid-height, then
+      // expand once the responder needs to reach the two final actions.
+      bottomSheetRef.current?.snapToIndex(showNextStep ? 2 : 1);
+    }
+  }, [showNextStep, status]);
+
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
@@ -61,7 +70,7 @@ export function OnSceneSheet() {
     return 'End Sharing'; // default
   };
 
-  const snapPoints = useMemo(() => ['15%', '50%', '90%'], []);
+  const snapPoints = useMemo(() => ['18%', '58%', '92%'], []);
   const fieldOutcome = selectedOutcome === 'handled'
     ? 'HANDLED_ON_SCENE' as const
     : selectedOutcome === 'refused'

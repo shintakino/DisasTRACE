@@ -7,6 +7,7 @@ import { useResponderStore, checkConnectivity } from '../stores/useResponderStor
 import { isMockedLocation } from '../lib/location-integrity';
 import { isEligibleHospitalDestination } from '../lib/hospital-destination-policy';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
+import { responderLocationStatusPayload } from '../lib/responder-location-status';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 let lastTransportContextAlertAt = 0;
@@ -347,7 +348,7 @@ export function useBroadcastTracker(
                     latitude: lat,
                     longitude: lng,
                     accuracy: pos.accuracy,
-                    responderStatus: statusRef.current,
+                    ...responderLocationStatusPayload(statusRef.current),
                     incidentId,
                     targetHospitalId: targetHospitalRef.current?.id ?? null,
                   }
@@ -363,12 +364,13 @@ export function useBroadcastTracker(
                     latitude: lat,
                     longitude: lng,
                     accuracy: pos.accuracy,
-                    responderStatus: statusRef.current,
+                    ...responderLocationStatusPayload(statusRef.current),
                     incidentId,
                     targetHospitalId: targetHospitalRef.current?.id ?? null,
                   })
                 });
                 if (response.ok) {
+                  useResponderStore.setState({ lastQueueError: null });
                   const result = await response.json().catch(() => null) as { autoArrivedHospitalIncidentId?: string | null } | null;
                   if (result?.autoArrivedHospitalIncidentId === incidentId) {
                     useResponderStore.setState({ status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL', isHospitalArrivalConfirmVisible: false });
@@ -396,7 +398,7 @@ export function useBroadcastTracker(
                     latitude: lat,
                     longitude: lng,
                     accuracy: pos.accuracy,
-                    responderStatus: statusRef.current,
+                    ...responderLocationStatusPayload(statusRef.current),
                     incidentId,
                     targetHospitalId: targetHospitalRef.current?.id ?? null,
                   }
@@ -480,7 +482,7 @@ export function useBroadcastTracker(
                   latitude: lat,
                   longitude: lng,
                   accuracy: pos.accuracy,
-                  responderStatus,
+                  ...responderLocationStatusPayload(responderStatus),
                   incidentId,
                   targetHospitalId: targetHospital?.id ?? null,
                 }
@@ -496,12 +498,13 @@ export function useBroadcastTracker(
                   latitude: lat,
                   longitude: lng,
                   accuracy: pos.accuracy,
-                  responderStatus,
+                  ...responderLocationStatusPayload(responderStatus),
                   incidentId,
                   targetHospitalId: targetHospital?.id ?? null,
                 })
             });
             if (response.ok) {
+              useResponderStore.setState({ lastQueueError: null });
               const result = await response.json().catch(() => null) as { autoArrivedHospitalIncidentId?: string | null } | null;
               if (result?.autoArrivedHospitalIncidentId === incidentId) {
                 useResponderStore.setState({ status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL', isHospitalArrivalConfirmVisible: false });
@@ -529,7 +532,7 @@ export function useBroadcastTracker(
                   latitude: lat,
                   longitude: lng,
                   accuracy: pos.accuracy,
-                  responderStatus,
+                  ...responderLocationStatusPayload(responderStatus),
                   incidentId,
                   targetHospitalId: targetHospital?.id ?? null,
                 }

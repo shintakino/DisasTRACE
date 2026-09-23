@@ -4,6 +4,7 @@ import { useRouter, useNavigation } from 'expo-router';
 import { ShieldAlert, CheckCircle, Navigation, LogOut } from 'lucide-react-native';
 import { TransmissionLoader } from '../../components/help/TransmissionLoader';
 import { useEmergencyReportStore } from '../../store/use-emergency-report-store';
+import { elapsedSecondsSince } from '../../lib/elapsed-time';
 import { supabase } from '../../lib/supabase';
 import { signOutFromMobile } from '../../lib/mobile-auth';
 import { useRejectedReportRecovery } from '../../hooks/use-rejected-report-recovery';
@@ -19,6 +20,7 @@ export default function PendingScreen() {
   const [transmissionStatus, setTransmissionStatus] = useState('Uploading incident media...');
   
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const waitingStartedAtRef = useRef(Date.now());
   const [isAccepted, setIsAccepted] = useState(false); // Simulate acceptance
   const [isSecuringResponder, setIsSecuringResponder] = useState(false);
   const incidentChannelRef = useRef<any>(null);
@@ -407,8 +409,10 @@ export default function PendingScreen() {
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (!isTransmitting && !isAccepted) {
+      const updateElapsed = () => setElapsedSeconds(elapsedSecondsSince(waitingStartedAtRef.current));
+      updateElapsed();
       interval = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
+        updateElapsed();
       }, 1000);
     }
     return () => clearInterval(interval);

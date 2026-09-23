@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { isSameDay } from "date-fns";
+import { format } from "date-fns";
 import { IncidentPanel } from "@/components/map/incident-panel";
 import { MapContainer } from "@/components/map/map-container";
 import { useMapData } from "@/hooks/use-map-data";
@@ -17,13 +17,14 @@ import { CommandMapOverlays, type CommandMapLayers } from "@/components/map/comm
 import { WebPreloader } from "@/components/ui/web-preloader";
 
 function MapPageContent() {
-  const { incidents, responders, hospitals, demandZones, summary, isLoading, error, refresh } = useMapData();
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const selectedMapDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
+  const { incidents, responders, hospitals, demandZones, summary, isLoading, error, refresh } = useMapData({ date: selectedMapDate });
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
   const [filter, setFilter] = useState("ALL");
   const [category, setCategory] = useState<"user" | "responder">("user");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [priorityIncidentId, setPriorityIncidentId] = useState<string | undefined>();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   
   const [layers, setLayers] = useState<CommandMapLayers>({
     critical: true,
@@ -75,12 +76,7 @@ function MapPageContent() {
     setIsReportSheetOpen(true);
   };
 
-  const dateFilteredIncidents = useMemo(() => selectedDate
-    ? incidents.filter((incident) => isSameDay(new Date(incident.createdAt), selectedDate))
-    : incidents,
-  [incidents, selectedDate]);
-
-  const displayedIncidents = dateFilteredIncidents.filter((incident) => {
+  const displayedIncidents = incidents.filter((incident) => {
     if (incident.category === "user" && !layers.requests) return false;
     if (incident.category === "responder" && !layers.reports) return false;
     if ((incident.status === "REJECTED" || incident.status === "DUPLICATE") && !layers.rejected) return false;

@@ -6,9 +6,16 @@ import { guestAllowanceCopy } from '../../lib/guest-report-allowance';
 interface GuestAllowanceBannerProps {
   remaining?: number;
   style?: StyleProp<ViewStyle>;
+  showReminder?: boolean;
+  showRegistrationAction?: boolean;
 }
 
-export function GuestAllowanceBanner({ remaining, style }: GuestAllowanceBannerProps) {
+export function GuestAllowanceBanner({
+  remaining,
+  style,
+  showReminder = true,
+  showRegistrationAction = true,
+}: GuestAllowanceBannerProps) {
   const router = useRouter();
   if (remaining === undefined) return null;
   const copy = guestAllowanceCopy(remaining);
@@ -16,15 +23,17 @@ export function GuestAllowanceBanner({ remaining, style }: GuestAllowanceBannerP
   return (
     <View style={[styles.container, copy.exhausted && styles.exhausted, style]}>
       <Text style={[styles.headline, copy.exhausted && styles.exhaustedHeadline]}>{copy.headline}</Text>
-      <Text style={styles.reminder}>{copy.reminder}</Text>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Create a DisasTRACE account"
-        onPress={() => router.push('/(auth)/sign-up' as never)}
-        style={styles.action}
-      >
-        <Text style={styles.actionText}>Create account</Text>
-      </TouchableOpacity>
+      {showReminder ? <Text style={styles.reminder}>{copy.reminder}</Text> : null}
+      {showRegistrationAction ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Create a DisasTRACE account"
+          onPress={() => router.push('/(auth)/sign-up' as never)}
+          style={styles.action}
+        >
+          <Text style={styles.actionText}>Create account</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

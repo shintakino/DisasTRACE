@@ -5,17 +5,37 @@ import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
-import { eq, desc } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { z } from "zod";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
+import { manilaDayBounds } from "@/lib/manila-time";
 
-export async function GET() {
+const MAP_RECORD_LIMIT = 200;
+const MapDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
+
+export async function GET(request: Request) {
   if (!(await isAdmin())) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
   try {
-    // Query active incidents from the database joined with verification requests for locations
+    const rawDate = new URL(request.url).searchParams.get('date') ?? undefined;
+    const parsedDate = MapDateSchema.safeParse(rawDate);
+    if (!parsedDate.success) {
+      return NextResponse.json({ error: 'Date must use YYYY-MM-DD.' }, { status: 400 });
+    }
+    const day = parsedDate.data;
+    const bounds = day ? manilaDayBounds(day) : null;
+    const incidentScope = bounds
+      ? and(gte(incidents.createdAt, bounds.start), lt(incidents.createdAt, bounds.end))
+      : inArray(incidents.status, ['DISPATCHED', 'EN_ROUTE', 'ARRIVED']);
+    const requestScope = bounds
+      ? and(gte(verificationRequests.createdAt, bounds.start), lt(verificationRequests.createdAt, bounds.end))
+      : inArray(verificationRequests.status, ['PENDING', 'VERIFIED']);
+
+    // Default map reads are live operational records only. An explicitly
+    // selected day receives a bounded historical slice rather than the full
+    // incident archive being transferred to every browser.
     const dbIncidents = await db
       .select({
         id: incidents.id,
@@ -39,9 +59,10 @@ export async function GET() {
       .from(incidents)
       .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
       .leftJoin(users, eq(verificationRequests.residentId, users.id))
-      .orderBy(desc(incidents.createdAt));
+      .where(incidentScope)
+      .orderBy(desc(incidents.createdAt))
+      .limit(MAP_RECORD_LIMIT);
 
-    // Query all verification requests
     const dbRequests = await db
       .select({
         id: verificationRequests.id,
@@ -63,7 +84,9 @@ export async function GET() {
       })
       .from(verificationRequests)
       .leftJoin(users, eq(verificationRequests.residentId, users.id))
-      .orderBy(desc(verificationRequests.createdAt));
+      .where(requestScope)
+      .orderBy(desc(verificationRequests.createdAt))
+      .limit(MAP_RECORD_LIMIT);
 
     const mappedIncidents = dbIncidents.map((inc) => {
       let mappedStatus: "ONGOING" | "COMPLETED" = "ONGOING";
@@ -87,11 +110,13 @@ export async function GET() {
         updatedAt: inc.createdAt.toISOString(),
         category: "responder" as const,
         submittedDate: new Date(inc.createdAt).toLocaleDateString("en-US", {
+          timeZone: 'Asia/Manila',
           year: 'numeric',
           month: 'long',
           day: 'numeric'
         }),
         submittedTime: new Date(inc.createdAt).toLocaleTimeString("en-US", {
+          timeZone: 'Asia/Manila',
           hour: '2-digit',
           minute: '2-digit'
         }),
@@ -118,11 +143,13 @@ export async function GET() {
         updatedAt: req.updatedAt.toISOString(),
         category: "user" as const,
         submittedDate: new Date(req.createdAt).toLocaleDateString("en-US", {
+          timeZone: 'Asia/Manila',
           year: 'numeric',
           month: 'long',
           day: 'numeric'
         }),
         submittedTime: new Date(req.createdAt).toLocaleTimeString("en-US", {
+          timeZone: 'Asia/Manila',
           hour: '2-digit',
           minute: '2-digit'
         }),

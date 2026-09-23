@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { db } from "@/db";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
-import { eq, and, gte, ne, sql } from "drizzle-orm";
+import { eq, and, gte, lt, ne, sql } from "drizzle-orm";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { createClient } from "@/lib/supabase-server";
+import { currentManilaDayBounds } from "@/lib/manila-time";
 
 export async function GET() {
   try {
@@ -24,16 +25,15 @@ export async function GET() {
       }, { status: 403 });
     }
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const today = currentManilaDayBounds();
 
     const [[incidentsCount], [activeIncidentsCount], [pendingVerificationCount], [respondersCount], [resolvedCount], [rejectedCount]] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(incidents).where(gte(incidents.createdAt, todayStart)),
+      db.select({ count: sql<number>`count(*)` }).from(incidents).where(and(gte(incidents.createdAt, today.start), lt(incidents.createdAt, today.end))),
       db.select({ count: sql<number>`count(*)` }).from(incidents).where(ne(incidents.status, "RESOLVED")),
       db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "PENDING")),
       db.select({ count: sql<number>`count(*)` }).from(users).where(and(eq(users.role, "ambulance_responder"), eq(users.status, "ACTIVE"))),
-      db.select({ count: sql<number>`count(*)` }).from(incidents).where(and(eq(incidents.status, "RESOLVED"), gte(incidents.resolvedAt, todayStart))),
-      db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(and(eq(verificationRequests.status, "REJECTED"), gte(verificationRequests.createdAt, todayStart))),
+      db.select({ count: sql<number>`count(*)` }).from(incidents).where(and(eq(incidents.status, "RESOLVED"), gte(incidents.resolvedAt, today.start), lt(incidents.resolvedAt, today.end))),
+      db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(and(eq(verificationRequests.status, "REJECTED"), gte(verificationRequests.updatedAt, today.start), lt(verificationRequests.updatedAt, today.end))),
     ]);
 
     // 4. Avg Response Time Today (in minutes)
@@ -45,7 +45,8 @@ export async function GET() {
       .where(
         and(
           eq(incidents.status, "RESOLVED"),
-          gte(incidents.resolvedAt, todayStart)
+          gte(incidents.resolvedAt, today.start),
+          lt(incidents.resolvedAt, today.end),
         )
       );
 

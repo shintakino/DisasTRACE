@@ -1593,7 +1593,7 @@ export async function exportDriverTripTicketPDF(
 
     addDTTFooters(doc);
 
-    doc.save(`CDRRMO_TripTicket_DTT_&{reportId}.pdf`.replace('&', ''));
+    doc.save(`CDRRMO_TripTicket_DTT_${reportId}.pdf`);
     return true;
   } catch (error) {
     console.error("Failed to generate Trip Ticket PDF:", error);

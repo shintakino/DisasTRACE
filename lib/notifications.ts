@@ -8,6 +8,8 @@ export type NotificationType =
   | "incident_rejected"
   | "ambulance_dispatched"
   | "responder_arrived"
+  | "patient_transport_started"
+  | "patient_transport_completed"
   | "incident_resolved"
   | "registration_pending"
   | "registration_approved";

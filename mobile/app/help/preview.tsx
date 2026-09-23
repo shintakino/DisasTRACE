@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -9,6 +9,11 @@ export default function PreviewScreen() {
   const router = useRouter();
   const photoUri = useEmergencyReportStore((state) => state.report.photoUri);
   const [isUploading, setIsUploading] = useState(false);
+  const uploadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (uploadTimerRef.current) clearTimeout(uploadTimerRef.current);
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -27,8 +32,10 @@ export default function PreviewScreen() {
   };
 
   const handleUsePhoto = () => {
+    if (isUploading) return;
     setIsUploading(true);
-    setTimeout(() => {
+    uploadTimerRef.current = setTimeout(() => {
+      uploadTimerRef.current = null;
       setIsUploading(false);
       router.push('/help/form');
     }, 1500);

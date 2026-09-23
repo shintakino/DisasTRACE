@@ -116,19 +116,12 @@ export default function SignUpScreen() {
 
       if (currentData.idCardUri) {
         if (!signUpData.session) {
-          throw new Error('Your account was created, but the required ID cannot be uploaded until your email is confirmed. Confirm your email, sign in, and complete verification.');
+          // Email confirmation intentionally creates no session. This is still
+          // a successful registration; after the applicant confirms and signs
+          // in, the pending-verification screen collects the ID securely.
+          setIsAutoConfirmed(false);
         } else {
-            const filePath = await withTimeout(uploadGovernmentID(userId, currentData.idCardUri), 30_000, 'government ID upload');
-
-            const { error: profileUpdateError } = await withTimeout((async () => (
-              await supabase
-                .from('users')
-                .update({
-                  id_image_url: filePath,
-                })
-                .eq('id', userId)
-            ))(), 15_000, 'verification profile update');
-            if (profileUpdateError) throw new Error(`Your account was created, but the required ID was not saved: ${profileUpdateError.message}`);
+            await withTimeout(uploadGovernmentID(currentData.idCardUri, currentData.idCardType), 30_000, 'government ID upload');
         }
       }
 
@@ -153,7 +146,7 @@ export default function SignUpScreen() {
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
-      className="flex-1"
+      style={{ flex: 1 }}
     >
       <LinearGradient colors={['#0A1332', '#15286A']} className="flex-1 pt-10">
         {/* Header */}
@@ -189,7 +182,14 @@ export default function SignUpScreen() {
           />
         </View>
 
-        <ScrollView className="flex-1 px-6 py-6" contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        <ScrollView
+          className="flex-1 px-6 py-6"
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 280 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
+        >
           <View className="mb-6 flex-row justify-between items-end">
             <View className="flex-1 pr-4">
               <Text className="text-2xl font-bold text-white mb-1">
@@ -231,15 +231,15 @@ export default function SignUpScreen() {
               </View>
               <Text className="text-2xl font-bold text-[#1E3A8A] mb-2 text-center">Account Created</Text>
               <Text className="text-gray-500 text-center mb-8 leading-6">
-                {isAutoConfirmed 
-                  ? "Your account has been successfully created! You may now log in." 
-                  : "We've sent a verification email to your address. Please confirm your email before logging in."}
+                {isAutoConfirmed
+                  ? "Your registration is complete. CDRRMO Super Admin will review your ID document and notify you after approval."
+                  : "We've sent a verification email to your address. Confirm it, sign in, and upload your ID so CDRRMO Super Admin can review your registration."}
               </Text>
               <TouchableOpacity
                 onPress={handleNextSuccess}
                 className="bg-[#1E3A8A] w-full p-4 rounded-xl items-center justify-center min-h-[56px]"
               >
-                <Text className="text-white font-bold text-lg">Next</Text>
+                <Text className="text-white font-bold text-lg">Return to Sign In</Text>
               </TouchableOpacity>
             </View>
           </View>

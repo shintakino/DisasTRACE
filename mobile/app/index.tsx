@@ -29,9 +29,13 @@ export default function EntryScreen() {
   useEffect(() => {
     if (!isLoaded) return; // wait for auth session
 
+    let cancelled = false;
+    let routeTimer: ReturnType<typeof setTimeout> | undefined;
+
     async function prepare() {
       // Hide native splash once we start our animation
       await SplashScreen.hideAsync();
+      if (cancelled) return;
 
       if (hasShownSplashGlobal) {
         if (isSignedIn) {
@@ -70,7 +74,8 @@ export default function EntryScreen() {
       );
 
       if (isSignedIn) {
-        setTimeout(() => {
+        routeTimer = setTimeout(() => {
+          if (cancelled) return;
           if (verificationStatus === 'approved') {
             router.replace('/(tabs)');
           } else if (verificationStatus === 'pending') {
@@ -100,7 +105,11 @@ export default function EntryScreen() {
       hasShownSplashGlobal = true;
     }
 
-    prepare();
+    void prepare();
+    return () => {
+      cancelled = true;
+      if (routeTimer) clearTimeout(routeTimer);
+    };
   }, [isLoaded, isSignedIn, verificationStatus]);
 
   const logoStyle = useAnimatedStyle(() => ({

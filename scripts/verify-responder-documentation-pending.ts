@@ -45,6 +45,7 @@ const onSceneSheet = read('mobile/components/responder/OnSceneSheet.tsx');
 assert.match(onSceneSheet, /Save Draft &amp; Become Available/);
 assert.match(onSceneSheet, /void deferDocumentation/);
 assert.doesNotMatch(onSceneSheet, /setStatus\('idle'\)/);
+assert.match(onSceneSheet, /snapToIndex\(showNextStep \? 2 : 1\)/);
 
 const hospitalSheet = read('mobile/components/responder/HospitalDocumentationSheet.tsx');
 assert.match(hospitalSheet, /Save Draft &amp; Become Available/);

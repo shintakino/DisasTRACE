@@ -6,6 +6,7 @@ import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, Trash, CloudLightning
 import { useAuthStatus } from '../hooks/use-auth-status';
 import { supabase } from '../lib/supabase';
 import { isNotificationVisibleForRole } from '../lib/report-location';
+import { useEmergencyReportStore } from '../store/use-emergency-report-store';
 
 type Notification = {
   id: string;
@@ -170,13 +171,32 @@ export default function NotificationsScreen() {
 
     // Route only to screens that are valid for the current mobile account.
     try {
+      const transportRequestId = typeof item.metadata?.requestId === 'string'
+        ? item.metadata.requestId
+        : null;
+      const transportIncidentId = typeof item.metadata?.incidentId === 'string'
+        ? item.metadata.incidentId
+        : null;
+      if (transportRequestId && transportIncidentId) {
+        useEmergencyReportStore.getState().setDetails({
+          id: transportRequestId,
+          incidentId: transportIncidentId,
+          trackingRequestId: transportRequestId,
+          reporterMode: 'resident',
+        });
+      }
       if (item.type === 'dispatch_alert' || item.type === 'new_incident') {
         router.replace('/(tabs)/index' as any);
       } else if (
         item.type === 'ambulance_dispatched' || 
-        item.type === 'responder_arrived'
+        item.type === 'responder_arrived' ||
+        item.type === 'patient_transport_started'
       ) {
-        router.replace('/help/tracking' as any);
+        router.replace((item.type === 'patient_transport_started' && transportRequestId
+          ? '/help/response-status'
+          : '/help/tracking') as any);
+      } else if (item.type === 'patient_transport_completed') {
+        router.replace('/help/resolution?completion=transport' as any);
       } else if (
         item.type === 'registration_approved' || 
         item.type === 'registration_rejected'
@@ -280,6 +300,8 @@ export default function NotificationsScreen() {
         return <Siren size={22} color="#EF4444" />;
       case 'ambulance_dispatched':
       case 'responder_arrived':
+      case 'patient_transport_started':
+      case 'patient_transport_completed':
         return <Truck size={22} color="#1E3A8A" />;
       case 'incident_verified':
       case 'registration_approved':

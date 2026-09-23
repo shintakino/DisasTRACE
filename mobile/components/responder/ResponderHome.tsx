@@ -29,6 +29,7 @@ import { ensureResponderEmergencyAlertChannels, getResponderEmergencyAlert } fro
 import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 import { getMobileApiBaseUrl } from '../../lib/api-base-url';
+import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
 import {
   getAutomaticHospitalRecommendation,
   isEligibleHospitalDestination,
@@ -62,6 +63,7 @@ export function ResponderHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { status, activeDispatch, targetHospital, setTargetHospital, drafts } = useResponderStore();
+  const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
   const { profile, user, role } = useAuthStatus();
   const { isOnline } = useOfflineReports();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -1251,9 +1253,7 @@ export function ResponderHome() {
 
         {/* A manually saved draft remains available on Forms, but should not
             cover the active dispatch map or invite duplicate form entry. */}
-        {isOnline && drafts.length > 0 && !(
-          activeDispatch && drafts.some((draft) => draft.incidentId === activeDispatch.id && draft.explicitlySaved)
-        ) && (
+        {isOnline && dutyStatus === 'ON_DUTY' && status === 'idle' && drafts.length > 0 && (
           <TouchableOpacity
             onPress={() => router.push('/(tabs)/forms')}
             activeOpacity={0.9}

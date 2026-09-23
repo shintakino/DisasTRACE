@@ -9,6 +9,9 @@ import { supabase } from '../../lib/supabase';
 import { signOutFromMobile } from '../../lib/mobile-auth';
 import { useRejectedReportRecovery } from '../../hooks/use-rejected-report-recovery';
 import { fetchWithTimeout } from '../../lib/network-timeout';
+import { getMobileApiBaseUrl } from '../../lib/api-base-url';
+import { getPublicResponseMode, type PublicTransportStatus } from '../../lib/public-response-lifecycle';
+import { elapsedSecondsSince } from '../../lib/elapsed-time';
 import * as Haptics from 'expo-haptics';
 
 const { height, width } = Dimensions.get('window');
@@ -58,7 +61,9 @@ export default function TrackingScreen() {
   const [hospitalDistance, setHospitalDistance] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0); // Natural elapsed time starting from 0
   const elapsedRef = useRef(0);
+  const trackingStartedAtRef = useRef(Date.now());
   const hasRedirectedToResolutionRef = useRef(false);
+  const hasRedirectedToSceneStatusRef = useRef(false);
   const [isArrived, setIsArrived] = useState(false);
   const [hasDismissedArrivedModal, setHasDismissedArrivedModal] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0); // Starts at 0% and climbs dynamically
@@ -92,7 +97,7 @@ export default function TrackingScreen() {
     return coordination || 'PACC is coordinating the appropriate response.';
   };
 
-  const handleResolutionRedirect = () => {
+  const handleResolutionRedirect = (completion?: 'transport') => {
     // Resolution can be observed through the initial lookup, the incident
     // lifecycle subscription, and the telemetry lookup at nearly the same
     // time. Android navigation must only receive one terminal transition.
@@ -112,7 +117,32 @@ export default function TrackingScreen() {
         responderVehicleId: vehicleId
       }
     }));
-    router.replace('/help/resolution');
+    router.replace((completion === 'transport' ? '/help/resolution?completion=transport' : '/help/resolution') as never);
+  };
+
+  const applyPublicLifecycle = (incidentStatus: string | null | undefined, transportStatus?: PublicTransportStatus | null, hasResponder = Boolean(assignedResponderRef.current)) => {
+    const mode = getPublicResponseMode({
+      incidentStatus: incidentStatus as Parameters<typeof getPublicResponseMode>[0]['incidentStatus'],
+      transportStatus,
+      hasResponder,
+    });
+    if (mode === 'CASE_CLOSED') {
+      handleResolutionRedirect();
+      return true;
+    }
+    if (mode === 'TRANSPORT_COMPLETE') {
+      handleResolutionRedirect('transport');
+      return true;
+    }
+    if (mode === 'HELP_ARRIVED' || mode === 'DOCUMENTATION_PENDING') {
+      if (!hasRedirectedToSceneStatusRef.current) {
+        hasRedirectedToSceneStatusRef.current = true;
+        router.replace('/help/response-status' as never);
+      }
+      return true;
+    }
+    setIsArrived(false);
+    return false;
   };
 
   // Pulse animation values for radar holding screen
@@ -186,7 +216,7 @@ export default function TrackingScreen() {
         console.log('[TrackingScreen] Syncing incident state for request:', requestId);
         const { data: incident, error } = await supabase
           .from('incidents')
-          .select('id, status, responder_id')
+          .select('id, status, responder_id, transport_status')
           .eq('request_id', requestId)
           .maybeSingle();
 
@@ -209,14 +239,7 @@ export default function TrackingScreen() {
             }));
           }
           
-          if (incident.status === 'RESOLVED') {
-            handleResolutionRedirect();
-            return;
-          }
-          
-          if (incident.status === 'ARRIVED') {
-            setIsArrived(true);
-          }
+          if (applyPublicLifecycle(incident.status, incident.transport_status, Boolean(incident.responder_id))) return;
           
           if (incident.responder_id) {
             setIsFindingAmbulance(false);
@@ -270,7 +293,7 @@ export default function TrackingScreen() {
 
     let active = true;
     let refreshing = false;
-    const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'https://disas-trace.vercel.app/api';
+    const apiUrl = getMobileApiBaseUrl();
 
     const syncRegisteredTracking = async () => {
       if (refreshing) return;
@@ -280,7 +303,7 @@ export default function TrackingScreen() {
         if (!session?.access_token) return;
 
         const response = await fetchWithTimeout(
-          `${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(report.id!)}`,
+          `${apiUrl}/api/emergency-intake/status?requestId=${encodeURIComponent(report.id!)}`,
           { headers: { Authorization: `Bearer ${session.access_token}` } },
           10_000,
           'Report tracking refresh',
@@ -294,7 +317,7 @@ export default function TrackingScreen() {
           return;
         }
 
-        const incident = result.data.incident as { id: string; status: string } | null;
+        const incident = result.data.incident as { id: string; status: string; responderId?: string | null } | null;
         useEmergencyReportStore.setState((state) => ({
           report: {
             ...state.report,
@@ -308,21 +331,16 @@ export default function TrackingScreen() {
           setIsFindingAmbulance(true);
           return;
         }
-        if (incident.status === 'RESOLVED') {
-          handleResolutionRedirect();
-          return;
-        }
-
-        setIsArrived(incident.status === 'ARRIVED');
+        const transport = result.data.transport as {
+          status: PublicTransportStatus;
+          hospital: { id: string; name: string; coordinates: { latitude: number; longitude: number } } | null;
+        } | null;
+        if (applyPublicLifecycle(incident.status, transport?.status, Boolean(incident.responderId))) return;
         const responder = result.data.responder as {
           id: string;
           fullName: string;
           lastLatitude: number | null;
           lastLongitude: number | null;
-        } | null;
-        const transport = result.data.transport as {
-          status: 'NONE' | 'TO_HOSPITAL';
-          hospital: { id: string; name: string; coordinates: { latitude: number; longitude: number } } | null;
         } | null;
         if (transport?.status === 'TO_HOSPITAL') {
           setLiveResponderStatus('to_hospital');
@@ -369,14 +387,14 @@ export default function TrackingScreen() {
     if (!isGuest || !report.id || !report.guestAccessToken) return;
     let active = true;
     let refreshing = false;
-    const apiUrl = process.env.EXPO_PUBLIC_MOBILE_API_URL || 'http://192.168.1.8:3000/api';
+    const apiUrl = getMobileApiBaseUrl();
 
     const syncGuestTracking = async () => {
       if (refreshing) return;
       refreshing = true;
       try {
         const response = await fetchWithTimeout(
-          `${apiUrl}/emergency-intake/status?requestId=${encodeURIComponent(report.id!)}`,
+          `${apiUrl}/api/emergency-intake/status?requestId=${encodeURIComponent(report.id!)}`,
           { headers: { 'X-Guest-Report-Token': report.guestAccessToken! } },
           10_000,
           'Guest report tracking refresh',
@@ -403,17 +421,12 @@ export default function TrackingScreen() {
           setIsFindingAmbulance(true);
           return;
         }
-        if (incident.status === 'RESOLVED') {
-          handleResolutionRedirect();
-          return;
-        }
-
-        setIsArrived(incident.status === 'ARRIVED');
-        const responder = result.data.responder as { id: string; fullName: string; lastLatitude: number | null; lastLongitude: number | null } | null;
         const transport = result.data.transport as {
-          status: 'NONE' | 'TO_HOSPITAL';
+          status: PublicTransportStatus;
           hospital: { id: string; name: string; coordinates: { latitude: number; longitude: number } } | null;
         } | null;
+        if (applyPublicLifecycle(incident.status, transport?.status, Boolean(incident.responderId))) return;
+        const responder = result.data.responder as { id: string; fullName: string; lastLatitude: number | null; lastLongitude: number | null } | null;
         if (transport?.status === 'TO_HOSPITAL') {
           setLiveResponderStatus('to_hospital');
           if (transport.hospital) setLiveTargetHospital(transport.hospital);
@@ -478,12 +491,7 @@ export default function TrackingScreen() {
                 }));
               }
 
-              if (newIncident.status === 'ARRIVED') {
-                setIsArrived(true);
-              }
-              if (newIncident.status === 'RESOLVED') {
-                handleResolutionRedirect();
-              }
+              if (applyPublicLifecycle(newIncident.status, newIncident.transport_status, Boolean(newIncident.responder_id))) return;
 
               if (newIncident.responder_id) {
                 const { data: resp } = await supabase
@@ -597,13 +605,7 @@ export default function TrackingScreen() {
           .single();
 
         if (!error && incident) {
-          if (incident.status === 'RESOLVED') {
-            handleResolutionRedirect();
-            return;
-          }
-          if (incident.status === 'ARRIVED') {
-            setIsArrived(true);
-          }
+          if (applyPublicLifecycle(incident.status, incident.transport_status, Boolean(incident.responder_id))) return;
           
           if (incident.responder_id) {
             setIsFindingAmbulance(false);
@@ -661,11 +663,18 @@ export default function TrackingScreen() {
     };
   }, [isGuest, report.incidentId]);
 
-  // Natural elapsed time incrementer - runs continuously during active tracking
+  // Derive from wall-clock time: JavaScript intervals pause while Android is
+  // backgrounded, but the response duration must continue when the user
+  // returns to the app.
   useEffect(() => {
+    const updateElapsed = () => {
+      const seconds = elapsedSecondsSince(trackingStartedAtRef.current);
+      elapsedRef.current = seconds;
+      setElapsed(seconds);
+    };
+    updateElapsed();
     const interval = setInterval(() => {
-      elapsedRef.current += 1;
-      setElapsed(elapsedRef.current);
+      updateElapsed();
     }, 1000);
     return () => clearInterval(interval);
   }, []);

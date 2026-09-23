@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Image, Alert } from 'react-native';
-import { supabase } from '../../lib/supabase';
 import { signOutFromMobile } from '../../lib/mobile-auth';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { XCircle, AlertCircle, Camera, Upload, ChevronDown } from 'lucide-react-native';
@@ -111,20 +110,7 @@ export default function RejectedVerificationScreen() {
 
     setLoading(true);
     try {
-      const filePath = await uploadGovernmentID(user.id, selectedImageUri);
-
-      const { error } = await supabase
-        .from('users')
-        .update({
-          id_type: selectedIdType,
-          id_image_url: filePath,
-          verification_status: 'PENDING',
-          rejection_reason: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
+      await uploadGovernmentID(selectedImageUri, selectedIdType);
 
       Alert.alert("Success", "Your registration has been successfully resubmitted. Please wait for admin approval.");
       setIsResubmitting(false);
@@ -160,7 +146,7 @@ export default function RejectedVerificationScreen() {
               <View className="items-center">
                 <Camera color="#9CA3AF" size={32} />
                 <Text className="text-gray-500 mt-2 font-medium">Tap to upload ID</Text>
-                <Text className="text-gray-400 text-xs mt-1">JPEG/PNG, max 25MB</Text>
+                <Text className="text-gray-400 text-xs mt-1">JPEG/PNG, max 5MB</Text>
               </View>
             )}
           </TouchableOpacity>

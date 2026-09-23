@@ -180,7 +180,11 @@ export default function IncidentDetailScreen() {
         <Text className="text-sm text-blue-200 ml-9">{report.id} · {report.type}</Text>
       </View>
 
-      <ScrollView className="flex-1 px-6 -mt-4" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
         {isRejected && (
           <View
             accessible

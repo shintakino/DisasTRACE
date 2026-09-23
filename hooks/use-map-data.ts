@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { MapDemandZone, MapDemandZoneSchema, MapIncident, MapResponder, MapSummary, MapHospital, MapIncidentSchema, MapResponderSchema, MapSummarySchema, MapHospitalSchema } from "@/types/map";
 import { z } from "zod";
 import { createClientBrowser } from "@/lib/supabase";
@@ -12,7 +12,7 @@ const TelemetryPayloadSchema = z.object({
   timestamp: z.string(),
 });
 
-export function useMapData() {
+export function useMapData({ date }: { date?: string } = {}) {
   const [incidents, setIncidents] = useState<MapIncident[]>([]);
   const [responders, setResponders] = useState<MapResponder[]>([]);
   const [hospitals, setHospitals] = useState<MapHospital[]>([]);
@@ -26,12 +26,13 @@ export function useMapData() {
     .sort();
   const activeDispatchKey = activeDispatchIds.join(":");
 
-  const fetchData = async (showSkeleton = true) => {
+  const fetchData = useCallback(async (showSkeleton = true) => {
     if (showSkeleton) setIsLoading(true);
     setError(null);
     try {
+      const incidentQuery = date ? `?date=${encodeURIComponent(date)}` : '';
       const [incidentsRes, respondersRes, summaryRes, hospitalsRes, hotspotsRes] = await Promise.all([
-        fetch("/api/map/incidents"),
+        fetch(`/api/map/incidents${incidentQuery}`),
         fetch("/api/map/responders"),
         fetch("/api/map/summary"),
         fetch("/api/map/hospitals"),
@@ -60,10 +61,10 @@ export function useMapData() {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
       if (showSkeleton) setIsLoading(false);
     }
-  };
+  }, [date]);
 
   useEffect(() => {
-    fetchData(true);
+    void fetchData(true);
 
     const supabase = createClientBrowser();
     
@@ -78,7 +79,7 @@ export function useMapData() {
           table: "incidents",
         },
         () => {
-          fetchData(false);
+          void fetchData(false);
         }
       )
       .on(
@@ -90,7 +91,7 @@ export function useMapData() {
           filter: "role=eq.ambulance_responder",
         },
         () => {
-          fetchData(false);
+          void fetchData(false);
         }
       )
       .on(
@@ -101,7 +102,7 @@ export function useMapData() {
           table: "verification_requests",
         },
         () => {
-          fetchData(false);
+          void fetchData(false);
         }
       )
       .subscribe();
@@ -109,7 +110,7 @@ export function useMapData() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchData]);
 
   // Responder clients broadcast GPS updates every few seconds while dispatched.
   // Admin maps subscribe to each active incident channel for immediate marker movement.

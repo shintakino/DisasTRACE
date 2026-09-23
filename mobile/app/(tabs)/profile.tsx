@@ -11,6 +11,7 @@ import { signOutFromMobile } from '../../lib/mobile-auth';
 import { syncResponderAvailabilityLocation } from '../../lib/responder-availability';
 import { registerResponderPushNotifications } from '../../lib/push-notifications';
 import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
+import { useResponderStore } from '../../stores/useResponderStore';
 import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 
 export default function ProfileScreen() {
@@ -18,6 +19,9 @@ export default function ProfileScreen() {
   const [logoutVisible, setLogoutVisible] = useState(false);
   const router = useRouter();
   const isResponder = role === 'ambulance_responder';
+  const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
+  const responderStatus = useResponderStore((state) => state.status);
+  const isOfferPending = isResponder && dutyStatus === 'ACTIVE_DISPATCH' && responderStatus === 'dispatch_offered';
 
   const [dbCount, setDbCount] = useState(0);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -289,9 +293,9 @@ export default function ProfileScreen() {
             <View className="absolute top-1 right-1 w-6 h-6 bg-white rounded-full items-center justify-center">
               <View className={`w-4 h-4 rounded-full ${
                 role === 'ambulance_responder'
-                  ? (profile?.dutyStatus === 'ON_DUTY'
+                  ? (dutyStatus === 'ON_DUTY'
                       ? 'bg-green-500'
-                      : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                      : dutyStatus === 'ACTIVE_DISPATCH'
                         ? 'bg-red-500'
                         : 'bg-slate-400')
                   : 'bg-green-500'
@@ -310,34 +314,34 @@ export default function ProfileScreen() {
                 <View className="flex-row">
                   <TouchableOpacity 
                     onPress={handleToggleDutyStatus}
-                    disabled={updatingDuty || (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'}
+                    disabled={updatingDuty || dutyStatus === 'ACTIVE_DISPATCH'}
                     className={`px-3 py-1.5 rounded-full border flex-row items-center ${
-                      (profile as any)?.dutyStatus === 'ON_DUTY' 
+                      dutyStatus === 'ON_DUTY'
                         ? "bg-green-500/20 border-green-400" 
-                        : (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'
-                          ? "bg-red-500/20 border-red-400"
+                        : dutyStatus === 'ACTIVE_DISPATCH'
+                          ? isOfferPending ? "bg-amber-500/20 border-amber-400" : "bg-red-500/20 border-red-400"
                           : "bg-slate-500/20 border-slate-400"
                     }`}
                   >
                     <View className={`w-2 h-2 rounded-full mr-1.5 ${
-                      (profile as any)?.dutyStatus === 'ON_DUTY' 
+                      dutyStatus === 'ON_DUTY'
                         ? "bg-green-400" 
-                        : (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'
-                          ? "bg-red-400"
+                        : dutyStatus === 'ACTIVE_DISPATCH'
+                          ? isOfferPending ? "bg-amber-400" : "bg-red-400"
                           : "bg-slate-400"
                     }`} />
                     <Text className={`text-[10px] font-black uppercase tracking-widest ${
-                      (profile as any)?.dutyStatus === 'ON_DUTY' 
+                      dutyStatus === 'ON_DUTY'
                         ? "text-green-400" 
-                        : (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'
-                          ? "text-red-400"
+                        : dutyStatus === 'ACTIVE_DISPATCH'
+                          ? isOfferPending ? "text-amber-300" : "text-red-400"
                           : "text-slate-400"
                     }`}>
                       {updatingDuty 
                         ? "Updating..." 
-                        : (profile as any)?.dutyStatus === 'ACTIVE_DISPATCH'
-                          ? "Active Dispatch"
-                          : (profile as any)?.dutyStatus === 'ON_DUTY'
+                        : dutyStatus === 'ACTIVE_DISPATCH'
+                          ? isOfferPending ? "Offer Pending" : "Active Dispatch"
+                          : dutyStatus === 'ON_DUTY'
                             ? "On Duty (Standby)"
                             : "Off Duty"}
                     </Text>

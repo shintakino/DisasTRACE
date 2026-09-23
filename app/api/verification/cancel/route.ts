@@ -14,7 +14,7 @@ export async function PATCH(request: NextRequest) {
     if (!body.id) return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
 
     const [updated] = await db.update(verificationRequests)
-      .set({ status: 'REJECTED' })
+      .set({ status: 'REJECTED', updatedAt: new Date() })
       .where(and(
         eq(verificationRequests.id, body.id),
         eq(verificationRequests.residentId, user.id),

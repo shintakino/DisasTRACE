@@ -24,6 +24,7 @@ import { useEmergencyReportStore } from '../../store/use-emergency-report-store'
 import { appendGuestReportMessages, updateGuestReportHistory } from '../../lib/guest-report-history';
 import { reportRefreshCopy } from '../../lib/report-status-feedback';
 import { GuestAllowanceBanner } from '../../components/guest/GuestAllowanceBanner';
+import { getPublicHomeNavigationPlan } from '../../lib/public-home-navigation';
 
 const NAVY = '#1E3A8A';
 const BLUE = '#3B82F6';
@@ -56,6 +57,8 @@ export default function ChatbotPendingScreen() {
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const refreshLock = useRef(false);
+  const screenActiveRef = useRef(true);
+  const isLeavingRef = useRef(false);
   const activeReportId = activeReport?.id;
   const activeReporterMode = activeReport?.reporterMode;
   const activeGuestToken = activeReport?.guestAccessToken;
@@ -72,13 +75,20 @@ export default function ChatbotPendingScreen() {
   };
 
   const returnHome = useCallback(() => {
-    if (activeReport?.reporterMode === 'guest') {
-      router.dismissAll();
-      router.replace('/');
-      return;
-    }
-    router.replace('/(tabs)');
-  }, [activeReport?.reporterMode, router]);
+    if (!activeReport || isLeavingRef.current) return;
+    isLeavingRef.current = true;
+    // Mark inactive before navigation so a status request which resolves in
+    // the transition cannot issue a competing route or set screen state.
+    screenActiveRef.current = false;
+    router.replace(getPublicHomeNavigationPlan(activeReport.reporterMode).route as never);
+  }, [activeReport, router]);
+
+  useEffect(() => {
+    screenActiveRef.current = true;
+    return () => {
+      screenActiveRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -89,6 +99,7 @@ export default function ChatbotPendingScreen() {
         return;
       }
       const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted || !screenActiveRef.current || isLeavingRef.current) return;
       const expectedOwnerId = activeReporterMode === 'guest' ? 'guest' : session?.user.id;
       if (!expectedOwnerId || ownerId !== expectedOwnerId) {
         clearReportToIdle();
@@ -104,13 +115,14 @@ export default function ChatbotPendingScreen() {
 
   useEffect(() => {
     if (!hasHydrated || !actorReady) return;
+    if (!screenActiveRef.current || isLeavingRef.current) return;
     if (!activeReport) {
       if (hasHandledRejection.current) return;
       router.replace('/help/chatbot' as never);
       return;
     }
     syncChatbotReportToEmergencyStore({ draft, activeReport, submissionId: activeReport.id });
-    if (activeReport.hasIncident) {
+    if (activeReport.hasIncident && activeReport.reporterMode !== 'guest') {
       markActiveResponse();
       router.replace('/help/response-status' as never);
     }
@@ -130,6 +142,7 @@ export default function ChatbotPendingScreen() {
         requestId: activeReportId,
         guestAccessToken: activeGuestToken,
       });
+      if (!screenActiveRef.current || isLeavingRef.current) return;
       setLastCheckedAt(new Date());
       setRefreshError(null);
       if (status.status === 'REJECTED') {
@@ -161,16 +174,18 @@ export default function ChatbotPendingScreen() {
         responderFullName: status.responder?.fullName ?? undefined,
       });
 
-      if (hasIncident || status.status === 'VERIFIED') {
+      if ((hasIncident || status.status === 'VERIFIED') && activeReporterMode !== 'guest') {
         markActiveResponse();
         router.replace('/help/response-status' as never);
       }
     } catch (error) {
       // Preserve the last verified status. Polling continues independently.
-      setRefreshError(error instanceof Error ? error.message : 'Status refresh failed.');
+      if (screenActiveRef.current && !isLeavingRef.current) {
+        setRefreshError(error instanceof Error ? error.message : 'Status refresh failed.');
+      }
     } finally {
       refreshLock.current = false;
-      setRefreshing(false);
+      if (screenActiveRef.current && !isLeavingRef.current) setRefreshing(false);
     }
   }, [activeGuestToken, activeReportId, activeReporterMode, handleRejectedReport, markActiveResponse, router, updateActiveReport]);
 
@@ -238,8 +253,8 @@ export default function ChatbotPendingScreen() {
       return;
     }
     if (/^(?:track|track\s+report|view\s+(?:report|response)(?:\s+status)?)$/i.test(message)) {
-      if (activeReport.hasIncident) router.replace('/help/response-status' as never);
-      else addMessage('bot', `A responder has not been assigned yet. Latest report status: ${activeReport.responseStatus}`);
+      if (activeReport.hasIncident && activeReport.reporterMode !== 'guest') router.replace('/help/response-status' as never);
+      else addMessage('bot', `Latest report status: ${activeReport.responseStatus}`);
       return;
     }
     setWaiting(true);
@@ -316,8 +331,14 @@ export default function ChatbotPendingScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-        {activeReport.reporterMode === 'guest' ? <GuestAllowanceBanner remaining={activeReport.reportsRemaining} style={styles.allowanceBox} /> : null}
-        {refreshing ? <Text style={styles.refreshing}>Checking for updates…</Text> : null}
+        {activeReport.reporterMode === 'guest' ? (
+          <GuestAllowanceBanner
+            remaining={activeReport.reportsRemaining}
+            style={styles.allowanceBox}
+            showReminder={false}
+            showRegistrationAction={false}
+          />
+        ) : null}
         {isRejected ? (
           <TouchableOpacity style={styles.removeButton} onPress={removeClosedReport}>
             <X color="#B91C1C" size={16} /><Text style={styles.removeText}>Remove from this device</Text>

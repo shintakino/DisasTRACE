@@ -41,6 +41,8 @@ check('chatbot incident choices derive emergency nature without a user toggle', 
 check('resident home resumes only active pending or verified requests', () => {
   assert.equal(shouldResumeResidentRequest({ status: 'PENDING' }), true);
   assert.equal(shouldResumeResidentRequest({ status: 'VERIFIED', incidentStatus: 'EN_ROUTE' }), true);
+  assert.equal(shouldResumeResidentRequest({ status: 'VERIFIED', incidentStatus: 'ARRIVED' }), false);
+  assert.equal(shouldResumeResidentRequest({ status: 'VERIFIED', incidentStatus: 'DOCUMENTATION_PENDING' }), false);
   assert.equal(shouldResumeResidentRequest({ status: 'VERIFIED', incidentStatus: 'RESOLVED' }), false);
   assert.equal(shouldResumeResidentRequest({ status: 'REJECTED' }), false);
 });

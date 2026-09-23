@@ -184,7 +184,7 @@ export default function EmergencyChatbotScreen() {
     if (!actorReady) return;
     if (activeReport) {
       if (submissionId) syncChatbotReportToEmergencyStore({ draft, activeReport, submissionId });
-      router.replace((activeReport.hasIncident ? '/help/response-status' : '/help/chatbot-pending') as never);
+      router.replace(((reporterMode === 'guest' || !activeReport.hasIncident) ? '/help/chatbot-pending' : '/help/response-status') as never);
     }
   }, [activeReport, actorReady, draft, router, submissionId]);
 
@@ -459,7 +459,7 @@ export default function EmergencyChatbotScreen() {
         }
       }
       syncChatbotReportToEmergencyStore({ draft: completeDraft, activeReport: report, submissionId });
-      router.replace((result.autoDispatched ? '/help/response-status' : '/help/chatbot-pending') as never);
+      router.replace(((reporterMode === 'guest' || !result.autoDispatched) ? '/help/chatbot-pending' : '/help/response-status') as never);
     } catch (error) {
       restoreDraftAfterFailure();
       Alert.alert('Report not sent', error instanceof Error ? error.message : 'Your draft was kept. Please try again.');

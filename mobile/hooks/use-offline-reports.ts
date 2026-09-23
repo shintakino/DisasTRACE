@@ -6,6 +6,7 @@ import { fetchWithTimeout } from '../lib/network-timeout';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
+import { normalizeResponderLocationPayload } from '../lib/responder-location-status';
 
 const OFFLINE_REPORTS_KEY = 'disas_trace_offline_reports';
 const DRAFT_REMINDER_NOTIFICATION_KEY = 'disas_trace_draft_reminder_notification_id';
@@ -24,16 +25,22 @@ export function useOfflineReports() {
 
   // Monitor network connection status
   useEffect(() => {
-    const interval = setInterval(async () => {
+    let mounted = true;
+    const checkConnection = async () => {
       try {
         await fetch('https://clients3.google.com/generate_204', { mode: 'no-cors' });
-        setIsOnline(true);
+        if (mounted) setIsOnline(true);
       } catch (err) {
-        setIsOnline(false);
+        if (mounted) setIsOnline(false);
       }
-    }, 4000); // Poll every 4 seconds to check internet connectivity
+    };
+    void checkConnection();
+    const interval = setInterval(() => void checkConnection(), 4000); // Poll every 4 seconds to check internet connectivity
 
-    return () => clearInterval(interval);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // 5-Minute Recurring Draft Reminder Loop (Triggers when device is online & pending drafts exist)
@@ -103,9 +110,10 @@ export function useOfflineReports() {
     if (!isOnline || syncing) return;
     if (offlineQueue.length === 0 && drafts.length === 0) return;
 
+    let mounted = true;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const syncOfflineQueueAndDrafts = async () => {
-      setSyncing(true);
+      if (mounted) setSyncing(true);
       setSyncingQueue(true);
 
       const apiUrl = getMobileApiBaseUrl();
@@ -190,7 +198,7 @@ export function useOfflineReports() {
                 const response = await fetch(`${apiUrl}${action.endpoint}`, {
                   method: action.method,
                   headers,
-                  body: JSON.stringify(action.payload),
+                  body: JSON.stringify(normalizeResponderLocationPayload(action.payload)),
                 });
                 if (!response.ok) {
                   if ([400, 403, 404, 409].includes(response.status)) {
@@ -205,6 +213,7 @@ export function useOfflineReports() {
 
               // On action replay success: dequeue the action
               await dequeueAction(action.id);
+              useResponderStore.setState({ lastQueueError: null });
               console.log(`[useOfflineReports] Successfully replayed action ${action.id}`);
             } catch (actionErr) {
               console.error(`[useOfflineReports] Replay failure for action ${action.id}:`, actionErr);
@@ -293,19 +302,20 @@ export function useOfflineReports() {
         // Trigger a light tactile success haptic warning once all pending actions are fully flushed and synced
         if (queueSuccess) {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        } else {
+        } else if (mounted) {
           retryTimer = setTimeout(() => setRetryNonce((value) => value + 1), 5_000);
         }
       } catch (err) {
         console.error('[useOfflineReports] Error during background synchronization:', err);
       } finally {
-        setSyncing(false);
+        if (mounted) setSyncing(false);
         setSyncingQueue(false);
       }
     };
 
     syncOfflineQueueAndDrafts();
     return () => {
+      mounted = false;
       if (retryTimer) clearTimeout(retryTimer);
     };
   }, [isOnline, offlineQueue.length, drafts.length, dequeueAction, retryNonce, setSyncingQueue]);

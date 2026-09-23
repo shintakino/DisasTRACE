@@ -1,5 +1,38 @@
 # Progress Tracker
 
+## 2026-09-23 - Mobile Home navigation stability and lifecycle audit
+
+- Corrected CDRRMO/PACC operational-data boundaries. Dashboard daily KPIs now use an inclusive/exclusive Asia/Manila SQL day range rather than Vercel's process-local midnight; rejected-today uses the terminal status timestamp (`updated_at`), and user cancellation updates that timestamp. Live-map default requests are limited to current incident/request states and usable on-duty/dispatched responders with real coordinates; selected dates issue a bounded server-side Manila-day query instead of loading the archive into every browser. Map summary values now use database aggregates. Trip-ticket exports now interpolate the report ID in their official filename correctly. Focused regression, root TypeScript, and whitespace checks pass.
+- Repaired mobile registration when Supabase email confirmation is enabled. An unconfirmed account is now reported as successfully created instead of failing because no session exists for the secure ID upload. After confirming email and signing in, a pending applicant without an ID is explicitly offered an authenticated document-upload workflow; CDRRMO review messaging appears only after that document is present. The ID-status route returns no document contents, only the minimum completion state.
+- Corrected a public-tracking privacy regression: `DOCUMENTATION_PENDING` now has its own non-tracking catch-up state, ahead of responder and transport fallbacks. Retained responder ownership can no longer reopen the original reporter's map or expose the responder's later GPS location. Tracking redirects to the field-response-complete status screen, and the lifecycle regression covers both ordinary and stale transport payloads.
+- Replaced Guest Mode's competing Home navigation (`dismissAll` followed by `replace`) with a single, idempotent route transition. The submitted report remains preserved for its authorized report-status/history flow.
+- Guarded the submitted-report identity check and three-second status poll so an in-flight asynchronous result cannot mutate state or redirect after the reporter leaves the screen. Guest chatbot status recovery is likewise a one-time redirect.
+- Cleared stale navigation timers in the authenticated entry splash and evidence-preview flows. Network-state checks and offline-sync UI updates now respect hook cleanup, preventing late state updates after a screen is gone.
+- Completed a focused mobile audit of reporter/responder routes, auth gates, polling, timers, realtime subscriptions, and offline replay. No further release-blocking static crash path was found; live Android device tests remain required to cover native navigation and background lifecycle behavior.
+
+## 2026-09-23 - Public status and registration reliability polish
+
+- Made the CDRRMO dashboard's responder-roster action a solid blue **View Responder Roster** button and grouped the Analytics refresh control with its Barangay filter.
+- Public response timers now derive their displayed elapsed duration from wall-clock time, so Android backgrounding no longer pauses them. Resident incident detail content now scrolls below its fixed header rather than clipping through it.
+- Guest Mode now stays in one chatbot-based submitted-report status experience whether or not dispatch begins immediately. It continues to refresh the server-confirmed report state, removes the transient “Checking for updates” text and post-submission registration action, and keeps only the remaining-report count. Guest completion now says **Return to Login**.
+- Replaced direct mobile writes to the private government-ID Storage bucket with an authenticated verification upload route. The route validates applicant identity, document type, image type, and size, saves the document server-side, and records pending CDRRMO review. Sign-up and resubmission now use that route, while the app clearly explains that CDRRMO Super Admin reviews the registration.
+- Added keyboard-safe signup and OTP layouts so Android resizing and scrolling keep focused fields above the keyboard. Web and mobile strict TypeScript checks and whitespace validation pass.
+
+## 2026-09-23 - Responder heartbeat, draft, and offer-state repair
+
+- Fixed the responder location heartbeat contract: mobile-only states such as `idle` and `dispatch_offered` are no longer posted as invalid server workflow statuses. Valid on-duty GPS heartbeats again refresh PACC eligibility, while legacy queued payloads are normalized during replay and a successful heartbeat clears an obsolete sync error.
+- Confirmed through the live dispatch diagnostic that documentation deferral persists as `DOCUMENTATION_PENDING` and returns the responder to `ON_DUTY`. A subsequently reserved new request is now labelled **Offer Pending** in the responder UI instead of misleadingly appearing as an active accepted dispatch.
+- Limited the home draft reminder card to a responder who is both `ON_DUTY` and locally idle, so it never covers an incoming/active field dispatch. Expanded the on-scene action sheet when its final documentation choices appear, keeping both actions reachable on short Android screens.
+
+## 2026-09-23 - Public arrival and hospital-transport lifecycle
+
+- Added one shared public-response lifecycle policy for server-confirmed inbound travel, field arrival, hospital transport, hospital arrival, and final case closure. A responder arriving at the scene now ends the inbound map with **Help has arrived**, without falsely resolving the incident.
+- Public tracking reopens only after the server records `TO_HOSPITAL`, follows the selected hospital, and transitions to **Patient Transport Complete** only after the server records `ARRIVED_AT_HOSPITAL`. The status screen remains a safe catch-up view for users who were using another app tab; it does not force an unrelated-tab redirect.
+- Registered reporters receive an in-app transport-started or transport-completed notification when that server transition occurs; each notification opens the relevant tracking or completion state rather than forcibly changing the current tab.
+- Home now auto-resumes only an inbound (`DISPATCHED`/`EN_ROUTE`) response. Scene arrival, transport, documentation, and completion states no longer hijack normal public-user tab navigation.
+- Registered reporters now check their existing incident feedback before showing the completion rating control, preventing duplicate rating prompts. Guest reports retain their device-local completion history and do not receive an unattributable feedback prompt.
+- Standardized these public status calls on the configured mobile API origin and added a focused lifecycle regression script. Mobile strict TypeScript and the focused script pass.
+
 ## 2026-09-22 - Responder availability and live-offer recovery
 
 - Corrected PACC rejection eligibility for a responder offer that fully expired

@@ -135,7 +135,7 @@ export default function Step3({ onNext, onBack }: Props) {
             <View className="items-center">
               <Camera color="#9CA3AF" size={32} />
               <Text className="text-gray-500 mt-2 font-medium">Tap to upload or take a photo of ID</Text>
-              <Text className="text-gray-400 text-xs mt-1">JPEG/PNG, max 25MB</Text>
+              <Text className="text-gray-400 text-xs mt-1">JPEG/PNG, max 5MB</Text>
             </View>
           )}
         </TouchableOpacity>

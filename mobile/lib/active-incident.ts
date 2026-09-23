@@ -3,8 +3,9 @@ export type ResidentRequestSnapshot = {
   incidentStatus?: string | null;
 };
 
-/** Only these states should cause Home to restore a report and navigate away. */
+/** Only inbound dispatch states should take a resident away from Home. */
 export function shouldResumeResidentRequest(request: ResidentRequestSnapshot): boolean {
   if (request.status === 'PENDING') return true;
-  return request.status === 'VERIFIED' && request.incidentStatus !== 'RESOLVED';
+  return request.status === 'VERIFIED'
+    && (request.incidentStatus === 'DISPATCHED' || request.incidentStatus === 'EN_ROUTE');
 }

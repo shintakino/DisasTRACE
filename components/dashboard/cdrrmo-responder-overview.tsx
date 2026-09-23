@@ -47,7 +47,7 @@ export function CDRRMOResponderOverview({ responders, onViewRoster }: CDRRMOResp
           ))}
           {responders.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">No active responder accounts found.</p> : null}
         </div>
-        <Button type="button" variant="outline" className="mt-4 w-full border-[#1E3A8A] text-xs font-bold text-[#1E3A8A] hover:bg-blue-50" onClick={onViewRoster}>View responder roster</Button>
+        <Button type="button" className="mt-4 w-full bg-[#1E3A8A] text-xs font-bold text-white hover:bg-[#172F70]" onClick={onViewRoster}>View Responder Roster</Button>
       </CardContent>
     </Card>
   );

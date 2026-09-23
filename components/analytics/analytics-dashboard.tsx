@@ -202,25 +202,27 @@ export function AnalyticsDashboard() {
           <h2 className="mt-1 text-2xl font-bold text-[#1E3A8A]">Incident Preparedness Overview</h2>
           <p className="mt-1 text-sm text-slate-600">Use recurring incident patterns and response outcomes to plan staffing, equipment, and readiness actions.</p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={refresh}
-          disabled={refreshing}
-          title="Refresh analytics"
-          aria-label="Refresh analytics"
-          className="border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-        >
-          {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-        </Button>
-        <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
-          Barangay
-          <select value={barangay} onChange={(event) => setBarangay(event.target.value)} className="h-9 max-w-48 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800">
-            <option value="">All barangays</option>
-            {BALIWAG_BARANGAYS.map((item) => <option key={item.psgcCode} value={item.name}>{item.name}</option>)}
-          </select>
-        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+            Barangay
+            <select value={barangay} onChange={(event) => setBarangay(event.target.value)} className="h-9 max-w-48 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800">
+              <option value="">All barangays</option>
+              {BALIWAG_BARANGAYS.map((item) => <option key={item.psgcCode} value={item.name}>{item.name}</option>)}
+            </select>
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={refresh}
+            disabled={refreshing}
+            title="Refresh analytics"
+            aria-label="Refresh analytics"
+            className="border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+          >
+            {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+          </Button>
+        </div>
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Incident statistics">

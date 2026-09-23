@@ -138,6 +138,10 @@ export async function GET(request: NextRequest) {
         transportStatus: incident.transportStatus,
       } : null,
       responder,
+      incidentLocation: {
+        latitude: trackingReport.latitude,
+        longitude: trackingReport.longitude,
+      },
       transport: {
         status: incident?.transportStatus ?? 'NONE',
         hospital: transportHospital

@@ -12,6 +12,7 @@ import { z } from "zod";
 import { retryPendingAutomaticDispatches } from "@/lib/dispatch-engine";
 import { assessResponderLocationMovement } from "@/lib/location-integrity";
 import { shouldAutomaticallyMarkArrived } from "@/lib/arrival-geofence";
+import { createNotification } from "@/lib/notifications";
 
 const LocationSchema = z.object({
   latitude: z.number().min(-90).max(90),
@@ -339,6 +340,29 @@ export async function POST(req: NextRequest) {
           code: 'TRANSPORT_STATE_CHANGED',
           message: 'The active incident changed before hospital transport could be saved. Refresh the dispatch before continuing.',
         }, { status: 409 });
+      }
+      if (
+        transportPersistence.kind === 'persisted'
+        && transportPersistence.incident.transportStatus !== verifiedTransportContext.transportStatus
+      ) {
+        const [reporter] = await db
+          .select({ residentId: verificationRequests.residentId, requestId: verificationRequests.id })
+          .from(incidents)
+          .innerJoin(verificationRequests, eq(verificationRequests.id, incidents.requestId))
+          .where(eq(incidents.id, transportPersistence.incident.id))
+          .limit(1);
+        if (reporter?.residentId) {
+          const transportComplete = transportPersistence.incident.transportStatus === 'ARRIVED_AT_HOSPITAL';
+          await createNotification(
+            reporter.residentId,
+            transportComplete ? 'patient_transport_completed' : 'patient_transport_started',
+            transportComplete ? 'Patient transport complete' : 'Patient transport started',
+            transportComplete
+              ? 'The responder has arrived at the selected hospital.'
+              : 'The responder is transporting the patient to the selected hospital.',
+            { incidentId: transportPersistence.incident.id, requestId: reporter.requestId },
+          );
+        }
       }
       if (transportPersistence.kind === 'persisted' && automaticHospitalArrival) {
         autoArrivedHospitalIncidentId = transportPersistence.incident.id;

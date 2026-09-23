@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ContactDetailsSchema, ContactDetailsType } from '../../schemas/auth';
@@ -455,6 +455,7 @@ export default function Step2({ onNext, onBack }: Props) {
         animationType="slide"
         onRequestClose={() => setShowOtpModal(false)}
       >
+        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View className="flex-1 justify-end bg-black/60">
           <TouchableOpacity 
             className="flex-grow" 
@@ -517,6 +518,7 @@ export default function Step2({ onNext, onBack }: Props) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

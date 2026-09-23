@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import { Image } from 'react-native';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { fetchWithTimeout } from './network-timeout';
+import { getMobileApiBaseUrl } from './api-base-url';
 
 /**
  * Optimizes an image URI on-device by resizing and compressing it.
@@ -55,13 +56,14 @@ export async function optimizeImage(imageUri: string, maxDimension: number = 102
 }
 
 /**
- * Uploads a government ID image to the private 'user-ids' bucket.
- * 
- * @param userId - The Supabase Auth ID of the user.
+ * Uploads a government ID image through the authenticated verification API.
+ * Pending applicants do not receive direct Storage write access.
+ *
  * @param imageUri - The local URI of the captured image.
+ * @param idType - The selected government ID type, when it changes.
  * @returns The file path in the storage bucket.
  */
-export async function uploadGovernmentID(userId: string, imageUri: string): Promise<string> {
+export async function uploadGovernmentID(imageUri: string, idType?: string): Promise<string> {
   try {
     // 1. Optimize the image on-device before reading
     const optimizedUri = await optimizeImage(imageUri, 1024);
@@ -72,30 +74,31 @@ export async function uploadGovernmentID(userId: string, imageUri: string): Prom
       throw new Error("Image file does not exist.");
     }
 
-    // Limit check: 25MB
-    if (file.size > 25 * 1024 * 1024) {
-      throw new Error("ID photo exceeds 25MB limit.");
+    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+      throw new Error("ID photo must be no larger than 5MB.");
     }
 
-    // Convert local file to base64 and decode to ArrayBuffer
-    const base64 = await file.base64();
-    const arrayBuffer = decode(base64);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('Your account session is not ready. Please sign in and try again.');
 
-    // Save as JPEG (extremely efficient)
-    const filePath = `ids/${userId}/id-card.jpg`;
+    const formData = new FormData();
+    formData.append('file', {
+      uri: optimizedUri,
+      name: 'government-id.jpg',
+      type: 'image/jpeg',
+    } as never);
+    if (idType) formData.append('idType', idType);
 
-    const { data, error } = await supabase.storage
-      .from('user-ids')
-      .upload(filePath, arrayBuffer, {
-        contentType: 'image/jpeg',
-        upsert: true,
-      });
-
-    if (error) {
-      throw new Error(`Storage upload failed: ${error.message}`);
+    const response = await fetchWithTimeout(`${getMobileApiBaseUrl()}/api/verification/id`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}`, Accept: 'application/json' },
+      body: formData,
+    }, 30_000, 'government ID upload');
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.data?.filePath) {
+      throw new Error(result?.error || 'Government ID upload could not be completed.');
     }
-
-    return filePath; // Return file path to store in database idImageUrl field
+    return result.data.filePath;
   } catch (err: any) {
     console.error("Upload error:", err);
     throw err;
@@ -151,6 +154,24 @@ export async function uploadIncidentPhoto(randomId: string, imageUri: string): P
     console.error("Upload incident photo error:", err);
     throw err;
   }
+}
+
+/** Returns whether the current signed-in applicant has submitted their ID. */
+export async function getGovernmentIDStatus(): Promise<{ hasDocument: boolean; verificationStatus: string }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Please sign in to continue your verification.');
+
+  const response = await fetchWithTimeout(`${getMobileApiBaseUrl()}/api/verification/id`, {
+    headers: { Authorization: `Bearer ${session.access_token}`, Accept: 'application/json' },
+  }, 15_000, 'verification requirements');
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.data) {
+    throw new Error(result?.error || 'Unable to load your verification requirements.');
+  }
+  return {
+    hasDocument: result.data.hasDocument === true,
+    verificationStatus: String(result.data.verificationStatus || 'PENDING'),
+  };
 }
 
 /**

@@ -1,5 +1,9 @@
 # Progress Tracker
 
+## 2026-09-24 - Responder false hospital-arrival prevention
+
+- Corrected a nullable-ID comparison in responder GPS tracking that could classify an on-duty responder with no dispatch as having arrived at a hospital (`null === null`). Automatic hospital-arrival UI now requires a real matching server incident ID, active `to_hospital` state, matching local dispatch, and an eligible selected destination. The same guarded policy is used for initial and continuing GPS uploads, with regression coverage for the no-dispatch response that caused the global documentation sheet and invalid form alert.
+
 ## 2026-09-24 - Resident and responder mobile reliability audit
 
 - Audited the mobile resident and responder workflows across registration/email confirmation, account and session changes, guest intake, reporting, dispatch offers, trusted arrival, hospital transport, documentation deferral, public tracking, navigation, GPS telemetry, and offline replay. Focused regression checks for each boundary passed, as did Expo Doctor (18/18) and the mobile lint gate.

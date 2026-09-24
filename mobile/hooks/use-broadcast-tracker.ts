@@ -5,7 +5,10 @@ import * as TaskManager from 'expo-task-manager';
 import { supabase } from '../lib/supabase';
 import { useResponderStore, checkConnectivity } from '../stores/useResponderStore';
 import { isMockedLocation } from '../lib/location-integrity';
-import { isEligibleHospitalDestination } from '../lib/hospital-destination-policy';
+import {
+  canApplyAutomaticHospitalArrival,
+  isEligibleHospitalDestination,
+} from '../lib/hospital-destination-policy';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
 import { responderLocationStatusPayload } from '../lib/responder-location-status';
 
@@ -372,7 +375,13 @@ export function useBroadcastTracker(
                 if (response.ok) {
                   useResponderStore.setState({ lastQueueError: null });
                   const result = await response.json().catch(() => null) as { autoArrivedHospitalIncidentId?: string | null } | null;
-                  if (result?.autoArrivedHospitalIncidentId === incidentId) {
+                  if (canApplyAutomaticHospitalArrival({
+                    incidentId,
+                    responseIncidentId: result?.autoArrivedHospitalIncidentId,
+                    responderStatus: statusRef.current,
+                    activeDispatchId: activeDispatchRef.current?.id,
+                    targetHospital: targetHospitalRef.current,
+                  })) {
                     useResponderStore.setState({ status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL', isHospitalArrivalConfirmVisible: false });
                     Alert.alert('Hospital arrival confirmed', 'Trusted GPS confirmed arrival at the selected hospital. Choose whether to finish documentation now or save it for later.');
                   }
@@ -506,7 +515,13 @@ export function useBroadcastTracker(
             if (response.ok) {
               useResponderStore.setState({ lastQueueError: null });
               const result = await response.json().catch(() => null) as { autoArrivedHospitalIncidentId?: string | null } | null;
-              if (result?.autoArrivedHospitalIncidentId === incidentId) {
+              if (canApplyAutomaticHospitalArrival({
+                incidentId,
+                responseIncidentId: result?.autoArrivedHospitalIncidentId,
+                responderStatus,
+                activeDispatchId: activeDispatch?.id,
+                targetHospital,
+              })) {
                 useResponderStore.setState({ status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL', isHospitalArrivalConfirmVisible: false });
                 Alert.alert('Hospital arrival confirmed', 'Trusted GPS confirmed arrival at the selected hospital. Choose whether to finish documentation now or save it for later.');
               }

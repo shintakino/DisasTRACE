@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  canApplyAutomaticHospitalArrival,
   canEnterHospitalReport,
   canStartHospitalTransport,
   getAutomaticHospitalRecommendation,
@@ -80,6 +81,35 @@ assert.equal(canEnterHospitalReport('en_route', hospitals[0]), false);
 assert.equal(canStartHospitalTransport('on_scene'), true);
 assert.equal(canStartHospitalTransport('en_route'), false);
 
+assert.equal(canApplyAutomaticHospitalArrival({
+  incidentId: null,
+  responseIncidentId: null,
+  responderStatus: 'idle',
+  activeDispatchId: null,
+  targetHospital: null,
+}), false, 'an on-duty responder without an incident must never enter the hospital-arrival flow');
+assert.equal(canApplyAutomaticHospitalArrival({
+  incidentId: 'INC-1',
+  responseIncidentId: 'INC-1',
+  responderStatus: 'to_hospital',
+  activeDispatchId: 'INC-1',
+  targetHospital: hospitals[0],
+}), true, 'a matching server-confirmed arrival may open documentation during an active hospital transport');
+assert.equal(canApplyAutomaticHospitalArrival({
+  incidentId: 'INC-1',
+  responseIncidentId: 'INC-1',
+  responderStatus: 'at_hospital',
+  activeDispatchId: 'INC-1',
+  targetHospital: hospitals[0],
+}), false, 'the automatic transition must not repeat after the responder has already arrived');
+assert.equal(canApplyAutomaticHospitalArrival({
+  incidentId: 'INC-1',
+  responseIncidentId: 'INC-2',
+  responderStatus: 'to_hospital',
+  activeDispatchId: 'INC-1',
+  targetHospital: hospitals[0],
+}), false, 'a response for a different incident must never alter the current dispatch');
+
 const locationRoute = readFileSync(
   join(process.cwd(), 'app/api/responder/location/route.ts'),
   'utf8',
@@ -103,5 +133,6 @@ const tracker = readFileSync(
   'utf8',
 );
 assert.match(tracker, /statusRef\.current === 'to_hospital'[\s\S]*!isEligibleHospitalDestination/);
+assert.match(tracker, /canApplyAutomaticHospitalArrival/);
 
 console.log('Hospital destination policy checks passed.');

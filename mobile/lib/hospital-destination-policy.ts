@@ -100,6 +100,28 @@ export function canEnterHospitalReport(
   return status === 'on_scene' || status === 'report_filling';
 }
 
+/**
+ * The location endpoint always includes a nullable auto-arrival ID. A null
+ * response must never be treated as a match for an idle responder whose local
+ * incident ID is also null. Keep this transition tied to the active transport
+ * context on the device as well as the server-confirmed incident ID.
+ */
+export function canApplyAutomaticHospitalArrival(input: {
+  incidentId: string | null | undefined;
+  responseIncidentId: string | null | undefined;
+  responderStatus: string | null | undefined;
+  activeDispatchId: string | null | undefined;
+  targetHospital: HospitalDestinationCandidate | null | undefined;
+}): boolean {
+  return Boolean(
+    input.incidentId
+    && input.responseIncidentId === input.incidentId
+    && input.responderStatus === 'to_hospital'
+    && input.activeDispatchId === input.incidentId
+    && isEligibleHospitalDestination(input.targetHospital),
+  );
+}
+
 export function canStartHospitalTransport(status: string): boolean {
   return status === 'on_scene';
 }

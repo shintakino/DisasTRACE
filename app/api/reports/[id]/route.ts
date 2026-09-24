@@ -8,7 +8,6 @@ import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care"
 import { and, eq, or } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { formatOfficialBaliwagLocation, getReportDetailText, getReportLocation } from "@/lib/report-location";
-import { parseResponderReportArchivePayload } from "@/lib/responder-report-management";
 
 
 export async function GET(
@@ -404,64 +403,5 @@ export async function GET(
   } catch (error) {
     console.error("Error in GET /api/reports/[id]:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  }
-}
-
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userProfile = await db.query.users.findFirst({
-      where: eq(users.id, user.id),
-      columns: { role: true, status: true },
-    });
-    if (!userProfile || userProfile.role !== 'ambulance_responder') {
-      return NextResponse.json({ error: 'Only responders can manage their report archive.' }, { status: 403 });
-    }
-    if (userProfile.status !== 'ACTIVE') {
-      return NextResponse.json({ error: 'Your responder account is not active.' }, { status: 403 });
-    }
-
-    let payload: { archived: boolean };
-    try {
-      payload = parseResponderReportArchivePayload(await req.json());
-    } catch {
-      return NextResponse.json({ error: 'The archived field must be a boolean.' }, { status: 400 });
-    }
-
-    const { id } = await params;
-    const now = new Date();
-    const [updatedReport] = await db
-      .update(reports)
-      .set({ archivedAt: payload.archived ? now : null, updatedAt: now })
-      .where(and(
-        eq(reports.id, id),
-        eq(reports.responderId, user.id),
-        eq(reports.status, 'SUBMITTED'),
-      ))
-      .returning({ id: reports.id, archivedAt: reports.archivedAt });
-
-    if (!updatedReport) {
-      return NextResponse.json({ error: 'Submitted report not found.' }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      report: {
-        id: updatedReport.id,
-        archivedAt: updatedReport.archivedAt?.toISOString() ?? null,
-        isArchived: updatedReport.archivedAt !== null,
-      },
-    });
-  } catch (error) {
-    console.error('Error in PATCH /api/reports/[id]:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

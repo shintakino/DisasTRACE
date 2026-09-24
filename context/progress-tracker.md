@@ -1,5 +1,17 @@
 # Progress Tracker
 
+## 2026-09-24 - Responder report archive retirement
+
+- Removed Archive/Restore from the responder My Reports screen and retired the corresponding responder report mutation. The normal bounded list now includes every responder-owned report, including records that had a legacy archive timestamp; no reports, clinical records, or audit data were deleted.
+- The reports list API no longer applies archive filtering or returns archive state, and explicitly rejects stale archive query parameters so an outdated client cannot appear to retain the removed feature.
+- Focused responder-report regression and root/mobile strict TypeScript checks pass. Mobile ESLint continues to report three pre-existing errors outside this change (unescaped text in verification and patient-care screens), plus existing warnings.
+
+## 2026-09-24 - Responder stale-dispatch recovery
+
+- Diagnosed responder profiles that displayed a prior hospital-arrival/documentation sheet after account changes. The server correctly showed no active assigned incident; the cause was client-only Zustand dispatch state surviving a mobile sign-out or account switch. The stale state could also post a no-longer-valid hospital workflow heartbeat, making PACC correctly label the responder **Sync Delayed**.
+- Added account-bound transient-dispatch cleanup on mobile auth changes and a server-authoritative responder-home reconciliation. A missing, resolved, or documentation-pending incident now clears only the active dispatch UI; drafts and offline actions remain scoped to their owner and are preserved in Forms.
+- Focused responder lifecycle regression, mobile strict TypeScript, ESLint, and whitespace checks pass. Live Android sign-out/sign-in and GPS verification remain required after installing the new build.
+
 ## 2026-09-23 - PACC operations dashboard alignment
 
 - Kept PACC's existing **Welcome back** operational header and rebuilt the dashboard body around the CDRRMO-style flat operations layout: five compact semantic metric cards, an **Attention Required** panel, and a live **Response Resource Status** panel. The view uses solid surfaces only—no gradients—and retains PACC's existing reports, dispatch, and responder data sources.

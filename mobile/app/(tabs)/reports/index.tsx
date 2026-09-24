@@ -16,7 +16,6 @@ import { type Href, useRouter } from 'expo-router';
 import {
   Activity,
   AlertTriangle,
-  Archive,
   CarFront,
   Check,
   ChevronDown,
@@ -24,7 +23,6 @@ import {
   ChevronRight,
   Flame,
   MapPin,
-  RotateCcw,
   Search,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -47,7 +45,6 @@ const TYPE_FILTERS = [
 ] as const;
 
 type StatusFilter = 'all' | 'completed' | 'ongoing';
-type ArchiveFilter = 'active' | 'archived';
 type SortOrder = 'newest' | 'oldest';
 type DateFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days';
 
@@ -95,8 +92,6 @@ type ReportApiItem = {
   crewFindings?: string | null;
   scenePhotos?: string[];
   duplicates?: Array<Record<string, unknown>>;
-  archivedAt?: string | null;
-  isArchived?: boolean;
 };
 
 type ReportListItem = ReportApiItem & {
@@ -123,19 +118,15 @@ export default function MyReportsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [archiveUpdatingId, setArchiveUpdatingId] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [barangayFilter, setBarangayFilter] = useState('');
   const [barangayPickerVisible, setBarangayPickerVisible] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active');
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [pagination, setPagination] = useState<Pagination>({ page: 1, total: 0, totalPages: 1 });
-  const [reloadVersion, setReloadVersion] = useState(0);
   const requestSequence = useRef(0);
   const activeRequest = useRef<AbortController | null>(null);
   const { role, isLoaded, user } = useAuthStatus();
@@ -175,7 +166,6 @@ export default function MyReportsScreen() {
         if (typeFilter) params.set('type', typeFilter);
         if (barangayFilter) params.set('barangay', barangayFilter);
         params.set('status', statusFilter);
-        params.set('archive', archiveFilter);
         params.set('sort', sortOrder);
         const dateBounds = responderDateBounds(dateFilter);
         if (dateBounds) {
@@ -250,7 +240,7 @@ export default function MyReportsScreen() {
         setRefreshing(false);
       }
     }
-  }, [archiveFilter, barangayFilter, dateFilter, isResponder, pagination.page, search, sortOrder, statusFilter, typeFilter]);
+  }, [barangayFilter, dateFilter, isResponder, pagination.page, search, sortOrder, statusFilter, typeFilter]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -260,49 +250,12 @@ export default function MyReportsScreen() {
       clearTimeout(timer);
       activeRequest.current?.abort();
     };
-  }, [fetchReports, isLoaded, reloadVersion, user]);
-
-  const updateArchive = async (report: ReportListItem) => {
-    if (archiveUpdatingId || report.status !== 'COMPLETED') return;
-    const shouldArchive = archiveFilter === 'active';
-    setArchiveUpdatingId(report.id);
-    setActionMessage(null);
-    setError(null);
-
-    try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-      const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch(`${apiUrl}/api/reports/${encodeURIComponent(report.id)}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ archived: shouldArchive }),
-      });
-      const result = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(result?.error || 'The report archive could not be updated.');
-
-      setSelectedReport(null);
-      setActionMessage(shouldArchive ? 'Report moved to Archived.' : 'Report restored to Active.');
-      if (reports.length === 1 && pagination.page > 1) {
-        setPagination((current) => ({ ...current, page: current.page - 1 }));
-      } else {
-        // Trigger a render before refetching so the request always uses the
-        // latest search/filter/sort state rather than this mutation's closure.
-        setReloadVersion((current) => current + 1);
-      }
-    } catch (mutationError) {
-      setError(mutationError instanceof Error ? mutationError.message : 'The report archive could not be updated.');
-    } finally {
-      setArchiveUpdatingId(null);
-    }
-  };
+  }, [fetchReports, isLoaded, user]);
 
   const onRefresh = () => void fetchReports(true);
 
   const changePage = (page: number) => {
-    if (loading || refreshing || archiveUpdatingId || page < 1 || page > pagination.totalPages) return;
+    if (loading || refreshing || page < 1 || page > pagination.totalPages) return;
     setPagination((current) => ({ ...current, page }));
   };
 
@@ -318,16 +271,8 @@ export default function MyReportsScreen() {
   };
 
   const chooseStatus = (value: StatusFilter) => {
-    if (archiveFilter === 'archived' && value === 'ongoing') return;
     setStatusFilter(value);
     setPagination((current) => ({ ...current, page: 1 }));
-  };
-
-  const chooseArchive = (value: ArchiveFilter) => {
-    setArchiveFilter(value);
-    if (value === 'archived') setStatusFilter('completed');
-    setPagination((current) => ({ ...current, page: 1 }));
-    setActionMessage(null);
   };
 
   const chooseDate = (value: DateFilter) => {
@@ -348,8 +293,6 @@ export default function MyReportsScreen() {
     if (report.status === 'CASE_CLOSED') statusBgColor = 'bg-[#22C55E]';
     if (report.status === 'REJECTED') statusBgColor = 'bg-[#DC2626]';
     const statusLabel = report.status === 'CASE_CLOSED' ? 'CASE CLOSED' : report.status;
-    const archiveDisabled = !!archiveUpdatingId || report.status !== 'COMPLETED';
-
     return (
       <View className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100">
         <TouchableOpacity
@@ -389,30 +332,6 @@ export default function MyReportsScreen() {
           </View>
         </View>
         </TouchableOpacity>
-
-        {isResponder && (
-          <TouchableOpacity
-            disabled={archiveDisabled}
-            onPress={() => void updateArchive(report)}
-            className={`mt-4 rounded-2xl py-3 flex-row items-center justify-center ${archiveDisabled ? 'bg-slate-100' : 'bg-blue-50'}`}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: archiveDisabled }}
-            accessibilityLabel={archiveFilter === 'active' ? 'Archive report' : 'Restore report'}
-          >
-            {archiveUpdatingId === report.id ? (
-              <ActivityIndicator size="small" color="#1E3A8A" />
-            ) : archiveFilter === 'active' ? (
-              <Archive size={16} color={archiveDisabled ? '#94A3B8' : '#1E3A8A'} />
-            ) : (
-              <RotateCcw size={16} color={archiveDisabled ? '#94A3B8' : '#1E3A8A'} />
-            )}
-            <Text className={`ml-2 text-sm font-bold ${archiveDisabled ? 'text-slate-400' : 'text-[#1E3A8A]'}`}>
-              {report.status !== 'COMPLETED'
-                ? 'Submit before archiving'
-                : archiveFilter === 'active' ? 'Archive' : 'Restore'}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   };
@@ -461,20 +380,6 @@ export default function MyReportsScreen() {
           maxLength={80}
           returnKeyType="search"
         />
-      </View>
-
-      <View className="flex-row bg-slate-200 rounded-2xl p-1 mb-4">
-        {(['active', 'archived'] as ArchiveFilter[]).map((value) => (
-          <TouchableOpacity
-            key={value}
-            onPress={() => chooseArchive(value)}
-            className={`flex-1 py-2.5 rounded-xl ${archiveFilter === value ? 'bg-white' : 'bg-transparent'}`}
-          >
-            <Text className={`text-center text-sm font-bold ${archiveFilter === value ? 'text-[#1E3A8A]' : 'text-slate-500'}`}>
-              {value === 'active' ? 'Active' : 'Archived'}
-            </Text>
-          </TouchableOpacity>
-        ))}
       </View>
 
       <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Incident type</Text>
@@ -526,12 +431,10 @@ export default function MyReportsScreen() {
           {(['all', 'completed', 'ongoing'] as StatusFilter[]).map((value) => (
             <TouchableOpacity
               key={value}
-              disabled={archiveFilter === 'archived' && value === 'ongoing'}
               onPress={() => chooseStatus(value)}
-              className={`px-3 py-2 rounded-xl mr-2 ${archiveFilter === 'archived' && value === 'ongoing' ? 'bg-slate-100' : statusFilter === value ? 'bg-blue-100' : 'bg-white border border-slate-200'}`}
-              accessibilityState={{ disabled: archiveFilter === 'archived' && value === 'ongoing' }}
+              className={`px-3 py-2 rounded-xl mr-2 ${statusFilter === value ? 'bg-blue-100' : 'bg-white border border-slate-200'}`}
             >
-              <Text className={`text-xs font-bold capitalize ${archiveFilter === 'archived' && value === 'ongoing' ? 'text-slate-300' : statusFilter === value ? 'text-[#1E3A8A]' : 'text-slate-500'}`}>{value}</Text>
+              <Text className={`text-xs font-bold capitalize ${statusFilter === value ? 'text-[#1E3A8A]' : 'text-slate-500'}`}>{value}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -540,7 +443,6 @@ export default function MyReportsScreen() {
         </TouchableOpacity>
       </View>
 
-      {!!actionMessage && <Text className="text-sm font-semibold text-emerald-700 mb-3">{actionMessage}</Text>}
       {!!error && (
         <View className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-4">
           <Text className="text-sm font-semibold text-red-700 mb-2">{error}</Text>
@@ -560,26 +462,26 @@ export default function MyReportsScreen() {
   const paginationFooter = !displayLoading && !error && reports.length > 0 ? (
     <View className="flex-row items-center justify-between bg-white border border-slate-200 rounded-2xl px-3 py-3 mb-24 mt-1">
       <TouchableOpacity
-        disabled={pagination.page <= 1 || !!archiveUpdatingId}
+        disabled={pagination.page <= 1}
         onPress={() => changePage(pagination.page - 1)}
-        className={`w-11 h-11 rounded-xl items-center justify-center ${pagination.page <= 1 || archiveUpdatingId ? 'bg-slate-100' : 'bg-blue-50'}`}
+        className={`w-11 h-11 rounded-xl items-center justify-center ${pagination.page <= 1 ? 'bg-slate-100' : 'bg-blue-50'}`}
         accessibilityLabel="Previous reports page"
-        accessibilityState={{ disabled: pagination.page <= 1 || !!archiveUpdatingId }}
+        accessibilityState={{ disabled: pagination.page <= 1 }}
       >
-        <ChevronLeft size={20} color={pagination.page <= 1 || archiveUpdatingId ? '#94A3B8' : '#1E3A8A'} />
+        <ChevronLeft size={20} color={pagination.page <= 1 ? '#94A3B8' : '#1E3A8A'} />
       </TouchableOpacity>
       <View className="items-center">
         <Text className="text-sm font-bold text-slate-800">Page {pagination.page} of {pagination.totalPages}</Text>
         <Text className="text-xs text-slate-500">Up to {RESPONDER_PAGE_SIZE} per page</Text>
       </View>
       <TouchableOpacity
-        disabled={pagination.page >= pagination.totalPages || !!archiveUpdatingId}
+        disabled={pagination.page >= pagination.totalPages}
         onPress={() => changePage(pagination.page + 1)}
-        className={`w-11 h-11 rounded-xl items-center justify-center ${pagination.page >= pagination.totalPages || archiveUpdatingId ? 'bg-slate-100' : 'bg-blue-50'}`}
+        className={`w-11 h-11 rounded-xl items-center justify-center ${pagination.page >= pagination.totalPages ? 'bg-slate-100' : 'bg-blue-50'}`}
         accessibilityLabel="Next reports page"
-        accessibilityState={{ disabled: pagination.page >= pagination.totalPages || !!archiveUpdatingId }}
+        accessibilityState={{ disabled: pagination.page >= pagination.totalPages }}
       >
-        <ChevronRight size={20} color={pagination.page >= pagination.totalPages || archiveUpdatingId ? '#94A3B8' : '#1E3A8A'} />
+        <ChevronRight size={20} color={pagination.page >= pagination.totalPages ? '#94A3B8' : '#1E3A8A'} />
       </TouchableOpacity>
     </View>
   ) : <View className="h-24" />;
@@ -606,7 +508,7 @@ export default function MyReportsScreen() {
             <View className="items-center py-16">
               <Text className="text-slate-700 font-bold mb-1">No reports found</Text>
               <Text className="text-slate-400 text-center">
-                {archiveFilter === 'archived' ? 'Archived reports will appear here.' : 'Try changing the search or filters.'}
+                Try changing the search or filters.
               </Text>
             </View>
           ) : null}

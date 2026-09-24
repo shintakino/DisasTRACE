@@ -5,10 +5,24 @@ import { User, Session } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { verifyMobileSession } from '../lib/mobile-auth';
 import { useResponderDutyStore } from '../stores/useResponderDutyStore';
+import { useResponderStore } from '../stores/useResponderStore';
 
 const VerificationStatusSchema = z.enum(['pending', 'approved', 'rejected']);
 type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
 type MobileVerificationStatus = VerificationStatus | 'loading' | 'banned' | 'unauthorized_platform';
+
+// Zustand stores outlive a Supabase auth session in a running Expo process.
+// Track the account globally so a second useAuthStatus consumer does not clear
+// a valid in-progress dispatch, while a genuine account switch always removes
+// the previous responder's in-memory dispatch UI.
+let activeMobileAccountId: string | null = null;
+
+function reconcileResponderStoreAccount(nextAccountId: string | null) {
+  if (activeMobileAccountId && activeMobileAccountId !== nextAccountId) {
+    useResponderStore.getState().clearTransientDispatch();
+  }
+  activeMobileAccountId = nextAccountId;
+}
 
 export function useAuthStatus() {
   const [user, setUser] = useState<User | null>(null);
@@ -156,6 +170,7 @@ export function useAuthStatus() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      reconcileResponderStoreAccount(session?.user.id ?? null);
       if (session?.user) {
         checkVerification(session.user, session);
       } else {
@@ -170,6 +185,7 @@ export function useAuthStatus() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      reconcileResponderStoreAccount(session?.user.id ?? null);
       if (session?.user) {
         checkVerification(session.user, session);
       } else {

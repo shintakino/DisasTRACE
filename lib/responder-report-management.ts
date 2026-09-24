@@ -29,7 +29,6 @@ const ResponderReportListQuerySchema = z.object({
   type: optionalTrimmedText(80),
   barangay: optionalOfficialBarangay,
   status: z.enum(['all', 'ongoing', 'completed']).default('all'),
-  archive: z.enum(['active', 'archived']).default('active'),
   sort: z.enum(['newest', 'oldest']).default('newest'),
   createdAfter: z.string().datetime({ offset: true }).optional(),
   createdBefore: z.string().datetime({ offset: true }).optional(),
@@ -48,27 +47,21 @@ const ResponderReportListQuerySchema = z.object({
   }
 });
 
-const ResponderReportArchivePayloadSchema = z.object({
-  archived: z.boolean(),
-}).strict();
-
 export type ResponderReportListQuery = z.infer<typeof ResponderReportListQuerySchema>;
 
 export function parseResponderReportListQuery(searchParams: URLSearchParams): ResponderReportListQuery {
+  if (searchParams.has('archive')) {
+    throw new Error('The responder report archive is no longer supported.');
+  }
   return ResponderReportListQuerySchema.parse({
     search: searchParams.get('search') ?? undefined,
     type: searchParams.get('type') ?? undefined,
     barangay: searchParams.get('barangay') ?? undefined,
     status: searchParams.get('status') ?? undefined,
-    archive: searchParams.get('archive') ?? undefined,
     sort: searchParams.get('sort') ?? undefined,
     createdAfter: searchParams.get('createdAfter') ?? undefined,
     createdBefore: searchParams.get('createdBefore') ?? undefined,
     page: searchParams.get('page') ?? undefined,
     limit: searchParams.get('limit') ?? undefined,
   });
-}
-
-export function parseResponderReportArchivePayload(payload: unknown): { archived: boolean } {
-  return ResponderReportArchivePayloadSchema.parse(payload);
 }

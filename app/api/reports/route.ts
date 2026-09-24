@@ -6,7 +6,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
-import { eq, and, asc, count, desc, gte, ilike, inArray, isNotNull, isNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
+import { eq, and, asc, count, desc, gte, ilike, inArray, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import crypto from "crypto";
@@ -217,11 +217,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid report list query parameters.' }, { status: 400 });
       }
 
-      whereConditions.push(
-        responderQuery.archive === 'archived'
-          ? isNotNull(reports.archivedAt)
-          : isNull(reports.archivedAt),
-      );
       if (responderQuery.status === 'completed') {
         whereConditions.push(eq(reports.status, 'SUBMITTED'));
       } else if (responderQuery.status === 'ongoing') {
@@ -268,7 +263,6 @@ export async function GET(req: NextRequest) {
         crewFindings: reports.description,
         scenePhotos: reports.scenePhotos,
         participants: reports.participants,
-        archivedAt: reports.archivedAt,
         patientCareCount: sql<number>`(select count(*)::int from patient_care_reports where patient_care_reports.incident_id = ${reports.incidentId})`,
         verificationRequestId: verificationRequests.id,
       })
@@ -394,8 +388,6 @@ export async function GET(req: NextRequest) {
         })(),
         crewFindings: r.crewFindings || "No additional logs provided.",
         scenePhotos: Array.isArray(r.scenePhotos) ? r.scenePhotos : [],
-        archivedAt: r.archivedAt?.toISOString() ?? null,
-        isArchived: r.archivedAt !== null,
         duplicates: duplicatesForReport,
       };
     });

@@ -716,7 +716,18 @@ export function ResponderHome() {
         .select('id, status, responder_id, current_offer_responder_id')
         .eq('id', incidentId)
         .maybeSingle();
-      if (!error && incident) clearReassignedDispatch(incident);
+      if (error || !mounted || useResponderStore.getState().activeDispatch?.id !== incidentId) return;
+
+      // A Zustand store stays in memory when someone signs out and signs in
+      // as another responder. Never resurrect that former account's sheet.
+      // DOCUMENTATION_PENDING and RESOLVED are also non-tracking terminal
+      // states: their draft belongs in Forms, not on the active dispatch map.
+      if (!incident || ['DOCUMENTATION_PENDING', 'RESOLVED'].includes(incident.status)) {
+        useResponderStore.getState().clearTransientDispatch();
+        return;
+      }
+
+      clearReassignedDispatch(incident);
     };
 
     void reconcile();

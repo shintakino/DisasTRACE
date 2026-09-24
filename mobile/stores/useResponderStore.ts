@@ -150,6 +150,8 @@ interface ResponderState {
   submitReport: (incidentId?: string, formData?: any) => Promise<void>;
   finishAndClose: () => void;
   completeIncident: () => void;
+  /** Clears only in-memory dispatch UI when the authenticated responder changes or the server has no live assignment. */
+  clearTransientDispatch: () => void;
   
   // Forms & Drafts Actions
   saveDraft: (incident: DispatchDetails, formData: any, explicitlySaved?: boolean) => Promise<void>;
@@ -729,6 +731,27 @@ export const useResponderStore = create<ResponderState>((set) => ({
     hospitalEtaMins: null,
     fieldOutcome: null,
     lastSubmittedSummary: null
+  }),
+
+  clearTransientDispatch: () => set({
+    status: 'idle',
+    activeDispatch: null,
+    targetHospital: null,
+    sceneTimeSeconds: 0,
+    elapsedTimeSeconds: 0,
+    isArrivalConfirmVisible: false,
+    isHospitalArrivalConfirmVisible: false,
+    isSubmittingReport: false,
+    showReportSuccess: false,
+    lastReportDelivery: null,
+    lastArrivalDelivery: null,
+    currentSpeedKph: 0,
+    hospitalDistanceKm: null,
+    hospitalEtaMins: null,
+    responseTimeSeconds: 0,
+    initialDistanceKm: 0,
+    lastSubmittedSummary: null,
+    fieldOutcome: null,
   }),
 
   saveDraft: async (incident, formData, explicitlySaved = false) => {

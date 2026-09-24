@@ -35,6 +35,18 @@ assert.match(store, /fieldOutcome: null/);
 assert.match(store, /queueDocumentationRelease/);
 assert.match(store, /fetchWithTimeout\([^\n]+\/api\/incidents\/status/);
 assert.match(store, /documentationReleaseIndex/);
+assert.match(store, /clearTransientDispatch/);
+assert.match(store, /clearTransientDispatch: \(\) => set\(\{/);
+assert.doesNotMatch(store.match(/clearTransientDispatch: \(\) => set\(\{[\s\S]*?\n  \}\),/)?.[0] ?? '', /drafts:|offlineQueue:/);
+
+const authStatus = read('mobile/hooks/use-auth-status.ts');
+assert.match(authStatus, /activeMobileAccountId/);
+assert.match(authStatus, /reconcileResponderStoreAccount/);
+assert.match(authStatus, /useResponderStore\.getState\(\)\.clearTransientDispatch\(\)/);
+
+const responderHome = read('mobile/components/responder/ResponderHome.tsx');
+assert.match(responderHome, /!incident \|\| \['DOCUMENTATION_PENDING', 'RESOLVED'\]\.includes\(incident\.status\)/);
+assert.match(responderHome, /clearTransientDispatch\(\)/);
 
 const offlineReports = read('mobile/hooks/use-offline-reports.ts');
 assert.match(offlineReports, /fetchWithTimeout\([^\n]+action\.endpoint/);

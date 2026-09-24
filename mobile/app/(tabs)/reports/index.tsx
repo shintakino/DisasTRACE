@@ -30,6 +30,7 @@ import { useAuthStatus } from '../../../hooks/use-auth-status';
 import { ReportDetailModal } from '../../../components/responder/ReportDetailModal';
 import { supabase } from '../../../lib/supabase';
 import { BALIWAG_BARANGAY_NAMES, formatBaliwagLocation } from '../../../lib/baliwag-location';
+import { readResidentReportCache, writeResidentReportCache } from '../../../lib/resident-report-cache';
 
 const RESPONDER_PAGE_SIZE = 15;
 const TYPE_FILTERS = [
@@ -111,6 +112,45 @@ type ReportsApiResponse = {
   totalPages?: number;
 };
 
+function mapReportItems(items: ReportApiItem[], isResponder: boolean): ReportListItem[] {
+  return items.map((report) => {
+    let icon: LucideIcon = AlertTriangle;
+    if (report.type?.toLowerCase().includes('vehicular') || report.type?.toLowerCase().includes('collision') || report.type?.toLowerCase().includes('accident')) {
+      icon = CarFront;
+    } else if (report.type?.toLowerCase().includes('medical') || report.type?.toLowerCase().includes('emergency')) {
+      icon = Activity;
+    } else if (report.type?.toLowerCase().includes('fire')) {
+      icon = Flame;
+    }
+
+    const rawStatus = report.status || 'COMPLETED';
+    const status = !isResponder && rawStatus !== 'REJECTED' && report.incidentStatus === 'RESOLVED'
+      ? 'CASE_CLOSED'
+      : rawStatus;
+    const responseLabel = isResponder
+      ? (report.vehicleId ? `${report.vehicleId} assigned` : 'Responder report')
+      : status === 'REJECTED'
+        ? 'Rejected by PACC'
+        : status === 'CASE_CLOSED'
+          ? 'Case closed'
+          : status === 'DUPLICATE'
+            ? 'Linked to primary report'
+            : status === 'PENDING'
+              ? 'Awaiting PACC review'
+              : 'Response in progress';
+
+    return {
+      ...report,
+      type: report.type || 'Incident',
+      date: report.date || 'Today',
+      status,
+      location: formatBaliwagLocation(report.barangay) ?? report.location ?? 'Location unavailable',
+      response: responseLabel,
+      icon,
+    };
+  });
+}
+
 export default function MyReportsScreen() {
   const router = useRouter();
   const [selectedReport, setSelectedReport] = useState<ReportListItem | null>(null);
@@ -118,6 +158,7 @@ export default function MyReportsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [offlineSavedAt, setOfflineSavedAt] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -184,44 +225,13 @@ export default function MyReportsScreen() {
       if (!response.ok) throw new Error(result?.error || 'Reports could not be loaded. Please try again.');
       if (sequence !== requestSequence.current) return;
 
-      const mappedReports: ReportListItem[] = Array.isArray(result?.data) ? result.data.map((report) => {
-        let icon: LucideIcon = AlertTriangle;
-        if (report.type?.toLowerCase().includes('vehicular') || report.type?.toLowerCase().includes('collision') || report.type?.toLowerCase().includes('accident')) {
-          icon = CarFront;
-        } else if (report.type?.toLowerCase().includes('medical') || report.type?.toLowerCase().includes('emergency')) {
-          icon = Activity;
-        } else if (report.type?.toLowerCase().includes('fire')) {
-          icon = Flame;
-        }
-
-        const rawStatus = report.status || 'COMPLETED';
-        const status = !isResponder && rawStatus !== 'REJECTED' && report.incidentStatus === 'RESOLVED'
-          ? 'CASE_CLOSED'
-          : rawStatus;
-        const responseLabel = isResponder
-          ? (report.vehicleId ? `${report.vehicleId} assigned` : 'Responder report')
-          : status === 'REJECTED'
-            ? 'Rejected by PACC'
-            : status === 'CASE_CLOSED'
-              ? 'Case closed'
-              : status === 'DUPLICATE'
-                ? 'Linked to primary report'
-                : status === 'PENDING'
-                  ? 'Awaiting PACC review'
-                  : 'Response in progress';
-
-        return {
-          ...report,
-          type: report.type || 'Incident',
-          date: report.date || 'Today',
-          status,
-          location: formatBaliwagLocation(report.barangay) ?? 'Location unavailable',
-          response: responseLabel,
-          icon,
-        };
-      }) : [];
+      const mappedReports = mapReportItems(Array.isArray(result?.data) ? result.data : [], isResponder);
 
       setReports(mappedReports);
+      setOfflineSavedAt(null);
+      if (!isResponder && user?.id) {
+        await writeResidentReportCache(user.id, Array.isArray(result?.data) ? result.data : []);
+      }
       if (isResponder) {
         setPagination((current) => ({
           page: Number(result?.page) || current.page,
@@ -232,8 +242,20 @@ export default function MyReportsScreen() {
     } catch (fetchError) {
       if (controller.signal.aborted || sequence !== requestSequence.current) return;
       console.error('Error fetching reports on mobile:', fetchError);
-      setReports([]);
-      setError(fetchError instanceof Error ? fetchError.message : 'Reports could not be loaded. Please try again.');
+      if (!isResponder && user?.id) {
+        const cached = await readResidentReportCache(user.id);
+        if (cached) {
+          setReports(mapReportItems(cached.reports, false));
+          setOfflineSavedAt(cached.savedAt);
+          setError('You are offline. Showing your last synced reports.');
+        } else {
+          setReports([]);
+          setError(fetchError instanceof Error ? fetchError.message : 'Reports could not be loaded. Please try again.');
+        }
+      } else {
+        setReports([]);
+        setError(fetchError instanceof Error ? fetchError.message : 'Reports could not be loaded. Please try again.');
+      }
     } finally {
       if (sequence === requestSequence.current) {
         setLoading(false);
@@ -251,6 +273,14 @@ export default function MyReportsScreen() {
       activeRequest.current?.abort();
     };
   }, [fetchReports, isLoaded, user]);
+
+  useEffect(() => {
+    // Never render the previous account's report list while a new session is
+    // hydrating or its scoped request is still in flight.
+    setReports([]);
+    setOfflineSavedAt(null);
+    setError(null);
+  }, [user?.id]);
 
   const onRefresh = () => void fetchReports(true);
 
@@ -523,10 +553,22 @@ export default function MyReportsScreen() {
           {displayLoading ? (
             <View className="items-center py-20"><ActivityIndicator size="large" color="#1E3A8A" /></View>
           ) : error ? (
-            <View className="items-center py-20">
-              <Text className="text-red-700 font-bold text-center mb-3">{error}</Text>
-              <TouchableOpacity onPress={() => void fetchReports()}><Text className="font-bold text-[#1E3A8A]">Try again</Text></TouchableOpacity>
-            </View>
+            <>
+              <View className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
+                <Text className="text-amber-800 font-bold text-center mb-2">{error}</Text>
+                {offlineSavedAt ? <Text className="text-amber-700 text-xs text-center mb-2">Last synced {new Date(offlineSavedAt).toLocaleString()}</Text> : null}
+                <TouchableOpacity onPress={() => void fetchReports()}><Text className="font-bold text-[#1E3A8A] text-center">Try again</Text></TouchableOpacity>
+              </View>
+              {reports.length > 0 ? (
+                <>
+                  {today.length > 0 && renderResidentSection('TODAY', today)}
+                  {yesterday.length > 0 && renderResidentSection('YESTERDAY', yesterday)}
+                  {older.length > 0 && renderResidentSection('OLDER', older)}
+                </>
+              ) : (
+                <View className="items-center py-16"><Text className="text-slate-400 font-bold">No reports available offline</Text></View>
+              )}
+            </>
           ) : reports.length === 0 ? (
             <View className="items-center py-20"><Text className="text-slate-400 font-bold">No reports found</Text></View>
           ) : (

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PersonalInfoSchema, PersonalInfoType } from '../../schemas/auth';
@@ -7,10 +7,14 @@ import { useSignUpStore } from '../../store/useSignUpStore';
 
 interface Props {
   onNext: () => void;
+  onInputFocus?: (target: number) => void;
 }
 
-export default function Step1({ onNext }: Props) {
+const NAME_SUFFIXES = ['', 'JR.', 'SR.', 'II', 'III', 'IV', 'V'] as const;
+
+export default function Step1({ onNext, onInputFocus }: Props) {
   const { data, updateData } = useSignUpStore();
+  const [suffixPickerVisible, setSuffixPickerVisible] = useState(false);
   
   const { control, handleSubmit, formState: { errors } } = useForm<PersonalInfoType>({
     resolver: zodResolver(PersonalInfoSchema),
@@ -48,6 +52,7 @@ export default function Step1({ onNext }: Props) {
             autoCapitalize="characters"
             autoCorrect={false}
             autoComplete="off"
+            onFocus={(event) => onInputFocus?.(event.nativeEvent.target)}
           />
         )} />
         {errors.firstName && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.firstName.message}</Text>}
@@ -64,6 +69,7 @@ export default function Step1({ onNext }: Props) {
             autoCapitalize="characters"
             autoCorrect={false}
             autoComplete="off"
+            onFocus={(event) => onInputFocus?.(event.nativeEvent.target)}
           />
         )} />
       </View>
@@ -79,6 +85,7 @@ export default function Step1({ onNext }: Props) {
             autoCapitalize="characters"
             autoCorrect={false}
             autoComplete="off"
+            onFocus={(event) => onInputFocus?.(event.nativeEvent.target)}
           />
         )} />
         {errors.lastName && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.lastName.message}</Text>}
@@ -86,16 +93,40 @@ export default function Step1({ onNext }: Props) {
 
       <View>
         <Text className="text-gray-700 font-bold mb-2 ml-1">Suffix Name (Optional)</Text>
-        <Controller control={control} name="suffix" render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            className="bg-gray-50 p-4 rounded-xl border border-gray-200 h-14 text-gray-800"
-            placeholder="JR., SR., III" onBlur={onBlur} 
-            onChangeText={onChange} 
-            value={value}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            autoComplete="off"
-          />
+        <Controller control={control} name="suffix" render={({ field: { onChange, value } }) => (
+          <>
+            <TouchableOpacity
+              onPress={() => setSuffixPickerVisible(true)}
+              className="bg-gray-50 px-4 rounded-xl border border-gray-200 h-14 flex-row items-center justify-between"
+              accessibilityRole="button"
+              accessibilityLabel="Choose name suffix"
+              accessibilityState={{ expanded: suffixPickerVisible }}
+            >
+              <Text className={value ? 'text-gray-800 font-medium' : 'text-gray-400'}>{value || 'NO SUFFIX'}</Text>
+              <Text className="text-[#1E3A8A] font-bold text-lg">⌄</Text>
+            </TouchableOpacity>
+            <Modal visible={suffixPickerVisible} transparent animationType="fade" onRequestClose={() => setSuffixPickerVisible(false)}>
+              <View className="flex-1 bg-black/40 justify-end">
+                <View className="bg-white rounded-t-3xl px-6 pt-5 pb-8">
+                  <Text className="text-lg font-bold text-slate-800 mb-1">Name Suffix</Text>
+                  <Text className="text-sm text-slate-500 mb-4">Choose the official suffix, if applicable.</Text>
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    {NAME_SUFFIXES.map((suffixOption) => (
+                      <TouchableOpacity
+                        key={suffixOption || 'none'}
+                        onPress={() => { onChange(suffixOption); setSuffixPickerVisible(false); }}
+                        className={`min-h-[48px] px-4 rounded-xl justify-center mb-2 ${value === suffixOption ? 'bg-blue-50 border border-blue-200' : 'bg-slate-50 border border-slate-200'}`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: value === suffixOption }}
+                      >
+                        <Text className={`font-bold ${value === suffixOption ? 'text-[#1E3A8A]' : 'text-slate-700'}`}>{suffixOption || 'No suffix'}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
+            </Modal>
+          </>
         )} />
       </View>
 

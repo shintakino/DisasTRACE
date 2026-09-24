@@ -60,6 +60,11 @@ const WELCOME = 'Hi, I’m the DisasTRACE assistant. I can answer approved safet
 
 type ChatMessage = { id: string; role: 'bot' | 'user'; text: string };
 type LanguageStyle = 'en' | 'fil' | 'taglish';
+type PendingEvidence = {
+  uri: string;
+  latitude?: number;
+  longitude?: number;
+};
 
 const PHASE_LABELS = ['Start', 'Location & contact', 'Incident details', 'Review', 'Submit'] as const;
 
@@ -112,7 +117,7 @@ function makeMessage(role: ChatMessage['role'], text: string): ChatMessage {
 
 export default function EmergencyChatbotScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mode?: string; returnTo?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; returnTo?: string; photoUri?: string }>();
   const requestedMode: ChatbotReporterMode = params.mode === 'guest' ? 'guest' : 'registered';
   const {
     lifecycle,
@@ -140,14 +145,18 @@ export default function EmergencyChatbotScreen() {
   const [capturingLocation, setCapturingLocation] = useState(false);
   const [officialLocationLabel, setOfficialLocationLabel] = useState<string | null>(null);
   const [actorReady, setActorReady] = useState(false);
+  const [pendingEvidence, setPendingEvidence] = useState<PendingEvidence | null>(null);
+  const [reviewMode, setReviewMode] = useState(false);
+  const [changingIncidentCategory, setChangingIncidentCategory] = useState(false);
   const submissionLock = useRef(false);
   const requestedLocation = useRef(false);
   const restoredPromptShown = useRef(false);
+  const appliedPhotoPrefill = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const activeSlot = useMemo(
-    () => editTarget ?? getNextMissingSlot(draft, reporterMode),
-    [draft, editTarget, reporterMode],
+    () => reviewMode ? 'review' : editTarget ?? getNextMissingSlot(draft, reporterMode),
+    [draft, editTarget, reporterMode, reviewMode],
   );
   const phase = deriveMobileIntakePhase(draft, reporterMode, lifecycle);
   const progressVisible = isReportProgressVisible(lifecycle);
@@ -172,6 +181,10 @@ export default function EmergencyChatbotScreen() {
       if (current.lifecycle !== 'IDLE' && (current.reporterMode !== requestedMode || current.ownerId !== expectedOwnerId)) {
         current.clearReportToIdle();
         useEmergencyReportStore.getState().resetReport();
+        if (mounted) {
+          setPendingEvidence(null);
+          setChangingIncidentCategory(false);
+        }
       }
       useChatbotStore.getState().setActor(requestedMode, expectedOwnerId);
       if (mounted) setActorReady(true);
@@ -179,6 +192,17 @@ export default function EmergencyChatbotScreen() {
     void verifyActor();
     return () => { mounted = false; };
   }, [hasHydrated, requestedMode, router]);
+
+  useEffect(() => {
+    const photoUri = typeof params.photoUri === 'string' ? params.photoUri : undefined;
+    if (!actorReady || !photoUri || appliedPhotoPrefill.current) return;
+    const current = useChatbotStore.getState();
+    if (current.lifecycle !== 'IDLE' || current.activeReport) return;
+    appliedPhotoPrefill.current = true;
+    setReviewMode(false);
+    current.startDraft({ photoUri });
+    addMessage('bot', promptFor('incidentType', requestedMode, languageStyle));
+  }, [actorReady, languageStyle, params.photoUri, requestedMode]);
 
   useEffect(() => {
     if (!actorReady) return;
@@ -237,7 +261,9 @@ export default function EmergencyChatbotScreen() {
   const announceNextSlot = (nextDraft: ChatbotDraft, completedEdit = false, style = languageStyle) => {
     const next = getNextMissingSlot(nextDraft, reporterMode);
     if (completedEdit) {
+      setChangingIncidentCategory(false);
       setEditTarget(null);
+      setReviewMode(true);
       addMessage('bot', promptFor('review', reporterMode, style));
       return;
     }
@@ -246,16 +272,27 @@ export default function EmergencyChatbotScreen() {
 
   const completeSlot = (updates: Partial<ChatbotDraft>, confirmation: string) => {
     const nextDraft = { ...draft, ...updates };
+    const returningFromCategoryChange = changingIncidentCategory && editTarget === 'incidentType';
     updateDraft(updates);
     setFieldValue('');
     addMessage('user', confirmation);
+    if (returningFromCategoryChange) {
+      setChangingIncidentCategory(false);
+      setEditTarget(null);
+      addMessage('bot', 'Incident category updated. Your other report details were kept.');
+      announceNextSlot(nextDraft, false);
+      return;
+    }
     announceNextSlot(nextDraft, Boolean(editTarget));
   };
 
   const beginReport = (updates: Partial<ChatbotDraft> = {}) => {
     const current = useChatbotStore.getState();
     if (current.activeReport || current.lifecycle !== 'IDLE') return;
+    setPendingEvidence(null);
+    setChangingIncidentCategory(false);
     startDraft(updates);
+    setReviewMode(false);
     addMessage('bot', promptFor(getNextMissingSlot(updates, reporterMode), reporterMode, languageStyle));
   };
 
@@ -270,6 +307,9 @@ export default function EmergencyChatbotScreen() {
           style: 'destructive',
           onPress: () => {
             discardDraft();
+            setReviewMode(false);
+            setPendingEvidence(null);
+            setChangingIncidentCategory(false);
             requestedLocation.current = false;
             restoredPromptShown.current = false;
             setMessages([makeMessage('bot', `${WELCOME} Your draft was cancelled and no report was sent.`)]);
@@ -322,6 +362,10 @@ export default function EmergencyChatbotScreen() {
   const sendComposer = async () => {
     const message = composer.trim();
     if (!message || waiting || lifecycle === 'SUBMITTING') return;
+    if (pendingEvidence) {
+      addMessage('bot', 'Please choose Use this photo or Retake photo before continuing.');
+      return;
+    }
     setComposer('');
     addMessage('user', message);
 
@@ -375,13 +419,26 @@ export default function EmergencyChatbotScreen() {
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       const photoCoordinates = getPhotoExifCoordinates(asset.exif);
-      completeSlot({
-        photoUri: asset.uri,
-        imageUrl: undefined,
-        photoLatitude: photoCoordinates?.latitude,
-        photoLongitude: photoCoordinates?.longitude,
-      }, photoCoordinates ? 'Photo evidence attached with embedded GPS coordinates' : 'Photo evidence attached');
+      setPendingEvidence({
+        uri: asset.uri,
+        latitude: photoCoordinates?.latitude,
+        longitude: photoCoordinates?.longitude,
+      });
+      addMessage('bot', 'Photo captured. Check that the incident details are sharp and readable before continuing. You can retake it if it is blurry.');
     }
+  };
+
+  const usePendingEvidence = () => {
+    if (!pendingEvidence) return;
+    completeSlot({
+      photoUri: pendingEvidence.uri,
+      imageUrl: undefined,
+      photoLatitude: pendingEvidence.latitude,
+      photoLongitude: pendingEvidence.longitude,
+    }, pendingEvidence.latitude !== undefined
+      ? 'Photo evidence attached with embedded GPS coordinates'
+      : 'Photo evidence attached');
+    setPendingEvidence(null);
   };
 
   const submitReport = async () => {
@@ -508,7 +565,12 @@ export default function EmergencyChatbotScreen() {
         onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
       />
       {input.error ? <Text style={styles.fieldError}>{input.error}</Text> : null}
-      <TouchableOpacity style={styles.primary} onPress={() => input.onSubmit(fieldValue.trim())}>
+      <TouchableOpacity
+        style={[styles.primary, !fieldValue.trim() && styles.primaryDisabled]}
+        onPress={() => input.onSubmit(fieldValue.trim())}
+        disabled={waiting || !fieldValue.trim()}
+        accessibilityState={{ disabled: waiting || !fieldValue.trim() }}
+      >
         <Send color="#FFF" size={17} />
         <Text style={styles.primaryText}>Send response</Text>
       </TouchableOpacity>
@@ -545,11 +607,25 @@ export default function EmergencyChatbotScreen() {
     if (activeSlot === 'evidence') {
       return (
         <View style={styles.formBlock}>
-          <TouchableOpacity style={styles.primary} onPress={() => void takeEvidence()}>
+          <TouchableOpacity style={[styles.primary, (waiting || capturingLocation) && styles.disabledButton]} onPress={() => void takeEvidence()} disabled={waiting}>
             <Camera color="#FFF" size={18} />
             <Text style={styles.primaryText}>{draft.photoUri ? 'Retake photo evidence' : 'Take photo evidence'}</Text>
           </TouchableOpacity>
-          {draft.photoUri ? <Image source={{ uri: draft.photoUri }} style={styles.preview} alt="Selected photo evidence" /> : null}
+          {pendingEvidence ? <Image source={{ uri: pendingEvidence.uri }} style={styles.preview} alt="New photo evidence awaiting confirmation" /> : null}
+          {pendingEvidence ? (
+            <View style={styles.evidenceReview}>
+              <Text style={styles.help}>If the photo is blurry, dark, or unreadable, retake it before sending.</Text>
+              <View style={styles.choiceRow}>
+                <TouchableOpacity style={styles.neutralChoice} onPress={() => { setPendingEvidence(null); void takeEvidence(); }}>
+                  <Text style={styles.neutralChoiceText}>Retake photo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.primaryChoice} onPress={usePendingEvidence}>
+                  <Text style={styles.primaryText}>Use this photo</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+          {!pendingEvidence && draft.photoUri ? <Image source={{ uri: draft.photoUri }} style={styles.preview} alt="Selected photo evidence" /> : null}
           {draft.photoUri ? (
             <TouchableOpacity
               accessibilityRole="button"
@@ -607,6 +683,8 @@ export default function EmergencyChatbotScreen() {
     if (activeSlot === 'location') {
       const hasGps = draft.latitude !== undefined && draft.longitude !== undefined;
       const outsideBaliwag = hasGps && !isWithinBaliwag(draft.latitude!, draft.longitude!);
+      const landmarks = fieldValue.trim() || draft.landmarks || '';
+      const canSendLocation = hasGps && !outsideBaliwag && (reporterMode === 'registered' || landmarks.length >= 5);
       return (
         <View style={styles.formBlock}>
           <TouchableOpacity style={styles.secondary} onPress={() => void captureLocation()} disabled={capturingLocation}>
@@ -624,8 +702,7 @@ export default function EmergencyChatbotScreen() {
             autoCorrect={false}
             onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
           />
-          <TouchableOpacity style={styles.primary} onPress={() => {
-            const landmarks = fieldValue.trim() || draft.landmarks || '';
+          <TouchableOpacity style={[styles.primary, !canSendLocation && styles.primaryDisabled]} onPress={() => {
             if (!hasGps) {
               addMessage('bot', 'GPS location is required. Please capture it before continuing.');
               return;
@@ -639,7 +716,7 @@ export default function EmergencyChatbotScreen() {
               return;
             }
             completeSlot({ landmarks }, landmarks || 'GPS location confirmed');
-          }}>
+          }} disabled={waiting || !canSendLocation} accessibilityState={{ disabled: waiting || !canSendLocation }}>
             <Send color="#FFF" size={17} />
             <Text style={styles.primaryText}>Send location</Text>
           </TouchableOpacity>
@@ -665,19 +742,27 @@ export default function EmergencyChatbotScreen() {
     }
     return (
       <View style={styles.reviewCard}>
-        <ReviewRow label="Evidence" value={draft.photoUri ? 'Photo attached' : 'Missing'} onEdit={() => setEditTarget('evidence')} />
-        <ReviewRow label="Nature" value={draft.nature === 'NON-EMERGENCY' ? 'Non-emergency' : 'Emergency'} onEdit={() => setEditTarget('incidentType')} />
-        <ReviewRow label="Incident" value={draft.incidentType ?? 'Missing'} onEdit={() => setEditTarget('incidentType')} />
-        {reporterMode === 'guest' ? <ReviewRow label="Contact" value={draft.contactNumber ?? 'Missing'} onEdit={() => setEditTarget('contactNumber')} /> : null}
-        <ReviewRow label="Location" value={officialLocationLabel || 'Verified GPS location'} onEdit={() => setEditTarget('location')} />
-        <ReviewRow label="People involved" value={String(draft.peopleInvolved ?? 'Missing')} onEdit={() => setEditTarget('peopleInvolved')} />
-        <ReviewRow label="Condition" value={draft.victimCondition ?? 'Missing'} onEdit={() => setEditTarget('victimCondition')} />
-        <TouchableOpacity style={styles.primary} onPress={() => void submitReport()}>
+        <ReviewRow label="Evidence" value={draft.photoUri ? 'Photo attached' : 'Missing'} onEdit={() => { setReviewMode(false); setEditTarget('evidence'); }} />
+        <ReviewRow label="Nature" value={draft.nature === 'NON-EMERGENCY' ? 'Non-emergency' : 'Emergency'} onEdit={() => { setReviewMode(false); setEditTarget('incidentType'); }} />
+        <ReviewRow label="Incident" value={draft.incidentType ?? 'Missing'} onEdit={() => { setReviewMode(false); setEditTarget('incidentType'); }} />
+        {reporterMode === 'guest' ? <ReviewRow label="Contact" value={draft.contactNumber ?? 'Missing'} onEdit={() => { setReviewMode(false); setEditTarget('contactNumber'); }} /> : null}
+        <ReviewRow label="Location" value={officialLocationLabel || 'Verified GPS location'} onEdit={() => { setReviewMode(false); setEditTarget('location'); }} />
+        <ReviewRow label="People involved" value={String(draft.peopleInvolved ?? 'Missing')} onEdit={() => { setReviewMode(false); setEditTarget('peopleInvolved'); }} />
+        <ReviewRow label="Condition" value={draft.victimCondition ?? 'Missing'} onEdit={() => { setReviewMode(false); setEditTarget('victimCondition'); }} />
+        <TouchableOpacity style={[styles.primary, (waiting || submissionLock.current || getNextMissingSlot(draft, reporterMode) !== 'review') && styles.primaryDisabled]} onPress={() => void submitReport()} disabled={waiting || submissionLock.current || getNextMissingSlot(draft, reporterMode) !== 'review'} accessibilityState={{ disabled: waiting || submissionLock.current || getNextMissingSlot(draft, reporterMode) !== 'review' }}>
           <CheckCircle2 color="#FFF" size={18} />
           <Text style={styles.primaryText}>Submit report</Text>
         </TouchableOpacity>
       </View>
     );
+  };
+
+  const changeIncidentCategory = () => {
+    if (waiting || lifecycle !== 'DRAFT' || !draft.incidentType) return;
+    setReviewMode(false);
+    setChangingIncidentCategory(true);
+    setEditTarget('incidentType');
+    addMessage('bot', 'Choose the category that best matches the incident. Your completed details will be kept.');
   };
 
   if (!hasHydrated || !actorReady) {
@@ -706,6 +791,28 @@ export default function EmergencyChatbotScreen() {
       <ScrollView ref={scrollRef} style={styles.chatScroll} contentContainerStyle={styles.chat} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
         {waiting ? <ActivityIndicator color={BLUE} /> : null}
+        {lifecycle === 'DRAFT' && activeSlot !== 'review' && (draft.incidentType || draft.peopleInvolved || draft.victimCondition) ? (
+          <TouchableOpacity
+            style={styles.reviewShortcut}
+            onPress={() => { setChangingIncidentCategory(false); setReviewMode(true); setEditTarget(null); }}
+            accessibilityRole="button"
+            accessibilityLabel="Review and correct previous answers"
+          >
+            <Text style={styles.reviewShortcutText}>Review and correct previous answers</Text>
+          </TouchableOpacity>
+        ) : null}
+        {lifecycle === 'DRAFT' && activeSlot !== 'incidentType' && activeSlot !== 'review' && draft.incidentType ? (
+          <TouchableOpacity
+            style={styles.categoryShortcut}
+            onPress={changeIncidentCategory}
+            disabled={waiting}
+            accessibilityRole="button"
+            accessibilityLabel="Change incident category"
+            accessibilityState={{ disabled: waiting }}
+          >
+            <Text style={styles.categoryShortcutText}>Change incident category</Text>
+          </TouchableOpacity>
+        ) : null}
         <View pointerEvents={waiting ? 'none' : 'auto'} style={[styles.controls, waiting && styles.disabledControls]}>{renderControls()}</View>
       </ScrollView>
 
@@ -721,7 +828,7 @@ export default function EmergencyChatbotScreen() {
           style={styles.composerInput}
           onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))}
         />
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send chat message" style={styles.sendButton} onPress={() => void sendComposer()} disabled={waiting}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send chat message" style={[styles.sendButton, (waiting || !composer.trim() || !!pendingEvidence) && styles.sendButtonDisabled]} onPress={() => void sendComposer()} disabled={waiting || !composer.trim() || !!pendingEvidence} accessibilityState={{ disabled: waiting || !composer.trim() || !!pendingEvidence }}>
           {waiting ? <ActivityIndicator color="#FFF" size="small" /> : <Send color="#FFF" size={18} />}
         </TouchableOpacity>
       </View> : null}
@@ -798,10 +905,13 @@ const styles = StyleSheet.create({
   disabledControls: { opacity: 0.55 },
   formBlock: { gap: 10 },
   primary: { minHeight: 48, paddingHorizontal: 16, borderRadius: 10, backgroundColor: NAVY, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  primaryDisabled: { backgroundColor: '#CBD5E1' },
+  disabledButton: { opacity: 0.5 },
   primaryText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
   secondary: { minHeight: 46, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: '#93C5FD', backgroundColor: '#EFF6FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   secondaryText: { color: NAVY, fontWeight: '800' },
   preview: { width: '100%', height: 180, borderRadius: 10, backgroundColor: '#E2E8F0' },
+  evidenceReview: { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FDBA74', borderRadius: 10, padding: 10, gap: 8 },
   choiceRow: { flexDirection: 'row', gap: 8 },
   choice: { flex: 1, minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' },
   choiceActive: { backgroundColor: '#DBEAFE', borderColor: BLUE },
@@ -822,6 +932,10 @@ const styles = StyleSheet.create({
   countHint: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 10, padding: 14 },
   countTitle: { color: NAVY, fontWeight: '800', marginBottom: 4 },
   reviewCard: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#DCE5F1', borderRadius: 12, padding: 15, gap: 2 },
+  reviewShortcut: { minHeight: 42, borderRadius: 10, borderWidth: 1, borderColor: '#93C5FD', backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  reviewShortcutText: { color: NAVY, fontSize: 13, fontWeight: '800' },
+  categoryShortcut: { minHeight: 38, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  categoryShortcutText: { color: BLUE, fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
   reviewRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   reviewCopy: { flex: 1 },
   reviewLabel: { color: '#64748B', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
@@ -831,4 +945,5 @@ const styles = StyleSheet.create({
   composer: { padding: 12, paddingBottom: 14, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: '#FFF', flexDirection: 'row', alignItems: 'center', gap: 8 },
   composerInput: { flex: 1, minHeight: 46, maxHeight: 100, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 23, paddingHorizontal: 16, color: '#0F172A', backgroundColor: '#F8FAFC' },
   sendButton: { width: 46, height: 46, borderRadius: 23, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' },
+  sendButtonDisabled: { backgroundColor: '#CBD5E1' },
 });

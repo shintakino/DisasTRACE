@@ -1,4 +1,5 @@
-import { pgTable, text, varchar, timestamp, doublePrecision, index, customType } from 'drizzle-orm/pg-core';
+import { pgTable, text, varchar, timestamp, doublePrecision, index, uniqueIndex, customType } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // Custom PostGIS Geometry Point Type definition for Drizzle
 const geometryPoint = customType<{ data: string }>({
@@ -36,6 +37,10 @@ export const users = pgTable('users', {
   otpExpiresAt: timestamp('otp_expires_at', { withTimezone: true }),
   responderType: text('responder_type', { enum: ['barangay', 'cdrrmo_hq'] }),
   barangay: varchar('barangay', { length: 255 }),
+  unitId: varchar('unit_id', { length: 50 }),
 }, (table) => ({
   locationGeomGistIdx: index('users_location_geom_gist_idx').using('gist', table.locationGeom),
+  unitIdUnique: uniqueIndex('users_unit_id_unique')
+    .on(table.unitId)
+    .where(sql`${table.unitId} IS NOT NULL`),
 }));

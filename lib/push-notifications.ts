@@ -103,8 +103,8 @@ export async function sendDispatchOfferPush({ responderId, incidentId, offerExpi
 /** Tell the original responder that a server-authoritative offer expired. */
 export async function sendDispatchOfferExpiredPush({ responderId, incidentId }: DispatchOfferExpiredPushInput) {
   await sendResponderPush(responderId, {
-    title: 'Dispatch offer expired',
-    body: 'This offer was released. PACC can reassign it to another available responder.',
+    title: 'Dispatch offer released',
+    body: 'You did not accept this report in time. It was released for reassignment.',
     sound: 'default',
     priority: 'high',
     channelId: 'emergency-alerts',

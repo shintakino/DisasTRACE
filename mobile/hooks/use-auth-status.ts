@@ -34,7 +34,7 @@ export function useAuthStatus() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<MobileVerificationStatus>('loading');
   const [role, setRole] = useState<string | null>(null);
-  const [profile, setProfile] = useState<{ fullName: string; address: string; barangay?: string; phone?: string; dutyStatus?: string } | null>(null);
+  const [profile, setProfile] = useState<{ fullName: string; address: string; barangay?: string; phone?: string; dutyStatus?: string; unitId?: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const checkVerification = async (currentUser: User, currentSession: Session) => {
@@ -59,7 +59,7 @@ export function useAuthStatus() {
       // Direct Supabase query is more robust than a separate API call for mobile
       const { data: dbUser, error: dbError } = await supabase
         .from('users')
-        .select('role, verification_status, status, full_name, address, barangay, phone, duty_status')
+        .select('role, verification_status, status, full_name, address, barangay, phone, duty_status, unit_id')
         .eq('id', currentUser.id)
         .single();
 
@@ -95,6 +95,7 @@ export function useAuthStatus() {
         barangay: dbUser.barangay || '',
         phone: dbUser.phone || '',
         dutyStatus: dbUser.duty_status || 'OFF_DUTY',
+        unitId: dbUser.unit_id || '',
       };
       setProfile(userProfile);
       useResponderDutyStore.getState().setDutyStatus(userProfile.dutyStatus);
@@ -145,6 +146,7 @@ export function useAuthStatus() {
               address: currentUser.user_metadata?.address || '',
               barangay: currentUser.user_metadata?.barangay || '',
               phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
+              unitId: currentUser.user_metadata?.unit_id || '',
             });
             useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
           }
@@ -153,7 +155,8 @@ export function useAuthStatus() {
             fullName: currentUser.user_metadata?.full_name || 'Resident',
             address: currentUser.user_metadata?.address || '',
             barangay: currentUser.user_metadata?.barangay || '',
-              phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
+            phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
+            unitId: currentUser.user_metadata?.unit_id || '',
           });
           useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
         }
@@ -163,6 +166,7 @@ export function useAuthStatus() {
           address: currentUser.user_metadata?.address || '',
           barangay: currentUser.user_metadata?.barangay || '',
           phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
+          unitId: currentUser.user_metadata?.unit_id || '',
         });
         useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
       });
@@ -254,13 +258,14 @@ export function useAuthStatus() {
             setVerificationStatus(VerificationStatusSchema.parse(newStatus.toLowerCase()));
           }
           
-          if (payload.new.full_name || payload.new.address || payload.new.barangay || payload.new.phone || payload.new.duty_status) {
+          if (payload.new.full_name || payload.new.address || payload.new.barangay || payload.new.phone || payload.new.duty_status || payload.new.unit_id) {
             const updatedProfile = {
               fullName: payload.new.full_name || '',
               address: payload.new.address || '',
               barangay: payload.new.barangay || '',
               phone: payload.new.phone || '',
               dutyStatus: payload.new.duty_status || 'OFF_DUTY',
+              unitId: payload.new.unit_id || '',
             };
             setProfile(updatedProfile);
             useResponderDutyStore.getState().setDutyStatus(updatedProfile.dutyStatus);

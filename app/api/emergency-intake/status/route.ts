@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
   const responder = incident?.responderId
     ? await db.query.users.findFirst({
       where: eq(users.id, incident.responderId),
-      columns: { id: true, fullName: true, lastLatitude: true, lastLongitude: true },
+      columns: { id: true, fullName: true, lastLatitude: true, lastLongitude: true, unitId: true },
     })
     : null;
   const transportHospital = incident?.transportHospitalId

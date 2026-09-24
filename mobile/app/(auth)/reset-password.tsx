@@ -11,7 +11,6 @@ import {
   Modal,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { signOutFromMobile } from '../../lib/mobile-auth';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,6 +19,7 @@ import { Eye, EyeSlash, ArrowLeft, ShieldTick } from 'iconsax-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
+import { getRecoveryCredentials } from '../../lib/recovery-session';
 
 // Strict Zod Validation Schema
 const ResetPasswordSchema = z.object({
@@ -71,34 +71,19 @@ export default function ResetPasswordScreen() {
   useEffect(() => {
     if (isOtpFlow) return;
 
-    const parseUrlValue = (source: string | null | undefined, key: string) => {
-      if (!source) return undefined;
-      const match = source.match(new RegExp(`(?:[?#&])${key}=([^&#]*)`));
-      return match?.[1] ? decodeURIComponent(match[1]) : undefined;
-    };
-
     async function handleRecoveryLink() {
       setIsVerifyingLink(true);
       setGlobalError(null);
 
       try {
-        const existing = await supabase.auth.getSession();
-        let session = existing.data.session;
-        const parsed = url ? Linking.parse(url) : { queryParams: {} };
-        const queryParams = (parsed.queryParams ?? {}) as Record<string, string | undefined>;
-        const accessToken = (queryParams.access_token as string | undefined) || access_token || parseUrlValue(url, 'access_token');
-        const refreshToken = (queryParams.refresh_token as string | undefined) || refresh_token || parseUrlValue(url, 'refresh_token');
-        const recoveryCode = (queryParams.code as string | undefined) || code || parseUrlValue(url, 'code');
+        const recovery = getRecoveryCredentials(url, { access_token, refresh_token, code });
+        if (!recovery) throw new Error('Open the password reset link from your email before saving a new password.');
 
-        if (!session && accessToken && refreshToken) {
-          const result = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-          if (result.error) throw result.error;
-          session = result.data.session;
-        } else if (!session && recoveryCode) {
-          const result = await supabase.auth.exchangeCodeForSession(recoveryCode);
-          if (result.error) throw result.error;
-          session = result.data.session;
-        }
+        const result = recovery.kind === 'tokens'
+          ? await supabase.auth.setSession({ access_token: recovery.accessToken!, refresh_token: recovery.refreshToken! })
+          : await supabase.auth.exchangeCodeForSession(recovery.code!);
+        if (result.error) throw result.error;
+        const session = result.data.session;
 
         if (!session) {
           throw new Error('Open the password reset link from your email before saving a new password.');
@@ -179,7 +164,7 @@ export default function ResetPasswordScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       
       // Sign out any active sessions to secure the account and trigger fresh login
-      await signOutFromMobile().catch(() => {});
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
 
       setShowSuccessModal(true);
 

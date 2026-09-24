@@ -14,9 +14,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { canAttemptDispatchAcceptance } from '../../lib/dispatch-offer-window';
 import { getMobileApiBaseUrl } from '../../lib/api-base-url';
+import { getDispatchReleaseNotice } from '../../lib/dispatch-release';
 
 export function DispatchSheet() {
-  const { status, activeDispatch, acceptDispatch, completeIncident } = useResponderStore();
+  const { status, activeDispatch, acceptDispatch, releaseDispatchOffer } = useResponderStore();
   const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds ?? 30;
   const serverExpiry = activeDispatch?.offerExpiresAt ? Date.parse(activeDispatch.offerExpiresAt) : NaN;
   const insets = useSafeAreaInsets();
@@ -62,6 +63,7 @@ export function DispatchSheet() {
         headers,
         body: JSON.stringify({ incidentId, action: 'REJECT' }),
       });
+      const payload = await response.json().catch(() => null) as { transferred?: boolean; reassignmentRequired?: boolean; error?: string } | null;
 
       // A 409 means the server has already accepted, expired, or reassigned
       // this offer. In every case this phone must release its stale offer UI.
@@ -70,11 +72,10 @@ export function DispatchSheet() {
           useResponderStore.getState().status === 'dispatch_offered'
           && useResponderStore.getState().activeDispatch?.id === incidentId
         ) {
-          Alert.alert(
-            'Dispatch offer expired',
-            'This offer was released. PACC can assign another available responder if needed.',
-          );
-          completeIncident();
+          releaseDispatchOffer({
+            incidentId,
+            ...getDispatchReleaseNotice(payload || {}),
+          });
         }
         return;
       }
@@ -90,7 +91,7 @@ export function DispatchSheet() {
         if (mountedRef.current) void releaseExpiredOffer(incidentId);
       }, 3_000);
     }
-  }, [completeIncident]);
+  }, [releaseDispatchOffer]);
 
   useEffect(() => {
     acceptingRef.current = false;
@@ -377,11 +378,11 @@ export function DispatchSheet() {
                   if (res.success) {
                     acceptDispatch();
                   } else if (response.status === 409) {
-                    Alert.alert(
-                      'Dispatch offer expired',
-                      'The offer was no longer available, so it has been released for reassignment.',
-                    );
-                    completeIncident();
+                    const disposition = res as { transferred?: boolean; reassignmentRequired?: boolean };
+                    releaseDispatchOffer({
+                      incidentId: activeDispatch?.id || 'unknown',
+                      ...getDispatchReleaseNotice(disposition),
+                    });
                   } else {
                     Alert.alert(
                       "Dispatch not accepted",

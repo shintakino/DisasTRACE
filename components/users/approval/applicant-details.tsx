@@ -20,7 +20,7 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">{applicant.fullName}</h1>
-            <div className="flex items-center gap-4 mt-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
               <div className="flex items-center gap-1.5 text-slate-500 text-sm">
                 <Mail className="w-4 h-4" />
                 {applicant.email}
@@ -35,12 +35,73 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
             {applicant.roleRequested.replace("_", " ").toUpperCase()}
           </Badge>
         </div>
+        <div className="mt-4 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-slate-700">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#1E3A8A]" aria-hidden="true" />
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#1E3A8A]">Submitted residential location</p>
+            <p className="mt-0.5 font-medium leading-relaxed">
+              {applicant.address || "No residential address provided."}
+              {applicant.barangay && !applicant.address.includes(applicant.barangay) ? `, Brgy. ${applicant.barangay}` : ""}
+            </p>
+          </div>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
         <div className="p-8 max-w-4xl mx-auto space-y-8">
-          {/* Identity Verification Section */}
-          <section>
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+            {/* Submitted location and registration details stay visible before the ID preview. */}
+            <div className="space-y-8">
+              <section className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="bg-slate-100 p-1.5 rounded text-slate-600">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <h2 className="text-sm font-bold text-slate-900 tracking-wider">
+                    Residential Address
+                  </h2>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 min-h-[100px] flex flex-col justify-center">
+                  <p className="text-slate-600 leading-relaxed font-medium">
+                    {applicant.address || "No residential address provided."}
+                  </p>
+                  {applicant.barangay && (
+                    <p className="mt-3 border-t border-slate-200 pt-3 text-sm text-slate-500">
+                      <span className="font-semibold text-slate-700">Barangay:</span> {applicant.barangay}
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              <section className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="bg-slate-100 p-1.5 rounded text-slate-600">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <h2 className="text-sm font-bold text-slate-900 tracking-wider">
+                    Registration Timeline
+                  </h2>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 font-medium">Application Date</span>
+                    <span className="font-bold text-slate-700">
+                      {format(new Date(applicant.registeredAt), "MMM d, yyyy")}
+                    </span>
+                  </div>
+                  <div className="h-px bg-slate-200/60 w-full" />
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 font-medium">Submission Time</span>
+                    <span className="font-bold text-[#1E3A8A]">
+                      {format(new Date(applicant.registeredAt), "h:mm a")}
+                    </span>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            {/* Identity Verification Section */}
+            <section>
             <div className="flex items-center gap-2 mb-4">
               <div className="bg-blue-100 p-1.5 rounded text-[#1E3A8A]">
                 <CreditCard className="w-4 h-4" />
@@ -104,50 +165,6 @@ export function ApplicantDetails({ applicant }: ApplicantDetailsProps) {
                 )}
               </div>
             </Card>
-          </section>
-
-          {/* Personal Information & Address */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="bg-slate-100 p-1.5 rounded text-slate-600">
-                  <MapPin className="w-4 h-4" />
-                </div>
-                <h2 className="text-sm font-bold text-slate-900 tracking-wider">
-                  Residential Address
-                </h2>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 min-h-[100px] flex flex-col justify-center">
-                <p className="text-slate-600 leading-relaxed font-medium">
-                  {applicant.address || "No residential address provided."}
-                </p>
-              </div>
-            </section>
-
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="bg-slate-100 p-1.5 rounded text-slate-600">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <h2 className="text-sm font-bold text-slate-900 tracking-wider">
-                  Registration Timeline
-                </h2>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500 font-medium">Application Date</span>
-                  <span className="font-bold text-slate-700">
-                    {format(new Date(applicant.registeredAt), "MMM d, yyyy")}
-                  </span>
-                </div>
-                <div className="h-px bg-slate-200/60 w-full" />
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500 font-medium">Submission Time</span>
-                  <span className="font-bold text-[#1E3A8A]">
-                    {format(new Date(applicant.registeredAt), "h:mm a")}
-                  </span>
-                </div>
-              </div>
             </section>
           </div>
 

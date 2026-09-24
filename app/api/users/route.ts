@@ -8,12 +8,13 @@ import { feedbacks } from "@/db/schema/feedbacks";
 import { reports } from "@/db/schema/reports";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { createClient, createAdminClient } from "@/lib/supabase-server";
 import { getUserRole } from "@/lib/auth";
 import { z } from "zod";
 import crypto from "crypto";
 import { isValidPhilippinePhone, normalizePhilippinePhone } from "@/lib/phone";
+import { isValidAmbulanceUnitId, normalizeAmbulanceUnitId } from "@/lib/ambulance-unit";
 
 const UpdateUserSchema = z.object({
   id: z.string(),
@@ -24,7 +25,44 @@ const UpdateUserSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional(),
   address: z.string().trim().max(500).optional(),
+  unitId: z.string().trim().max(50).optional(),
 });
+
+function isUnitIdConflict(error: unknown): boolean {
+  const inspected = new Set<unknown>();
+  let current: unknown = error;
+
+  while (current && typeof current === 'object' && !inspected.has(current)) {
+    inspected.add(current);
+    const databaseError = current as { code?: unknown; constraint?: unknown; message?: unknown; cause?: unknown };
+    if (
+      databaseError.code === '23505'
+      && (
+        databaseError.constraint === 'users_unit_id_unique'
+        || (typeof databaseError.message === 'string' && databaseError.message.includes('users_unit_id_unique'))
+      )
+    ) {
+      return true;
+    }
+    current = databaseError.cause;
+  }
+
+  return false;
+}
+
+async function removeFailedResponderAccount(adminClient: ReturnType<typeof createAdminClient>, userId: string) {
+  try {
+    await db.delete(users).where(eq(users.id, userId));
+  } catch (cleanupError) {
+    console.error('Failed to remove duplicate responder profile after Unit ID conflict:', cleanupError);
+  }
+
+  try {
+    await adminClient.auth.admin.deleteUser(userId);
+  } catch (cleanupError) {
+    console.error('Failed to remove duplicate responder auth account after Unit ID conflict:', cleanupError);
+  }
+}
 
 export async function GET() {
   try {
@@ -54,6 +92,7 @@ export async function GET() {
       lastActive: u.updatedAt ? "Active recently" : "Never",
       phone: u.phone,
       address: u.address,
+      unitId: u.unitId,
     }));
 
     return NextResponse.json({
@@ -96,6 +135,7 @@ export async function POST(req: NextRequest) {
       address: z.string().optional(),
       responderType: z.enum(["barangay", "cdrrmo_hq"]).optional(),
       barangay: z.string().optional(),
+      unitId: z.string().trim().max(50).optional(),
     });
 
     const result = CreateUserSchema.safeParse(body);
@@ -103,7 +143,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid payload", details: result.error.format() }, { status: 400 });
     }
 
-    const { fullName, email, password, role, phone, address, responderType, barangay } = result.data;
+    const { fullName, email, password, role, phone, address, responderType, barangay, unitId: requestedUnitId } = result.data;
+    const unitId = role === 'ambulance_responder' ? normalizeAmbulanceUnitId(requestedUnitId) : null;
+    if (role === 'ambulance_responder' && (!unitId || !isValidAmbulanceUnitId(unitId))) {
+      return NextResponse.json({ error: "Enter a valid unique Unit ID such as AMB-EG-7EC." }, { status: 400 });
+    }
+    if (unitId) {
+      const existingUnit = await db.query.users.findFirst({ where: eq(users.unitId, unitId), columns: { id: true } });
+      if (existingUnit) return NextResponse.json({ error: "That Unit ID is already assigned to another responder." }, { status: 409 });
+    }
     const adminClient = createAdminClient();
 
     // Create the user in Supabase Auth via the service-role client
@@ -120,6 +168,7 @@ export async function POST(req: NextRequest) {
         role,
         responder_type: responderType,
         barangay,
+        unit_id: unitId,
       }
     });
 
@@ -142,16 +191,26 @@ export async function POST(req: NextRequest) {
       createdUser.verificationStatus = 'APPROVED';
     } else if (createdUser && role === 'ambulance_responder') {
       // Direct approve responders created by admin
-      await db.update(users)
-        .set({ 
-          status: 'ACTIVE', 
-          verificationStatus: 'APPROVED',
-          responderType: responderType || null,
-          barangay: responderType === 'barangay' ? barangay || null : null
-        })
-        .where(eq(users.id, createdUser.id));
+      try {
+        await db.update(users)
+          .set({
+            status: 'ACTIVE',
+            verificationStatus: 'APPROVED',
+            responderType: responderType || null,
+            barangay: responderType === 'barangay' ? barangay || null : null,
+            unitId,
+          })
+          .where(eq(users.id, createdUser.id));
+      } catch (error) {
+        if (isUnitIdConflict(error)) {
+          await removeFailedResponderAccount(adminClient, createdUser.id);
+          return NextResponse.json({ error: "That Unit ID is already assigned to another responder." }, { status: 409 });
+        }
+        throw error;
+      }
       createdUser.status = 'ACTIVE';
       createdUser.verificationStatus = 'APPROVED';
+      createdUser.unitId = unitId;
     }
 
     // Insert audit log
@@ -196,7 +255,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Invalid payload", details: result.error.format() }, { status: 400 });
     }
 
-    const { id, status, role, rejectionReason, fullName, email, phone, address } = result.data;
+    const { id, status, role, rejectionReason, fullName, email, phone, address, unitId: requestedUnitId } = result.data;
     const adminClient = createAdminClient();
 
     const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
@@ -212,6 +271,41 @@ export async function PATCH(req: NextRequest) {
     if (phone !== undefined && !isValidPhilippinePhone(phone)) {
       return NextResponse.json({ error: "Enter a valid Philippine mobile number." }, { status: 400 });
     }
+    const targetRole = role ?? existingUser.role;
+    const isPromotingToResponder = targetRole === 'ambulance_responder' && existingUser.role !== 'ambulance_responder';
+    const isRemovingResponderRole = existingUser.role === 'ambulance_responder' && targetRole !== 'ambulance_responder';
+    const normalizedUnitId = requestedUnitId === undefined ? undefined : normalizeAmbulanceUnitId(requestedUnitId);
+
+    if (isPromotingToResponder && normalizedUnitId === undefined) {
+      return NextResponse.json({ error: "A valid unique Unit ID is required before assigning the responder role." }, { status: 400 });
+    }
+    if (normalizedUnitId !== undefined && targetRole !== 'ambulance_responder') {
+      return NextResponse.json({ error: "Unit IDs can only be assigned to ambulance responders." }, { status: 400 });
+    }
+
+    const unitIdWillChange = normalizedUnitId !== undefined || isRemovingResponderRole;
+    const nextUnitId = isRemovingResponderRole ? null : normalizedUnitId;
+    if (unitIdWillChange) {
+      if (targetRole === 'ambulance_responder' && (!nextUnitId || !isValidAmbulanceUnitId(nextUnitId))) {
+        return NextResponse.json({ error: "Enter a valid Unit ID such as AMB-EG-7EC." }, { status: 400 });
+      }
+      const activeIncident = await db.query.incidents.findFirst({
+        where: and(
+          or(eq(incidents.responderId, id), eq(incidents.currentOfferResponderId, id)),
+          inArray(incidents.status, ['DISPATCHED', 'EN_ROUTE', 'ARRIVED']),
+        ),
+        columns: { id: true },
+      });
+      if (activeIncident) {
+        return NextResponse.json({ error: "This responder has an active dispatch. Finish it before changing the Unit ID." }, { status: 409 });
+      }
+      if (nextUnitId) {
+        const existingUnit = await db.query.users.findFirst({ where: eq(users.unitId, nextUnitId), columns: { id: true } });
+        if (existingUnit && existingUnit.id !== id) {
+          return NextResponse.json({ error: "That Unit ID is already assigned to another responder." }, { status: 409 });
+        }
+      }
+    }
 
     // Perform database update
     const updatePayload: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
@@ -222,14 +316,23 @@ export async function PATCH(req: NextRequest) {
     if (email !== undefined) updatePayload.email = email.toLowerCase();
     if (normalizedPhone !== undefined) updatePayload.phone = normalizedPhone;
     if (address !== undefined) updatePayload.address = address;
+    if (unitIdWillChange) updatePayload.unitId = nextUnitId;
 
-    const [updatedUser] = await db.update(users)
-      .set(updatePayload)
-      .where(eq(users.id, id))
-      .returning();
+    let updatedUser: typeof users.$inferSelect | undefined;
+    try {
+      [updatedUser] = await db.update(users)
+        .set(updatePayload)
+        .where(eq(users.id, id))
+        .returning();
+    } catch (error) {
+      if (isUnitIdConflict(error)) {
+        return NextResponse.json({ error: "That Unit ID is already assigned to another responder." }, { status: 409 });
+      }
+      throw error;
+    }
 
     // Side effect: If role or status changes, sync to Supabase Auth metadata using adminClient
-    if (role || status || fullName !== undefined || email !== undefined || normalizedPhone !== undefined || address !== undefined) {
+    if (role || status || fullName !== undefined || email !== undefined || normalizedPhone !== undefined || address !== undefined || unitIdWillChange) {
       const { data: { user: targetUser } } = await adminClient.auth.admin.getUserById(id);
       if (targetUser) {
         await adminClient.auth.admin.updateUserById(id, {
@@ -239,7 +342,8 @@ export async function PATCH(req: NextRequest) {
             ...targetUser.user_metadata,
             ...(fullName !== undefined ? { full_name: fullName } : {}),
             ...(normalizedPhone !== undefined ? { phone: normalizedPhone } : {}),
-            ...(address !== undefined ? { address } : {}),
+          ...(address !== undefined ? { address } : {}),
+          ...(unitIdWillChange ? { unit_id: nextUnitId } : {}),
           },
         });
       }
@@ -249,7 +353,7 @@ export async function PATCH(req: NextRequest) {
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(),
       userId: user.id,
-      action: `Updated user: ${updatedUser?.fullName || id} (Role: ${role || 'unchanged'}, Status: ${status || 'unchanged'}${fullName !== undefined || email !== undefined || phone !== undefined || address !== undefined ? ', Profile: updated' : ''})`,
+      action: `Updated user: ${updatedUser?.fullName || id} (Role: ${role || 'unchanged'}, Status: ${status || 'unchanged'}${fullName !== undefined || email !== undefined || phone !== undefined || address !== undefined || unitIdWillChange ? ', Profile: updated' : ''})`,
       entityType: "USER",
       entityId: id,
     });

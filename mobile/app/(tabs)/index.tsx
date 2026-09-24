@@ -76,8 +76,8 @@ export default function HomeScreen() {
           // ran. Make the result explicit instead of silently returning Home.
           router.replace('/(tabs)');
           Alert.alert(
-            'Dispatch offer expired',
-            'This offer is no longer available. It was released or reassigned by the dispatch system.',
+            'Dispatch offer released',
+            'You did not accept this report in time. It was released for reassignment to another available responder or PACC.',
           );
         }
         return;
@@ -728,29 +728,23 @@ export default function HomeScreen() {
         </View>
 
         {/* Service Improvement Banner */}
-        <View className="mb-10 overflow-hidden rounded-2xl shadow-sm shadow-red-900/10">
-          <LinearGradient
-            colors={['#B91C1C', '#991B1B']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            className="p-5"
-          >
-            <View className="flex-row items-center justify-between mb-4">
-              <View className="flex-1 pr-4">
-                <Text className="text-white font-bold text-base">Help us improve our service</Text>
-                <Text className="text-white/90 text-xs mt-0.5 leading-snug">
-                  Spotted an issue in your area? Contact us so we can fix it.
-                </Text>
-              </View>
+        <View className="mb-10 rounded-2xl border border-blue-100 bg-[#EAF1FF] p-5">
+          <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-1 pr-4">
+              <Text className="text-[#1E3A8A] font-bold text-base">Help us improve our service</Text>
+              <Text className="text-slate-600 text-xs mt-0.5 leading-snug">
+                Spotted an issue in your area? Contact us so we can fix it.
+              </Text>
             </View>
-            
-            <TouchableOpacity 
-              className="bg-[#1E3A8A] rounded-xl py-2.5 items-center shadow-sm active:bg-blue-900"
-              onPress={() => router.push('/contact-us' as any)}
-            >
-              <Text className="text-white font-bold text-sm">Contact Us</Text>
-            </TouchableOpacity>
-          </LinearGradient>
+          </View>
+          <TouchableOpacity
+            className="border border-[#BFD6FF] bg-[#D8E7FF] rounded-xl py-2.5 items-center active:bg-[#CFE0FF]"
+            onPress={() => router.push('/contact-us' as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Contact DisasTRACE support"
+          >
+            <Text className="text-[#1E3A8A] font-bold text-sm">Contact Us</Text>
+          </TouchableOpacity>
         </View>
       </View>
 

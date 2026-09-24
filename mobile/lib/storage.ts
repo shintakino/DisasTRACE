@@ -63,7 +63,7 @@ export async function optimizeImage(imageUri: string, maxDimension: number = 102
  * @param idType - The selected government ID type, when it changes.
  * @returns The file path in the storage bucket.
  */
-export async function uploadGovernmentID(imageUri: string, idType?: string): Promise<string> {
+export async function uploadGovernmentID(imageUri: string, idType?: string, accessToken?: string): Promise<string> {
   try {
     // 1. Optimize the image on-device before reading
     const optimizedUri = await optimizeImage(imageUri, 1024);
@@ -78,8 +78,9 @@ export async function uploadGovernmentID(imageUri: string, idType?: string): Pro
       throw new Error("ID photo must be no larger than 5MB.");
     }
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) throw new Error('Your account session is not ready. Please sign in and try again.');
+    const currentSession = accessToken ? null : await supabase.auth.getSession();
+    const token = accessToken || currentSession?.data.session?.access_token;
+    if (!token) throw new Error('Your account session is not ready. Please sign in and try again.');
 
     const formData = new FormData();
     formData.append('file', {
@@ -91,7 +92,7 @@ export async function uploadGovernmentID(imageUri: string, idType?: string): Pro
 
     const response = await fetchWithTimeout(`${getMobileApiBaseUrl()}/api/verification/id`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${session.access_token}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       body: formData,
     }, 30_000, 'government ID upload');
     const result = await response.json().catch(() => null);

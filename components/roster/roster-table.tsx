@@ -88,6 +88,13 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
       },
     },
     {
+      accessorKey: "unitId",
+      header: "UNIT ID",
+      cell: ({ row }) => (
+        <div className="font-mono text-sm font-bold text-[#1E3A8A]">{row.original.unitId || "Unassigned"}</div>
+      ),
+    },
+    {
       id: "actions",
       header: "ACTION",
       cell: ({ row }) => {

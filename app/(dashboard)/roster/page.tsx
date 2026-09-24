@@ -31,6 +31,8 @@ export default function RosterPage() {
   const [userToDelete, setUserToDelete] = React.useState<RosterEntry | null>(null)
   const [userToBan, setUserToBan] = React.useState<RosterEntry | null>(null)
   const [banAction, setBanAction] = React.useState<'SUSPENDED' | 'DEACTIVATED'>('SUSPENDED')
+  const [unitIdDraft, setUnitIdDraft] = React.useState('')
+  const [unitIdSaving, setUnitIdSaving] = React.useState(false)
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false)
   const [newResponder, setNewResponder] = React.useState({
@@ -47,7 +49,8 @@ export default function RosterPage() {
     barangay: '',
     street: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    unitId: ''
   })
   const [addError, setAddError] = React.useState('')
 
@@ -113,8 +116,35 @@ export default function RosterPage() {
     const user = data.find((item) => item.id === id)
     if (user) {
       setUserToBan(user)
+      setUnitIdDraft(user.unitId || '')
     }
   }, [data])
+
+  const saveUnitId = async () => {
+    if (!userToBan || !unitIdDraft.trim()) return
+    setUnitIdSaving(true)
+    try {
+      const response = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userToBan.id, unitId: unitIdDraft }),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        toast.error(payload.error || 'Failed to update Unit ID')
+        return
+      }
+      toast.success(`Unit ID updated to ${payload.user?.unitId || unitIdDraft.toUpperCase()}`)
+      await fetchRosterData()
+      setUserToBan((current) => current ? { ...current, unitId: payload.user?.unitId || unitIdDraft.toUpperCase() } : current)
+      setUnitIdDraft(payload.user?.unitId || unitIdDraft.toUpperCase())
+    } catch (error) {
+      console.error('Failed to update Unit ID:', error)
+      toast.error('A network error occurred while updating the Unit ID.')
+    } finally {
+      setUnitIdSaving(false)
+    }
+  }
 
   const confirmDelete = async () => {
     if (!userToDelete) return
@@ -171,7 +201,7 @@ export default function RosterPage() {
     setAddError('')
     
     const isBarangay = newResponder.responderType === 'barangay';
-    if (!newResponder.firstName || !newResponder.surname || !newResponder.gender || !newResponder.email || !newResponder.mobileNumber || (isBarangay && !newResponder.barangay) || !newResponder.street || !newResponder.password) {
+    if (!newResponder.firstName || !newResponder.surname || !newResponder.gender || !newResponder.email || !newResponder.mobileNumber || !newResponder.unitId || (isBarangay && !newResponder.barangay) || !newResponder.street || !newResponder.password) {
       setAddError("Please fill in all required fields.")
       return
     }
@@ -199,6 +229,7 @@ export default function RosterPage() {
           address: fullAddress,
           responderType: newResponder.responderType,
           barangay: isBarangay ? newResponder.barangay : undefined,
+          unitId: newResponder.unitId,
         }),
       })
 
@@ -210,7 +241,7 @@ export default function RosterPage() {
           firstName: '', middleName: '', surname: '', suffixName: '', gender: '',
           email: '', mobileNumber: '', province: 'Bulacan', city: 'Baliwag City',
           responderType: 'cdrrmo_hq',
-          barangay: '', street: '', password: '', confirmPassword: ''
+          barangay: '', street: '', password: '', confirmPassword: '', unitId: ''
         })
       } else {
         const err = await response.json()
@@ -332,6 +363,24 @@ export default function RosterPage() {
               <p>You are about to modify {userToBan?.fullName}.</p>
             </div>
             
+            <div className="w-full text-left">
+              <p className="text-[#1E3A8A] font-bold text-xs mb-2 uppercase tracking-widest">Ambulance Unit ID</p>
+              <div className="flex gap-2">
+                <Input
+                  aria-label="Ambulance Unit ID"
+                  value={unitIdDraft}
+                  onChange={(event) => setUnitIdDraft(event.target.value.toUpperCase())}
+                  placeholder="AMB-EG-7EC"
+                  className="h-11 flex-1 border-slate-200 bg-white font-mono"
+                  disabled={unitIdSaving}
+                />
+                <Button type="button" onClick={() => void saveUnitId()} disabled={unitIdSaving || !unitIdDraft.trim()} className="bg-[#1E3A8A] text-white hover:bg-[#172F6E]">
+                  {unitIdSaving ? 'Saving…' : 'Save ID'}
+                </Button>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Unit IDs are unique. Active dispatches must finish before reassignment.</p>
+            </div>
+
             <div className="w-full text-left">
               <p className="text-[#1E3A8A] font-bold text-xs mb-2 uppercase tracking-widest">Action</p>
               <div className="grid grid-cols-2 gap-3">
@@ -501,6 +550,17 @@ export default function RosterPage() {
                         <SelectItem value="barangay" className="cursor-pointer rounded-lg mx-1 my-0.5">Barangay</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Ambulance Unit ID <span className="text-red-500">*</span></label>
+                    <Input
+                      required
+                      placeholder="e.g. AMB-EG-7EC"
+                      value={newResponder.unitId}
+                      onChange={(e) => setNewResponder({ ...newResponder, unitId: e.target.value.toUpperCase() })}
+                      className="h-12 rounded-xl border-slate-200 bg-slate-50 font-mono focus-visible:ring-[#2B4C9B] focus-visible:bg-white transition-colors px-4"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-500">Unique operational identifier; it cannot be changed during an active dispatch.</p>
                   </div>
                   {newResponder.responderType === 'barangay' && (
                     <div>

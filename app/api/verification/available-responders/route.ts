@@ -62,6 +62,7 @@ export async function GET() {
         lat: r.lastLatitude,
         lng: r.lastLongitude,
         responderType: r.responderType,
+        unitId: r.unitId,
       };
     });
 

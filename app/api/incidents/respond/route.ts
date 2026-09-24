@@ -12,11 +12,29 @@ import {
   canResponderAcceptDispatchOffer,
   DISPATCH_ACCEPTANCE_GRACE_MS,
 } from "@/lib/dispatch-policy";
+import { legacyAmbulanceUnitId } from '@/lib/ambulance-unit';
 
 const RespondSchema = z.object({
   incidentId: z.string().min(1, "Incident ID is required"),
   action: z.enum(['ACCEPT', 'REJECT']),
 });
+
+async function getOfferDisposition(incidentId: string, responderId: string) {
+  const latest = await db.query.incidents.findFirst({
+    where: eq(incidents.id, incidentId),
+    columns: { status: true, responderId: true, currentOfferResponderId: true },
+  });
+  const transferred = Boolean(
+    latest && (
+      (latest.responderId && latest.responderId !== responderId)
+      || (latest.currentOfferResponderId && latest.currentOfferResponderId !== responderId)
+    ),
+  );
+  return {
+    transferred,
+    reassignmentRequired: latest?.status === 'DISPATCHED' && !latest.responderId && !latest.currentOfferResponderId,
+  };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,7 +76,10 @@ export async function POST(req: NextRequest) {
     // valid after expiry so the foreground client can release immediately;
     // ACCEPT is intentionally stricter and must beat the server deadline.
     if (!canCascadeDispatchOffer(incident, user.id)) {
-      return NextResponse.json({ error: "Conflict: This offer is no longer valid or belongs to another responder" }, { status: 409 });
+      return NextResponse.json({
+        error: "Conflict: This offer is no longer valid or belongs to another responder",
+        ...(await getOfferDisposition(incidentId, user.id)),
+      }, { status: 409 });
     }
 
     if (action === 'ACCEPT') {
@@ -66,19 +87,11 @@ export async function POST(req: NextRequest) {
         // Trigger recovery now rather than waiting for the next scheduler tick.
         await checkAndCascadeExpiredOffers();
         return NextResponse.json(
-          { error: "Conflict: This offer has expired or was reassigned" },
+          { error: "Conflict: This offer has expired or was reassigned", ...(await getOfferDisposition(incidentId, user.id)) },
           { status: 409 },
         );
       }
-      // Generate deterministic vehicle ID based on initials and unique UUID suffix (Option 1)
-      const initials = dbUser.fullName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 3);
-      const suffix = dbUser.id.slice(-3).toUpperCase();
-      const vehicleId = `AMB-${initials || "001"}-${suffix}`;
+      const vehicleId = dbUser.unitId || legacyAmbulanceUnitId(dbUser.fullName, dbUser.id);
 
       // Claim the offer before the optional ETA calculation. The conditional
       // update remains the authority for expiry, but no database work unrelated
@@ -116,7 +129,7 @@ export async function POST(req: NextRequest) {
 
       if (!updatedIncident) {
         return NextResponse.json(
-          { error: "Conflict: This offer was already accepted, expired, or reassigned" },
+          { error: "Conflict: This offer was already accepted, expired, or reassigned", ...(await getOfferDisposition(incidentId, user.id)) },
           { status: 409 },
         );
       }
@@ -196,10 +209,16 @@ export async function POST(req: NextRequest) {
       console.log(`Responder ${dbUser.fullName} declined incident offer ${incidentId}. Cascading/reverting immediately...`);
       
       await cascadeIncident(incidentId, user.id);
+      const disposition = await getOfferDisposition(incidentId, user.id);
 
       return NextResponse.json({
         success: true,
-        message: "Dispatch offer declined and cascaded/reverted.",
+        ...disposition,
+        message: disposition.transferred
+          ? "Dispatch offer declined and transferred to another responder."
+          : disposition.reassignmentRequired
+            ? "Dispatch offer declined. PACC reassignment is required."
+            : "Dispatch offer declined and released.",
       });
     }
   } catch (error) {

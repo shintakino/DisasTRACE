@@ -11,6 +11,7 @@ export const RosterEntrySchema = z.object({
   status: RosterStatusSchema,
   responderType: z.enum(["barangay", "cdrrmo_hq"]).nullable().optional(),
   barangay: z.string().nullable().optional(),
+  unitId: z.string().nullable().optional(),
 });
 export type RosterEntry = z.infer<typeof RosterEntrySchema>;
 

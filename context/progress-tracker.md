@@ -1,5 +1,49 @@
 # Progress Tracker
 
+## 2026-09-24 - Responder Unit ID and transfer-feedback review repairs
+
+- Closed the Unit ID role-transition gap: the protected user API now requires a valid unique Unit ID before an account can become an ambulance responder, clears the identifier when an account leaves that role, and blocks either transition while the responder owns a pending or active dispatch.
+- Added database-constraint conflict handling for Unit ID creation and updates. A concurrent duplicate now returns a clear `409`; if a responder account had just been created in Supabase Auth, its empty profile and Auth record are removed rather than leaving an unusable orphan account.
+- Replaced the short-lived reassignment alert with a persistent responder release screen. It uses server-confirmed transfer/PACC disposition, remains visible until acknowledged, is cleared on account reset, and yields immediately to a newly received dispatch offer.
+- Applied canonical migration `0031_cooing_smasher.sql` to the configured database. The Drizzle ledger now contains all 32 local journal migrations, and the schema audit confirms the `users.unit_id` column and `users_unit_id_unique` partial index are present.
+- Added a read-only responder Unit ID data verification script. It checked the four configured responder profiles without printing personal data; all have valid Unit IDs and the production partial unique index has the intended predicate.
+
+## 2026-09-24 - Responder transfer feedback and managed ambulance identity
+
+- Added server-confirmed dispatch-offer disposition data. When an offer expires, is rejected after reassignment, or is accepted too late, the original responder is told whether the report was transferred to another responder or returned to PACC for reassignment; the floating mobile dispatch sheet and expiry notification use the same operational wording.
+- Added a normalized, partially unique `users.unit_id` with a migration that backfills legacy responder records. Super Admin roster creation and management now require a valid unique ambulance Unit ID, while active-dispatch responders cannot have their identifier changed.
+- Propagated the assigned Unit ID through automatic/manual dispatch, responder maps, public tracking, responder profile/home, and dispatch roster views. Documentation forms display the assigned unit as read-only so responders cannot create a conflicting operational identity; incident records continue to retain their historical assigned-unit snapshot.
+- Added `scripts/verify-responder-transfer-and-unit-id.ts` to guard the transfer disposition, uniqueness, active-dispatch lock, and cross-surface Unit ID contracts.
+
+## 2026-09-24 - Public mobile UI refinements
+
+- Made empty chatbot response, location, submission, and composer actions visibly disabled as well as non-clickable, preventing a blank response from looking ready to send.
+- Added a direct **Change incident category** action during an in-progress report. It keeps the existing evidence, contact, GPS, count, and condition details while reopening only the category choice.
+- Replaced registration's free-text suffix with a controlled picker, removed misleading required markers from system-prefilled Province and City/Municipality labels, and restyled the Home support card as a light-blue information treatment.
+- Expanded the public map legend for incident clusters, configured/selected hospitals, and live location, and made the lower profile panel flush with the map instead of a floating rounded card.
+- Added `scripts/verify-mobile-public-ui-refinements.ts` to guard these interaction and visual contracts.
+
+## 2026-09-24 - Public mobile location, offline reports, and chatbot guardrails
+
+- Hardened first-launch resident location resolution with a trusted last-known position, bounded fresh GPS retries, read timeouts, and mock-location rejection. A cold GPS fix no longer requires restarting the app before Baliwag location can appear.
+- Added an authenticated resident My Reports cache on the device. It stores only bounded, redacted report summaries keyed by user ID and keeps the previous list visible with a last-synced indicator when the API is unavailable.
+- Updated chatbot evidence capture so every camera result is reviewed in place with a direct **Retake photo** or **Use this photo** choice before the evidence is attached. Added a visible **Review and correct previous answers** shortcut and disabled empty required controls, including location and final submission actions.
+- Added `scripts/verify-mobile-public-reliability.ts`; focused reliability checks, mobile strict TypeScript, and mobile ESLint pass.
+- Cleared unconfirmed camera evidence whenever a report draft is discarded, a new draft begins, or the reporting actor changes. A prior account or cancelled report therefore cannot attach its temporary photo to a later report.
+
+## 2026-09-24 - Public registration, recovery, and editable-intake repair
+
+- Password reset now establishes the session from the actual Supabase recovery link (hash tokens or PKCE code) before updating the password. It no longer trusts a pre-existing mobile session that could belong to another account, and it performs only a local sign-out after a successful reset.
+- Registration now supplies the fresh sign-up access token directly to the authenticated government-ID upload route, eliminating the Android SecureStore persistence race that displayed “Your account session is not ready” after an otherwise successful account creation. Applications without an uploaded ID no longer enter CDRRMO’s actionable review queue; successful automatic-confirmation registrations proceed to the review confirmation, while email-confirmation registrations accurately ask the user to confirm, sign in, and upload the required ID first.
+- Retired the reachable legacy resident intake transition from photo preview to the state-resetting form/details flow. It now starts the supported chatbot intake with the captured evidence preserved, where each report item has a dedicated Review → Edit action before submission.
+- Registration input focus now measures and scrolls the outer Android form container, keeping personal, contact, street, and password fields above the software keyboard. Added focused regression coverage for recovery links, fresh-token ID upload, editable intake routing, keyboard focus handling, and reviewable-document gating.
+
+## 2026-09-24 - Super Admin approval-location and filter-continuity repair
+
+- The CDRRMO approval API now includes both the stored residential address and barangay in its applicant contract. The approval workspace presents that submitted location in the applicant summary and again in its review details before the government-ID evidence, so an operator can verify the declared location without scrolling past a large document preview.
+- Audit Logs, Status & Logs, and Reports now debounce free-text search (350 ms), preserve the current results while a later query is running, discard stale query responses, and show an inline updating state rather than replacing the screen with a preloader. Role and date filters remain immediate; Reports no longer refetches its server data merely because its client-side date filters change.
+- Added a focused dashboard approval/filter continuity regression check. Root strict TypeScript, ESLint, and whitespace checks pass.
+
 ## 2026-09-24 - Responder false hospital-arrival prevention
 
 - Corrected a nullable-ID comparison in responder GPS tracking that could classify an on-duty responder with no dispatch as having arrived at a hospital (`null === null`). Automatic hospital-arrival UI now requires a real matching server incident ID, active `to_hospital` state, matching local dispatch, and an eligible selected destination. The same guarded policy is used for initial and continuing GPS uploads, with regression coverage for the no-dispatch response that caused the global documentation sheet and invalid form alert.

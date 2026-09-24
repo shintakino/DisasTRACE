@@ -219,7 +219,7 @@ export default function ProfileScreen() {
   const displayName = profile?.fullName || (isResponder ? 'Renzy Bastes' : 'Eloisa Guibani');
   const vehicleInitials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
   const suffix = user?.id ? user.id.slice(-3).toUpperCase() : "";
-  const vehicleId = `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
+  const vehicleId = profile?.unitId || `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
   const registeredLocation = formatBaliwagLocation(profile?.barangay) || 'Location unavailable';
 
   const renderPillRow = (Icon: any, title: string, subtitle: string, onPress?: () => void) => (

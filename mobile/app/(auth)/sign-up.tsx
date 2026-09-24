@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Modal, KeyboardAvoidingView, Platform, UIManager, findNodeHandle } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +21,7 @@ export default function SignUpScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isAutoConfirmed, setIsAutoConfirmed] = useState(false);
+  const registrationScrollRef = useRef<ScrollView>(null);
   const { reset, updateData } = useSignUpStore();
 
   useEffect(() => {
@@ -121,7 +122,9 @@ export default function SignUpScreen() {
           // in, the pending-verification screen collects the ID securely.
           setIsAutoConfirmed(false);
         } else {
-            await withTimeout(uploadGovernmentID(currentData.idCardUri, currentData.idCardType), 30_000, 'government ID upload');
+            // Use the just-issued token directly. Android SecureStore may not
+            // have persisted getSession() yet even though sign-up succeeded.
+            await withTimeout(uploadGovernmentID(currentData.idCardUri, currentData.idCardType, signUpData.session.access_token), 30_000, 'government ID upload');
         }
       }
 
@@ -141,6 +144,17 @@ export default function SignUpScreen() {
   };
 
   const progressPercentage = (currentStep / 4) * 100;
+
+  const keepFocusedInputVisible = (target: number) => {
+    const scrollNode = findNodeHandle(registrationScrollRef.current);
+    if (!scrollNode) return;
+    UIManager.measureLayout(
+      target,
+      scrollNode,
+      () => undefined,
+      (_x, y) => registrationScrollRef.current?.scrollTo({ y: Math.max(0, y - 48), animated: true }),
+    );
+  };
 
   return (
     <KeyboardAvoidingView 
@@ -183,6 +197,7 @@ export default function SignUpScreen() {
         </View>
 
         <ScrollView
+          ref={registrationScrollRef}
           className="flex-1 px-6 py-6"
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 280 }}
           showsVerticalScrollIndicator={false}
@@ -215,10 +230,10 @@ export default function SignUpScreen() {
           )}
 
           <View className="bg-white rounded-t-3xl mt-4 px-6 pt-8 pb-20">
-            {currentStep === 1 && <Step1 onNext={() => setCurrentStep(2)} />}
-            {currentStep === 2 && <Step2 onNext={() => setCurrentStep(3)} onBack={() => setCurrentStep(1)} />}
+            {currentStep === 1 && <Step1 onNext={() => setCurrentStep(2)} onInputFocus={keepFocusedInputVisible} />}
+            {currentStep === 2 && <Step2 onNext={() => setCurrentStep(3)} onBack={() => setCurrentStep(1)} onInputFocus={keepFocusedInputVisible} />}
             {currentStep === 3 && <Step3 onNext={() => setCurrentStep(4)} onBack={() => setCurrentStep(2)} />}
-            {currentStep === 4 && <Step4 onRegister={handleRegister} onBack={() => setCurrentStep(3)} isLoading={loading} />}
+            {currentStep === 4 && <Step4 onRegister={handleRegister} onBack={() => setCurrentStep(3)} isLoading={loading} onInputFocus={keepFocusedInputVisible} />}
           </View>
         </ScrollView>
 

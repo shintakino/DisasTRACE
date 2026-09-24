@@ -658,6 +658,7 @@ export function IncidentReportForm() {
           onClose={() => setActivePcrPatientIndex(null)}
           patientIndex={activePcrPatientIndex}
           data={patients[activePcrPatientIndex]?.pcrDetails}
+          respondingUnit={activeDispatch?.assignedAmbulance || profile?.unitId || null}
           onSave={handleSavePcr}
         />
       )}

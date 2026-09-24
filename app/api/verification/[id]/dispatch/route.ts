@@ -15,6 +15,7 @@ import {
 import { createClient } from '@/lib/supabase-server';
 import { auditLogs } from '@/db/schema/audit_logs';
 import { createAuditActor, createAuditEvent, PACC_AUDIT_ACTIONS } from '@/lib/audit-events';
+import { legacyAmbulanceUnitId } from '@/lib/ambulance-unit';
 
 const ManualDispatchSchema = z.object({
   responderId: z.string().trim().min(1).max(255),
@@ -137,13 +138,7 @@ export async function POST(
         return failure(409, 'RESPONDER_UNAVAILABLE', 'Selected responder is no longer available. Refresh the responder list.');
       }
 
-      const initials = responder.fullName
-        .split(' ')
-        .map((name) => name[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 3);
-      const vehicleId = `AMB-${initials || '001'}-${responder.id.slice(-3).toUpperCase()}`;
+      const vehicleId = responder.unitId || legacyAmbulanceUnitId(responder.fullName, responder.id);
       const offerExpiresAt = new Date(now.getTime() + offerDuration * 1000);
 
       const [incident] = existingIncident

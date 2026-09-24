@@ -5,6 +5,7 @@ import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
 import { sendDispatchOfferExpiredPush, sendDispatchOfferPush } from "@/lib/push-notifications";
+import { legacyAmbulanceUnitId } from "@/lib/ambulance-unit";
 import { eq, and, or, sql, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import {
   AUTO_DISPATCH_RADIUS_KM,
@@ -17,7 +18,7 @@ import {
 
 type EligibleResponderBase = Pick<
   typeof users.$inferSelect,
-  'id' | 'fullName' | 'email' | 'role' | 'status' | 'dutyStatus' | 'lastLatitude' | 'lastLongitude'
+  'id' | 'fullName' | 'email' | 'role' | 'status' | 'dutyStatus' | 'lastLatitude' | 'lastLongitude' | 'unitId'
 >;
 type EligibleResponder = EligibleResponderBase | (EligibleResponderBase & { distanceMeters: number });
 
@@ -133,6 +134,7 @@ export async function autoDispatchIncident(
           dutyStatus: users.dutyStatus,
           lastLatitude: users.lastLatitude,
           lastLongitude: users.lastLongitude,
+          unitId: users.unitId,
           distanceMeters: sql<number>`ST_Distance(
             ${users.locationGeom}::geography,
             ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography
@@ -252,15 +254,7 @@ export async function autoDispatchIncident(
         // Successfully reserved this responder atomically — proceed with dispatch
         const offerExpiresAt = new Date(Date.now() + offerDuration * 1000);
 
-        // Generate deterministic vehicle ID
-        const initials = candidate.fullName
-          .split(" ")
-          .map((n: string) => n[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 3);
-        const suffix = candidate.id.slice(-3).toUpperCase();
-        const vehicleId = `AMB-${initials || "001"}-${suffix}`;
+        const vehicleId = candidate.unitId || legacyAmbulanceUnitId(candidate.fullName, candidate.id);
 
         // Create the incident record with the dispatch offer
         const [newIncident] = await tx.insert(incidents).values({
@@ -510,6 +504,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
           dutyStatus: users.dutyStatus,
           lastLatitude: users.lastLatitude,
           lastLongitude: users.lastLongitude,
+          unitId: users.unitId,
           distanceMeters: sql<number>`ST_Distance(
             ${users.locationGeom}::geography,
             ST_SetSRID(ST_MakePoint(${reqLng}, ${reqLat}), 4326)::geography

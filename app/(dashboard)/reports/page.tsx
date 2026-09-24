@@ -19,13 +19,16 @@ export default function ReportsPage() {
   const [category, setCategory] = React.useState<"user" | "responder">("responder");
   const [reporterSource, setReporterSource] = React.useState<"all" | "registered" | "guest">("all");
   const [data, setData] = React.useState<ReportEntry[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [isInitialLoading, setIsInitialLoading] = React.useState(true);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [filters, setFilters] = React.useState<ReportFilter>({});
   const [selectedReportId, setSelectedReportId] = React.useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<string>("all");
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
   const [isExporting, setIsExporting] = React.useState(false);
+  const hasLoadedRef = React.useRef(false);
+  const latestRequestRef = React.useRef(0);
 
   const handleFilterChange = React.useCallback((newFilters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => {
     setFilters((prev) => {
@@ -50,7 +53,14 @@ export default function ReportsPage() {
   };
 
   const fetchReports = React.useCallback(async () => {
-    setLoading(true);
+    const requestId = ++latestRequestRef.current;
+    const isInitialLoad = !hasLoadedRef.current;
+    if (isInitialLoad) {
+      setIsInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+
     try {
       const params = new URLSearchParams();
       params.append("category", category);
@@ -62,15 +72,23 @@ export default function ReportsPage() {
       if (filters.status) params.append("status", filters.status);
 
       const res = await fetch(`/api/reports?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch reports");
       const json = await res.json();
-      setData(json.data || []);
+      if (!Array.isArray(json.data)) throw new Error("Invalid reports response");
+      if (requestId === latestRequestRef.current) {
+        setData(json.data);
+      }
     } catch (error) {
       console.error("Failed to fetch reports:", error);
       toast.error("Failed to load reports. Please try again.");
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestRef.current) {
+        hasLoadedRef.current = true;
+        setIsInitialLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [filters, category, reporterSource, role]);
+  }, [filters.search, filters.status, filters.type, category, reporterSource, role]);
 
   React.useEffect(() => {
     fetchReports();
@@ -247,14 +265,21 @@ export default function ReportsPage() {
       )}
 
       <div className="flex flex-col rounded-xl shadow-xl border border-slate-200/80 overflow-hidden bg-white">
-        <ReportsHeader
-          onFilterChange={handleFilterChange}
-          onExport={handleExportPDF}
-          isExporting={isExporting}
-          category={category}
-          filteredCount={filteredData.length}
-          totalCount={data.length}
-        />
+        <div className="relative">
+          <ReportsHeader
+            onFilterChange={handleFilterChange}
+            onExport={handleExportPDF}
+            isExporting={isExporting}
+            category={category}
+            filteredCount={filteredData.length}
+            totalCount={data.length}
+          />
+          {isRefreshing && (
+            <p className="absolute bottom-2 right-6 text-[11px] font-medium text-blue-200" role="status">
+              Updating results…
+            </p>
+          )}
+        </div>
         
         <div className="px-6 py-4 border-b border-slate-100 bg-white">
           <div className="flex overflow-x-auto no-scrollbar bg-slate-100/80 rounded-xl p-1 gap-1">
@@ -289,7 +314,7 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {loading ? (
+        {isInitialLoading ? (
           <div className="p-8">
             <WebPreloader title="Loading Reports Management..." subtitle="Retrieving historical post-incident reports and citizen submissions" />
           </div>

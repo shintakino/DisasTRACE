@@ -170,10 +170,11 @@ interface PatientCareModalProps {
   onClose: () => void;
   patientIndex: number;
   data: any;
+  respondingUnit?: string | null;
   onSave: (pcrData: any) => void;
 }
 
-export function PatientCareModal({ visible, onClose, patientIndex, data, onSave }: PatientCareModalProps) {
+export function PatientCareModal({ visible, onClose, patientIndex, data, respondingUnit, onSave }: PatientCareModalProps) {
   const [patientName, setPatientName] = useState(data?.patientName || '');
   const [patientAddress, setPatientAddress] = useState(data?.patientAddress || '');
   const [patientContact, setPatientContact] = useState(data?.patientContact || '');
@@ -196,14 +197,16 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
 
   const [dispatchInfo, setDispatchInfo] = useState(() => {
     const today = getTodayDateString();
+    const assignedUnit = respondingUnit || data?.dispatchInfo?.unit || '';
     if (data?.dispatchInfo) {
       return {
         ...data.dispatchInfo,
-        date: data.dispatchInfo.date || today
+        date: data.dispatchInfo.date || today,
+        unit: assignedUnit,
       };
     }
     return {
-      hqDprtTime: '', hqArrTime: '', sceneDprtTime: '', sceneArrTime: '', hospitalDprtTime: '', hospitalArrTime: '', date: today, unit: ''
+      hqDprtTime: '', hqArrTime: '', sceneDprtTime: '', sceneArrTime: '', hospitalDprtTime: '', hospitalArrTime: '', date: today, unit: assignedUnit
     };
   });
 
@@ -414,7 +417,7 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
               </View>
               <View className="flex-1">
                 <Text className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">Responding Unit</Text>
-                <TextInput value={dispatchInfo.unit} onChangeText={(val) => setDispatchInfo({...dispatchInfo, unit: val})} placeholder="AMB-001" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 font-medium text-xs" />
+                <TextInput value={dispatchInfo.unit} editable={false} placeholder="Assigned by dispatch" className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-100 text-slate-500 font-medium text-xs" />
               </View>
             </View>
             <View className="flex-row space-x-3">

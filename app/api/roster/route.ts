@@ -28,6 +28,7 @@ export async function GET() {
         status: users.status,
         responderType: users.responderType,
         barangay: users.barangay,
+        unitId: users.unitId,
       })
       .from(users)
       .where(eq(users.role, "ambulance_responder"));
@@ -49,6 +50,7 @@ export async function GET() {
         status: mappedStatus,
         responderType: r.responderType,
         barangay: r.barangay,
+        unitId: r.unitId,
       };
     });
 

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { IncidentType, ReportFilter, DatePreset } from "@/types/reports";
 import { cn } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 interface ReportsHeaderProps {
   onFilterChange: (filters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => void;
@@ -41,6 +42,8 @@ export function ReportsHeader({
   const [datePreset, setDatePreset] = React.useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
+  const debouncedSearch = useDebouncedValue(search, 350);
+  const lastPublishedSearch = React.useRef(search);
 
   const dateRange = (from = dateFrom, to = dateTo) => from || to ? {
     from: from ? new Date(`${from}T00:00:00`) : undefined,
@@ -49,14 +52,19 @@ export function ReportsHeader({
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
+  };
+
+  React.useEffect(() => {
+    if (debouncedSearch === lastPublishedSearch.current) return;
+    lastPublishedSearch.current = debouncedSearch;
     onFilterChange((prev: ReportFilter) => ({
       ...prev,
-      search: val || undefined,
+      search: debouncedSearch || undefined,
       type: type === "all" ? undefined : type,
       datePreset: datePreset === "all" ? undefined : datePreset,
       dateRange: dateRange(),
     }));
-  };
+  }, [debouncedSearch]);
 
   const handleTypeChange = (val: string | null) => {
     const newType = (val || "all") as IncidentType | "all";

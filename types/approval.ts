@@ -17,6 +17,7 @@ export const ApplicantSchema = z.object({
   email: z.string().email(),
   phone: z.string(),
   address: z.string(),
+  barangay: z.string(),
   roleRequested: UserRoleSchema,
   status: ApprovalStatusSchema,
   identityDocument: IdentityDocumentSchema,

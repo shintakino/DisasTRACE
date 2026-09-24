@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { View, Text, StatusBar, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StatusBar, TouchableOpacity, Alert, Modal } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Play, Pause, LogOut } from 'lucide-react-native';
@@ -29,6 +29,7 @@ import { ensureResponderEmergencyAlertChannels, getResponderEmergencyAlert } fro
 import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 import { getMobileApiBaseUrl } from '../../lib/api-base-url';
+import { getDispatchReleaseNotice } from '../../lib/dispatch-release';
 import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
 import {
   getAutomaticHospitalRecommendation,
@@ -62,7 +63,16 @@ interface ActiveDispatchOwnership {
 export function ResponderHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { status, activeDispatch, targetHospital, setTargetHospital, drafts } = useResponderStore();
+  const {
+    status,
+    activeDispatch,
+    targetHospital,
+    setTargetHospital,
+    drafts,
+    dispatchReleaseNotice,
+    releaseDispatchOffer,
+    dismissDispatchReleaseNotice,
+  } = useResponderStore();
   const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
   const { profile, user, role } = useAuthStatus();
   const { isOnline } = useOfflineReports();
@@ -149,7 +159,16 @@ export function ResponderHome() {
   const name = profile?.fullName || 'Renzy Bastes';
   const vehicleInitials = name.trim().split(/\s+/).map(n => n ? n[0] : '').join('').toUpperCase().slice(0, 3);
   const suffix = user?.id ? user.id.slice(-3).toUpperCase() : "";
-  const myVehicleId = `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
+  const myVehicleId = profile?.unitId || `AMB-${vehicleInitials || '001'}${suffix ? `-${suffix}` : ""}`;
+
+  // A new live offer takes precedence over a prior release acknowledgement.
+  // This prevents a status modal from obscuring an emergency that arrived just
+  // after the responder became available again.
+  useEffect(() => {
+    if (status === 'dispatch_offered' && dispatchReleaseNotice) {
+      dismissDispatchReleaseNotice();
+    }
+  }, [dispatchReleaseNotice, dismissDispatchReleaseNotice, status]);
 
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number]>([120.895, 14.945]);
@@ -702,11 +721,18 @@ export function ResponderHome() {
         return;
       }
       if (!stillOwned && mounted && useResponderStore.getState().activeDispatch?.id === incidentId) {
-        useResponderStore.getState().completeIncident();
-        Alert.alert(
-          'Dispatch reassigned',
-          'This response is no longer assigned to you. Your active dispatch has been cleared.',
-        );
+        releaseDispatchOffer({
+          incidentId,
+          ...getDispatchReleaseNotice({
+            transferred: Boolean(
+              (incident?.responder_id && incident.responder_id !== user.id)
+              || (incident?.current_offer_responder_id && incident.current_offer_responder_id !== user.id),
+            ),
+            reassignmentRequired: incident?.status === 'DISPATCHED'
+              && !incident?.responder_id
+              && !incident?.current_offer_responder_id,
+          }),
+        });
       }
     };
 
@@ -744,7 +770,7 @@ export function ResponderHome() {
       mounted = false;
       supabase.removeChannel(channel);
     };
-  }, [activeDispatch?.id, status, user?.id]);
+  }, [activeDispatch?.id, releaseDispatchOffer, status, user?.id]);
 
   useEffect(() => {
     const fetchHospitals = async () => {
@@ -1501,6 +1527,39 @@ export function ResponderHome() {
         )}
 
       </View>
+
+      <Modal
+        visible={Boolean(dispatchReleaseNotice)}
+        transparent
+        animationType="fade"
+        onRequestClose={dismissDispatchReleaseNotice}
+      >
+        <View className="flex-1 items-center justify-center bg-slate-950/60 px-6">
+          <View className="w-full max-w-[380px] overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <View className="items-center bg-[#1E3A8A] px-6 pb-6 pt-8">
+              <View className="mb-4 h-16 w-16 items-center justify-center rounded-2xl bg-white/15">
+                <Truck color="white" size={32} />
+              </View>
+              <Text className="text-center text-xl font-black text-white">{dispatchReleaseNotice?.title}</Text>
+            </View>
+            <View className="px-6 pb-6 pt-5">
+              <Text className="text-center text-sm leading-6 text-slate-600">
+                {dispatchReleaseNotice?.message}
+              </Text>
+              <Text className="mt-3 text-center text-xs font-semibold text-slate-400">
+                You are available for the next dispatch.
+              </Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={dismissDispatchReleaseNotice}
+                className="mt-6 items-center rounded-2xl bg-[#1E3A8A] px-5 py-4"
+              >
+                <Text className="text-sm font-black text-white">Back to Dashboard</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Sheets */}
       <DispatchSheet />

@@ -13,9 +13,10 @@ interface Props {
   onRegister: () => void;
   onBack: () => void;
   isLoading: boolean;
+  onInputFocus?: (target: number) => void;
 }
 
-export default function Step4({ onRegister, onBack, isLoading }: Props) {
+export default function Step4({ onRegister, onBack, isLoading, onInputFocus }: Props) {
   const { updateData } = useSignUpStore();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -76,6 +77,7 @@ export default function Step4({ onRegister, onBack, isLoading }: Props) {
               placeholder="At least 8 characters" onBlur={onBlur} onChangeText={onChange} value={value}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              onFocus={(event) => onInputFocus?.(event.nativeEvent.target)}
             />
           )} />
           <TouchableOpacity 
@@ -98,6 +100,7 @@ export default function Step4({ onRegister, onBack, isLoading }: Props) {
               placeholder="Re-enter password" onBlur={onBlur} onChangeText={onChange} value={value}
               secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
+              onFocus={(event) => onInputFocus?.(event.nativeEvent.target)}
             />
           )} />
           <TouchableOpacity 

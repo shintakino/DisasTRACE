@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { AuditFilter } from "@/types/audit";
 import { cn } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 interface AuditHeaderProps {
   onFilterChange: (filters: AuditFilter) => void;
@@ -28,6 +29,8 @@ export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
   const [role, setRole] = React.useState<string>("all");
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
+  const debouncedSearch = useDebouncedValue(search, 350);
+  const lastPublishedSearch = React.useRef(search);
 
   const publishFilters = (next: { search?: string; role?: string; from?: string; to?: string }) => {
     const start = next.from ?? from;
@@ -44,8 +47,13 @@ export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
-    publishFilters({ search: val });
   };
+
+  React.useEffect(() => {
+    if (debouncedSearch === lastPublishedSearch.current) return;
+    lastPublishedSearch.current = debouncedSearch;
+    publishFilters({ search: debouncedSearch });
+  }, [debouncedSearch]);
 
   const handleRoleChange = (val: string | null) => {
     const value = val || "all";

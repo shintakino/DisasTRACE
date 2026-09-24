@@ -105,9 +105,9 @@ export default function TrackingScreen() {
     hasRedirectedToResolutionRef.current = true;
 
     const currentResponder = assignedResponderRef.current;
-    const vehicleId = currentResponder?.full_name 
-      ? `AMB-${currentResponder.full_name.trim().split(/\s+/).map((n: string) => n ? n[0] : '').join("").toUpperCase().slice(0, 3)}${currentResponder.id ? `-${currentResponder.id.slice(-3).toUpperCase()}` : ""}` 
-      : "AMB-001";
+    const vehicleId = currentResponder?.unit_id || (currentResponder?.full_name
+      ? `AMB-${currentResponder.full_name.trim().split(/\s+/).map((n: string) => n ? n[0] : '').join("").toUpperCase().slice(0, 3)}${currentResponder.id ? `-${currentResponder.id.slice(-3).toUpperCase()}` : ""}`
+      : "AMB-001");
 
     useEmergencyReportStore.setState((state) => ({
       report: {
@@ -341,6 +341,7 @@ export default function TrackingScreen() {
           fullName: string;
           lastLatitude: number | null;
           lastLongitude: number | null;
+          unitId?: string | null;
         } | null;
         if (transport?.status === 'TO_HOSPITAL') {
           setLiveResponderStatus('to_hospital');
@@ -357,6 +358,7 @@ export default function TrackingScreen() {
           full_name: responder.fullName,
           last_latitude: responder.lastLatitude,
           last_longitude: responder.lastLongitude,
+          unit_id: responder.unitId,
         });
         setIsFindingAmbulance(false);
         if (responder.lastLatitude !== null && responder.lastLongitude !== null) {
@@ -426,7 +428,7 @@ export default function TrackingScreen() {
           hospital: { id: string; name: string; coordinates: { latitude: number; longitude: number } } | null;
         } | null;
         if (applyPublicLifecycle(incident.status, transport?.status, Boolean(incident.responderId))) return;
-        const responder = result.data.responder as { id: string; fullName: string; lastLatitude: number | null; lastLongitude: number | null } | null;
+        const responder = result.data.responder as { id: string; fullName: string; unitId?: string | null; lastLatitude: number | null; lastLongitude: number | null } | null;
         if (transport?.status === 'TO_HOSPITAL') {
           setLiveResponderStatus('to_hospital');
           if (transport.hospital) setLiveTargetHospital(transport.hospital);
@@ -437,7 +439,7 @@ export default function TrackingScreen() {
           return;
         }
 
-        updateAssignedResponder({ id: responder.id, full_name: responder.fullName, last_latitude: responder.lastLatitude, last_longitude: responder.lastLongitude });
+        updateAssignedResponder({ id: responder.id, full_name: responder.fullName, unit_id: responder.unitId, last_latitude: responder.lastLatitude, last_longitude: responder.lastLongitude });
         setIsFindingAmbulance(false);
         if (responder.lastLatitude !== null && responder.lastLongitude !== null) {
           setAmbulanceLocation({ latitude: responder.lastLatitude, longitude: responder.lastLongitude });
@@ -1076,9 +1078,9 @@ export default function TrackingScreen() {
               </View>
               <View style={styles.ambulancePillText}>
                 <Text style={[styles.ambulanceUnitText, isTransporting && { color: '#065F46' }]}>
-                  {assignedResponder?.full_name 
-                    ? `AMB-${assignedResponder.full_name.trim().split(/\s+/).map((n: string) => n ? n[0] : '').join("").toUpperCase().slice(0, 3)}${assignedResponder.id ? `-${assignedResponder.id.slice(-3).toUpperCase()}` : ""}` 
-                    : "AMB-001"}
+                  {assignedResponder?.unit_id || (assignedResponder?.full_name
+                    ? `AMB-${assignedResponder.full_name.trim().split(/\s+/).map((n: string) => n ? n[0] : '').join("").toUpperCase().slice(0, 3)}${assignedResponder.id ? `-${assignedResponder.id.slice(-3).toUpperCase()}` : ""}`
+                    : "AMB-001")}
                 </Text>
                 <Text style={[styles.ambulanceStatusText, isTransporting && { color: '#047857' }]}>
                   {isTransporting 

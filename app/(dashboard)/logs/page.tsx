@@ -16,11 +16,21 @@ export default function LogsPage() {
   const isPaccAdmin = role === "pacc_admin"
 
   const [logs, setLogs] = React.useState<StatusLogEntry[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
+  const [isInitialLoading, setIsInitialLoading] = React.useState(true)
+  const [isRefreshing, setIsRefreshing] = React.useState(false)
   const [filters, setFilters] = React.useState<LogFilter>({})
+  const hasLoadedRef = React.useRef(false)
+  const latestRequestRef = React.useRef(0)
 
   const fetchLogs = React.useCallback(async (showSkeleton = true) => {
-    if (showSkeleton) setIsLoading(true)
+    const requestId = ++latestRequestRef.current
+    const isInitialLoad = !hasLoadedRef.current
+    if (showSkeleton && isInitialLoad) {
+      setIsInitialLoading(true)
+    } else if (showSkeleton) {
+      setIsRefreshing(true)
+    }
+
     try {
       const queryParams = new URLSearchParams()
       if (filters.search) queryParams.append("search", filters.search)
@@ -38,12 +48,19 @@ export default function LogsPage() {
       })
       if (!response.ok) throw new Error("Failed to fetch logs")
       const data = await response.json()
-      setLogs(data)
+      if (!Array.isArray(data)) throw new Error("Invalid logs response")
+      if (requestId === latestRequestRef.current) {
+        setLogs(data)
+      }
     } catch (error) {
       console.error("Failed to fetch logs:", error)
       toast.error("Error loading activity logs")
     } finally {
-      if (showSkeleton) setIsLoading(false)
+      if (requestId === latestRequestRef.current) {
+        hasLoadedRef.current = true
+        setIsInitialLoading(false)
+        if (showSkeleton) setIsRefreshing(false)
+      }
     }
   }, [filters])
 
@@ -86,7 +103,7 @@ export default function LogsPage() {
     }
   }, [role])
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="h-full flex items-center justify-center p-8 bg-[#0B132B]">
         <WebPreloader title="Loading Activity Logs..." subtitle="Streaming status logs, dispatcher activity, and audit records in real-time" />
@@ -104,7 +121,14 @@ export default function LogsPage() {
       </div>
 
       <div className="flex flex-col rounded-xl shadow-xl border border-slate-200/80 overflow-hidden bg-white">
-        <LogsHeader onFilterChange={setFilters} />
+        <div className="relative">
+          <LogsHeader onFilterChange={setFilters} />
+          {isRefreshing && (
+            <p className="absolute bottom-2 right-6 text-[11px] font-medium text-blue-200" role="status">
+              Updating results…
+            </p>
+          )}
+        </div>
         
         <LogsTable data={logs} showActionColumn={role === "cdrrmo_super_admin"} />
       </div>

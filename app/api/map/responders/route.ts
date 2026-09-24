@@ -7,6 +7,7 @@ import { users } from "@/db/schema/users";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { isResponderHeartbeatFresh } from "@/lib/dispatch-policy";
+import { legacyAmbulanceUnitId } from "@/lib/ambulance-unit";
 
 export async function GET() {
   if (!(await isAdmin())) {
@@ -25,6 +26,7 @@ export async function GET() {
         lastLatitude: users.lastLatitude,
         lastLongitude: users.lastLongitude,
         lastLocationUpdatedAt: users.lastLocationUpdatedAt,
+        unitId: users.unitId,
       })
       .from(users)
       .where(and(
@@ -52,7 +54,7 @@ export async function GET() {
 
     const mapped = dbResponders.filter((responder) => (
       responder.dutyStatus === 'ACTIVE_DISPATCH' || isResponderHeartbeatFresh(responder.lastLocationUpdatedAt)
-    )).map((r, i) => {
+    )).map((r) => {
       const isRecent = isResponderHeartbeatFresh(r.lastLocationUpdatedAt);
 
       let mappedStatus: "AVAILABLE" | "DISPATCHED" | "OFF_DUTY" = "OFF_DUTY";
@@ -64,14 +66,7 @@ export async function GET() {
         mappedStatus = "OFF_DUTY";
       }
 
-      // Generate a dynamic, deterministic vehicle ID
-      const initials = r.fullName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 3);
-      const vehicleId = `AMB-${initials || `00${i + 1}`}`;
+      const vehicleId = r.unitId || legacyAmbulanceUnitId(r.fullName, r.id);
       const activeIncident = activeIncidentByResponder.get(r.id);
 
       return {

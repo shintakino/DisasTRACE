@@ -83,6 +83,12 @@ export interface DispatchDetails {
   fieldOutcome?: FieldOutcome | null;
 }
 
+export interface DispatchReleaseNotice {
+  incidentId: string;
+  title: string;
+  message: string;
+}
+
 export interface DraftForm {
   id: string; // e.g. df-123
   ownerUserId: string;
@@ -119,6 +125,7 @@ interface ResponderState {
   } | null;
   currentLocation: [number, number] | null;
   fieldOutcome: FieldOutcome | null;
+  dispatchReleaseNotice: DispatchReleaseNotice | null;
   
   drafts: DraftForm[];
   submittedIncidentIds: string[];
@@ -150,6 +157,8 @@ interface ResponderState {
   submitReport: (incidentId?: string, formData?: any) => Promise<void>;
   finishAndClose: () => void;
   completeIncident: () => void;
+  releaseDispatchOffer: (notice: DispatchReleaseNotice) => void;
+  dismissDispatchReleaseNotice: () => void;
   /** Clears only in-memory dispatch UI when the authenticated responder changes or the server has no live assignment. */
   clearTransientDispatch: () => void;
   
@@ -214,6 +223,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
   lastSubmittedSummary: null,
   currentLocation: null,
   fieldOutcome: null,
+  dispatchReleaseNotice: null,
   drafts: [],
   submittedIncidentIds: [],
   offlineQueue: [],
@@ -261,7 +271,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
       status: 'en_route',
       elapsedTimeSeconds: 0,
       responseTimeSeconds: 0,
-      initialDistanceKm: parsedDist
+      initialDistanceKm: parsedDist,
+      dispatchReleaseNotice: null,
     });
   },
 
@@ -733,6 +744,26 @@ export const useResponderStore = create<ResponderState>((set) => ({
     lastSubmittedSummary: null
   }),
 
+  releaseDispatchOffer: (notice) => set({
+    status: 'idle',
+    activeDispatch: null,
+    targetHospital: null,
+    sceneTimeSeconds: 0,
+    elapsedTimeSeconds: 0,
+    isArrivalConfirmVisible: false,
+    isHospitalArrivalConfirmVisible: false,
+    isSubmittingReport: false,
+    showReportSuccess: false,
+    currentSpeedKph: 0,
+    hospitalDistanceKm: null,
+    hospitalEtaMins: null,
+    fieldOutcome: null,
+    lastSubmittedSummary: null,
+    dispatchReleaseNotice: notice,
+  }),
+
+  dismissDispatchReleaseNotice: () => set({ dispatchReleaseNotice: null }),
+
   clearTransientDispatch: () => set({
     status: 'idle',
     activeDispatch: null,
@@ -752,6 +783,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
     initialDistanceKm: 0,
     lastSubmittedSummary: null,
     fieldOutcome: null,
+    dispatchReleaseNotice: null,
   }),
 
   saveDraft: async (incident, formData, explicitlySaved = false) => {

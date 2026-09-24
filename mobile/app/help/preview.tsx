@@ -37,7 +37,12 @@ export default function PreviewScreen() {
     uploadTimerRef.current = setTimeout(() => {
       uploadTimerRef.current = null;
       setIsUploading(false);
-      router.push('/help/form');
+      // The chatbot is the supported resident intake. It preserves the photo
+      // and gives the reporter a field-by-field Edit action before submission.
+      router.replace({
+        pathname: '/help/chatbot',
+        params: { mode: 'resident', photoUri },
+      });
     }, 1500);
   };
 

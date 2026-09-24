@@ -4,6 +4,9 @@ import { resolveBaliwagLocation } from '../lib/baliwag-location';
 import { isMockedLocation } from '../lib/location-integrity';
 
 const MINIMUM_REFRESH_DISTANCE_METERS = 50;
+const LOCATION_RETRY_COUNT = 3;
+const LOCATION_RETRY_DELAY_MS = 1_200;
+const LOCATION_READ_TIMEOUT_MS = 12_000;
 
 type LiveLocation = {
   city: string | null;
@@ -27,6 +30,17 @@ function distanceInMeters(
       * Math.cos((second.latitude * Math.PI) / 180)
       * Math.sin(longitudeDelta / 2) ** 2;
   return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function wait(milliseconds: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function readCurrentPosition() {
+  return Promise.race([
+    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Location read timed out.')), LOCATION_READ_TIMEOUT_MS)),
+  ]);
 }
 
 export function useLiveBarangay(enabled: boolean, observedCoordinate?: Coordinates | null) {
@@ -79,9 +93,32 @@ export function useLiveBarangay(enabled: boolean, observedCoordinate?: Coordinat
           return;
         }
 
-        const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        if (isMockedLocation(current)) {
-          if (active) setLocation({ city: null, barangay: null, state: 'unavailable' });
+        // A cold Android GPS fix can fail once immediately after launch. Use a
+        // trusted last-known fix for an instant location label, then retry a
+        // fresh reading before presenting an unavailable state.
+        try {
+          const lastKnown = await Location.getLastKnownPositionAsync();
+          if (lastKnown && !isMockedLocation(lastKnown)) await resolveBarangay(lastKnown.coords);
+        } catch (error) {
+          console.warn('[LiveBarangay] Last-known location was unavailable; continuing with fresh retries:', error);
+        }
+
+        let current: Location.LocationObject | null = null;
+        let lastError: unknown = null;
+        for (let attempt = 0; attempt < LOCATION_RETRY_COUNT && active; attempt += 1) {
+          try {
+            current = await readCurrentPosition();
+            if (isMockedLocation(current)) throw new Error('Mocked location is not accepted.');
+            break;
+          } catch (error) {
+            lastError = error;
+            if (attempt < LOCATION_RETRY_COUNT - 1) await wait(LOCATION_RETRY_DELAY_MS);
+          }
+        }
+        if (!active) return;
+        if (!current) {
+          console.warn('[LiveBarangay] Unable to read device location after retries:', lastError);
+          setLocation((previous) => previous.state === 'ready' ? previous : { city: null, barangay: null, state: 'unavailable' });
           return;
         }
         await resolveBarangay(current.coords);

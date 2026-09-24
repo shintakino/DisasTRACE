@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { LogStatus, LogFilter } from "@/types/logs";
 import { cn } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 interface LogsHeaderProps {
   onFilterChange: (filters: LogFilter) => void;
@@ -28,6 +29,8 @@ export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
   const [status, setStatus] = React.useState<LogStatus | "all">("all");
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
+  const debouncedSearch = useDebouncedValue(search, 350);
+  const lastPublishedSearch = React.useRef(search);
 
   const publishFilters = (next: { search?: string; status?: LogStatus | "all"; from?: string; to?: string }) => {
     const start = next.from ?? from;
@@ -45,8 +48,13 @@ export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
-    publishFilters({ search: val });
   };
+
+  React.useEffect(() => {
+    if (debouncedSearch === lastPublishedSearch.current) return;
+    lastPublishedSearch.current = debouncedSearch;
+    publishFilters({ search: debouncedSearch });
+  }, [debouncedSearch]);
 
   const handleStatusChange = (val: string | null) => {
     const newStatus = (val || "all") as LogStatus | "all";

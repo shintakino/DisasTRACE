@@ -11,6 +11,7 @@ import { fetchWithTimeout } from '../../lib/network-timeout';
 interface Props {
   onNext: () => void;
   onBack: () => void;
+  onInputFocus?: (target: number) => void;
 }
 
 const BARANGAYS = [
@@ -22,7 +23,7 @@ const BARANGAYS = [
   "TIBAG", "TILAPAYONG"
 ];
 
-export default function Step2({ onNext, onBack }: Props) {
+export default function Step2({ onNext, onBack, onInputFocus }: Props) {
   const { data, updateData } = useSignUpStore();
   const [showBarangayModal, setShowBarangayModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -283,6 +284,7 @@ export default function Step2({ onNext, onBack }: Props) {
             autoCapitalize="none" keyboardType="email-address"
             autoCorrect={false}
             autoComplete="off"
+            onFocus={(event) => onInputFocus?.(event.nativeEvent.target)}
           />
         )} />
         {errors.email && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.email.message}</Text>}
@@ -300,6 +302,7 @@ export default function Step2({ onNext, onBack }: Props) {
             maxLength={11}
             autoCorrect={false}
             autoComplete="off"
+            onFocus={(event) => onInputFocus?.(event.nativeEvent.target)}
           />
         )} />
         <Text className="text-gray-400 text-xs mt-1 ml-1">Format: 09XXXXXXXXX</Text>
@@ -309,7 +312,7 @@ export default function Step2({ onNext, onBack }: Props) {
 
       <View className="flex-row gap-4">
         <View className="flex-1">
-          <Text className="text-gray-700 font-bold mb-2 ml-1">Province *</Text>
+          <Text className="text-gray-700 font-bold mb-2 ml-1">Province</Text>
           <Controller control={control} name="province" render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
               className={`bg-gray-100 p-4 rounded-xl border ${errors.province ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-500`}
@@ -322,7 +325,7 @@ export default function Step2({ onNext, onBack }: Props) {
           {errors.province && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.province.message}</Text>}
         </View>
         <View className="flex-1">
-          <Text className="text-gray-700 font-bold mb-2 ml-1">City / Municipality *</Text>
+          <Text className="text-gray-700 font-bold mb-2 ml-1">City / Municipality</Text>
           <Controller control={control} name="city" render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
               className={`bg-gray-100 p-4 rounded-xl border ${errors.city ? 'border-red-500' : 'border-gray-200'} h-14 text-gray-500`}
@@ -361,6 +364,7 @@ export default function Step2({ onNext, onBack }: Props) {
             autoCapitalize="characters"
             autoCorrect={false}
             autoComplete="off"
+            onFocus={(event) => onInputFocus?.(event.nativeEvent.target)}
           />
         )} />
         {errors.street && <Text className="text-red-500 text-sm mt-1 ml-1">{errors.street.message}</Text>}

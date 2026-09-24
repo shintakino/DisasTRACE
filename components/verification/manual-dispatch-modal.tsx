@@ -12,6 +12,7 @@ import { createClientBrowser } from "@/lib/supabase"
 interface Responder {
   id: string
   fullName: string
+  unitId: string | null
   phone: string
   address: string
   status: "STANDBY" | "LOCATION_SYNC_DELAYED"
@@ -214,6 +215,9 @@ export function ManualDispatchModal({
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-slate-800 text-sm tracking-tight mb-1 truncate">
                       {resp.fullName}
+                    </div>
+                    <div className="text-[11px] font-mono font-bold text-[#1E3A8A] mb-1">
+                      {resp.unitId || "Unit ID pending"}
                     </div>
                     <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-0.5">
                       <Phone className="w-3 h-3 text-slate-400" />

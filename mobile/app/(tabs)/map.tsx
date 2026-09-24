@@ -163,11 +163,25 @@ export default function MapScreen() {
         style={{ top: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 66 : 106 }}
         pointerEvents="none"
       >
-        <View className="self-start flex-row items-center bg-white/95 border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
-          <View className="w-3 h-3 rounded-full bg-red-500 border-2 border-red-200 mr-2" />
-          <View>
-            <Text className="text-slate-800 text-xs font-bold">Incident cluster</Text>
-            <Text className="text-slate-500 text-[10px]">Number = reports in the last 30 days</Text>
+        <View className="self-start bg-white/95 border border-slate-200 rounded-xl px-3 py-2 shadow-sm gap-2">
+          <View className="flex-row items-center">
+            <View className="w-3 h-3 rounded-full bg-red-500 border-2 border-red-200 mr-2" />
+            <View>
+              <Text className="text-slate-800 text-xs font-bold">Incident cluster</Text>
+              <Text className="text-slate-500 text-[10px]">Number = reports in the last 30 days</Text>
+            </View>
+          </View>
+          <View className="flex-row items-center">
+            <View className="w-5 h-5 rounded-full bg-[#DC2626] items-center justify-center mr-2"><Hospital color="white" size={11} variant="Bold" /></View>
+            <Text className="text-slate-600 text-[10px] font-semibold">Configured hospital</Text>
+          </View>
+          <View className="flex-row items-center">
+            <View className="w-5 h-5 rounded-full bg-blue-600 items-center justify-center mr-2"><Hospital color="white" size={11} variant="Bold" /></View>
+            <Text className="text-slate-600 text-[10px] font-semibold">Selected hospital</Text>
+          </View>
+          <View className="flex-row items-center">
+            <View className="w-3 h-3 rounded-full bg-blue-600 border border-blue-200 mr-3 ml-1" />
+            <Text className="text-slate-600 text-[10px] font-semibold">Your live location</Text>
           </View>
         </View>
       </View>
@@ -249,7 +263,7 @@ export default function MapScreen() {
       </Map>
 
       <View className="absolute bottom-0 w-full">
-        <View className="bg-white rounded-t-[32px] pt-6 pb-8 px-6 shadow-2xl shadow-indigo-900/20 border border-slate-100 flex-col">
+        <View className="bg-white pt-5 pb-8 px-6 border-t border-slate-200 flex-col">
           
           <View className="flex-row items-center">
             {selectedHospital ? (

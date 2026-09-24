@@ -9,12 +9,22 @@ import { CommandPageHeading } from "@/components/dashboard/command-page-heading"
 
 export default function AuditPage() {
   const [logs, setLogs] = React.useState<AuditLogEntry[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [isInitialLoading, setIsInitialLoading] = React.useState(true);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [filters, setFilters] = React.useState<AuditFilter>({});
+  const hasLoadedRef = React.useRef(false);
+  const latestRequestRef = React.useRef(0);
 
   const fetchLogs = React.useCallback(async () => {
+    const requestId = ++latestRequestRef.current;
+    const isInitialLoad = !hasLoadedRef.current;
+    if (isInitialLoad) {
+      setIsInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+
     try {
-      setLoading(true);
       const queryParams = new URLSearchParams();
       if (filters.search) queryParams.append("query", filters.search);
       if (filters.role) queryParams.append("role", filters.role);
@@ -22,12 +32,20 @@ export default function AuditPage() {
       if (filters.dateRange?.to) queryParams.append("to", filters.dateRange.to.toISOString());
       
       const response = await fetch(`/api/audit?${queryParams.toString()}`);
+      if (!response.ok) throw new Error("Failed to fetch audit logs");
       const data = await response.json();
-      setLogs(data);
+      if (!Array.isArray(data)) throw new Error("Invalid audit log response");
+      if (requestId === latestRequestRef.current) {
+        setLogs(data);
+      }
     } catch (error) {
       console.error("Failed to fetch audit logs:", error);
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestRef.current) {
+        hasLoadedRef.current = true;
+        setIsInitialLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, [filters]);
 
@@ -35,7 +53,7 @@ export default function AuditPage() {
     fetchLogs();
   }, [fetchLogs]);
 
-  if (loading) {
+  if (isInitialLoading) {
     return (
       <div className="h-full flex items-center justify-center p-8 bg-[#0B132B]">
         <WebPreloader title="Loading Audit Trails..." subtitle="Synchronizing security logs, access tokens, and accountability records" />
@@ -52,7 +70,14 @@ export default function AuditPage() {
       />
 
       <div className="flex flex-col shadow-2xl shadow-blue-900/10 rounded-xl overflow-hidden border border-slate-200">
-        <AuditHeader onFilterChange={setFilters} />
+        <div className="relative">
+          <AuditHeader onFilterChange={setFilters} />
+          {isRefreshing && (
+            <p className="absolute bottom-2 right-6 text-[11px] font-medium text-blue-200" role="status">
+              Updating results…
+            </p>
+          )}
+        </div>
         
         <AuditTable data={logs} />
       </div>

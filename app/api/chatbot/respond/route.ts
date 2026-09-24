@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
           : '';
         response = {
           ...response,
-          reply: `${getKnowledgeAnswer(knowledge, suggestion?.languageStyle ?? response.languageStyle)}${resume}`,
+          reply: `${getKnowledgeAnswer(knowledge, suggestion?.languageStyle ?? response.languageStyle, parsed.data.reporterMode)}${resume}`,
           replyKey: knowledge.id,
           action: 'ANSWER_CONTEXT',
           languageStyle: suggestion?.languageStyle ?? response.languageStyle,
@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
     console.info('[chatbot-response]', {
       traceId,
       reporterMode: parsed.data.reporterMode,
+      replyKey: validatedResponse.replyKey,
       resultClass,
       totalLatencyMs: Date.now() - startedAt,
       providerLatencyMs: providerMetadata.latencyMs,

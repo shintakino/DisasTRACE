@@ -163,7 +163,7 @@ export function deterministicChatbotResponse(request: ChatbotRespondRequest): Ch
   if (knowledge && (request.mode !== 'DRAFT' || knowledge.allowDuringDraft)) {
     return {
       ...defaults,
-      reply: `${getKnowledgeAnswer(knowledge, languageStyle)}${resumePrompt(request, languageStyle)}`,
+      reply: `${getKnowledgeAnswer(knowledge, languageStyle, request.reporterMode)}${resumePrompt(request, languageStyle)}`,
       replyKey: knowledge.id,
       action: 'ANSWER_CONTEXT',
       nextSlot: pendingSlot,

@@ -43,6 +43,12 @@ check('accepts UUID submission IDs and rejects arbitrary primary keys', () => {
   assert.equal(ChatbotSubmissionIdSchema.safeParse('attacker-selected-id').success, false);
 });
 check('keeps catalog identifiers unique', () => assert.equal(new Set(KNOWLEDGE_CATALOG.map(({ id }) => id)).size, KNOWLEDGE_CATALOG.length));
+check('answers reporting-process questions without starting a draft', () => {
+  const response = deterministicChatbotResponse({ message: 'How do I report an emergency?', mode: 'IDLE', reporterMode: 'guest', draft: {} });
+  assert.equal(response.replyKey, 'chatbot-4-reporting-guide');
+  assert.equal(response.action, 'ANSWER_CONTEXT');
+  assert.equal(response.shouldStartDraft, false);
+});
 check('distinguishes safety guidance by disaster phase', () => {
   assert.equal(deterministicChatbotResponse({ message: 'What should I do during a typhoon?', mode: 'IDLE', reporterMode: 'guest', draft: {} }).replyKey, 'typhoon-during');
   assert.equal(deterministicChatbotResponse({ message: 'What should I do after an earthquake?', mode: 'IDLE', reporterMode: 'guest', draft: {} }).replyKey, 'earthquake-after');

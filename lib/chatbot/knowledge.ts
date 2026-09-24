@@ -1,9 +1,12 @@
+import { CHATBOT_4_REPORTING_GUIDE } from './chatbot-4-context';
+
 export interface KnowledgeEntry {
   id: string;
   keywords: string[];
   answers: { en: string; fil: string; taglish: string };
   allowDuringDraft: boolean;
-  source: 'chatbotContext.md';
+  source: 'chatbotContext.md' | 'Chatbot-4.md';
+  reporterModeAnswers?: { guest: { en: string; fil: string; taglish: string }; registered: { en: string; fil: string; taglish: string } };
 }
 
 function entry(
@@ -20,6 +23,14 @@ function entry(
 // Proposed directories, hotlines, live weather, and evacuation-center details
 // are absent until a verified system-backed source is available.
 export const KNOWLEDGE_CATALOG: KnowledgeEntry[] = [
+  {
+    id: CHATBOT_4_REPORTING_GUIDE.id,
+    keywords: [...CHATBOT_4_REPORTING_GUIDE.keywords],
+    answers: CHATBOT_4_REPORTING_GUIDE.answers.registered,
+    reporterModeAnswers: CHATBOT_4_REPORTING_GUIDE.answers,
+    allowDuringDraft: true,
+    source: CHATBOT_4_REPORTING_GUIDE.source,
+  },
   entry('disastrace-purpose', ['what is disastrace', 'ano ang disastrace', 'disastrace purpose', 'para saan ang disastrace'], 'DisasTRACE helps Baliwag residents report incidents, receive verified emergency updates, and support coordination with the Baliwag CDRRMO.', 'Tinutulungan ng DisasTRACE ang mga residente ng Baliwag na mag-report ng insidente, makatanggap ng beripikadong update, at masuportahan ang koordinasyon ng Baliwag CDRRMO.', 'Ang DisasTRACE ay tumutulong sa Baliwag residents na mag-report ng incident, makatanggap ng verified updates, at masuportahan ang CDRRMO coordination.'),
   entry('disastrace-process', ['how does disastrace work', 'paano gumagana ang disastrace', 'disastrace process'], 'A public user submits an incident report in DisasTRACE. Authorized personnel review it, coordinate the appropriate response, and use available dispatch and tracking tools.', 'Nagsusumite ang public user ng incident report sa DisasTRACE. Sinusuri ito ng authorized personnel, kino-coordinate ang angkop na tugon, at ginagamit ang available dispatch at tracking tools.', 'A public user submits an incident report, then authorized personnel review it, coordinate the response, at use available dispatch and tracking tools.'),
   entry('chatbot-purpose', ['what can you do', 'what can the bot do', 'ano kaya mo', 'chatbot purpose'], 'I can guide incident reports and provide approved DisasTRACE, emergency-safety, preparedness, and Baliwag CDRRMO information.', 'Maaari kitang gabayan sa incident report at magbigay ng aprubadong impormasyon tungkol sa DisasTRACE, kaligtasan, paghahanda, at Baliwag CDRRMO.', 'I can guide your incident report at magbigay ng approved DisasTRACE, safety, preparedness, at Baliwag CDRRMO information.'),
@@ -50,9 +61,12 @@ export const KNOWLEDGE_CATALOG: KnowledgeEntry[] = [
 
 export function findKnowledge(message: string) {
   const normalized = message.toLowerCase();
-  return KNOWLEDGE_CATALOG.find((knowledge) => knowledge.keywords.some((keyword) => normalized.includes(keyword)));
+  const matches = KNOWLEDGE_CATALOG.filter((knowledge) => knowledge.keywords.some((keyword) => normalized.includes(keyword)));
+  // Chatbot-4 intentionally includes broad prompts such as “What should I do?”.
+  // A more specific approved safety/preparedness topic must take precedence.
+  return matches.find((knowledge) => knowledge.id !== CHATBOT_4_REPORTING_GUIDE.id) ?? matches[0];
 }
 
-export function getKnowledgeAnswer(entry: KnowledgeEntry, language: 'en' | 'fil' | 'taglish') {
-  return entry.answers[language];
+export function getKnowledgeAnswer(entry: KnowledgeEntry, language: 'en' | 'fil' | 'taglish', reporterMode?: 'guest' | 'registered') {
+  return (reporterMode ? entry.reporterModeAnswers?.[reporterMode] : undefined)?.[language] ?? entry.answers[language];
 }

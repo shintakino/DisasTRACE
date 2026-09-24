@@ -1,4 +1,5 @@
 import type { CHATBOT_INCIDENT_TYPES } from '@/lib/chatbot/contracts';
+import { CHATBOT_4_TRIAGE_ALIASES } from '@/lib/chatbot/chatbot-4-context';
 
 type IncidentType = typeof CHATBOT_INCIDENT_TYPES[number];
 type Nature = 'EMERGENCY' | 'NON-EMERGENCY';
@@ -38,28 +39,46 @@ const PATIENT_TRANSPORT_PATTERN = /\b(?:patient\s+transport|transport(?:ing)?\s+
 
 const ROUTINE_NON_EMERGENCY_PATTERN = /\b(?:non[- ]?emergency|other\s+request|general\s+assistance|medical\s+advice|checkup|routine\s+(?:consultation|transport)|stable\s+(?:patient|pasyente)|lagnat|nilalagnat|nahihilo|nanlalabo(?:\s+ang)?\s+(?:mata|paningin)|nahihirapan\s+(?:(?:ako|siya)ng\s+)?lunukin|hindi\s+makalunok|hindi\s+makakain|masakit\s+(?:ang\s+)?(?:tiyan|tyan|ulo)|pagtatae|nagsusuka|namamaga\s+(?:ang\s+)?(?:kamay|paa|mata)|pantal|nangangati|panic|nagpapanic|naipit\s+(?:ang\s+)?(?:kamay|daliri)\s+sa\s+pinto|(?:na)?gasgas|minor\s+(?:injury|wound)|sprain|pilay|hindi\s+maigalaw\s+(?:ang\s+)?(?:tuhod|balikat)|nasugatan\s+sa\s+(?:baso|kutsilyo)|nasunog\s+(?:ang\s+)?balat)\b/i;
 
+function hasChatbot4Alias(message: string, incidentType: IncidentType) {
+  const normalized = message.toLocaleLowerCase();
+  return CHATBOT_4_TRIAGE_ALIASES.find((entry) => entry.incidentType === incidentType)
+    ?.phrases.some((phrase) => normalized.includes(phrase)) ?? false;
+}
+
 export function classifyReportedIncident(message: string): TriageClassification | undefined {
   // Hazard/event categories have stronger operational meaning than symptoms.
-  if (/\b(?:fire|sunog|nasusunog|may\s+apoy)\b/i.test(message)) {
+  if (/\b(?:fire|sunog|nasusunog|may\s+apoy)\b/i.test(message) || hasChatbot4Alias(message, 'Fire Emergency')) {
     return { incidentType: 'Fire Emergency', nature: 'EMERGENCY' };
   }
-  if (/\b(?:crash|collision|vehicular|car\s+accident|motor(?:cycle)?\s+accident|bangga|nabangga|naaksidente(?:\s+sa\s+(?:kotse|motor|sasakyan))?|natamaan\s+ng\s+sasakyan)\b/i.test(message)) {
+  if (/\b(?:crash|collision|vehicular|car\s+accident|motor(?:cycle)?\s+accident|bangga|nabangga|naaksidente(?:\s+sa\s+(?:kotse|motor|sasakyan))?|natamaan\s+ng\s+sasakyan)\b/i.test(message) || hasChatbot4Alias(message, 'Vehicular Collision')) {
     return { incidentType: 'Vehicular Collision', nature: 'EMERGENCY' };
   }
-  if (/\b(?:structural|collapse|collapsed|building\s+damage|gumuho|guho|bumagsak\s+(?:ang\s+)?(?:bubong|pader|gusali)|trapped\s+(?:inside|sa\s+loob))\b/i.test(message)) {
+  if (/\b(?:structural|collapse|collapsed|building\s+damage|gumuho|guho|bumagsak\s+(?:ang\s+)?(?:bubong|pader|gusali)|trapped\s+(?:inside|sa\s+loob))\b/i.test(message) || hasChatbot4Alias(message, 'Structural Failure')) {
     return { incidentType: 'Structural Failure', nature: 'EMERGENCY' };
   }
-  if (/\b(?:flood|flooding|baha|floodwater|water\s+rescue|umaapaw\s+na\s+ang\s+ilog|mataas\s+na\s+(?:ang\s+)?tubig)\b/i.test(message)) {
+  if (/\b(?:flood|flooding|baha|floodwater|water\s+rescue|umaapaw\s+na\s+ang\s+ilog|mataas\s+na\s+(?:ang\s+)?tubig)\b/i.test(message) || hasChatbot4Alias(message, 'Flood/Water')) {
     return { incidentType: 'Flood/Water', nature: 'EMERGENCY' };
   }
   if (CRITICAL_MEDICAL_PATTERN.test(message)) {
     return { incidentType: 'Medical Emergency', nature: 'EMERGENCY' };
   }
+  if (hasChatbot4Alias(message, 'Medical Emergency')) {
+    return { incidentType: 'Medical Emergency', nature: 'EMERGENCY' };
+  }
   if (PATIENT_TRANSPORT_PATTERN.test(message)) {
+    return { incidentType: 'Patient Transport', nature: 'NON-EMERGENCY' };
+  }
+  if (hasChatbot4Alias(message, 'Patient Transport')) {
     return { incidentType: 'Patient Transport', nature: 'NON-EMERGENCY' };
   }
   if (ROUTINE_NON_EMERGENCY_PATTERN.test(message)) {
     return { incidentType: 'Other / non-emergency request', nature: 'NON-EMERGENCY' };
+  }
+  if (hasChatbot4Alias(message, 'Other / non-emergency request')) {
+    return { incidentType: 'Other / non-emergency request', nature: 'NON-EMERGENCY' };
+  }
+  if (hasChatbot4Alias(message, 'Unknown Cause')) {
+    return { incidentType: 'Unknown Cause', nature: 'NON-EMERGENCY' };
   }
   return undefined;
 }

@@ -1,5 +1,12 @@
 # Progress Tracker
 
+## 2026-09-25 - Chatbot-4 safe reporting-context integration
+
+- Added a typed, reviewed `Chatbot-4.md` context map instead of loading the raw Markdown into the chatbot, mobile bundle, or DeepSeek prompt. The provider continues to receive only compact allowlisted knowledge IDs and keywords.
+- Added guest and registered reporting checklists in English, Filipino, and Taglish. A process question remains an informational `ANSWER_CONTEXT` response in the IDLE state; the existing visible **Start incident report** control is still the explicit action that creates a draft.
+- Added deterministic aliases for reviewed vehicular, fire, medical, structural, flood, unknown-cause, patient-transport, and explicit non-emergency wording. Each resolves only to an existing category, preserves event/critical precedence, and remains confirmation-first before a draft can begin.
+- Kept the source document's unresponsive-person, head-injury, and breathing-difficulty first-aid scripts out of runtime responses pending written CDRRMO/clinical approval. Added focused coverage for this boundary, process guidance, category mappings, provider privacy, and specific-safety-topic precedence.
+
 ## 2026-09-24 - Responder Unit ID and transfer-feedback review repairs
 
 - Closed the Unit ID role-transition gap: the protected user API now requires a valid unique Unit ID before an account can become an ambulance responder, clears the identifier when an account leaves that role, and blocks either transition while the responder owns a pending or active dispatch.

@@ -89,7 +89,7 @@ export function AuditTable({ data }: AuditTableProps) {
                 return (
                   <TableHead 
                     key={header.id} 
-                    className={cn("h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest", widthClass)}
+                    className={cn("h-12 text-[15px] font-black text-slate-500 uppercase tracking-widest", widthClass)}
                   >
                     {header.isPlaceholder
                       ? null

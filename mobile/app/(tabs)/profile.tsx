@@ -36,6 +36,16 @@ export default function ProfileScreen() {
     
     setUpdatingDuty(true);
     try {
+      if (nextDuty === 'ON_DUTY') {
+        setDutySyncMessage('Confirming your GPS with PACC...');
+        const sync = await syncResponderAvailabilityLocation();
+        if (!sync.success) {
+          setDutySyncMessage(sync.message);
+          Alert.alert('GPS sync needed', sync.message);
+          return;
+        }
+      }
+
       const apiUrl = getMobileApiBaseUrl();
       const { data: { session } } = await supabase.auth.getSession();
       const headers: Record<string, string> = {
@@ -59,18 +69,14 @@ export default function ProfileScreen() {
 
       useResponderDutyStore.getState().setDutyStatus(nextDuty);
       if (nextDuty === 'ON_DUTY') {
-        setDutySyncMessage('Syncing GPS with PACC...');
-        const sync = await syncResponderAvailabilityLocation();
         const push = await registerResponderPushNotifications().catch(() => ({
           registered: false,
-          message: 'GPS is synced, but dispatch alert registration could not be confirmed. Keep DisasTRACE open for live offers.',
+          message: 'You are available, but dispatch alert registration could not be confirmed. Keep DisasTRACE open for live offers.',
         }));
-        const combinedMessage = sync.success
-          ? `${sync.message} ${push.message}`
-          : sync.message;
+        const combinedMessage = `GPS synced. You are available for emergency offers. ${push.message}`;
         setDutySyncMessage(combinedMessage);
         await refreshStatus();
-        Alert.alert(sync.success ? 'You are available' : 'GPS sync needed', combinedMessage);
+        Alert.alert('You are available', combinedMessage);
       } else {
         setDutySyncMessage('You are off duty and will not receive new emergency offers.');
         await refreshStatus();

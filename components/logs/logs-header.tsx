@@ -90,15 +90,15 @@ export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</label>
                 <Select value={status} onValueChange={handleStatusChange}>
-                  <SelectTrigger className="uppercase">
-                    <SelectValue placeholder="ALL" />
+                  <SelectTrigger>
+                    <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">ALL</SelectItem>
-                    <SelectItem value="DISPATCHED">DISPATCHED</SelectItem>
-                    <SelectItem value="STANDBY">STANDBY</SelectItem>
-                    <SelectItem value="ON-SCENE">ON-SCENE</SelectItem>
-                    <SelectItem value="OFF-DUTY">OFF-DUTY</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="DISPATCHED">Dispatched</SelectItem>
+                    <SelectItem value="STANDBY">Standby</SelectItem>
+                    <SelectItem value="ON-SCENE">On Scene</SelectItem>
+                    <SelectItem value="OFF-DUTY">Off Duty</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

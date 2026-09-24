@@ -15,6 +15,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import { isValidPhilippinePhone, normalizePhilippinePhone } from "@/lib/phone";
 import { isValidAmbulanceUnitId, normalizeAmbulanceUnitId } from "@/lib/ambulance-unit";
+import { isResponderAssignmentBarangay } from "@/lib/responder-assignment-barangays";
 
 const UpdateUserSchema = z.object({
   id: z.string(),
@@ -144,6 +145,9 @@ export async function POST(req: NextRequest) {
     }
 
     const { fullName, email, password, role, phone, address, responderType, barangay, unitId: requestedUnitId } = result.data;
+    if (role === 'ambulance_responder' && responderType === 'barangay' && !isResponderAssignmentBarangay(barangay)) {
+      return NextResponse.json({ error: 'Select an official City of Baliwag Barangay for this responder.' }, { status: 400 });
+    }
     const unitId = role === 'ambulance_responder' ? normalizeAmbulanceUnitId(requestedUnitId) : null;
     if (role === 'ambulance_responder' && (!unitId || !isValidAmbulanceUnitId(unitId))) {
       return NextResponse.json({ error: "Enter a valid unique Unit ID such as AMB-EG-7EC." }, { status: 400 });

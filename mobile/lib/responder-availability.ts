@@ -17,7 +17,7 @@ function getCurrentPositionWithTimeout() {
   ]);
 }
 
-/** Publish one trusted GPS heartbeat immediately after a responder goes on duty. */
+/** Publish one trusted GPS heartbeat before a responder enters the dispatch pool. */
 export async function syncResponderAvailabilityLocation(): Promise<ResponderAvailabilitySyncResult> {
   const permission = await Location.requestForegroundPermissionsAsync();
   if (permission.status !== 'granted') {
@@ -61,18 +61,24 @@ export async function syncResponderAvailabilityLocation(): Promise<ResponderAvai
       }),
       signal: controller.signal,
     });
-    const payload = await response.json().catch(() => null) as { message?: string; error?: string } | null;
+    const payload = await response.json().catch(() => null) as { success?: boolean; held?: boolean; message?: string; error?: string } | null;
     if (!response.ok) {
       return {
         success: false,
         message: payload?.message || payload?.error || 'PACC could not confirm your GPS location. Check your signal and try again.',
       };
     }
+    if (payload?.success === false || payload?.held) {
+      return {
+        success: false,
+        message: payload?.message || 'PACC could not confirm a trusted GPS location. Check device location and try again.',
+      };
+    }
     return { success: true, message: 'GPS synced. You are available for emergency offers.' };
   } catch {
     return {
       success: false,
-      message: 'Your on-duty status was saved, but GPS sync could not reach PACC. Check your connection and retry GPS sync.',
+      message: 'GPS sync could not reach PACC. You are still Off Duty; check your connection and retry GPS sync.',
     };
   } finally {
     clearTimeout(timeout);

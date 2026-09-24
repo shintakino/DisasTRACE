@@ -34,3 +34,22 @@ export function currentManilaDayBounds() {
     end: sql`((date_trunc('day', now() AT TIME ZONE ${MANILA_TIME_ZONE}) + interval '1 day') AT TIME ZONE ${MANILA_TIME_ZONE})`,
   };
 }
+
+export type ManilaOperationalPeriod = 'today' | 'weekly' | 'monthly' | 'yearly';
+
+/**
+ * SQL bounds for the Map's operational review periods. The start is always
+ * calculated in Manila time, while the end is the current instant so a period
+ * never includes future records when the database is configured for another
+ * time zone.
+ */
+export function manilaOperationalPeriodBounds(period: ManilaOperationalPeriod) {
+  const start = {
+    today: sql`(date_trunc('day', now() AT TIME ZONE ${MANILA_TIME_ZONE}) AT TIME ZONE ${MANILA_TIME_ZONE})`,
+    weekly: sql`(date_trunc('week', now() AT TIME ZONE ${MANILA_TIME_ZONE}) AT TIME ZONE ${MANILA_TIME_ZONE})`,
+    monthly: sql`(date_trunc('month', now() AT TIME ZONE ${MANILA_TIME_ZONE}) AT TIME ZONE ${MANILA_TIME_ZONE})`,
+    yearly: sql`(date_trunc('year', now() AT TIME ZONE ${MANILA_TIME_ZONE}) AT TIME ZONE ${MANILA_TIME_ZONE})`,
+  }[period];
+
+  return { start, end: sql`now()` };
+}

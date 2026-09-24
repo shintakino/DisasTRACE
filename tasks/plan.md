@@ -185,6 +185,133 @@ Add the useful report-guidance phrases and reviewed incident examples from `Chat
 | New aliases cause wrong operational classification | High | Deterministic table-driven tests, event/critical precedence, user confirmation, and existing server/PACC triage. |
 | Sensitive incident text reaches the AI provider | High | Retain privacy filter and add regression cases for every sensitive field class. |
 
+---
+
+# Implementation Plan: Compact PACC Verification Workspace
+
+## Overview
+
+Refine the PACC-only Verification workspace into a compact, desktop-first triage view inspired by the supplied references. Preserve server-authoritative triage, duplicate handling, rejection, dispatch, audit, and realtime behavior. Use the existing authenticated evidence URLs and only a client-side, clearly labelled dummy emergency-assistance configuration using `09364294078`.
+
+## Architecture Decisions
+
+- Queue thumbnails reuse the existing authenticated `VerificationRequest.imageUrl`; no image copies, uploads, database migration, or public data endpoint are needed.
+- Retain all operational queue states under four cards: **For Action** = action-needed; **For Review** = review-needed plus responder-offer awaiting records, with an explicit “Awaiting responder” row badge; **Closed** = resolved/case-closed; **Rejected** = rejected/duplicate. This prevents live dispatch work disappearing merely to fit four labels.
+- Put the selected report’s concise incident snapshot and timeline together in the right rail. Detailed classification/coordination and related-report controls stay in the center workspace, compacted for desktop and scrollable only on constrained viewports.
+- Define incident-type assistance in a typed local module. Each mapping has one agency label and the requested dummy `tel:09364294078` target. It is demo UI data and does not write a coordination action or claim to contact a real agency.
+- Use flat semantic colors: navy for action, blue for review/info, green for closed, red for rejected/critical, and amber only for warning/high severity. Reuse `INCIDENT_PRESENTATION` for the Map’s incident-type legend.
+
+## Task List
+
+### Phase 1: Queue and compact triage layout
+
+#### Task 1: Consolidate queue filters and add evidence previews
+
+**Description:** Replace the five-card queue with one horizontal row of For Action, For Review, Closed, and Rejected. Add debounced local search and a small evidence thumbnail/type fallback to each queue item.
+
+**Acceptance criteria:**
+
+- [ ] Exactly four queue cards are visible in one desktop row; none wraps below.
+- [ ] Awaiting-responder records remain accessible through For Review with a clear row-level status.
+- [ ] Search filters request ID, incident type, reporter, and location without blocking selection or realtime refresh.
+- [ ] Submitted images preview safely; reports without one have an accessible type fallback.
+
+**Verification:** Focused queue contract covers four buckets and awaiting retention; manual desktop check confirms thumbnails, search, keyboard selection, and no wrapping.
+
+**Dependencies:** None.
+**Files likely touched:** `components/verification/verification-queue.tsx`, `app/(dashboard)/verification/page.tsx`, `scripts/verify-pacc-verification-workspace.ts` (new).
+**Estimated scope:** Medium.
+
+#### Task 2: Recompose selected-report workspace for one-screen triage
+
+**Description:** Compact center evidence/location/metrics and move the essential incident snapshot into the right-side dispatch timeline. Preserve classification override, related-report decisions, and agency coordination.
+
+**Acceptance criteria:**
+
+- [ ] Report ID, type, severity, location, received time, people count, evidence, actions, incident snapshot, and dispatch timeline are visible together at the supported desktop breakpoint.
+- [ ] Accept, reject, duplicate, classification, coordination, and manual-dispatch eligibility do not change.
+- [ ] Smaller viewports use intentional scrolling rather than clipped controls or data.
+
+**Verification:** Manual desktop/tablet checks; existing triage and rejection workflow checks.
+**Dependencies:** Task 1.
+**Files likely touched:** `components/verification/verification-details.tsx`, `components/verification/resident-panel.tsx`, `app/(dashboard)/verification/page.tsx`, focused script.
+**Estimated scope:** Medium.
+
+### Checkpoint: Triage workspace
+
+- [ ] Four queue categories retain every existing operational record.
+- [ ] PACC can select, inspect, accept, reject, merge, and dispatch without regression.
+- [ ] Desktop layout is manually approved against the supplied references.
+
+### Phase 2: Action rail, dialog, and visual language
+
+#### Task 3: Add typed dummy external emergency assistance
+
+**Description:** Add one type-dependent assistance card below PACC actions, with an agency label and direct `tel:` Call control for the requested dummy number.
+
+**Acceptance criteria:**
+
+- [ ] Fire/explosion selects BFP; medical, vehicular, flood/structural, and other types each resolve to an intentional demo assistance label.
+- [ ] Only assistance relevant to the selected incident type appears.
+- [ ] Call uses `href="tel:09364294078"`, has an accessible label, and never changes coordination or dispatch state.
+
+**Verification:** Table-driven mapping coverage for all supported types; manual browser check of the Call target.
+**Dependencies:** Task 2.
+**Files likely touched:** `lib/pacc-emergency-assistance.ts` (new), `components/verification/resident-panel.tsx`, focused script.
+**Estimated scope:** Small.
+
+#### Task 4: Expand rejection dialog and apply semantic PACC colors
+
+**Description:** Give the rejection dialog generous desktop space, readable reason cards, notes, and footer actions; normalize verification queue/action colors to the semantic palette.
+
+**Acceptance criteria:**
+
+- [ ] Dialog remains within the viewport and exposes reasons, notes, Cancel, and Reject without crowding.
+- [ ] Rejection validation, public-feedback text, and protected API behavior do not change.
+- [ ] Queue/action colors consistently communicate action, review, closed, rejected, and severity states.
+
+**Verification:** Keyboard/screen-reader dialog check and rejection-workflow regression.
+**Dependencies:** Task 2.
+**Files likely touched:** `components/verification/reject-incident-dialog.tsx`, `components/verification/verification-queue.tsx`, `components/verification/resident-panel.tsx`, focused script.
+**Estimated scope:** Medium.
+
+#### Task 5: Restore map incident-type legend and password visibility
+
+**Description:** Add an Incident Types section to the shared Map legend using the approved presentation palette, and replace PACC Settings password inputs with the existing accessible `PasswordInput` component.
+
+**Acceptance criteria:**
+
+- [ ] Legend lists every supported incident type with approved color and readable label alongside marker/resource/demand-zone keys.
+- [ ] Current Password and New Password each have one independent eye toggle; existing update/disabled behavior remains unchanged.
+
+**Verification:** Static palette/password check and manual toggle/legend check.
+**Dependencies:** None.
+**Files likely touched:** `components/map/command-map-overlays.tsx`, `components/account/settings-view.tsx`, focused script.
+**Estimated scope:** Small.
+
+### Checkpoint: Release validation
+
+- [ ] `npx tsx scripts/verify-pacc-verification-workspace.ts` passes.
+- [ ] Existing verification, map, and rejected-report workflow checks pass.
+- [ ] `npx tsc --noEmit`, relevant lint, and `npm run build` pass.
+- [ ] Manual PACC test covers cards, search, image/no-image preview, assistance/call link, accept/reject/merge/dispatch, modal keyboard behavior, map legend, and both password toggles.
+
+## Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+| --- | --- | --- |
+| Four categories hide awaiting responder offers | High | Put them in For Review with an Awaiting responder label; test all prior states. |
+| Dense layout clips a critical control | High | Desktop grid constraints with responsive overflow fallback; manually test standard and narrow heights. |
+| Dummy call card is mistaken for a real directory | Medium | Label it demo assistance, use only the supplied number, persist no coordination state. |
+| Preview exposes data outside PACC authorization | High | Reuse authenticated `imageUrl`; add no public storage URL or route. |
+
+## PACC Open Questions
+
+1. For the demo mapping, should vehicular use **PNP**, medical **CDRRMO EMS**, and flood/structural **CDRRMO**, as proposed?
+2. Should the UI visibly say “Demo hotline,” or show only agency and number during stakeholder review?
+
+---
+
 ## Open Questions
 
 1. Who will provide the written CDRRMO/clinical approval for the three new medical first-aid replies?

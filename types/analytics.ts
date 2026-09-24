@@ -21,6 +21,7 @@ const AnalyticsSummarySchema = z.object({
   resolved: z.coerce.number(),
   resolutionRate: z.coerce.number(),
   avgResponseMinutes: z.coerce.number(),
+  completedFieldResponses: z.coerce.number(),
 });
 
 const PreparednessInsightSchema = z.object({

@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
+import { RESPONDER_ASSIGNMENT_BARANGAYS } from "@/lib/responder-assignment-barangays"
 
 import { toast } from "sonner"
 
@@ -54,13 +55,7 @@ export default function RosterPage() {
   })
   const [addError, setAddError] = React.useState('')
 
-  const barangays = [
-    "Bagong Nayon", "Barangca", "Bonga Mayor", "Bonga Menor", "Catulinan", 
-    "Concepcion", "Hinukay", "Makinabang", "Matangtubig", "Pagala", "Paitan", 
-    "Piel", "Pinagbarilan", "Poblacion", "Sabang", "San Roque", "San Roque", 
-    "Santa Barbara", "Santo Cristo", "Santo Niño", "Subic", "Sulivan", 
-    "Tangos", "Tarcan", "Tiaong", "Tibag", "Virgen delas Flores"
-  ]
+  const barangays = RESPONDER_ASSIGNMENT_BARANGAYS
 
   const fetchRosterData = React.useCallback(async () => {
     try {

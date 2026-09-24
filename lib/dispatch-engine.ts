@@ -720,6 +720,33 @@ export async function checkAndCascadeExpiredOffers(): Promise<DispatchMaintenanc
   }
 }
 
+/**
+ * Reconcile one report's overdue offer before a PACC mutation reads its
+ * dispatch state. The compare-and-swap in cascadeIncident remains the owner
+ * of the release, so an accept or reassignment that wins the race is never
+ * overwritten by a stale PACC action.
+ */
+export async function reconcileExpiredOfferForRequest(requestId: string): Promise<
+  'NOT_REQUIRED' | 'ACTIVE_OFFER' | 'RECONCILED' | 'FAILED'
+> {
+  const incident = await db.query.incidents.findFirst({
+    where: eq(incidents.requestId, requestId),
+  });
+
+  if (!incident?.currentOfferResponderId || !incident.offerExpiresAt) {
+    return 'NOT_REQUIRED';
+  }
+
+  const offerExpiresAt = new Date(incident.offerExpiresAt).getTime();
+  if (!Number.isFinite(offerExpiresAt) || offerExpiresAt + DISPATCH_ACCEPTANCE_GRACE_MS > Date.now()) {
+    return 'ACTIVE_OFFER';
+  }
+
+  return (await cascadeIncident(incident.id, incident.currentOfferResponderId))
+    ? 'RECONCILED'
+    : 'FAILED';
+}
+
 /** @deprecated All offer expiry must use the compare-and-swap cascade path. */
 export async function checkAndRecycleManualOverrides() {
   await checkAndCascadeExpiredOffers();

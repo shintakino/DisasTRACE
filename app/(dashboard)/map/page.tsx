@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { format } from "date-fns";
 import { IncidentPanel } from "@/components/map/incident-panel";
 import { MapContainer } from "@/components/map/map-container";
 import { useMapData } from "@/hooks/use-map-data";
 import { MapIncident } from "@/types/map";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, MapPinned } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
@@ -17,9 +16,8 @@ import { CommandMapOverlays, type CommandMapLayers } from "@/components/map/comm
 import { WebPreloader } from "@/components/ui/web-preloader";
 
 function MapPageContent() {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const selectedMapDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
-  const { incidents, responders, hospitals, demandZones, summary, isLoading, error, refresh } = useMapData({ date: selectedMapDate });
+  const [period, setPeriod] = useState<"today" | "weekly" | "monthly" | "yearly">("today");
+  const { incidents, responders, hospitals, demandZones, isLoading, error, refresh } = useMapData({ period });
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
   const [filter, setFilter] = useState("ALL");
   const [category, setCategory] = useState<"user" | "responder">("user");
@@ -54,6 +52,9 @@ function MapPageContent() {
         // Ensure layer is visible
         if (incident.category === "user") setLayers((current) => ({ ...current, requests: true }));
         else if (incident.category === "responder") setLayers((current) => ({ ...current, reports: true }));
+        if (incident.status === "REJECTED" || incident.status === "DUPLICATE") {
+          setLayers((current) => ({ ...current, rejected: true }));
+        }
       }
     }
   }, [selectParam, incidents]);
@@ -68,6 +69,9 @@ function MapPageContent() {
       setCategory(found.category);
       if (found.category === "user") setLayers((current) => ({ ...current, requests: true }));
       else if (found.category === "responder") setLayers((current) => ({ ...current, reports: true }));
+      if (found.status === "REJECTED" || found.status === "DUPLICATE") {
+        setLayers((current) => ({ ...current, rejected: true }));
+      }
     }
   };
 
@@ -79,7 +83,7 @@ function MapPageContent() {
   const displayedIncidents = incidents.filter((incident) => {
     if (incident.category === "user" && !layers.requests) return false;
     if (incident.category === "responder" && !layers.reports) return false;
-    if ((incident.status === "REJECTED" || incident.status === "DUPLICATE") && !layers.rejected) return false;
+    if ((incident.status === "REJECTED" || incident.status === "DUPLICATE") && !layers.rejected && filter !== "REJECTED") return false;
     if (incident.severity === "Critical" && !layers.critical) return false;
     if (incident.severity === "High" && !layers.high) return false;
     if ((incident.severity === "Medium" || incident.severity === "Low") && !layers.moderate) return false;
@@ -101,17 +105,8 @@ function MapPageContent() {
     );
   }
 
-  const activeIncidentCount = incidents.filter((incident) => !['COMPLETED', 'REJECTED', 'DUPLICATE'].includes(incident.status)).length;
-
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-blue-100 bg-[#EAF1FF] px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-lg bg-[#1E3A8A] text-white"><MapPinned className="size-5" /></div>
-          <div><h1 className="text-lg font-black text-[#1E3A8A]">Live Operations Map</h1><p className="mt-0.5 text-xs text-slate-600">Monitor current reports, active responses, and available ambulance units.</p></div>
-        </div>
-        <div className="flex items-center gap-4 text-xs font-semibold text-[#1E3A8A]"><span className="inline-flex items-center gap-1.5"><Activity className="size-3.5" /> {activeIncidentCount} active incidents</span><span>{responders.filter((responder) => responder.status === 'AVAILABLE').length} responders available</span></div>
-      </header>
+    <div className="h-full min-h-0">
       <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       {isLoading ? (
         <div className="flex h-full w-full items-center justify-center bg-slate-50 p-4">
@@ -124,8 +119,7 @@ function MapPageContent() {
             isSidebarOpen ? "w-[400px]" : "w-0"
           )}>
             <IncidentPanel
-              summary={summary}
-              incidents={displayedIncidents}
+              incidents={incidents}
               onSelectIncident={handleSelectIncident}
               selectedIncidentId={selectedIncidentId}
               filter={filter}
@@ -134,8 +128,8 @@ function MapPageContent() {
               category={category}
               onCategoryChange={setCategory}
               onPriorityChange={setPriorityIncidentId}
-              selectedDate={selectedDate}
-              onSelectedDateChange={setSelectedDate}
+              period={period}
+              onPeriodChange={setPeriod}
             />
           </div>
 
@@ -156,7 +150,6 @@ function MapPageContent() {
             layers={layers}
             onLayerChange={(layer, checked) => setLayers((current) => ({ ...current, [layer]: checked }))}
             zones={demandZones}
-            isIncidentPanelOpen={isSidebarOpen}
           />
 
           <div className="relative h-full flex-1">

@@ -6,6 +6,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   XAxis,
@@ -28,6 +29,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { WebPreloader } from "@/components/ui/web-preloader";
 import { AnalyticsDataSchema, type AnalyticsData, type AnalyticsPeriod } from "@/types/analytics";
 import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
+import { formatDurationMinutes } from "@/lib/incident-presentation";
 
 const analyticsResponseSchema = z.object({
   data: AnalyticsDataSchema,
@@ -229,7 +231,7 @@ export function AnalyticsDashboard() {
         <SummaryMetric label="Reported incidents" value={data.summary.totalReported} detail="All logged reports" icon={FileBarChart} iconClassName="bg-blue-50 text-blue-700" />
         <SummaryMetric label="Verified reports" value={data.summary.verified} detail={`${data.summary.pending} awaiting triage`} icon={ClipboardCheck} iconClassName="bg-amber-50 text-amber-700" />
         <SummaryMetric label="Resolution rate" value={`${data.summary.resolutionRate}%`} detail={`${data.summary.resolved} resolved dispatches`} icon={CheckCircle2} iconClassName="bg-emerald-50 text-emerald-700" />
-        <SummaryMetric label="Avg. resolution time" value={`${data.summary.avgResponseMinutes} min`} detail="Dispatch to recorded resolution" icon={Clock3} iconClassName="bg-violet-50 text-violet-700" />
+        <SummaryMetric label="Avg. field response time" value={formatDurationMinutes(data.summary.avgResponseMinutes)} detail={data.summary.completedFieldResponses > 0 ? `Dispatch to field completion · ${data.summary.completedFieldResponses} completed response${data.summary.completedFieldResponses === 1 ? "" : "s"}` : "No completed field responses"} icon={Clock3} iconClassName="bg-violet-50 text-violet-700" />
       </section>
 
       <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-5">
@@ -302,7 +304,9 @@ export function AnalyticsDashboard() {
                   <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
                   <YAxis type="category" dataKey="type" width={112} tickLine={false} axisLine={false} tick={{ fill: "#475569", fontSize: 11 }} />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" name="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Bar dataKey="count" name="count" radius={[0, 4, 4, 0]} barSize={20}>
+                    {data.frequencies.map((frequency) => <Cell key={frequency.type} fill={frequency.color} />)}
+                  </Bar>
                 </BarChart>
               </ChartContainer>
             ) : <EmptyChart message="No incident reports have been recorded yet." />}

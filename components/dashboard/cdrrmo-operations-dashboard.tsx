@@ -7,6 +7,7 @@ import { CDRRMOIncidentSummary } from "@/components/dashboard/cdrrmo-incident-su
 import { CDRRMORecentActivity } from "@/components/dashboard/cdrrmo-recent-activity";
 import { CDRRMOResponderOverview } from "@/components/dashboard/cdrrmo-responder-overview";
 import type { DashboardData } from "@/types/dashboard";
+import { formatDurationMinutes } from "@/lib/incident-presentation";
 
 interface CDRRMOOperationsDashboardProps {
   data: DashboardData;
@@ -64,7 +65,7 @@ export function CDRRMOOperationsDashboard({
             <p className="mt-1 text-xs leading-5 text-slate-600">Welcome back. City activity is currently being monitored in real time — here is where operations stand this shift.</p>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-[#1E3A8A]">
               <span className="inline-flex items-center gap-1.5"><Activity className="size-3.5" /> {data.kpis.activeIncidents} active incidents</span>
-              <span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" /> {data.kpis.avgResponseTime} min average response</span>
+              <span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" /> {data.kpis.avgResponseTime === '0' ? 'No completed field responses today' : `${formatDurationMinutes(data.kpis.avgResponseTime)} average field response`}</span>
             </div>
           </div>
           <div className="absolute right-7 top-1/2 grid size-16 -translate-y-1/2 place-items-center rounded-full bg-blue-100 text-[#1E3A8A] ring-8 ring-blue-100/50"><MapPinned className="size-8" /></div>
@@ -86,8 +87,8 @@ export function CDRRMOOperationsDashboard({
 
         <CDRRMOIncidentSummary data={data.distribution} filter={distributionFilter} onFilterChange={onDistributionFilterChange} />
 
-        <section className="grid gap-5 xl:grid-cols-2">
-          <div className="grid gap-5 lg:grid-cols-[1.05fr_.95fr] xl:grid-cols-1 2xl:grid-cols-[1.05fr_.95fr]">
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,.85fr)_minmax(0,1.35fr)]">
+          <div className="space-y-5">
             <CDRRMOResponderOverview responders={data.responders} onViewRoster={onViewRoster} />
             <Card className="border-slate-200 p-5 shadow-sm">
               <h2 className="text-base font-bold text-[#1E3A8A]">Incident Trends</h2>

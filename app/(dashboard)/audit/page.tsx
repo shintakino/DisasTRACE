@@ -12,13 +12,17 @@ export default function AuditPage() {
   const [isInitialLoading, setIsInitialLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [filters, setFilters] = React.useState<AuditFilter>({});
-  const hasLoadedRef = React.useRef(false);
+  const initialRequestStartedRef = React.useRef(false);
   const latestRequestRef = React.useRef(0);
 
   const fetchLogs = React.useCallback(async () => {
     const requestId = ++latestRequestRef.current;
-    const isInitialLoad = !hasLoadedRef.current;
+    // A search must never restore the full-page preloader. Mark the initial
+    // request synchronously, before the network round trip, to cover rapid
+    // input and React development-mode effect replays.
+    const isInitialLoad = !initialRequestStartedRef.current;
     if (isInitialLoad) {
+      initialRequestStartedRef.current = true;
       setIsInitialLoading(true);
     } else {
       setIsRefreshing(true);
@@ -42,7 +46,6 @@ export default function AuditPage() {
       console.error("Failed to fetch audit logs:", error);
     } finally {
       if (requestId === latestRequestRef.current) {
-        hasLoadedRef.current = true;
         setIsInitialLoading(false);
         setIsRefreshing(false);
       }

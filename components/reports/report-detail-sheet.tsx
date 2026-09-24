@@ -145,7 +145,7 @@ export function ReportDetailSheet({
                 </div>
 
                 {/* Tab buttons */}
-                <div className="flex flex-row md:flex-col gap-1.5 text-[10px] font-black uppercase tracking-wide w-full overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
+                <div className="flex flex-row md:flex-col gap-1.5 text-xs font-black uppercase tracking-wide w-full overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
                   <button
                     onClick={() => setActiveTab("resident")}
                     className={cn(
@@ -204,26 +204,26 @@ export function ReportDetailSheet({
                 <div className="w-full space-y-6 animate-in fade-in zoom-in-95 duration-200">
                   {/* Resident's Report */}
                   <div>
-                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 tracking-wider">Resident's Report</h3>
+                    <h3 className="text-[#1A237E] font-black text-xs mb-3 tracking-wider">Resident's Report</h3>
                     <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
                       <div className="space-y-4 mb-4">
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-sm">
                           <span className="text-slate-500 font-medium">Nature of Call</span>
                           <span className="font-bold text-[#1A237E]">{report.natureOfCall || "Emergency"}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-sm">
                           <span className="text-slate-500 font-medium">Type of Emergency</span>
                           <span className="font-bold text-[#1A237E]">{report.type}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-sm">
                           <span className="text-slate-500 font-medium">Severity Level</span>
                           <span className="font-bold text-[#1A237E]">{report.severityLevel || "Critical"}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-sm">
                           <span className="text-slate-500 font-medium">People Involved</span>
                           <span className="font-bold text-[#1A237E]">{report.residentPeopleInvolved || report.peopleInvolved || 2}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px] pt-1">
+                        <div className="flex justify-between items-center text-sm pt-1">
                           <span className="text-slate-500 font-medium self-start">Location</span>
                           <span className="font-bold text-[#1A237E] text-right max-w-[65%] leading-tight">{report.location}</span>
                         </div>
@@ -255,18 +255,18 @@ export function ReportDetailSheet({
 
                   {/* Resident Information */}
                   <div>
-                    <h3 className="text-[#1A237E] font-black text-[11px] mb-3 tracking-wider">Reporter Information</h3>
+                    <h3 className="text-[#1A237E] font-black text-xs mb-3 tracking-wider">Reporter Information</h3>
                     <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-sm">
                           <span className="text-slate-500 font-medium">Reporter Name</span>
                           <span className="font-bold text-[#1A237E]">{report.residentName || "Anonymous"}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-sm">
                           <span className="text-slate-500 font-medium">Contact Number</span>
                           <span className="font-bold text-[#1A237E]">{report.residentPhone || "N/A"}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px] pt-1">
+                        <div className="flex justify-between items-center text-sm pt-1">
                           <span className="text-slate-500 font-medium self-start">Home Address</span>
                           <span className="font-bold text-[#1A237E] text-right max-w-[65%] leading-tight">{report.residentAddress || "N/A"}</span>
                         </div>
@@ -278,7 +278,7 @@ export function ReportDetailSheet({
                   {report.status !== "RESPONDING" && (
                     <div className="animate-in slide-in-from-top-4 fade-in duration-300">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-[#1A237E]/60 font-black text-[11px] tracking-wider">
+                        <h3 className="text-[#1A237E]/60 font-black text-xs tracking-wider">
                           Crew's Actual Findings
                         </h3>
                         {report.status === "ONGOING" && (
@@ -288,26 +288,26 @@ export function ReportDetailSheet({
                         )}
                       </div>
                       
-                      <h4 className="text-[#1A237E] font-black text-[11px] mb-3 tracking-wider">Nature of Call</h4>
+                      <h4 className="text-[#1A237E] font-black text-xs mb-3 tracking-wider">Nature of Call</h4>
                       <div className="border border-[#E8EAF6] rounded-3xl p-5 shadow-sm bg-white">
                         <div className="space-y-4">
-                          <div className="flex justify-between items-center text-[13px]">
+                          <div className="flex justify-between items-center text-sm">
                             <span className="text-slate-500 font-medium">Nature of Call</span>
                             <span className="font-bold text-[#1A237E]">{report.natureOfCall || "Emergency"}</span>
                           </div>
-                          <div className="flex justify-between items-center text-[13px]">
+                          <div className="flex justify-between items-center text-sm">
                             <span className="text-slate-500 font-medium">Type of Emergency</span>
                             <span className="font-bold text-[#1A237E]">{report.type}</span>
                           </div>
-                          <div className="flex justify-between items-center text-[13px]">
+                          <div className="flex justify-between items-center text-sm">
                             <span className="text-slate-500 font-medium">Severity Level</span>
                             <span className="font-bold text-[#1A237E]">{report.severityLevel || "Critical"}</span>
                           </div>
-                          <div className="flex justify-between items-center text-[13px]">
+                          <div className="flex justify-between items-center text-sm">
                             <span className="text-slate-500 font-medium">People Involved</span>
                             <span className="font-bold text-[#1A237E]">{report.peopleInvolved || 1}</span>
                           </div>
-                          <div className="flex justify-between items-center text-[13px] pt-1">
+                          <div className="flex justify-between items-center text-sm pt-1">
                             <span className="text-slate-500 font-medium self-start">Location</span>
                             <span className="font-bold text-[#1A237E] text-right max-w-[65%] leading-tight">{report.location}</span>
                           </div>

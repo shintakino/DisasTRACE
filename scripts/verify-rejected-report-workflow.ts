@@ -3,6 +3,7 @@ import {
   canPaccRejectVerificationRequest,
   classifyActiveVerificationBucket,
   classifyVerificationQueueItem,
+  getPaccRejectionConflict,
   normalizeRequiredRejectionReason,
   projectReporterReportStatus,
 } from '../lib/rejected-report-workflow';
@@ -74,6 +75,23 @@ check('allows rejection after an unanswered offer is fully released, but never d
     requestStatus: 'VERIFIED',
     incident: { incidentStatus: 'EN_ROUTE', responderId: 'accepted-responder', currentOfferResponderId: null },
   }), false);
+});
+
+check('explains an active or expired offer without treating it as a safe rejection', () => {
+  assert.deepEqual(getPaccRejectionConflict({
+    requestStatus: 'VERIFIED',
+    incident: { incidentStatus: 'DISPATCHED', responderId: null, currentOfferResponderId: 'offered-responder', offerExpiresAt: new Date('2026-09-25T10:01:00.000Z') },
+    now: new Date('2026-09-25T10:00:00.000Z'),
+  })?.code, 'ACTIVE_OFFER');
+  assert.deepEqual(getPaccRejectionConflict({
+    requestStatus: 'VERIFIED',
+    incident: { incidentStatus: 'DISPATCHED', responderId: null, currentOfferResponderId: 'offered-responder', offerExpiresAt: new Date('2026-09-25T10:00:00.000Z') },
+    now: new Date('2026-09-25T10:00:05.000Z'),
+  })?.code, 'OFFER_RECOVERY_PENDING');
+  assert.deepEqual(getPaccRejectionConflict({
+    requestStatus: 'VERIFIED',
+    incident: { incidentStatus: 'EN_ROUTE', responderId: 'accepted-responder', currentOfferResponderId: null },
+  })?.code, 'ACTIVE_RESPONSE');
 });
 
 check('projects rejection as a terminal reporter status with the exact reason', () => {

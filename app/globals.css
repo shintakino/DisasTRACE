@@ -185,3 +185,9 @@
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.35); /* Brighter on hover */
 }
+
+/* The password field supplies its own accessible Eye/EyeOff control. */
+.password-reveal-input::-ms-reveal,
+.password-reveal-input::-ms-clear {
+  display: none;
+}

@@ -21,3 +21,22 @@
 ## Checkpoint: Release validation
 
 - [ ] Chatbot contract, mobile state, provider, TypeScript, lint, build, and Android manual-flow checks pass.
+
+---
+
+# PACC Verification Workspace Tasks
+
+- [x] Task 1: Consolidate four queue filters, local search, and evidence previews.
+- [x] Task 2: Recompose selected-report workspace and dispatch timeline for compact desktop triage.
+
+## Checkpoint: Triage workspace
+
+- [ ] Queue states, PACC actions, and desktop layout are manually verified.
+
+- [x] Task 3: Add type-dependent dummy external emergency assistance and direct Call link.
+- [x] Task 4: Expand rejection dialog and normalize PACC semantic colors.
+- [x] Task 5: Restore Map incident-type legend and add PACC password visibility toggles.
+
+## Checkpoint: Release validation
+
+- [ ] Focused PACC, existing workflow, TypeScript, lint, build, and manual PACC checks pass.

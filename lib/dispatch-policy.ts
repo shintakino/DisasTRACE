@@ -86,6 +86,14 @@ export function isResponderHeartbeatFresh(
     && updatedAt >= now.getTime() - RESPONDER_HEARTBEAT_FRESHNESS_MS;
 }
 
+/** A responder may enter the dispatch pool only after a trusted recent heartbeat. */
+export function canActivateResponderDuty(
+  lastLocationUpdatedAt: Date | string | null,
+  now = new Date(),
+) {
+  return isResponderHeartbeatFresh(lastLocationUpdatedAt, now);
+}
+
 export function evaluateManualDispatchEligibility({
   requestStatus,
   incident,

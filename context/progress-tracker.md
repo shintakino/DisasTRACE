@@ -1,5 +1,44 @@
 # Progress Tracker
 
+## 2026-09-25 - PACC offer-rejection and responder-duty handshake repair
+
+- PACC rejection now reconciles that report's expired responder offer before taking its locked decision, rather than depending on the periodic scheduler to have run first. The compare-and-swap cascade still owns release/reassignment, so an accepted or re-offered dispatch remains protected. Conflicts now identify an active response, an active offer, or pending offer recovery, and the PACC queue refreshes after a failed rejection.
+- A responder can enter **On Duty** only after PACC has accepted a current trusted GPS heartbeat. The mobile flow synchronizes GPS before requesting the duty change; the API independently verifies the same 90-second heartbeat policy in both its guard and conditional update. A held/untrusted GPS response is no longer treated as a successful availability sync.
+- Added focused regression checks for expired-offer rejection messaging and the GPS-before-On-Duty server/mobile handshake. GPS-sync failure feedback now accurately states that the responder remains Off Duty.
+
+## 2026-09-25 - Compact PACC verification workspace
+
+- Reworked the PACC verification queue into four horizontal filters: For Action,
+  For Review, Closed, and Rejected. Local deferred search and evidence thumbnails
+  make reports easier to identify. Awaiting-responder work remains visible under
+  For Review rather than creating a fifth status category.
+- Compacted evidence and primary incident details, and grouped incident facts with
+  the dispatch timeline in the right rail. The rail now keeps PACC actions and
+  type-matched external assistance together; it displays 09364294078 normally and
+  exposes a direct dial link without calling the hotline a demo.
+- Widened the rejection dialog, restored shared-palette incident-type indicators
+  to the Map legend, and used the shared password input for PACC Settings so there
+  is one consistent visibility toggle. Root TypeScript checks pass.
+- Closed the PACC review follow-up: the shared workspace filter now excludes
+  assigned/in-progress incidents from For Review, while keeping awaiting offers,
+  closed cases, rejections, and merged duplicates correctly grouped. Primary
+  triage content is fixed in the desktop workspace; secondary reporter and
+  coordination controls are compact disclosures rather than page-level scroll
+  content. The focused check exercises the lifecycle grouping contract.
+
+## 2026-09-25 - Super Admin metric, map, roster, and dashboard refinements
+
+- Removed the duplicate Live Operations Map banner from the shared CDRRMO/PACC Map page; the common dashboard page title is now simply **Map**. The left operation panel now has official Barangay and Today/Weekly/Monthly/Yearly filters, Manila-time server bounds, and the same four All/Active/Resolved/Rejected categories for its counters and status overview.
+- Restricted Add Responder Barangay assignments to the provided official 23-barangay City of Baliwag list. Enlarged table column labels across User Management, Responder Roster, Audit Logs, and Status & Logs, and increased report-detail navigation and primary report-information typography for readability.
+- Prevented Audit Log searches from ever reinstating the full-screen preloader after the first request begins; debounced input remains editable while only an inline refresh indicator is shown.
+- Closed review gaps for the new Map and responder roster changes: the exact 23-item assignment list is now shared by the Add Responder selector and the protected account-creation API, which rejects invalid or missing Barangays for barangay responders. Updated the map-scope regression check for both date and period query contracts.
+
+- Replaced the misleading all-time fallback response average with a field-response metric: dispatch creation through recorded field completion, scoped to the current Manila day on the dashboard. Analytics uses the same definition across completed field responses and displays human-readable durations.
+- Centralized the approved eight-category incident palette and applied it to Dashboard summary/frequency data and Analytics frequency data. The CDRRMO incident donut is larger while its labels and bars remain responsive.
+- Moved Historical Demand Outlook into the right-side map-control rail directly above Map Legend and Layers, keeping the PACC/CDRRMO map surface clear.
+- Reflowed the CDRRMO desktop dashboard to stack Responder Status and Incident Trends on the left while Recent Activity occupies the right column. Updated visible filter values to Title Case, hid roster pagination for zero/one page result sets, and prevented Edge's native password reveal from overlapping the app's one accessible visibility control.
+- Added `scripts/verify-super-admin-ui-refinements.ts` to cover the metric source, approved colors, map rail order, Title Case filters, empty pagination, single password icon, and dashboard layout.
+
 ## 2026-09-25 - Chatbot-4 safe reporting-context integration
 
 - Added a typed, reviewed `Chatbot-4.md` context map instead of loading the raw Markdown into the chatbot, mobile bundle, or DeepSeek prompt. The provider continues to receive only compact allowlisted knowledge IDs and keywords.

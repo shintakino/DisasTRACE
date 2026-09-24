@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Truck, Siren, CheckCircle, Clock } from "lucide-react";
 import { KpiData } from "@/types/dashboard";
 import { motion } from "motion/react";
+import { formatDurationMinutes } from "@/lib/incident-presentation";
 
 const container = {
   hidden: { opacity: 0 },
@@ -41,8 +42,8 @@ export function KpiCards({ data }: { data: KpiData }) {
       accent: "border-emerald-300 bg-white text-slate-900",
     },
     {
-      title: "AVG RESPONSE TIME",
-      value: `${data.avgResponseTime}m`,
+      title: "AVG FIELD RESPONSE",
+      value: formatDurationMinutes(data.avgResponseTime),
       icon: Clock,
       accent: "border-amber-300 bg-white text-slate-900",
     },

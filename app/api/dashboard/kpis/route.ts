@@ -36,32 +36,22 @@ export async function GET() {
       db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(and(eq(verificationRequests.status, "REJECTED"), gte(verificationRequests.updatedAt, today.start), lt(verificationRequests.updatedAt, today.end))),
     ]);
 
-    // 4. Avg Response Time Today (in minutes)
+    // Field-response time ends when the responder completes the field outcome,
+    // not when later documentation is finally submitted.
     const avgResponse = await db
       .select({
-        avgSeconds: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (${incidents.resolvedAt} - ${incidents.createdAt}))), 0)`
+        avgSeconds: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (${incidents.fieldResponseCompletedAt} - ${incidents.createdAt}))), 0)`
       })
       .from(incidents)
       .where(
         and(
-          eq(incidents.status, "RESOLVED"),
-          gte(incidents.resolvedAt, today.start),
-          lt(incidents.resolvedAt, today.end),
+          sql`${incidents.fieldResponseCompletedAt} IS NOT NULL`,
+          gte(incidents.fieldResponseCompletedAt, today.start),
+          lt(incidents.fieldResponseCompletedAt, today.end),
         )
       );
 
-    let avgMinutes = avgResponse[0] ? Math.round(avgResponse[0].avgSeconds / 60) : 0;
-
-    if (avgMinutes === 0) {
-      const historicalAvgResponse = await db
-        .select({
-          avgSeconds: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (${incidents.resolvedAt} - ${incidents.createdAt}))), 0)`
-        })
-        .from(incidents)
-        .where(eq(incidents.status, "RESOLVED"));
-
-      avgMinutes = historicalAvgResponse[0] ? Math.round(historicalAvgResponse[0].avgSeconds / 60) : 0;
-    }
+    const avgMinutes = avgResponse[0] ? Math.round(avgResponse[0].avgSeconds / 60) : 0;
 
     return NextResponse.json({
       data: {

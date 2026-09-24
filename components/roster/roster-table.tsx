@@ -133,6 +133,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
       },
     },
   })
+  const hasMultiplePages = table.getPageCount() > 1
 
   return (
     <div className="flex flex-col border border-slate-200/80 shadow-sm rounded-xl overflow-hidden bg-white">
@@ -149,7 +150,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="h-14 text-black font-bold text-xs uppercase tracking-widest px-6">
+                  <TableHead key={header.id} className="h-14 text-[15px] font-black text-slate-700 uppercase tracking-widest px-6">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -185,8 +186,8 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
           </TableBody>
         </Table>
         
-        {/* Custom Pagination matching the design */}
-        <div className="flex justify-end px-6 py-6 border-t border-gray-100">
+        {/* Hide controls when there are zero or one actual result pages. */}
+        {hasMultiplePages ? <div className="flex justify-end px-6 py-6 border-t border-gray-100">
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -198,8 +199,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
               <ChevronLeft className="size-4" />
             </Button>
             
-            {Array.from({ length: table.getPageCount() || 10 }, (_, i) => i).map((page) => {
-              // Just a simplified pagination rendering to match the "1 2 3 ... 10" look for the mock
+            {Array.from({ length: table.getPageCount() }, (_, i) => i).map((page) => {
               if (page > 2 && page < 9) {
                 if (page === 3) return <span key={page} className="px-1 text-gray-400">...</span>
                 return null;
@@ -233,7 +233,7 @@ export function RosterTable({ data, searchComponent, filterComponent, onManage, 
               <ChevronRight className="size-4" />
             </Button>
           </div>
-        </div>
+        </div> : null}
       </div>
     </div>
   )

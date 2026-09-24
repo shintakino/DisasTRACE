@@ -2,17 +2,14 @@
 
 import * as React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MapIncident, MapSummary } from "@/types/map";
-import { Calendar as CalendarIcon, Activity, Flame, Car, ShieldAlert, Clock, MapPin } from "lucide-react";
+import { MapIncident } from "@/types/map";
+import { Activity, Flame, Car, ShieldAlert, Clock, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as UICalendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { compareOperationalIncidents, isOperationalIncidentActive } from "@/lib/incident-display-priority";
 
 interface IncidentPanelProps {
-  summary: MapSummary;
   incidents: MapIncident[];
   onSelectIncident: (incident: MapIncident) => void;
   selectedIncidentId?: string;
@@ -22,8 +19,8 @@ interface IncidentPanelProps {
   category?: "user" | "responder";
   onCategoryChange?: (category: "user" | "responder") => void;
   onPriorityChange?: (incidentId: string | undefined) => void;
-  selectedDate?: Date;
-  onSelectedDateChange?: (date: Date | undefined) => void;
+  period?: "today" | "weekly" | "monthly" | "yearly";
+  onPeriodChange?: (period: "today" | "weekly" | "monthly" | "yearly") => void;
 }
 
 export function IncidentPanel({
@@ -36,21 +33,12 @@ export function IncidentPanel({
   category: externalCategory,
   onCategoryChange,
   onPriorityChange,
-  selectedDate: externalSelectedDate,
-  onSelectedDateChange,
+  period = "today",
+  onPeriodChange,
 }: IncidentPanelProps) {
   const [internalCategory, setInternalCategory] = React.useState<"user" | "responder">("user");
   const category = externalCategory !== undefined ? externalCategory : internalCategory;
-  const [internalSelectedDate, setInternalSelectedDate] = React.useState<Date | undefined>(undefined);
-  const selectedDate = externalSelectedDate ?? internalSelectedDate;
-
-  const handleSelectedDateChange = (date: Date | undefined) => {
-    if (onSelectedDateChange) {
-      onSelectedDateChange(date);
-      return;
-    }
-    setInternalSelectedDate(date);
-  };
+  const [barangay, setBarangay] = React.useState("all");
 
   // Auto-scroll list when an incident pin is selected on the map
   React.useEffect(() => {
@@ -78,52 +66,39 @@ export function IncidentPanel({
     onFilterChange("ALL");
   };
 
-  // Client-side statistics calculations for high-fidelity widgets
+  const barangays = React.useMemo(() => Array.from(new Set(
+    incidents.map((incident) => incident.barangay).filter((value): value is string => Boolean(value)),
+  )).sort((first, second) => first.localeCompare(second)), [incidents]);
+
+  const normaliseStatus = (incident: MapIncident) => {
+    if (incident.status === "REJECTED" || incident.status === "DUPLICATE") return "REJECTED";
+    if (incident.status === "COMPLETED") return "RESOLVED";
+    return "ACTIVE";
+  };
+
+  // The top controls and overview deliberately use the same four categories.
   const stats = React.useMemo(() => {
-    const userPending = incidents.filter(i => i.category === "user" && i.status === "PENDING").length;
-    const userVerified = incidents.filter(i => i.category === "user" && i.status === "VERIFIED").length;
-    const userRejected = incidents.filter(i => i.category === "user" && i.status === "REJECTED").length;
-    const userDuplicate = incidents.filter(i => i.category === "user" && i.status === "DUPLICATE").length;
-
-    const respOngoing = incidents.filter(i => i.category === "responder" && i.status === "ONGOING").length;
-    const respCompleted = incidents.filter(i => i.category === "responder" && i.status === "COMPLETED").length;
-
+    const categoryIncidents = incidents.filter((incident) => (
+      incident.category === category && (barangay === "all" || incident.barangay === barangay)
+    ));
     return {
-      user: {
-        PENDING: userPending,
-        VERIFIED: userVerified,
-        REJECTED: userRejected,
-        DUPLICATE: userDuplicate,
-      },
-      responder: {
-        ONGOING: respOngoing,
-        COMPLETED: respCompleted,
-      }
+      ALL: categoryIncidents.length,
+      ACTIVE: categoryIncidents.filter((incident) => normaliseStatus(incident) === "ACTIVE").length,
+      RESOLVED: categoryIncidents.filter((incident) => normaliseStatus(incident) === "RESOLVED").length,
+      REJECTED: categoryIncidents.filter((incident) => normaliseStatus(incident) === "REJECTED").length,
     };
-  }, [incidents]);
+  }, [barangay, category, incidents]);
 
   const filteredIncidents = incidents.filter((incident) => {
     // 0. Category Filter
     if (incident.category !== category) return false;
 
     // 1. Status Filter
-    let statusMatch = true;
-    if (filter === "ALL") statusMatch = true;
-    else statusMatch = incident.status === filter;
+    const statusMatch = filter === "ALL" || normaliseStatus(incident) === filter;
 
     if (!statusMatch) return false;
 
-    // 2. Date Filter
-    if (selectedDate) {
-      const incidentDate = new Date(incident.createdAt);
-      return (
-        incidentDate.getFullYear() === selectedDate.getFullYear() &&
-        incidentDate.getMonth() === selectedDate.getMonth() &&
-        incidentDate.getDate() === selectedDate.getDate()
-      );
-    }
-
-    return true;
+    return barangay === "all" || incident.barangay === barangay;
   }).sort((a, b) => compareOperationalIncidents(
     { id: a.id, severity: a.severity, status: a.status, createdAt: a.createdAt },
     { id: b.id, severity: b.severity, status: b.status, createdAt: b.createdAt },
@@ -139,35 +114,20 @@ export function IncidentPanel({
       <div className="flex flex-col px-6 pt-6 pb-4 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-20 gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold capitalize text-[#1E3A8A] tracking-tight">Incident reports</h1>
+            <h1 className="text-2xl font-bold capitalize text-[#1E3A8A] tracking-tight">Incident Reports</h1>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Real-time Command Feed</p>
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 text-[10px] font-black border border-slate-200 shadow-sm transition-colors cursor-pointer outline-none">
-                <CalendarIcon size={12} className="text-slate-400" />
-                <span>{selectedDate ? format(selectedDate, "MM.dd.yyyy") : "ALL DATES"}</span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 z-50 bg-white shadow-2xl border border-slate-100 rounded-2xl" align="end">
-              <div className="p-2 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider pl-1">Filter by Date</span>
-                {selectedDate && (
-                  <button 
-                    onClick={() => handleSelectedDateChange(undefined)}
-                    className="text-[9px] font-bold text-red-500 hover:text-red-700 uppercase pr-1 cursor-pointer"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <UICalendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={handleSelectedDateChange}
-              />
-            </PopoverContent>
-          </Popover>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Select value={barangay} onValueChange={(value) => setBarangay(value ?? "all")}>
+            <SelectTrigger aria-label="Filter incidents by Barangay" className="h-9 text-xs font-semibold"><SelectValue placeholder="All Barangays" /></SelectTrigger>
+            <SelectContent><SelectItem value="all">All Barangays</SelectItem>{barangays.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={period} onValueChange={(value) => { if (value) onPeriodChange?.(value as "today" | "weekly" | "monthly" | "yearly"); }}>
+            <SelectTrigger aria-label="Filter incidents by time period" className="h-9 text-xs font-semibold"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="today">Today</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem></SelectContent>
+          </Select>
         </div>
 
         {/* Category Toggles (User vs Responder) */}
@@ -202,43 +162,12 @@ export function IncidentPanel({
         <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2.5 block">
           Overall Incident Statistics
         </span>
-        {category === "user" ? (
-          <div className="grid grid-cols-4 gap-2">
-            <SummaryCard
-              label="PENDING"
-              count={stats.user.PENDING}
-              tone="bg-[#1E3A8A]"
-            />
-            <SummaryCard
-              label="VERIFIED"
-              count={stats.user.VERIFIED}
-              tone="bg-[#047857]"
-            />
-            <SummaryCard
-              label="REJECTED"
-              count={stats.user.REJECTED}
-              tone="bg-[#B91C1C]"
-            />
-            <SummaryCard
-              label="DUPLICATE"
-              count={stats.user.DUPLICATE}
-              tone="bg-[#B45309]"
-            />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            <SummaryCard
-              label="ONGOING"
-              count={stats.responder.ONGOING}
-              tone="bg-[#B91C1C]"
-            />
-            <SummaryCard
-              label="COMPLETED"
-              count={stats.responder.COMPLETED}
-              tone="bg-[#047857]"
-            />
-          </div>
-        )}
+        <div className="grid grid-cols-4 gap-2">
+          <SummaryCard label="ALL" count={stats.ALL} tone="bg-[#1E3A8A]" />
+          <SummaryCard label="ACTIVE" count={stats.ACTIVE} tone="bg-[#2563EB]" />
+          <SummaryCard label="RESOLVED" count={stats.RESOLVED} tone="bg-[#047857]" />
+          <SummaryCard label="REJECTED" count={stats.REJECTED} tone="bg-[#B91C1C]" />
+        </div>
       </div>
 
       {/* Filter Tabs with descriptive label */}
@@ -249,18 +178,9 @@ export function IncidentPanel({
         <Tabs value={filter} onValueChange={onFilterChange} className="w-full">
           <TabsList className="flex w-full bg-slate-100/80 p-1 rounded-xl h-11">
             <TabTrigger value="ALL">ALL</TabTrigger>
-            {category === "user" ? (
-              <>
-                <TabTrigger value="PENDING">PENDING</TabTrigger>
-                <TabTrigger value="VERIFIED">VERIFIED</TabTrigger>
-                <TabTrigger value="REJECTED">REJECTED</TabTrigger>
-              </>
-            ) : (
-              <>
-                <TabTrigger value="ONGOING">ONGOING</TabTrigger>
-                <TabTrigger value="COMPLETED">COMPLETED</TabTrigger>
-              </>
-            )}
+            <TabTrigger value="ACTIVE">ACTIVE</TabTrigger>
+            <TabTrigger value="RESOLVED">RESOLVED</TabTrigger>
+            <TabTrigger value="REJECTED">REJECTED</TabTrigger>
           </TabsList>
         </Tabs>
       </div>

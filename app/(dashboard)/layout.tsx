@@ -243,7 +243,7 @@ export default function DashboardLayout({
   const navItems = getNavItems(role as UserRole);
 
   const getPageTitle = (path: string) => {
-    if (path === '/map') return 'Incident Command Center';
+    if (path === '/map') return 'Map';
     const item = navItems.find((item) => item.url === path);
     return item ? item.title : "Dashboard";
   };

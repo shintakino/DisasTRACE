@@ -439,6 +439,9 @@ export default function VerificationPage() {
       const message = error instanceof Error ? error.message : "Failed to update status"
       setActionFeedback(createActionErrorFeedback(`${requestLabel} was not changed`, message))
       toast.error(message)
+      // A conflict can be an accepted, reassigned, or just-recovered offer.
+      // Refresh the authoritative queue before PACC tries another action.
+      if (status === 'REJECTED') void fetchRequestsSilent()
       return false
     } finally {
       setIsProcessing(false)
@@ -660,7 +663,7 @@ export default function VerificationPage() {
       responderId: request.incident?.responderId,
       currentOfferResponderId: request.incident?.currentOfferResponderId,
     })
-    if (bucket) setFilter(bucket)
+    if (bucket) setFilter(bucket === "ACTION" ? "ACTION" : "REVIEW")
     setSelectedId(request.id)
   }
   const activeAlertPriority = mostUrgentAlert ? getIncidentAlertPriority(mostUrgentAlert.severity) : "standard";

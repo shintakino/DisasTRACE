@@ -45,11 +45,11 @@ export function CDRRMOIncidentSummary({ data, filter, onFilterChange }: CDRRMOIn
           <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">No incidents reported for this period.</div>
         ) : (
           <>
-            <div className="grid gap-5 lg:grid-cols-[150px_1fr]">
-              <div className="grid grid-cols-[108px_1fr] items-center gap-3 lg:block">
-                <div className="relative size-[108px]">
-                  <PieChart width={108} height={108} aria-label="Incident type distribution">
-                    <Pie data={reported} dataKey="value" nameKey="name" innerRadius={33} outerRadius={52} paddingAngle={2} stroke="none">
+            <div className="grid gap-5 lg:grid-cols-[190px_1fr]">
+              <div className="grid grid-cols-[144px_1fr] items-center gap-3 lg:block">
+                <div className="relative size-36">
+                  <PieChart width={144} height={144} aria-label="Incident type distribution">
+                    <Pie data={reported} dataKey="value" nameKey="name" innerRadius={45} outerRadius={68} paddingAngle={2} stroke="none">
                       {reported.map((item) => <Cell key={item.name} fill={item.fill} />)}
                     </Pie>
                   </PieChart>

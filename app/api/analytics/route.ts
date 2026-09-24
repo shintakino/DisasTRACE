@@ -7,17 +7,9 @@ import { createClient } from "@/lib/supabase-server";
 import { AnalyticsPeriodSchema, type AnalyticsPeriod } from "@/types/analytics";
 import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
 import { buildIncidentDemandOutlook, zeroFillCompletedBuckets } from "@/lib/incident-demand-outlook";
+import { INCIDENT_PRESENTATION } from "@/lib/incident-presentation";
 
-const INCIDENT_TYPES = [
-  { type: "Vehicular Collision", color: "#1E3A8A" },
-  { type: "Medical Emergency", color: "#DC2626" },
-  { type: "Structural Failure", color: "#D97706" },
-  { type: "Fire Emergency", color: "#B91C1C" },
-  { type: "Flood/Water", color: "#2563EB" },
-  { type: "Unknown Cause", color: "#64748B" },
-  { type: "Patient Transport", color: "#0F766E" },
-  { type: "Other / non-emergency request", color: "#7C3AED" },
-] as const;
+const INCIDENT_TYPES = INCIDENT_PRESENTATION;
 
 interface TrendRow {
   label: string;
@@ -169,17 +161,21 @@ export async function GET(request: Request) {
 
     try {
       responseTimeRows = await db
-        .select({ avgResponseMinutes: sql<number>`coalesce(round(avg(extract(epoch from (${incidents.resolvedAt} - ${incidents.createdAt})) / 60)::numeric, 0), 0)` })
+        .select({
+          avgResponseMinutes: sql<number>`coalesce(round(avg(extract(epoch from (${incidents.fieldResponseCompletedAt} - ${incidents.createdAt})) / 60)::numeric, 0), 0)`,
+          completedFieldResponses: sql<number>`count(${incidents.fieldResponseCompletedAt})`,
+        })
         .from(incidents)
         .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
-        .where(incidentScope(eq(incidents.status, "RESOLVED")));
+        .where(incidentScope(sql`${incidents.fieldResponseCompletedAt} IS NOT NULL`));
     } catch (e) {
       console.error("[Analytics] responseTimeRows query failed:", e);
       throw e;
     }
 
     const frequencies = INCIDENT_TYPES.map((incidentType) => ({
-      ...incidentType,
+      type: incidentType.type,
+      color: incidentType.color,
       count: Number(frequencyRows.find((row) => row.type === incidentType.type)?.count ?? 0),
     })).sort((first, second) => second.count - first.count);
 
@@ -192,6 +188,7 @@ export async function GET(request: Request) {
     const pending = Number(pendingRows[0]?.count ?? 0);
     const resolved = Number(resolvedRows[0]?.count ?? 0);
     const avgResponseMinutes = Number(responseTimeRows[0]?.avgResponseMinutes ?? 0);
+    const completedFieldResponses = Number(responseTimeRows[0]?.completedFieldResponses ?? 0);
     const topFrequency = frequencies[0];
     const peakTrend = trends.reduce<TrendRow | undefined>(
       (peak, current) => (!peak || current.count > peak.count ? current : peak),
@@ -221,7 +218,7 @@ export async function GET(request: Request) {
             title: pending > 0 ? `${pending} reports still await triage` : `${resolutionRate}% of verified incidents are resolved`,
             detail: pending > 0
               ? "Review the pending queue to keep incident classification and response coordination current."
-              : `${resolved} dispatched incident${resolved === 1 ? " has" : "s have"} been resolved; average recorded response lifecycle is ${avgResponseMinutes} minutes.`,
+              : `${resolved} dispatched incident${resolved === 1 ? " has" : "s have"} been resolved; ${completedFieldResponses} completed field response${completedFieldResponses === 1 ? " is" : "s are"} included in the response-time average.`,
           },
         ];
 
@@ -237,6 +234,7 @@ export async function GET(request: Request) {
           resolved,
           resolutionRate,
           avgResponseMinutes,
+          completedFieldResponses,
         },
         insights,
         outlook,

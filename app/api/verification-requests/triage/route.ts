@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
     } else {
       const rejection = await rejectVerificationRequest(requestId, rejectionReason);
       if (!rejection.success) {
-        return NextResponse.json({ error: rejection.error }, { status: rejection.status });
+        return NextResponse.json({ error: rejection.error, code: rejection.code }, { status: rejection.status });
       }
       finalReq = rejection.request;
     }

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+import { INCIDENT_PRESENTATION } from "@/lib/incident-presentation";
 
 export async function GET(request: Request) {
   try {
@@ -50,16 +51,7 @@ export async function GET(request: Request) {
     const dbDistribution = await distQuery.groupBy(verificationRequests.type);
 
     // Map database enum types to dashboard display names and specific brand colors
-    const typeColorMap: Record<string, { name: string; fill: string }> = {
-      'Vehicular Collision': { name: 'Vehicular Collision', fill: '#15286A' },
-      'Medical Emergency': { name: 'Medical Emergency', fill: '#A80107' },
-      'Structural Failure': { name: 'Structural Failure', fill: '#E77F00' },
-      'Fire Emergency': { name: 'Fire / Explosion', fill: '#0F4503' },
-      'Flood/Water': { name: 'Flood / Water', fill: '#2803A2' },
-      'Unknown Cause': { name: 'Unknown Cause', fill: '#9B058C' },
-      'Patient Transport': { name: 'Patient Transport', fill: '#0F766E' },
-      'Other / non-emergency request': { name: 'Other / non-emergency request', fill: '#7C3AED' },
-    };
+    const typeColorMap = Object.fromEntries(INCIDENT_PRESENTATION.map((item) => [item.type, { name: item.label, fill: item.color }]));
 
     // Dynamic distribution computation
     const distribution = Object.entries(typeColorMap).map(([key, info]) => {

@@ -60,7 +60,7 @@ export async function PATCH(
       const rejection = await rejectVerificationRequest(id, rejectionReason, createAuditActor(user));
 
       if (!rejection.success) {
-        return NextResponse.json({ error: rejection.error }, { status: rejection.status });
+        return NextResponse.json({ error: rejection.error, code: rejection.code }, { status: rejection.status });
       }
 
       return NextResponse.json({

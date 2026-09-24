@@ -135,7 +135,7 @@ export function LogsTable({ data, showActionColumn = true }: LogsTableProps) {
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <TableHead key={header.id} className="h-12 text-[15px] font-black text-slate-500 uppercase tracking-widest">
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -271,24 +272,22 @@ export function SettingsView() {
 
                 <div className="space-y-2">
                   <Label htmlFor="currentPassword" className="text-sm font-semibold text-[#1E293B]">Current Password</Label>
-                  <Input 
-                    id="currentPassword" 
-                    type="password" 
+                  <PasswordInput
+                    id="currentPassword"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password (for safety)" 
-                    className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white" 
+                    placeholder="Enter current password (for safety)"
+                    className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="newPassword" className="text-sm font-semibold text-[#1E293B]">New Password</Label>
-                  <Input 
-                    id="newPassword" 
-                    type="password" 
+                  <PasswordInput
+                    id="newPassword"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password" 
-                    className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white" 
+                    placeholder="Enter new password"
+                    className="h-12 border-[#CBD5E1] rounded-xl text-base px-4 bg-white"
                   />
                 </div>
                 <Button 

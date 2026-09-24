@@ -16,6 +16,7 @@ export const MapIncidentSchema = z.object({
   type: z.string(),
   origin: z.string(),
   destination: z.string(),
+  barangay: z.string().nullable().optional(),
   lat: z.number(),
   lng: z.number(),
   createdAt: z.string(),

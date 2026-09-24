@@ -12,7 +12,7 @@ const TelemetryPayloadSchema = z.object({
   timestamp: z.string(),
 });
 
-export function useMapData({ date }: { date?: string } = {}) {
+export function useMapData({ date, period }: { date?: string; period?: 'today' | 'weekly' | 'monthly' | 'yearly' } = {}) {
   const [incidents, setIncidents] = useState<MapIncident[]>([]);
   const [responders, setResponders] = useState<MapResponder[]>([]);
   const [hospitals, setHospitals] = useState<MapHospital[]>([]);
@@ -30,7 +30,8 @@ export function useMapData({ date }: { date?: string } = {}) {
     if (showSkeleton) setIsLoading(true);
     setError(null);
     try {
-      const incidentQuery = date ? `?date=${encodeURIComponent(date)}` : '';
+      const query = date ? `date=${encodeURIComponent(date)}` : period ? `period=${encodeURIComponent(period)}` : '';
+      const incidentQuery = query ? `?${query}` : '';
       const [incidentsRes, respondersRes, summaryRes, hospitalsRes, hotspotsRes] = await Promise.all([
         fetch(`/api/map/incidents${incidentQuery}`),
         fetch("/api/map/responders"),
@@ -61,7 +62,7 @@ export function useMapData({ date }: { date?: string } = {}) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
       if (showSkeleton) setIsLoading(false);
     }
-  }, [date]);
+  }, [date, period]);
 
   useEffect(() => {
     void fetchData(true);

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, gte, ne } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import { retryPendingAutomaticDispatches } from "@/lib/dispatch-engine";
+import { canActivateResponderDuty, RESPONDER_HEARTBEAT_FRESHNESS_MS } from "@/lib/dispatch-policy";
 
 const DutyStatusSchema = z.object({
   dutyStatus: z.enum(['OFF_DUTY', 'ON_DUTY']),
@@ -41,18 +42,33 @@ export async function PATCH(req: NextRequest) {
     }
 
     const { dutyStatus } = result.data;
+    const heartbeatFreshAfter = new Date(Date.now() - RESPONDER_HEARTBEAT_FRESHNESS_MS);
+
+    if (dutyStatus === 'ON_DUTY' && !canActivateResponderDuty(dbUser.lastLocationUpdatedAt)) {
+      return NextResponse.json({
+        error: 'Share a current trusted GPS location before going On Duty. Check location permission and signal, then try again.',
+        code: 'LOCATION_HEARTBEAT_REQUIRED',
+      }, { status: 409 });
+    }
 
     // Update duty status
+    const updateConditions = [eq(users.id, user.id), ne(users.dutyStatus, 'ACTIVE_DISPATCH')];
+    if (dutyStatus === 'ON_DUTY') updateConditions.push(gte(users.lastLocationUpdatedAt, heartbeatFreshAfter));
     const [updatedUser] = await db.update(users)
       .set({ 
         dutyStatus,
         updatedAt: new Date()
       })
-      .where(and(eq(users.id, user.id), ne(users.dutyStatus, 'ACTIVE_DISPATCH')))
+      .where(and(...updateConditions))
       .returning();
 
     if (!updatedUser) {
-      return NextResponse.json({ error: 'Conflict: A dispatch reserved this responder before the duty change completed.' }, { status: 409 });
+      return NextResponse.json({
+        error: dutyStatus === 'ON_DUTY'
+          ? 'PACC could not confirm a fresh trusted GPS location. Check location permission and signal, then try again.'
+          : 'Conflict: A dispatch reserved this responder before the duty change completed.',
+        code: dutyStatus === 'ON_DUTY' ? 'LOCATION_HEARTBEAT_REQUIRED' : 'ACTIVE_DISPATCH',
+      }, { status: 409 });
     }
 
     if (dutyStatus === 'ON_DUTY') {

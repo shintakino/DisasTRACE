@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { CheckCircle2, ChevronDown, CircleDotDashed, Hospital, Layers3, MapPin, Navigation, Siren } from "lucide-react";
 import type { DemandZoneRisk, MapDemandZone } from "@/types/map";
 import { cn } from "@/lib/utils";
+import { INCIDENT_PRESENTATION } from "@/lib/incident-presentation";
 
 export interface CommandMapLayers {
   critical: boolean;
@@ -20,7 +21,6 @@ interface CommandMapOverlaysProps {
   layers: CommandMapLayers;
   onLayerChange: (layer: keyof CommandMapLayers, checked: boolean) => void;
   zones: MapDemandZone[];
-  isIncidentPanelOpen: boolean;
 }
 
 function LayerToggle({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: (checked: boolean) => void }) {
@@ -59,7 +59,7 @@ const riskLabel: Record<DemandZoneRisk, string> = {
   EMERGING: "Emerging historical recurrence",
 };
 
-export function CommandMapOverlays({ layers, onLayerChange, zones, isIncidentPanelOpen }: CommandMapOverlaysProps) {
+export function CommandMapOverlays({ layers, onLayerChange, zones }: CommandMapOverlaysProps) {
   const [isLegendOpen, setIsLegendOpen] = useState(false);
   const [isLayersOpen, setIsLayersOpen] = useState(false);
   const strongestZones = [...zones].sort((first, second) => second.count - first.count).slice(0, 3);
@@ -67,7 +67,16 @@ export function CommandMapOverlays({ layers, onLayerChange, zones, isIncidentPan
   return (
     <>
       <aside aria-label="Map legend and controls" className="absolute right-4 top-4 z-20 hidden w-60 space-y-3 lg:block">
+        <section aria-label="Historical incident demand outlook" className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
+          <div className="flex items-center gap-2"><CircleDotDashed className="size-4 text-violet-700" /><div><h2 className="text-xs font-black text-[#1E3A8A]">Historical Demand Outlook</h2><p className="text-[9px] font-bold uppercase tracking-wide text-violet-700">Descriptive, not a forecast</p></div></div>
+          {strongestZones.length ? <ul className="mt-3 space-y-2">{strongestZones.map((zone) => <li key={zone.id} className="text-xs text-slate-700"><span className="font-bold">{riskLabel[zone.riskLevel]}</span><span className="block text-[10px] text-slate-500">{zone.count} verified reports in one mapped cluster</span></li>)}</ul> : <p className="mt-3 text-xs leading-5 text-slate-500">No recurring verified-report clusters meet the display threshold yet.</p>}
+          <p className="mt-3 border-t border-slate-100 pt-3 text-[10px] leading-4 text-slate-500">Demand zones help planning; they do not predict or confirm an incident.</p>
+        </section>
         <CollapsiblePanel id="map-legend-content" icon={<MapPin className="size-3.5" />} title="Map Legend" open={isLegendOpen} onToggle={() => setIsLegendOpen((current) => !current)}>
+          <p className="mt-3 text-[9px] font-black uppercase tracking-wide text-slate-400">Incident types</p>
+          <ul className="mt-2 space-y-1.5 text-[10px] text-slate-600">
+            {INCIDENT_PRESENTATION.map((incident) => <LegendRow key={incident.label} color={incident.color} label={incident.label} />)}
+          </ul>
           <p className="mt-3 text-[9px] font-black uppercase tracking-wide text-slate-400">Incident markers</p>
           <ul className="mt-2 space-y-1.5 text-[10px] text-slate-600">
             <LegendRow icon={<Siren className="size-3.5 text-red-600" />} label="Active emergency or critical priority" />
@@ -104,11 +113,6 @@ export function CommandMapOverlays({ layers, onLayerChange, zones, isIncidentPan
         </CollapsiblePanel>
       </aside>
 
-      <section aria-label="Historical incident demand outlook" className={cn("absolute bottom-4 z-20 hidden w-64 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur transition-[left] duration-300 lg:block", isIncidentPanelOpen ? "left-[416px]" : "left-4")}>
-        <div className="flex items-center gap-2"><CircleDotDashed className="size-4 text-violet-700" /><div><h2 className="text-xs font-black text-[#1E3A8A]">Historical Demand Outlook</h2><p className="text-[9px] font-bold uppercase tracking-wide text-violet-700">Descriptive, not a forecast</p></div></div>
-        {strongestZones.length ? <ul className="mt-3 space-y-2">{strongestZones.map((zone) => <li key={zone.id} className="text-xs text-slate-700"><span className="font-bold">{riskLabel[zone.riskLevel]}</span><span className="block text-[10px] text-slate-500">{zone.count} verified reports in one mapped cluster</span></li>)}</ul> : <p className="mt-3 text-xs leading-5 text-slate-500">No recurring verified-report clusters meet the display threshold yet.</p>}
-        <p className="mt-3 border-t border-slate-100 pt-3 text-[10px] leading-4 text-slate-500">Demand zones help planning; they do not predict or confirm an incident.</p>
-      </section>
     </>
   );
 }

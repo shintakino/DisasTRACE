@@ -8,10 +8,11 @@ import { users } from "@/db/schema/users";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { z } from "zod";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
-import { manilaDayBounds } from "@/lib/manila-time";
+import { manilaDayBounds, manilaOperationalPeriodBounds } from "@/lib/manila-time";
 
 const MAP_RECORD_LIMIT = 200;
 const MapDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
+const MapPeriodSchema = z.enum(['today', 'weekly', 'monthly', 'yearly']).optional();
 
 export async function GET(request: Request) {
   if (!(await isAdmin())) {
@@ -20,12 +21,17 @@ export async function GET(request: Request) {
 
   try {
     const rawDate = new URL(request.url).searchParams.get('date') ?? undefined;
+    const rawPeriod = new URL(request.url).searchParams.get('period') ?? undefined;
     const parsedDate = MapDateSchema.safeParse(rawDate);
+    const parsedPeriod = MapPeriodSchema.safeParse(rawPeriod);
     if (!parsedDate.success) {
       return NextResponse.json({ error: 'Date must use YYYY-MM-DD.' }, { status: 400 });
     }
+    if (!parsedPeriod.success || (parsedDate.data && parsedPeriod.data)) {
+      return NextResponse.json({ error: 'Use either a valid map period or a YYYY-MM-DD date.' }, { status: 400 });
+    }
     const day = parsedDate.data;
-    const bounds = day ? manilaDayBounds(day) : null;
+    const bounds = day ? manilaDayBounds(day) : parsedPeriod.data ? manilaOperationalPeriodBounds(parsedPeriod.data) : null;
     const incidentScope = bounds
       ? and(gte(incidents.createdAt, bounds.start), lt(incidents.createdAt, bounds.end))
       : inArray(incidents.status, ['DISPATCHED', 'EN_ROUTE', 'ARRIVED']);
@@ -104,6 +110,7 @@ export async function GET(request: Request) {
         type: inc.type,
         origin: "CDRRMO HQ",
         destination: formatOfficialBaliwagLocation(inc.barangay),
+        barangay: inc.barangay,
         lat: inc.latitude,
         lng: inc.longitude,
         createdAt: inc.createdAt.toISOString(),
@@ -137,6 +144,7 @@ export async function GET(request: Request) {
         type: req.type,
         origin: "CDRRMO HQ",
         destination: formatOfficialBaliwagLocation(req.barangay),
+        barangay: req.barangay,
         lat: req.latitude,
         lng: req.longitude,
         createdAt: req.createdAt.toISOString(),

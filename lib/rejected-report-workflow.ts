@@ -1,9 +1,12 @@
+import { DISPATCH_ACCEPTANCE_GRACE_MS } from '@/lib/dispatch-policy';
+
 export const MAX_REJECTION_REASON_LENGTH = 250;
 
 export type VerificationRequestStatus = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'DUPLICATE';
 export type VerificationIncidentStatus = 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'DOCUMENTATION_PENDING' | 'RESOLVED';
 export type VerificationQueueClassification = 'ACTIVE' | 'REJECTED' | 'CASE_CLOSED';
 export type ActiveVerificationBucket = 'ACTION' | 'REVIEW' | 'AWAITING';
+export type VerificationWorkspaceFilter = 'ACTION' | 'REVIEW' | 'CLOSED' | 'REJECTED';
 
 interface VerificationQueueState {
   requestStatus: VerificationRequestStatus;
@@ -15,6 +18,53 @@ interface ActionableVerificationQueueState extends VerificationQueueState {
   requiresPaccReassignment?: boolean;
   responderId?: string | null;
   currentOfferResponderId?: string | null;
+  offerExpiresAt?: Date | string | null;
+}
+
+export type PaccRejectionConflictCode =
+  | 'REQUEST_TERMINAL'
+  | 'ACTIVE_RESPONSE'
+  | 'ACTIVE_OFFER'
+  | 'OFFER_RECOVERY_PENDING';
+
+export function getPaccRejectionConflict(input: {
+  requestStatus: VerificationRequestStatus;
+  incident?: Pick<ActionableVerificationQueueState, 'incidentStatus' | 'responderId' | 'currentOfferResponderId' | 'offerExpiresAt'> | null;
+  now?: Date;
+}): { code: PaccRejectionConflictCode; error: string } | null {
+  if (input.requestStatus !== 'PENDING' && input.requestStatus !== 'VERIFIED') {
+    return {
+      code: 'REQUEST_TERMINAL',
+      error: 'This report already has a terminal outcome and cannot be rejected again.',
+    };
+  }
+  if (!input.incident) return null;
+  if (input.incident.responderId) {
+    return {
+      code: 'ACTIVE_RESPONSE',
+      error: 'This report already has an active responder and cannot be rejected.',
+    };
+  }
+  if (input.incident.currentOfferResponderId) {
+    const expiresAt = input.incident.offerExpiresAt ? new Date(input.incident.offerExpiresAt).getTime() : Number.NaN;
+    if (Number.isFinite(expiresAt) && expiresAt + DISPATCH_ACCEPTANCE_GRACE_MS <= (input.now ?? new Date()).getTime()) {
+      return {
+        code: 'OFFER_RECOVERY_PENDING',
+        error: 'The responder offer just expired and is being reconciled. Refresh the queue and try again.',
+      };
+    }
+    return {
+      code: 'ACTIVE_OFFER',
+      error: 'This report has an active responder offer and cannot be rejected.',
+    };
+  }
+  if (input.incident.incidentStatus !== 'DISPATCHED') {
+    return {
+      code: 'ACTIVE_RESPONSE',
+      error: 'This report is already in an active response and cannot be rejected.',
+    };
+  }
+  return null;
 }
 
 /**
@@ -24,14 +74,10 @@ interface ActionableVerificationQueueState extends VerificationQueueState {
  */
 export function canPaccRejectVerificationRequest(input: {
   requestStatus: VerificationRequestStatus;
-  incident?: Pick<ActionableVerificationQueueState, 'incidentStatus' | 'responderId' | 'currentOfferResponderId'> | null;
+  incident?: Pick<ActionableVerificationQueueState, 'incidentStatus' | 'responderId' | 'currentOfferResponderId' | 'offerExpiresAt'> | null;
 }) {
-  if (input.requestStatus !== 'PENDING' && input.requestStatus !== 'VERIFIED') return false;
-  if (!input.incident) return input.requestStatus === 'PENDING';
-
-  return input.incident.incidentStatus === 'DISPATCHED'
-    && !input.incident.responderId
-    && !input.incident.currentOfferResponderId;
+  return getPaccRejectionConflict(input) === null
+    && (input.requestStatus === 'PENDING' || input.incident?.incidentStatus === 'DISPATCHED');
 }
 
 /**
@@ -72,6 +118,20 @@ export function classifyActiveVerificationBucket(
     || input.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY'
     ? 'ACTION'
     : 'REVIEW';
+}
+
+/** Maps canonical request lifecycle states to the four visible PACC queue views. */
+export function classifyVerificationWorkspaceFilter(
+  input: ActionableVerificationQueueState,
+): VerificationWorkspaceFilter | null {
+  const outcome = classifyVerificationQueueItem(input);
+  if (outcome === 'REJECTED') return 'REJECTED';
+  if (input.requestStatus === 'DUPLICATE' || outcome === 'CASE_CLOSED') return 'CLOSED';
+
+  const bucket = classifyActiveVerificationBucket(input);
+  if (bucket === 'ACTION') return 'ACTION';
+  if (bucket === 'REVIEW' || bucket === 'AWAITING') return 'REVIEW';
+  return null;
 }
 
 export function normalizeRequiredRejectionReason(value: unknown): string | null {

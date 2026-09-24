@@ -2,14 +2,16 @@ import { db } from '@/db';
 import { incidents } from '@/db/schema/incidents';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { eq } from 'drizzle-orm';
-import { canPaccRejectVerificationRequest, normalizeRequiredRejectionReason } from '@/lib/rejected-report-workflow';
+import { canPaccRejectVerificationRequest, getPaccRejectionConflict, normalizeRequiredRejectionReason, type PaccRejectionConflictCode } from '@/lib/rejected-report-workflow';
 import { auditLogs } from '@/db/schema/audit_logs';
 import { createAuditEvent, PACC_AUDIT_ACTIONS, type AuditActor } from '@/lib/audit-events';
+import { reconcileExpiredOfferForRequest } from '@/lib/dispatch-engine';
 
 interface RejectionFailure {
   success: false;
   status: 400 | 404 | 409;
   error: string;
+  code?: PaccRejectionConflictCode;
 }
 
 interface RejectionSuccess {
@@ -30,6 +32,19 @@ export async function rejectVerificationRequest(
       success: false,
       status: 400,
       error: 'A clear rejection reason is required.',
+    };
+  }
+
+  // Do not make the PACC operator wait for the periodic scheduler. If this
+  // report's offer is overdue, reconcile its compare-and-swap release before
+  // taking the locked rejection decision below.
+  const offerRecovery = await reconcileExpiredOfferForRequest(id);
+  if (offerRecovery === 'FAILED') {
+    return {
+      success: false,
+      status: 409,
+      code: 'OFFER_RECOVERY_PENDING',
+      error: 'The expired responder offer is still being reconciled. Refresh the queue and try again.',
     };
   }
 
@@ -58,14 +73,25 @@ export async function rejectVerificationRequest(
         incidentStatus: lockedIncident.status,
         responderId: lockedIncident.responderId,
         currentOfferResponderId: lockedIncident.currentOfferResponderId,
+        offerExpiresAt: lockedIncident.offerExpiresAt,
       } : null,
     });
 
     if (!canReject) {
+      const conflict = getPaccRejectionConflict({
+        requestStatus: lockedRequest.status,
+        incident: lockedIncident ? {
+          incidentStatus: lockedIncident.status,
+          responderId: lockedIncident.responderId,
+          currentOfferResponderId: lockedIncident.currentOfferResponderId,
+          offerExpiresAt: lockedIncident.offerExpiresAt,
+        } : null,
+      });
       return {
         success: false,
         status: 409,
-        error: 'Only pending reports without an active response can be rejected.',
+        code: conflict?.code,
+        error: conflict?.error ?? 'Only pending reports without an active response can be rejected.',
       } as const;
     }
 

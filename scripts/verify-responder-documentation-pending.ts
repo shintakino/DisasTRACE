@@ -41,8 +41,10 @@ assert.doesNotMatch(store.match(/clearTransientDispatch: \(\) => set\(\{[\s\S]*?
 
 const authStatus = read('mobile/hooks/use-auth-status.ts');
 assert.match(authStatus, /activeMobileAccountId/);
+assert.match(authStatus, /hasHydratedInitialMobileSession/);
 assert.match(authStatus, /reconcileResponderStoreAccount/);
 assert.match(authStatus, /useResponderStore\.getState\(\)\.clearTransientDispatch\(\)/);
+assert.match(authStatus, /event === 'SIGNED_IN' \|\| event === 'SIGNED_OUT'/);
 
 const responderHome = read('mobile/components/responder/ResponderHome.tsx');
 assert.match(responderHome, /!incident \|\| \['DOCUMENTATION_PENDING', 'RESOLVED'\]\.includes\(incident\.status\)/);

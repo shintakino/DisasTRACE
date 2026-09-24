@@ -1,5 +1,12 @@
 # Progress Tracker
 
+## 2026-09-24 - Resident and responder mobile reliability audit
+
+- Audited the mobile resident and responder workflows across registration/email confirmation, account and session changes, guest intake, reporting, dispatch offers, trusted arrival, hospital transport, documentation deferral, public tracking, navigation, GPS telemetry, and offline replay. Focused regression checks for each boundary passed, as did Expo Doctor (18/18) and the mobile lint gate.
+- Closed an auth-hydration race that could let a newly signed-in responder briefly inherit an old in-memory dispatch sheet (including the Hospital Arrival screen). Initial session hydration and explicit sign-in/sign-out now clear only transient dispatch UI before the account is reconciled; normal token refreshes retain a genuine active dispatch.
+- Corrected three mobile lint errors in registration-rejection and patient-care text without changing application behavior. Static review found guarded parsing for locally stored responder/guest data and cleanup paths for the principal timers, subscriptions, and route transitions.
+- The local command runner cannot complete a Metro Android export within its fixed execution window and leaves Metro workers running; this is a workspace-runner limitation, not an Expo diagnostic failure. A fresh Android build still requires manual device verification of permissions, background/foreground transitions, push delivery, and account sign-out/reinstall recovery before a production release can be guaranteed crash-free.
+
 ## 2026-09-24 - Responder report archive retirement
 
 - Removed Archive/Restore from the responder My Reports screen and retired the corresponding responder report mutation. The normal bounded list now includes every responder-owned report, including records that had a legacy archive timestamp; no reports, clinical records, or audit data were deleted.

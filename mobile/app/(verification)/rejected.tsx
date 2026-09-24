@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Image, Alert } from 'react-native';
 import { signOutFromMobile } from '../../lib/mobile-auth';
 import { useAuthStatus } from '../../hooks/use-auth-status';
-import { XCircle, AlertCircle, Camera, Upload, ChevronDown } from 'lucide-react-native';
+import { XCircle, AlertCircle, Camera, ChevronDown } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadGovernmentID } from '../../lib/storage';
 
@@ -232,7 +232,7 @@ export default function RejectedVerificationScreen() {
           <Text className="text-secondary font-bold ml-2 text-lg">Reason for Rejection</Text>
         </View>
         <Text className="text-dark-grey leading-6 italic">
-          "{rejectionReason}"
+          &quot;{rejectionReason}&quot;
         </Text>
       </View>
 

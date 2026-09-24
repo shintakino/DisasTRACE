@@ -768,7 +768,7 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, onSave 
             {/* Patient / Parent / Guardian Signature */}
             <View className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
               <Text className="text-slate-500 text-[10px] font-black uppercase tracking-wider">
-                Patient's Signature or if Minor, Parent / Legal Guardian
+                Patient&apos;s Signature or if Minor, Parent / Legal Guardian
               </Text>
               {liabilityRelease.patientSignature ? (
                 <View className="bg-white border border-slate-200 rounded-xl p-2 h-24 justify-center items-center relative">

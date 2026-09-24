@@ -16,9 +16,13 @@ type MobileVerificationStatus = VerificationStatus | 'loading' | 'banned' | 'una
 // a valid in-progress dispatch, while a genuine account switch always removes
 // the previous responder's in-memory dispatch UI.
 let activeMobileAccountId: string | null = null;
+let hasHydratedInitialMobileSession = false;
 
-function reconcileResponderStoreAccount(nextAccountId: string | null) {
-  if (activeMobileAccountId && activeMobileAccountId !== nextAccountId) {
+function reconcileResponderStoreAccount(nextAccountId: string | null, clearTransientDispatch = false) {
+  if (
+    clearTransientDispatch
+    || (activeMobileAccountId && activeMobileAccountId !== nextAccountId)
+  ) {
     useResponderStore.getState().clearTransientDispatch();
   }
   activeMobileAccountId = nextAccountId;
@@ -170,7 +174,11 @@ export function useAuthStatus() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      reconcileResponderStoreAccount(session?.user.id ?? null);
+      // A store can survive a fast account replacement before the previous
+      // identity is observed. The first session hydration must therefore
+      // never trust an in-memory dispatch from an earlier account.
+      reconcileResponderStoreAccount(session?.user.id ?? null, !hasHydratedInitialMobileSession);
+      hasHydratedInitialMobileSession = true;
       if (session?.user) {
         checkVerification(session.user, session);
       } else {
@@ -182,10 +190,13 @@ export function useAuthStatus() {
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      reconcileResponderStoreAccount(session?.user.id ?? null);
+      // A deliberate sign-in must begin from server-confirmed state. Do not
+      // clear an ongoing dispatch on ordinary token refreshes for the same
+      // responder.
+      reconcileResponderStoreAccount(session?.user.id ?? null, event === 'SIGNED_IN' || event === 'SIGNED_OUT');
       if (session?.user) {
         checkVerification(session.user, session);
       } else {

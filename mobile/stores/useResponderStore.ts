@@ -79,6 +79,7 @@ export interface DispatchDetails {
   dispatchOfferDurationSeconds?: number; // Configurable duration in seconds
   offerExpiresAt?: string; // Server timestamp used for the responder countdown
   assignedAmbulance?: string; // e.g. "AMB-001"
+  transportHospitalId?: string;
   documentationPending?: boolean;
   fieldOutcome?: FieldOutcome | null;
 }

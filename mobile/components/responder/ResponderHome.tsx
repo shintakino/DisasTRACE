@@ -37,6 +37,11 @@ import {
   isValidGeoPoint,
   rankEligibleHospitals,
 } from '../../lib/hospital-destination-policy';
+import {
+  getResponderStatusLabel,
+  getRestoredResponderState,
+  shouldRequestResponderRoute,
+} from '../../lib/responder-lifecycle-policy';
 
 // Helper to calculate distance in meters
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -58,6 +63,8 @@ interface ActiveDispatchOwnership {
   status?: string;
   responder_id?: string | null;
   current_offer_responder_id?: string | null;
+  transport_status?: string | null;
+  transport_hospital_id?: string | null;
 }
 
 export function ResponderHome() {
@@ -69,6 +76,7 @@ export function ResponderHome() {
     targetHospital,
     setTargetHospital,
     drafts,
+    submittedIncidentIds,
     dispatchReleaseNotice,
     releaseDispatchOffer,
     dismissDispatchReleaseNotice,
@@ -471,7 +479,12 @@ export function ResponderHome() {
         async (payload) => {
           console.log('[ResponderHome] Postgres change received on incidents table:', payload);
           const inc = payload.new as any;
-          if (inc && inc.current_offer_responder_id === user.id && inc.status === 'DISPATCHED') {
+          if (
+            inc
+            && inc.current_offer_responder_id === user.id
+            && inc.status === 'DISPATCHED'
+            && !submittedIncidentIds.includes(inc.id)
+          ) {
             console.log('[ResponderHome] Active dispatch offer received for this responder!', inc);
             
             let reporterName = 'Resident';
@@ -689,38 +702,60 @@ export function ResponderHome() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile, role, status, user?.id]);
+  }, [profile, role, status, submittedIncidentIds, user?.id]);
 
   // A timed-out offer may be cascaded to another responder while this device is
   // backgrounded. Reconcile the local screen with the server before a stale
   // offer can be progressed into arrival or report completion.
   useEffect(() => {
-    if (!user?.id || !activeDispatch?.id || status === 'idle') return;
+    if (!user?.id || !activeDispatch?.id) return;
 
     let mounted = true;
     const incidentId = activeDispatch.id;
-    const clearReassignedDispatch = (incident: ActiveDispatchOwnership) => {
-      const stillOwned = incident?.responder_id === user.id
+    const reconcileDispatch = (incident: ActiveDispatchOwnership) => {
+      const assignedToResponder = incident?.responder_id === user.id;
+      const stillOwned = assignedToResponder
         || (
           incident?.status === 'DISPATCHED'
           && !incident?.responder_id
           && incident?.current_offer_responder_id === user.id
         );
-      if (
-        stillOwned
-        && incident?.status === 'ARRIVED'
-        && useResponderStore.getState().status === 'en_route'
-      ) {
-        const current = useResponderStore.getState();
-        useResponderStore.setState({
-          status: 'on_scene',
-          sceneTimeSeconds: 0,
-          responseTimeSeconds: current.elapsedTimeSeconds,
-          isArrivalConfirmVisible: false,
-        });
+      const current = useResponderStore.getState();
+      if (['DOCUMENTATION_PENDING', 'RESOLVED'].includes(incident?.status || '')) {
+        if (current.activeDispatch?.id === incidentId) current.clearTransientDispatch();
         return;
       }
-      if (!stillOwned && mounted && useResponderStore.getState().activeDispatch?.id === incidentId) {
+
+      if (assignedToResponder) {
+        const restoredStatus = getRestoredResponderState(incident.status, incident.transport_status);
+        const reconciledHospitalId = incident.transport_hospital_id || current.activeDispatch?.transportHospitalId;
+        const canReconcileLifecycle = [
+          'dispatch_offered',
+          'en_route',
+          'on_scene',
+          'to_hospital',
+          'at_hospital',
+        ].includes(current.status);
+
+        if (restoredStatus && canReconcileLifecycle) {
+          useResponderStore.setState({
+            status: restoredStatus,
+            activeDispatch: current.activeDispatch
+              ? { ...current.activeDispatch, transportHospitalId: reconciledHospitalId || undefined }
+              : null,
+            fieldOutcome: restoredStatus === 'at_hospital' ? 'HOSPITAL_ARRIVAL' : current.fieldOutcome,
+            sceneTimeSeconds: restoredStatus === 'on_scene' ? 0 : current.sceneTimeSeconds,
+            responseTimeSeconds: restoredStatus === 'on_scene'
+              ? current.elapsedTimeSeconds
+              : current.responseTimeSeconds,
+            isArrivalConfirmVisible: false,
+            isHospitalArrivalConfirmVisible: false,
+          });
+        }
+        return;
+      }
+
+      if (!stillOwned && mounted && current.activeDispatch?.id === incidentId) {
         releaseDispatchOffer({
           incidentId,
           ...getDispatchReleaseNotice({
@@ -739,7 +774,7 @@ export function ResponderHome() {
     const reconcile = async () => {
       const { data: incident, error } = await supabase
         .from('incidents')
-        .select('id, status, responder_id, current_offer_responder_id')
+        .select('id, status, responder_id, current_offer_responder_id, transport_status, transport_hospital_id')
         .eq('id', incidentId)
         .maybeSingle();
       if (error || !mounted || useResponderStore.getState().activeDispatch?.id !== incidentId) return;
@@ -753,7 +788,7 @@ export function ResponderHome() {
         return;
       }
 
-      clearReassignedDispatch(incident);
+      reconcileDispatch(incident);
     };
 
     void reconcile();
@@ -762,7 +797,7 @@ export function ResponderHome() {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'incidents', filter: `id=eq.${incidentId}` },
-        (payload) => clearReassignedDispatch(payload.new),
+        (payload) => reconcileDispatch(payload.new),
       )
       .subscribe();
 
@@ -799,6 +834,10 @@ export function ResponderHome() {
         }));
         
         setHospitals(mapped);
+        const restoredHospital = activeDispatch?.transportHospitalId
+          ? mapped.find((hospital: { id: string }) => hospital.id === activeDispatch.transportHospitalId)
+          : null;
+        if (restoredHospital) setTargetHospital(restoredHospital);
         setHospitalLoadState('ready');
       } catch (err) {
         console.error("Error fetching mobile map hospitals:", err);
@@ -807,10 +846,10 @@ export function ResponderHome() {
       }
     };
     
-    if (status === 'en_route' || status === 'on_scene' || status === 'to_hospital') {
+    if (['en_route', 'on_scene', 'to_hospital', 'at_hospital', 'report_filling'].includes(status)) {
       fetchHospitals();
     }
-  }, [status]);
+  }, [activeDispatch?.transportHospitalId, setTargetHospital, status]);
 
   // A recommendation is established once for a transport leg. Subsequent GPS
   // updates only refresh distances and must never replace a responder override.
@@ -873,19 +912,10 @@ export function ResponderHome() {
             
             const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
-            // Geofence coordinate locking for developer testing convenience
+            // Developer fallback remains isolated from production telemetry.
             if (isDevMode && (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00)) {
-              if (status === 'on_scene' && activeDispatch?.coordinates) {
-                lat = activeDispatch.coordinates.latitude;
-                lng = activeDispatch.coordinates.longitude;
-              } else {
-                lat = 14.954;
-                lng = 120.902;
-              }
-            } else if (status === 'on_scene' && activeDispatch?.coordinates) {
-              // Maintain on-scene snap alignment in both dev and production to ensure map markers overlap perfectly
-              lat = activeDispatch.coordinates.latitude;
-              lng = activeDispatch.coordinates.longitude;
+              lat = 14.954;
+              lng = 120.902;
             }
             
             setCurrentLocation([lng, lat]);
@@ -942,9 +972,9 @@ export function ResponderHome() {
               lng = 120.902;
             }
             
+            // A cached fix is useful for initial map centering only. Routing,
+            // arrival checks, and telemetry wait for watchPositionAsync.
             setCurrentLocation([lng, lat]);
-            setHasLiveLocation(true);
-            useResponderStore.setState({ currentLocation: [lng, lat] });
           }
         }
       } catch (err) {
@@ -954,84 +984,88 @@ export function ResponderHome() {
     getInitialLocation();
   }, []);
 
+  const incidentLatitude = activeDispatch?.coordinates.latitude;
+  const incidentLongitude = activeDispatch?.coordinates.longitude;
+  const hospitalLatitude = targetHospital?.coordinates.latitude;
+  const hospitalLongitude = targetHospital?.coordinates.longitude;
+
   // 3. Dynamic Real-Time OSRM route calculation
   useEffect(() => {
-    if (status === 'en_route' && activeDispatch) {
-      const fetchRoute = async () => {
-        try {
-          const url = `https://router.project-osrm.org/route/v1/driving/${currentLocation[0]},${currentLocation[1]};${activeDispatch.coordinates.longitude},${activeDispatch.coordinates.latitude}?overview=full&geometries=geojson`;
-          const res = await fetch(url);
-          const data = await res.json();
-          if (data.routes && data.routes[0]) {
-            const coords = data.routes[0].geometry.coordinates;
-            setRouteCoords(coords);
+    const destination = status === 'en_route' && incidentLatitude !== undefined && incidentLongitude !== undefined
+      ? { latitude: incidentLatitude, longitude: incidentLongitude }
+      : status === 'to_hospital' && hospitalLatitude !== undefined && hospitalLongitude !== undefined
+        ? { latitude: hospitalLatitude, longitude: hospitalLongitude }
+        : null;
+    const origin = { latitude: currentLocation[1], longitude: currentLocation[0] };
 
-            const distanceKm = Number((data.routes[0].distance / 1000).toFixed(1));
-            const etaMins = Math.ceil(data.routes[0].duration / 60);
-
-            const store = useResponderStore.getState();
-            if (store.activeDispatch) {
-              store.setActiveDispatch({
-                ...store.activeDispatch,
-                distance: `${distanceKm} km`,
-                eta: `~${etaMins} min`
-              });
-
-              // Lock the initial distance to the first real OSRM driving route distance calculated en route
-              if (store.elapsedTimeSeconds < 15 || store.initialDistanceKm === 0) {
-                useResponderStore.setState({ initialDistanceKm: distanceKm });
-              }
-            }
-            
-            // Calculate map view bounds for OSRM route
-            let minLng = coords[0][0], maxLng = coords[0][0], minLat = coords[0][1], maxLat = coords[0][1];
-            coords.forEach((coord: number[]) => {
-              if (coord[0] < minLng) minLng = coord[0];
-              if (coord[0] > maxLng) maxLng = coord[0];
-              if (coord[1] < minLat) minLat = coord[1];
-              if (coord[1] > maxLat) maxLat = coord[1];
-            });
-            setRouteBounds([minLng, minLat, maxLng, maxLat]);
-          }
-        } catch (err) {
-          console.error('[ResponderHome] Error fetching en route route:', err);
-        }
-      };
-      fetchRoute();
-    } else if (status === 'to_hospital' && targetHospital) {
-      const fetchRoute = async () => {
-        try {
-          const url = `https://router.project-osrm.org/route/v1/driving/${currentLocation[0]},${currentLocation[1]};${targetHospital.coordinates.longitude},${targetHospital.coordinates.latitude}?overview=full&geometries=geojson`;
-          const res = await fetch(url);
-          const data = await res.json();
-          if (data.routes && data.routes[0]) {
-            const coords = data.routes[0].geometry.coordinates;
-            setRouteCoords(coords);
-            
-            const distanceKm = Number((data.routes[0].distance / 1000).toFixed(1));
-            const etaMins = Math.ceil(data.routes[0].duration / 60);
-            useResponderStore.getState().setHospitalRouteMetrics(distanceKm, etaMins);
-
-            // Calculate map view bounds for OSRM route
-            let minLng = coords[0][0], maxLng = coords[0][0], minLat = coords[0][1], maxLat = coords[0][1];
-            coords.forEach((coord: number[]) => {
-              if (coord[0] < minLng) minLng = coord[0];
-              if (coord[0] > maxLng) maxLng = coord[0];
-              if (coord[1] < minLat) minLat = coord[1];
-              if (coord[1] > maxLat) maxLat = coord[1];
-            });
-            setRouteBounds([minLng, minLat, maxLng, maxLat]);
-          }
-        } catch (err) {
-          console.error('[ResponderHome] Error fetching hospital route:', err);
-        }
-      };
-      fetchRoute();
-    } else {
+    if (!shouldRequestResponderRoute({ status, hasLiveLocation, origin, destination })) {
       setRouteCoords(null);
       setRouteBounds(null);
+      return;
     }
-  }, [status, currentLocation, activeDispatch, targetHospital]);
+
+    const controller = new AbortController();
+    const fetchRoute = async () => {
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${origin.longitude},${origin.latitude};${destination!.longitude},${destination!.latitude}?overview=full&geometries=geojson`;
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (controller.signal.aborted || !data.routes?.[0]) return;
+
+        const coords = data.routes[0].geometry.coordinates as [number, number][];
+        setRouteCoords(coords);
+        const distanceKm = Number((data.routes[0].distance / 1000).toFixed(1));
+        const etaMins = Math.ceil(data.routes[0].duration / 60);
+
+        if (status === 'en_route') {
+          const store = useResponderStore.getState();
+          const currentDispatch = store.activeDispatch;
+          if (currentDispatch && currentDispatch.id === activeDispatch?.id) {
+            const distance = `${distanceKm} km`;
+            const eta = `~${etaMins} min`;
+            if (currentDispatch.distance !== distance || currentDispatch.eta !== eta) {
+              store.setActiveDispatch({ ...currentDispatch, distance, eta });
+            }
+            if (store.elapsedTimeSeconds < 15 || store.initialDistanceKm === 0) {
+              useResponderStore.setState({ initialDistanceKm: distanceKm });
+            }
+          }
+        } else {
+          useResponderStore.getState().setHospitalRouteMetrics(distanceKm, etaMins);
+        }
+
+        let minLng = coords[0][0];
+        let maxLng = coords[0][0];
+        let minLat = coords[0][1];
+        let maxLat = coords[0][1];
+        coords.forEach((coordinate) => {
+          minLng = Math.min(minLng, coordinate[0]);
+          maxLng = Math.max(maxLng, coordinate[0]);
+          minLat = Math.min(minLat, coordinate[1]);
+          maxLat = Math.max(maxLat, coordinate[1]);
+        });
+        setRouteBounds([minLng, minLat, maxLng, maxLat]);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error('[ResponderHome] Error fetching responder route:', error);
+        }
+      }
+    };
+
+    void fetchRoute();
+    return () => controller.abort();
+  }, [
+    incidentLatitude,
+    incidentLongitude,
+    activeDispatch?.id,
+    currentLocation,
+    hasLiveLocation,
+    status,
+    hospitalLatitude,
+    hospitalLongitude,
+    targetHospital?.id,
+  ]);
 
   // Mock route coordinates from responder to incident
   const routeGeoJSON = {
@@ -1495,7 +1529,7 @@ export function ResponderHome() {
                   <Text className="text-slate-900 text-2xl font-black tracking-tight">{myVehicleId}</Text>
                   <View className="ml-3 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 shadow-sm">
                     <Text className="text-[#1E3A8A] text-[10px] font-black tracking-widest uppercase">
-                      {status === 'en_route' ? 'Dispatched' : status === 'dispatch_offered' ? 'Incoming' : status === 'to_hospital' ? 'To Hospital' : 'On Scene'}
+                      {getResponderStatusLabel(status)}
                     </Text>
                   </View>
                 </View>

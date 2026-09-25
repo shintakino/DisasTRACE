@@ -1,5 +1,13 @@
 # Progress Tracker
 
+## 2026-09-25 - Responder trusted-GPS routing and lifecycle recovery repair
+
+- Removed the on-scene coordinate substitution that replaced responder telemetry with the public incident pin. Cached coordinates may still center the map, but routing, arrival checks, and store telemetry now wait for a fresh trusted GPS callback.
+- Gated OSRM requests to active en-route or hospital-transport legs with valid live endpoints and meaningful distance, cancelled superseded requests, and prevented stale route responses from overwriting the current dispatch.
+- Restored accepted incidents with their server transport stage and selected hospital, including To Hospital and At Hospital after app restart or real-time reconnect. Visible lifecycle labels now distinguish At Hospital and Documentation rather than falling back to On Scene.
+- Suppressed already-confirmed incident IDs during notification hydration, startup offer recovery, and real-time offer delivery so a locally completed response cannot immediately reappear as a new offer while client state settles.
+- Added `scripts/verify-responder-route-lifecycle.ts` for GPS-source, route-gating, lifecycle restoration, status-label, and duplicate-offer regression coverage. The focused verifier, mobile TypeScript check, and mobile lint complete successfully; lint retains only the existing warning backlog.
+
 ## 2026-09-25 - Shared command-map containment and resilience repair
 
 - Restored the Map page's viewport-bounded flex workspace after the header removal had left its `flex-1` map area outside a flex parent. The PACC/CDRRMO shared page now keeps the map canvas fixed while the incident list alone scrolls, including scroll chaining containment.

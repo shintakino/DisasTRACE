@@ -20,6 +20,7 @@ import { shouldResumeResidentRequest } from '../../lib/active-incident';
 import { useLiveBarangay } from '../../hooks/use-live-barangay';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
 import { getMobileApiBaseUrl } from '../../lib/api-base-url';
+import { getRestoredResponderState } from '../../lib/responder-lifecycle-policy';
 
 import * as Notifications from 'expo-notifications';
 import { Platform, Vibration } from 'react-native';
@@ -84,6 +85,10 @@ export default function HomeScreen() {
       }
 
       const offer = result.data;
+      if (useResponderStore.getState().submittedIncidentIds.includes(offer.id)) {
+        router.replace('/(tabs)');
+        return;
+      }
       const initials = offer.reporterName.split(' ').map((name: string) => name[0]).join('').slice(0, 2).toUpperCase() || 'R';
       useResponderStore.setState({
         status: 'dispatch_offered',
@@ -376,6 +381,10 @@ export default function HomeScreen() {
           if (!active) return;
 
           if (activeInc) {
+            if (useResponderStore.getState().submittedIncidentIds.includes(activeInc.id)) {
+              useResponderStore.getState().clearTransientDispatch();
+              return;
+            }
             console.log('[HomeScreen] Found active incident in DB to resume:', activeInc);
             
             let reporterName = 'Resident';
@@ -415,9 +424,10 @@ export default function HomeScreen() {
               }
             }
 
-            let storeStatus: any = 'en_route';
-            if (activeInc.status === 'ARRIVED') {
-              storeStatus = 'on_scene';
+            const storeStatus = getRestoredResponderState(activeInc.status, activeInc.transport_status);
+            if (!storeStatus) {
+              useResponderStore.getState().clearTransientDispatch();
+              return;
             }
 
             let initialDistanceStr = '1.7 km';
@@ -438,6 +448,7 @@ export default function HomeScreen() {
 
             useResponderStore.setState({
               status: storeStatus,
+              fieldOutcome: storeStatus === 'at_hospital' ? 'HOSPITAL_ARRIVAL' : null,
               initialDistanceKm: parsedDistanceKm,
               activeDispatch: {
                 id: activeInc.id,
@@ -456,6 +467,7 @@ export default function HomeScreen() {
                 },
                 typeOfEmergency,
                 assignedAmbulance: activeInc.assigned_ambulance || 'AMB-001',
+                transportHospitalId: activeInc.transport_hospital_id || undefined,
                 attachmentUrl: vReq?.image_url || undefined,
               }
             });
@@ -469,7 +481,11 @@ export default function HomeScreen() {
               .eq('status', 'DISPATCHED')
               .maybeSingle();
 
-            if (!offerError && offerInc) {
+            if (
+              !offerError
+              && offerInc
+              && !useResponderStore.getState().submittedIncidentIds.includes(offerInc.id)
+            ) {
               console.log('[HomeScreen] Found active offer in DB to resume:', offerInc);
               
               let reporterName = 'Resident';

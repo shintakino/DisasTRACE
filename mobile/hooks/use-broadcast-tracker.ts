@@ -254,19 +254,10 @@ export function useBroadcastTracker(
 
           const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
-          // Geofence coordinate locking for developer testing convenience
+          // Developer fallback remains isolated from production telemetry.
           if (isDevMode && (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00)) {
-            if (statusRef.current === 'on_scene' && activeDispatchRef.current?.coordinates) {
-              lat = activeDispatchRef.current.coordinates.latitude;
-              lng = activeDispatchRef.current.coordinates.longitude;
-            } else {
-              lat = 14.954;
-              lng = 120.902;
-            }
-          } else if (statusRef.current === 'on_scene' && activeDispatchRef.current?.coordinates) {
-            // Maintain on-scene snap alignment in both dev and production to ensure map markers overlap perfectly
-            lat = activeDispatchRef.current.coordinates.latitude;
-            lng = activeDispatchRef.current.coordinates.longitude;
+            lat = 14.954;
+            lng = 120.902;
           }
 
           const payload = {
@@ -442,17 +433,8 @@ export function useBroadcastTracker(
           const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
           if (isDevMode && (lat < 14.90 || lat > 15.05 || lng < 120.80 || lng > 121.00)) {
-            if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
-              lat = activeDispatch.coordinates.latitude;
-              lng = activeDispatch.coordinates.longitude;
-            } else {
-              lat = 14.954;
-              lng = 120.902;
-            }
-          } else if (responderStatus === 'on_scene' && activeDispatch?.coordinates) {
-            // Maintain on-scene snap alignment in both dev and production to ensure map markers overlap perfectly
-            lat = activeDispatch.coordinates.latitude;
-            lng = activeDispatch.coordinates.longitude;
+            lat = 14.954;
+            lng = 120.902;
           }
 
           lastDbUpdateRef.current = Date.now();

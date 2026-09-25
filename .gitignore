@@ -25,6 +25,7 @@
 .DS_Store
 *.pem
 mobile/disastrace-*.json
+mobile/eas.local.json
 
 # debug
 npm-debug.log*

@@ -1,5 +1,14 @@
 # Progress Tracker
 
+## 2026-09-26 - Web build TypeScript workspace isolation
+
+- Excluded root maintenance and verification scripts from the Next.js TypeScript program. Several of those scripts intentionally import Expo-only mobile modules; Next.js 16 type-checks the complete selected TypeScript program during `next build`, so including them caused a Vercel web deployment to resolve unavailable React Native dependencies. The web app, API, and generated Next route types remain covered by the root build; mobile TypeScript continues to be checked from the `mobile` workspace.
+
+## 2026-09-25 - Per-developer Expo/EAS project configuration
+
+- Kept the shared Expo configuration in version control while moving only the account-specific `owner` and `extra.eas.projectId` values to ignored `mobile/eas.local.json`.
+- Added a dynamic Expo config, tracked local-config template, and `scripts/verify-local-eas-project-config.ts` so each developer can link and build with a personal Expo account without committing over another developer's EAS identity. The deployment guide records the local setup and the requirement to retain the release signing credentials for official Android updates.
+
 ## 2026-09-25 - Responder trusted-GPS routing and lifecycle recovery repair
 
 - Removed the on-scene coordinate substitution that replaced responder telemetry with the public incident pin. Cached coordinates may still center the map, but routing, arrival checks, and store telemetry now wait for a fresh trusted GPS callback.

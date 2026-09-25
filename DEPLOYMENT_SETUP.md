@@ -135,6 +135,29 @@ the server binds each token to the account's active mobile session and removes
 it on sign-out or provider invalidation. No Firebase Admin service-account key
 is required by this implementation.
 
+### Developer-owned Expo/EAS projects
+
+The shared `mobile/app.json` intentionally contains no Expo account owner or
+EAS project ID. Do not ignore or replace that file: it defines the shared app
+identity, Android package, permissions, plugins, and build behavior.
+
+Each developer who needs an EAS build should create a personal Expo project,
+copy `mobile/eas.local.example.json` to `mobile/eas.local.json`, and set their
+Expo username and EAS project ID. `mobile/app.config.js` applies that ignored
+local identity only on that developer's machine, so it cannot overwrite another
+developer's Expo link in Git.
+
+Create the personal project through the Expo dashboard or `npx eas-cli@latest
+init`, then copy its generated project ID into `eas.local.json`. After using
+`eas init`, discard any attempted `app.json` change; the local file is the
+source of the per-developer EAS identity. Run `npx expo config --json` to
+confirm the resolved `owner` and `extra.eas.projectId` before building.
+
+Personal-account APKs are suitable for development and internal testing. An
+official update to an existing Android installation or Play Store listing must
+continue to use the same Android signing key and release Expo project
+credentials.
+
 Install and run locally:
 
 ```bash

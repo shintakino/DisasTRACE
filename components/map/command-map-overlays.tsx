@@ -79,10 +79,10 @@ export function CommandMapOverlays({ layers, onLayerChange, zones }: CommandMapO
           </ul>
           <p className="mt-3 text-[9px] font-black uppercase tracking-wide text-slate-400">Incident markers</p>
           <ul className="mt-2 space-y-1.5 text-[10px] text-slate-600">
-            <LegendRow icon={<Siren className="size-3.5 text-red-600" />} label="Active emergency or critical priority" />
-            <LegendRow icon={<MapPin className="size-3.5 text-amber-500" />} label="Active non-emergency incident" />
-            <LegendRow icon={<CheckCircle2 className="size-3.5 text-emerald-600" />} label="Resolved incident" />
-            <LegendRow icon={<MapPin className="size-3.5 text-blue-600" />} label="Selected incident" />
+            <LegendRow icon={<Siren className="size-3.5 text-[#1E3A8A]" />} label="Siren icon: active emergency" />
+            <LegendRow icon={<MapPin className="size-3.5 text-[#1E3A8A]" />} label="Pin icon: active non-emergency" />
+            <LegendRow icon={<CheckCircle2 className="size-3.5 text-[#1E3A8A]" />} label="Check icon: resolved incident" />
+            <LegendRow icon={<MapPin className="size-3.5 text-blue-600" />} label="Blue outline: selected incident" />
           </ul>
           <p className="mt-3 text-[9px] font-black uppercase tracking-wide text-slate-400">Resources</p>
           <ul className="mt-2 space-y-1.5 text-[10px] text-slate-600">

@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { MapPin, Navigation, Hospital, Siren } from "lucide-react";
+import { CheckCircle2, MapPin, Navigation, Hospital, Siren } from "lucide-react";
+import { incidentPresentationForType } from "@/lib/incident-presentation";
 
 interface MapMarkerProps {
   type: "incident" | "responder" | "hospital";
@@ -17,6 +18,7 @@ interface MapMarkerProps {
   destination?: string;
   severity?: "Low" | "Medium" | "High" | "Critical";
   nature?: "EMERGENCY" | "NON-EMERGENCY";
+  incidentType?: string;
   responderName?: string;
   lastUpdated?: string;
 }
@@ -35,6 +37,7 @@ export function MapMarker({
   destination,
   severity,
   nature,
+  incidentType,
   responderName,
   lastUpdated,
 }: MapMarkerProps) {
@@ -80,7 +83,9 @@ export function MapMarker({
   if (type === "incident") {
     const isCritical = severity === "Critical";
     const isEmergency = nature === "EMERGENCY";
-    const needsUrgentColor = (isCritical || isEmergency) && status !== "COMPLETED";
+    const isResolved = status === "COMPLETED";
+    const presentation = incidentPresentationForType(incidentType || "Unknown Cause");
+    const isLightPresentation = presentation.color === "#E2E5EC";
 
     return (
       <div className="relative group cursor-pointer flex flex-col items-center">
@@ -90,17 +95,16 @@ export function MapMarker({
             <span>{label}</span>
             <span className={cn(
               "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border",
-              status === "COMPLETED" 
-                ? "bg-green-50 text-green-700 border-green-200" 
-                : "bg-red-50 text-red-700 border-red-200"
+              isResolved ? "bg-green-50 text-green-700 border-green-200" : "bg-slate-50 text-slate-700 border-slate-200"
             )}>
               {status}
             </span>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-            <span>{status === "COMPLETED" ? "Resolved Incident" : "Active Request"}</span>
+            <span>{isResolved ? "Resolved Incident" : isEmergency ? "Active Emergency" : "Active Non-emergency"}</span>
             {severity && <span className={cn("rounded px-1.5 py-0.5 text-[8px] uppercase", isCritical ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600")}>{severity}</span>}
           </div>
+          <div className="text-[10px] font-bold" style={{ color: presentation.color }}>{presentation.label}</div>
           <div className="h-px bg-slate-100 my-1" />
           {reporterName && (
             <div className="text-[9px] text-slate-600 font-medium">
@@ -126,11 +130,10 @@ export function MapMarker({
 
         {/* Marker Icon */}
         <div className={cn(
-          "relative z-10 p-1 rounded-full border-2 transition-transform",
-          isSelected ? "scale-125 border-primary bg-primary text-primary-foreground" : needsUrgentColor ? "bg-red-600 border-red-200 text-white" : "bg-amber-500 border-amber-200 text-white",
-          status === "COMPLETED" && !isSelected && "bg-green-500 border-green-200"
-        )}>
-          {needsUrgentColor ? <Siren size={16} fill="currentColor" /> : <MapPin size={16} fill="currentColor" />}
+          "relative z-10 rounded-full border-2 p-1 transition-transform",
+          isSelected && "scale-125 ring-4 ring-blue-200"
+        )} style={{ backgroundColor: presentation.color, borderColor: isSelected ? "#1D4ED8" : presentation.color, color: isLightPresentation ? "#334155" : "#FFFFFF" }}>
+          {isResolved ? <CheckCircle2 size={16} fill="currentColor" /> : isEmergency ? <Siren size={16} fill="currentColor" /> : <MapPin size={16} fill="currentColor" />}
         </div>
       </div>
     );

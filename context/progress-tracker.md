@@ -7,6 +7,8 @@
 - Decoupled the five map data reads: unavailable responder, hospital, summary, or historical-demand data now leaves the rest of the command map usable and identifies the temporarily unavailable supporting data. A full map-data failure remains an explicit retryable error.
 - Added `scripts/verify-map-workspace-resilience.ts` to guard the viewport containment, error/retry state, and independently settled map data contract.
 - Kept the right-side Map Legend and Layers controls visible below the desktop breakpoint and bounded the overlay to its own viewport-height scroll area, so smaller web windows retain map meaning without moving the map itself.
+- Connected every incident marker to the approved shared incident-type palette. Marker fill now identifies the report category, while the siren, pin, or check icon identifies active emergency, active non-emergency, or resolved state; selected reports retain a blue outline.
+- Added one-time automatic camera framing for the active visible incident set, including after layer changes or a MapLibre retry. Selecting a report still flies only to that known marker, so operators no longer need a card click to discover where active incidents are.
 
 ## 2026-09-25 - PACC offer-rejection and responder-duty handshake repair
 

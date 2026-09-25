@@ -9,6 +9,11 @@ export const INCIDENT_PRESENTATION = [
   { type: 'Other / non-emergency request', label: 'Other', color: '#E2E5EC' },
 ] as const;
 
+export function incidentPresentationForType(type: string) {
+  return INCIDENT_PRESENTATION.find((incident) => incident.type === type)
+    ?? INCIDENT_PRESENTATION.find((incident) => incident.type === 'Unknown Cause')!;
+}
+
 export function formatDurationMinutes(value: number | string | null | undefined) {
   const minutes = Number(value);
   if (!Number.isFinite(minutes) || minutes <= 0) return '—';

@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { INCIDENT_PRESENTATION, formatDurationMinutes } from '../lib/incident-presentation';
+import { INCIDENT_PRESENTATION, formatDurationMinutes, incidentPresentationForType } from '../lib/incident-presentation';
 import { RESPONDER_ASSIGNMENT_BARANGAYS } from '../lib/responder-assignment-barangays';
 
 const source = (file: string) => readFileSync(join(process.cwd(), file), 'utf8');
 
 assert.deepEqual(INCIDENT_PRESENTATION.map((item) => item.color), ['#203F91', '#2F6FED', '#7C3AED', '#E52421', '#119C91', '#64748B', '#E2E5EC', '#E2E5EC']);
+assert.equal(incidentPresentationForType('Medical Emergency').color, '#2F6FED');
+assert.equal(incidentPresentationForType('unrecognized type').type, 'Unknown Cause');
 assert.equal(formatDurationMinutes(752), '12h 32m');
 assert.equal(formatDurationMinutes(0), '—');
 
@@ -22,8 +24,13 @@ assert.match(analyticsDashboard, /<Cell key=\{frequency\.type\} fill=\{frequency
 assert.match(analyticsDashboard, /data\.summary\.completedFieldResponses > 0/);
 
 const mapOverlays = source('components/map/command-map-overlays.tsx');
+const mapMarker = source('components/map/map-marker.tsx');
+const mapContainer = source('components/map/map-container.tsx');
 assert.ok(mapOverlays.indexOf('Historical Demand Outlook') < mapOverlays.indexOf('Map Legend'));
 assert.doesNotMatch(mapOverlays, /bottom-4/);
+assert.match(mapMarker, /incidentPresentationForType\(incidentType \|\| "Unknown Cause"\)/);
+assert.match(mapMarker, /backgroundColor: presentation\.color/);
+assert.match(mapContainer, /incidentType=\{incident\.type\}/);
 
 const rosterFilter = source('components/roster/roster-filter.tsx');
 assert.match(rosterFilter, />All<\/SelectItem>/);

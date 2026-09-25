@@ -79,6 +79,7 @@ export function MapContainer({
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const lastFocusedIncidentIdRef = useRef<string | undefined>(undefined);
+  const lastFittedIncidentKeyRef = useRef<string | undefined>(undefined);
   const routeCacheRef = useRef<globalThis.Map<string, RouteCacheEntry>>(new globalThis.Map());
   const [routeGeometries, setRouteGeometries] = useState<RouteGeometry[]>([]);
   const demandZoneFeatures = useMemo(() => ({
@@ -89,6 +90,10 @@ export function MapContainer({
       geometry: { type: "Point" as const, coordinates: [zone.longitude, zone.latitude] },
     })),
   }), [demandZones]);
+  const visibleIncidentKey = useMemo(() => incidents
+    .map((incident) => `${incident.id}:${incident.lat}:${incident.lng}`)
+    .sort()
+    .join("|"), [incidents]);
 
   // Fly to incident when selected from the list
   useEffect(() => {
@@ -109,6 +114,43 @@ export function MapContainer({
       }
     }
   }, [selectedIncidentId, incidents]);
+
+  // Frame the markers already visible under the active layer filters. Selection
+  // remains a separate action: clicking a report focuses only that one marker.
+  useEffect(() => {
+    const map = mapRef.current;
+    const fitKey = `${mapInstanceKey}:${visibleIncidentKey}`;
+    if (!isMapReady || !map || !visibleIncidentKey || lastFittedIncidentKeyRef.current === fitKey) return;
+
+    lastFittedIncidentKeyRef.current = fitKey;
+    if (selectedIncidentId) return;
+
+    if (incidents.length === 1) {
+      map.flyTo({
+        center: [incidents[0].lng, incidents[0].lat],
+        zoom: 14,
+        duration: 0,
+        essential: true,
+      });
+      return;
+    }
+
+    const [firstIncident, ...remainingIncidents] = incidents;
+    const bounds = remainingIncidents.reduce<[[number, number], [number, number]]>((currentBounds, incident) => [
+      [Math.min(currentBounds[0][0], incident.lng), Math.min(currentBounds[0][1], incident.lat)],
+      [Math.max(currentBounds[1][0], incident.lng), Math.max(currentBounds[1][1], incident.lat)],
+    ], [
+      [firstIncident.lng, firstIncident.lat],
+      [firstIncident.lng, firstIncident.lat],
+    ]);
+
+    map.fitBounds(bounds, {
+      padding: { top: 64, right: 280, bottom: 64, left: 64 },
+      maxZoom: 14,
+      duration: 0,
+      essential: true,
+    });
+  }, [incidents, isMapReady, mapInstanceKey, selectedIncidentId, visibleIncidentKey]);
 
   // Keep a live road route for every active dispatched ambulance, not just the selected incident.
   useEffect(() => {
@@ -264,6 +306,7 @@ export function MapContainer({
               destination={incident.destination}
               severity={incident.severity}
               nature={incident.nature}
+              incidentType={incident.type}
             />
           </Marker>
         ))}

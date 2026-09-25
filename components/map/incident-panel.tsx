@@ -141,11 +141,19 @@ export function IncidentPanel({
         </div>
 
         <div className="flex gap-2">
-          <Select value={barangay} onValueChange={(value) => onBarangayChange?.(value ?? "all")}>
+          <Select
+            value={barangay}
+            itemToStringLabel={(value) => value === "all" ? "All Barangays" : String(value)}
+            onValueChange={(value) => onBarangayChange?.(value ?? "all")}
+          >
             <SelectTrigger aria-label="Filter incidents by Barangay" className="h-11 min-w-0 flex-1 text-sm font-semibold"><SelectValue placeholder="All Barangays" /></SelectTrigger>
             <SelectContent><SelectItem value="all">All Barangays</SelectItem>{barangays.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent>
           </Select>
-          <Select value={period} onValueChange={(value) => { if (value) onPeriodChange?.(value as "today" | "weekly" | "monthly" | "yearly"); }}>
+          <Select
+            value={period}
+            itemToStringLabel={(value) => ({ today: "Today", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" }[String(value)] ?? String(value))}
+            onValueChange={(value) => { if (value) onPeriodChange?.(value as "today" | "weekly" | "monthly" | "yearly"); }}
+          >
             <SelectTrigger aria-label="Filter incidents by time period" className="h-11 w-28 shrink-0 text-sm font-semibold"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="today">Today</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem></SelectContent>
           </Select>

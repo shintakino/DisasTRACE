@@ -1,5 +1,9 @@
 # Progress Tracker
 
+## 2026-09-26 - Map filter display labels
+
+- Updated the shared PACC/CDRRMO map filter selects to resolve their user-facing labels as `All Barangays` and `Today` while preserving the existing `all` and `today` filter values and query behavior.
+
 ## 2026-09-26 - Chatbot draft-restoration truthfulness
 
 - Fixed the Public User chatbot so the “unfinished report draft was restored” message is created only from a valid `DRAFT` recovered during SecureStore hydration. Fresh report starts, evidence-photo starts, chatbot-triggered starts, and same-session failed-send recovery explicitly clear the non-persisted restoration marker.

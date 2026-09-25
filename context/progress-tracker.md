@@ -6,6 +6,7 @@
 - Added MapLibre loading, error, and retry feedback so an unavailable OpenFreeMap style or tile request cannot leave the operations map as a silent blank canvas.
 - Decoupled the five map data reads: unavailable responder, hospital, summary, or historical-demand data now leaves the rest of the command map usable and identifies the temporarily unavailable supporting data. A full map-data failure remains an explicit retryable error.
 - Added `scripts/verify-map-workspace-resilience.ts` to guard the viewport containment, error/retry state, and independently settled map data contract.
+- Kept the right-side Map Legend and Layers controls visible below the desktop breakpoint and bounded the overlay to its own viewport-height scroll area, so smaller web windows retain map meaning without moving the map itself.
 
 ## 2026-09-25 - PACC offer-rejection and responder-duty handshake repair
 

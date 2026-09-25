@@ -60,13 +60,13 @@ const riskLabel: Record<DemandZoneRisk, string> = {
 };
 
 export function CommandMapOverlays({ layers, onLayerChange, zones }: CommandMapOverlaysProps) {
-  const [isLegendOpen, setIsLegendOpen] = useState(false);
+  const [isLegendOpen, setIsLegendOpen] = useState(true);
   const [isLayersOpen, setIsLayersOpen] = useState(false);
   const strongestZones = [...zones].sort((first, second) => second.count - first.count).slice(0, 3);
 
   return (
     <>
-      <aside aria-label="Map legend and controls" className="absolute right-4 top-4 z-20 hidden w-60 space-y-3 lg:block">
+      <aside aria-label="Map legend and controls" className="absolute right-4 top-4 z-20 max-h-[calc(100%-2rem)] w-60 max-w-[calc(100%-2rem)] space-y-3 overflow-y-auto pr-1">
         <section aria-label="Historical incident demand outlook" className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur">
           <div className="flex items-center gap-2"><CircleDotDashed className="size-4 text-violet-700" /><div><h2 className="text-xs font-black text-[#1E3A8A]">Historical Demand Outlook</h2><p className="text-[9px] font-bold uppercase tracking-wide text-violet-700">Descriptive, not a forecast</p></div></div>
           {strongestZones.length ? <ul className="mt-3 space-y-2">{strongestZones.map((zone) => <li key={zone.id} className="text-xs text-slate-700"><span className="font-bold">{riskLabel[zone.riskLevel]}</span><span className="block text-[10px] text-slate-500">{zone.count} verified reports in one mapped cluster</span></li>)}</ul> : <p className="mt-3 text-xs leading-5 text-slate-500">No recurring verified-report clusters meet the display threshold yet.</p>}

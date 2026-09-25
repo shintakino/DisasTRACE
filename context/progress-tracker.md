@@ -1,5 +1,12 @@
 # Progress Tracker
 
+## 2026-09-25 - Shared command-map containment and resilience repair
+
+- Restored the Map page's viewport-bounded flex workspace after the header removal had left its `flex-1` map area outside a flex parent. The PACC/CDRRMO shared page now keeps the map canvas fixed while the incident list alone scrolls, including scroll chaining containment.
+- Added MapLibre loading, error, and retry feedback so an unavailable OpenFreeMap style or tile request cannot leave the operations map as a silent blank canvas.
+- Decoupled the five map data reads: unavailable responder, hospital, summary, or historical-demand data now leaves the rest of the command map usable and identifies the temporarily unavailable supporting data. A full map-data failure remains an explicit retryable error.
+- Added `scripts/verify-map-workspace-resilience.ts` to guard the viewport containment, error/retry state, and independently settled map data contract.
+
 ## 2026-09-25 - PACC offer-rejection and responder-duty handshake repair
 
 - PACC rejection now reconciles that report's expired responder offer before taking its locked decision, rather than depending on the periodic scheduler to have run first. The compare-and-swap cascade still owns release/reassignment, so an accepted or re-offered dispatch remains protected. Conflicts now identify an active response, an active offer, or pending offer recovery, and the PACC queue refreshes after a failed rejection.

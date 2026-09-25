@@ -109,7 +109,7 @@ export function IncidentPanel({
   }, [onPriorityChange, priorityIncidentId]);
 
   return (
-    <div className="flex flex-col h-full w-[400px] border-r bg-white shadow-xl z-10">
+    <div className="flex h-full min-h-0 w-[400px] flex-col border-r bg-white shadow-xl z-10">
       {/* Header */}
       <div className="flex flex-col px-6 pt-6 pb-4 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-20 gap-4">
         <div className="flex items-center justify-between">
@@ -186,7 +186,7 @@ export function IncidentPanel({
       </div>
 
       {/* Incident List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="p-6 space-y-4">
           <AnimatePresence mode="popLayout">
             {filteredIncidents.map((incident, index) => (

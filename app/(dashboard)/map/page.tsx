@@ -17,7 +17,7 @@ import { WebPreloader } from "@/components/ui/web-preloader";
 
 function MapPageContent() {
   const [period, setPeriod] = useState<"today" | "weekly" | "monthly" | "yearly">("today");
-  const { incidents, responders, hospitals, demandZones, isLoading, error, refresh } = useMapData({ period });
+  const { incidents, responders, hospitals, demandZones, isLoading, error, warning, refresh } = useMapData({ period });
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
   const [filter, setFilter] = useState("ALL");
   const [category, setCategory] = useState<"user" | "responder">("user");
@@ -106,8 +106,9 @@ function MapPageContent() {
   }
 
   return (
-    <div className="h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {warning ? <p role="status" className="absolute bottom-4 left-4 z-30 max-w-sm rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 shadow-sm">{warning}</p> : null}
       {isLoading ? (
         <div className="flex h-full w-full items-center justify-center bg-slate-50 p-4">
           <WebPreloader title="Loading Interactive Emergency Map..." subtitle="Fetching real-time GPS responder telemetry, active emergency pins, and hospital routes" />
@@ -115,7 +116,7 @@ function MapPageContent() {
       ) : (
         <>
           <div className={cn(
-            "z-10 flex h-full overflow-hidden border-r border-slate-200 transition-all duration-300 ease-in-out",
+            "z-10 flex h-full min-h-0 shrink-0 overflow-hidden border-r border-slate-200 transition-all duration-300 ease-in-out",
             isSidebarOpen ? "w-[400px]" : "w-0"
           )}>
             <IncidentPanel
@@ -152,7 +153,7 @@ function MapPageContent() {
             zones={demandZones}
           />
 
-          <div className="relative h-full flex-1">
+          <div className="relative h-full min-h-0 min-w-0 flex-1">
             <MapContainer
               incidents={displayedIncidents}
               responders={responders}

@@ -12,6 +12,31 @@ const TelemetryPayloadSchema = z.object({
   timestamp: z.string(),
 });
 
+async function readMapResponse<T>(
+  result: PromiseSettledResult<Response>,
+  label: string,
+  parse: (payload: unknown) => T,
+  fallback: T,
+  failedEndpoints: string[],
+): Promise<T> {
+  if (result.status === "rejected") {
+    failedEndpoints.push(label);
+    return fallback;
+  }
+
+  if (!result.value.ok) {
+    failedEndpoints.push(label);
+    return fallback;
+  }
+
+  try {
+    return parse(await result.value.json());
+  } catch {
+    failedEndpoints.push(label);
+    return fallback;
+  }
+}
+
 export function useMapData({ date, period }: { date?: string; period?: 'today' | 'weekly' | 'monthly' | 'yearly' } = {}) {
   const [incidents, setIncidents] = useState<MapIncident[]>([]);
   const [responders, setResponders] = useState<MapResponder[]>([]);
@@ -20,6 +45,7 @@ export function useMapData({ date, period }: { date?: string; period?: 'today' |
   const [summary, setSummary] = useState<MapSummary>({ new: 0, ongoing: 0, completed: 0, standby: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const activeDispatchIds = responders
     .filter((responder) => responder.status === "DISPATCHED" && responder.activeIncidentId)
     .map((responder) => responder.activeIncidentId as string)
@@ -29,33 +55,36 @@ export function useMapData({ date, period }: { date?: string; period?: 'today' |
   const fetchData = useCallback(async (showSkeleton = true) => {
     if (showSkeleton) setIsLoading(true);
     setError(null);
+    setWarning(null);
     try {
       const query = date ? `date=${encodeURIComponent(date)}` : period ? `period=${encodeURIComponent(period)}` : '';
       const incidentQuery = query ? `?${query}` : '';
-      const [incidentsRes, respondersRes, summaryRes, hospitalsRes, hotspotsRes] = await Promise.all([
+      const results = await Promise.allSettled([
         fetch(`/api/map/incidents${incidentQuery}`),
         fetch("/api/map/responders"),
         fetch("/api/map/summary"),
         fetch("/api/map/hospitals"),
         fetch("/api/map/hotspots"),
       ]);
+      const failedEndpoints: string[] = [];
+      const [incidentsData, respondersData, summaryData, hospitalsData, hotspotsData] = await Promise.all([
+        readMapResponse(results[0], "incident reports", (payload) => z.array(MapIncidentSchema).parse(payload), [], failedEndpoints),
+        readMapResponse(results[1], "responder locations", (payload) => z.array(MapResponderSchema).parse(payload), [], failedEndpoints),
+        readMapResponse(results[2], "map summary", (payload) => MapSummarySchema.parse(payload), { new: 0, ongoing: 0, completed: 0, standby: 0 }, failedEndpoints),
+        readMapResponse(results[3], "hospital locations", (payload) => z.array(MapHospitalSchema).parse(payload), [], failedEndpoints),
+        readMapResponse(results[4], "historical demand zones", (payload) => z.array(MapDemandZoneSchema).parse((payload as { data?: unknown }).data), [], failedEndpoints),
+      ]);
 
-      if (!incidentsRes.ok || !respondersRes.ok || !summaryRes.ok || !hospitalsRes.ok || !hotspotsRes.ok) {
-        throw new Error("Failed to fetch map data");
+      setIncidents(incidentsData);
+      setResponders(respondersData);
+      setSummary(summaryData);
+      setHospitals(hospitalsData);
+      setDemandZones(hotspotsData);
+      if (failedEndpoints.length === results.length) {
+        setError("Unable to load live map data.");
+      } else if (failedEndpoints.length > 0) {
+        setWarning(`Some supporting map data is temporarily unavailable: ${failedEndpoints.join(", ")}.`);
       }
-
-      const incidentsData = await incidentsRes.json();
-      const respondersData = await respondersRes.json();
-      const summaryData = await summaryRes.json();
-      const hospitalsData = await hospitalsRes.json();
-      const hotspotsData = await hotspotsRes.json();
-
-      setIncidents(z.array(MapIncidentSchema).parse(incidentsData));
-      setResponders(z.array(MapResponderSchema).parse(respondersData));
-      setSummary(MapSummarySchema.parse(summaryData));
-      setHospitals(z.array(MapHospitalSchema).parse(hospitalsData));
-      setDemandZones(z.array(MapDemandZoneSchema).parse(hotspotsData.data));
-      setError(null);
       if (showSkeleton) setIsLoading(false);
     } catch (err) {
       console.error("Error fetching map data:", err);
@@ -148,5 +177,5 @@ export function useMapData({ date, period }: { date?: string; period?: 'today' |
     };
   }, [activeDispatchKey]);
 
-  return { incidents, responders, hospitals, demandZones, summary, isLoading, error, refresh: () => fetchData(true) };
+  return { incidents, responders, hospitals, demandZones, summary, isLoading, error, warning, refresh: () => fetchData(true) };
 }

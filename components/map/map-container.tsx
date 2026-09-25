@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import Map, { NavigationControl, Marker, MapRef, Source, Layer } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { AlertCircle, RefreshCw } from "lucide-react";
 import { MapDemandZone, MapIncident, MapResponder, MapHospital } from "@/types/map";
 import { MapMarker } from "./map-marker";
 import { configureMapLibreWorker } from "./maplibre-worker";
@@ -74,6 +75,9 @@ export function MapContainer({
   onSelectIncident,
 }: MapContainerProps) {
   const mapRef = useRef<MapRef>(null);
+  const [mapInstanceKey, setMapInstanceKey] = useState(0);
+  const [isMapReady, setIsMapReady] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   const lastFocusedIncidentIdRef = useRef<string | undefined>(undefined);
   const routeCacheRef = useRef<globalThis.Map<string, RouteCacheEntry>>(new globalThis.Map());
   const [routeGeometries, setRouteGeometries] = useState<RouteGeometry[]>([]);
@@ -177,9 +181,16 @@ export function MapContainer({
     // Note: useEffect above will handle the flyTo
   }, [onSelectIncident]);
 
+  const retryMap = useCallback(() => {
+    setMapError(null);
+    setIsMapReady(false);
+    setMapInstanceKey((current) => current + 1);
+  }, []);
+
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#f3f4f6]">
+    <div className="relative h-full min-h-0 w-full overflow-hidden bg-[#f3f4f6]">
       <Map
+        key={mapInstanceKey}
         ref={mapRef}
         initialViewState={BALIWAG_CENTER}
         style={{ width: "100%", height: "100%" }}
@@ -189,6 +200,15 @@ export function MapContainer({
         maxZoom={18}
         maxBounds={BALIWAG_CAMERA_BOUNDS}
         renderWorldCopies={false}
+        onLoad={() => {
+          setMapError(null);
+          setIsMapReady(true);
+        }}
+        onError={(event) => {
+          if (!isMapReady) {
+            setMapError(event.error?.message || "The map style or tiles could not be loaded.");
+          }
+        }}
       >
         <NavigationControl position="bottom-right" />
 
@@ -287,6 +307,26 @@ export function MapContainer({
           </Marker>
         ))}
       </Map>
+
+      {!isMapReady && !mapError ? (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-100/70" role="status" aria-live="polite">
+          <p className="rounded-lg bg-white/95 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Loading map…</p>
+        </div>
+      ) : null}
+
+      {mapError ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-100/90 p-6" role="alert">
+          <div className="max-w-sm rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+            <AlertCircle className="mx-auto size-6 text-amber-600" aria-hidden="true" />
+            <h2 className="mt-3 text-base font-bold text-slate-900">Map unavailable</h2>
+            <p className="mt-2 text-sm leading-5 text-slate-600">The incident data is still available, but the basemap could not be loaded. Check the network connection and try again.</p>
+            <button type="button" onClick={retryMap} className="mt-4 inline-flex items-center gap-2 rounded-md bg-[#1E3A8A] px-3 py-2 text-sm font-semibold text-white hover:bg-[#173274] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E3A8A] focus-visible:ring-offset-2">
+              <RefreshCw className="size-4" aria-hidden="true" />
+              Retry map
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -123,7 +123,7 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
   - Ambulance GPS position updates → Public User tracking screen and admin map.
   - Responder status changes → Admin status monitoring panels.
   - Notification delivery → In-app notification panels.
-- Channels are scoped by role and incident context to minimize unnecessary data transfer. Realtime Broadcast remains the low-latency foreground path for ambulance marker movement, while public tracking also refreshes the authorized report-status API every three seconds as a recovery path when either Android app is backgrounded or a broadcast is missed. During patient transport, the responder heartbeat persists the active transport state and selected hospital on the incident; the same authorized status response supplies that destination to the public map. Guests use that endpoint with their per-report token rather than exposing a direct anonymous Realtime subscription.
+- Channels are scoped by role and incident context to minimize unnecessary data transfer. Realtime Broadcast remains the low-latency foreground path for inbound ambulance marker movement, while public tracking also refreshes the authorized report-status API every three seconds as a recovery path when either Android app is backgrounded or a broadcast is missed. Server-confirmed scene arrival is a monotonic public completion boundary: the public status projection stops returning responder coordinates, ETA, transport state, and hospital destination at `ARRIVED` and never reopens tracking during hospital transport or documentation. The responder heartbeat still persists transport state and the selected hospital for responder and PACC/CDRRMO operations. Guests use the same redacted endpoint with their per-report token rather than exposing a direct anonymous Realtime subscription.
 
 ## Mapping Model
 
@@ -160,3 +160,4 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 7. All mapping uses OpenFreeMap + MapLibre — no paid map services.
 8. Responder dispatch push tokens are stored only for the matching active mobile session; external push delivery never changes dispatch authority or bypasses API expiry checks.
 9. A client-side queued action is never represented as server-confirmed; only an authenticated successful REST response may claim synchronization, notification, arrival confirmation, or report completion.
+10. Scene arrival ends public responder tracking permanently for that report. Later responder coordinates, hospital destination, and transport progress remain available only to authorized operational roles and never change the internal incident to `RESOLVED` merely to complete the public view.

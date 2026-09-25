@@ -9,10 +9,16 @@ import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { z } from "zod";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 import { manilaDayBounds, manilaOperationalPeriodBounds } from "@/lib/manila-time";
+import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
 
 const MAP_RECORD_LIMIT = 200;
 const MapDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
 const MapPeriodSchema = z.enum(['today', 'weekly', 'monthly', 'yearly']).optional();
+const officialBarangayNames = new Set(BALIWAG_BARANGAYS.map(({ name }) => name));
+const MapBarangaySchema = z.string().refine(
+  (barangay) => officialBarangayNames.has(barangay),
+  'Barangay must be an official City of Baliwag barangay.',
+).optional();
 
 export async function GET(request: Request) {
   if (!(await isAdmin())) {
@@ -22,13 +28,18 @@ export async function GET(request: Request) {
   try {
     const rawDate = new URL(request.url).searchParams.get('date') ?? undefined;
     const rawPeriod = new URL(request.url).searchParams.get('period') ?? undefined;
+    const rawBarangay = new URL(request.url).searchParams.get('barangay') ?? undefined;
     const parsedDate = MapDateSchema.safeParse(rawDate);
     const parsedPeriod = MapPeriodSchema.safeParse(rawPeriod);
+    const parsedBarangay = MapBarangaySchema.safeParse(rawBarangay);
     if (!parsedDate.success) {
       return NextResponse.json({ error: 'Date must use YYYY-MM-DD.' }, { status: 400 });
     }
     if (!parsedPeriod.success || (parsedDate.data && parsedPeriod.data)) {
       return NextResponse.json({ error: 'Use either a valid map period or a YYYY-MM-DD date.' }, { status: 400 });
+    }
+    if (!parsedBarangay.success) {
+      return NextResponse.json({ error: 'Barangay must be an official City of Baliwag barangay.' }, { status: 400 });
     }
     const day = parsedDate.data;
     const bounds = day ? manilaDayBounds(day) : parsedPeriod.data ? manilaOperationalPeriodBounds(parsedPeriod.data) : null;
@@ -38,6 +49,12 @@ export async function GET(request: Request) {
     const requestScope = bounds
       ? and(gte(verificationRequests.createdAt, bounds.start), lt(verificationRequests.createdAt, bounds.end))
       : inArray(verificationRequests.status, ['PENDING', 'VERIFIED']);
+    const incidentWhere = parsedBarangay.data
+      ? and(incidentScope, eq(verificationRequests.barangay, parsedBarangay.data))
+      : incidentScope;
+    const requestWhere = parsedBarangay.data
+      ? and(requestScope, eq(verificationRequests.barangay, parsedBarangay.data))
+      : requestScope;
 
     // Default map reads are live operational records only. An explicitly
     // selected day receives a bounded historical slice rather than the full
@@ -65,7 +82,7 @@ export async function GET(request: Request) {
       .from(incidents)
       .innerJoin(verificationRequests, eq(incidents.requestId, verificationRequests.id))
       .leftJoin(users, eq(verificationRequests.residentId, users.id))
-      .where(incidentScope)
+      .where(incidentWhere)
       .orderBy(desc(incidents.createdAt))
       .limit(MAP_RECORD_LIMIT);
 
@@ -90,7 +107,7 @@ export async function GET(request: Request) {
       })
       .from(verificationRequests)
       .leftJoin(users, eq(verificationRequests.residentId, users.id))
-      .where(requestScope)
+      .where(requestWhere)
       .orderBy(desc(verificationRequests.createdAt))
       .limit(MAP_RECORD_LIMIT);
 

@@ -81,23 +81,24 @@ export default function DashboardPage() {
     async function fetchDashboardData() {
       setError(null);
       try {
-        const [kpiRes, trendRes, reportRes, responderRes] = await Promise.all([
+        const isSuperAdmin = role?.toLowerCase() === 'cdrrmo_super_admin';
+        const [kpiRes, trendRes, reportRes, responderRes, auditRes] = await Promise.all([
           fetch('/api/dashboard/kpis'),
           fetch(`/api/dashboard/trends?trendFilter=${trendFilter}&distFilter=${distFilter}`),
           fetch('/api/dashboard/reports'),
           fetch('/api/dashboard/responders'),
+          isSuperAdmin ? fetch('/api/audit?limit=7') : Promise.resolve(null),
         ]);
 
-        const responses = await Promise.all([
+        const [kpiJson, trendJson, reportJson, responderJson, auditJson] = await Promise.all([
           kpiRes.json(),
           trendRes.json(),
           reportRes.json(),
           responderRes.json(),
+          auditRes ? auditRes.json() : Promise.resolve([]),
         ]);
 
-        const [kpiJson, trendJson, reportJson, responderJson] = responses;
-
-        if (kpiRes.ok && trendRes.ok && reportRes.ok && responderRes.ok) {
+        if (kpiRes.ok && trendRes.ok && reportRes.ok && responderRes.ok && (!auditRes || auditRes.ok)) {
           // Validate and parse the combined data using Zod
           const validatedData = DashboardDataSchema.parse({
             kpis: kpiJson.data,
@@ -105,20 +106,22 @@ export default function DashboardPage() {
             distribution: trendJson.data.distribution,
             reports: reportJson.data,
             responders: responderJson.data,
+            auditPreview: auditJson,
           });
           
           setData(validatedData);
         } else {
           // Extract error message from any of the failed responses
-          const firstError = [kpiJson, trendJson, reportJson, responderJson].find(r => r.error)?.message 
+          const firstError = [kpiJson, trendJson, reportJson, responderJson, auditJson].find(r => r?.error)?.message
             || "One or more dashboard requests failed";
           setError(firstError);
-          setErrorKind([kpiRes, trendRes, reportRes, responderRes].some((response) => response.status === 401 || response.status === 403) ? 'PERMISSION' : 'DATA');
+          setErrorKind([kpiRes, trendRes, reportRes, responderRes, auditRes].some((response) => response?.status === 401 || response?.status === 403) ? 'PERMISSION' : 'DATA');
           console.error("Dashboard Fetch Error Detail:", {
             kpis: kpiJson,
             trends: trendJson,
             reports: reportJson,
-            responders: responderJson
+            responders: responderJson,
+            audit: auditJson,
           });
         }
       } catch (err) {
@@ -201,7 +204,6 @@ export default function DashboardPage() {
         displayName={displayName}
         distributionFilter={distFilter}
         onDistributionFilterChange={setDistFilter}
-        onSelectReport={handleReportClick}
         onViewAnalytics={() => router.push('/analytics')}
         onViewAudit={() => router.push('/audit')}
         onViewRoster={() => router.push('/roster')}

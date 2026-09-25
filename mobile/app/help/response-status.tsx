@@ -17,7 +17,6 @@ interface IncidentStatus {
   status: 'DISPATCHED' | 'EN_ROUTE' | 'ARRIVED' | 'DOCUMENTATION_PENDING' | 'RESOLVED';
   responderId: string | null;
   transportStatus: PublicTransportStatus;
-  transportHospitalName: string | null;
 }
 
 type DispatchRecoveryState = 'PACC_REASSIGNMENT_REQUIRED' | null;
@@ -33,11 +32,7 @@ function messageFor(incident: IncidentStatus | null, agencies: string[], recover
     return `${coordination ? `${coordination}. ` : ''}PACC is arranging another available responder.`;
   }
   const mode = getPublicResponseMode({ incidentStatus: incident?.status, transportStatus: incident?.transportStatus, hasResponder: Boolean(incident?.responderId) });
-  if (mode === 'TRANSPORT_COMPLETE') return 'Patient transport is complete.';
-  if (mode === 'TRANSPORT_TRACKING') return `Patient transport is in progress${incident?.transportHospitalName ? ` to ${incident.transportHospitalName}` : ''}.`;
-  if (mode === 'HELP_ARRIVED') return 'Help has arrived. The responder is assisting at the scene.';
-  if (incident?.status === 'DOCUMENTATION_PENDING') return 'The field response has been completed. The responder is finishing incident documentation for PACC.';
-  if (incident?.status === 'RESOLVED') return 'Response coordination has been completed.';
+  if (mode === 'RESPONSE_COMPLETE') return 'The responder has arrived. Your live tracking session is complete.';
   if (incident?.status === 'EN_ROUTE' || incident?.responderId) return `${coordination ? `${coordination}. ` : ''}Responders are on the way.`;
   return coordination || 'Coordinating the nearest available responder.';
 }
@@ -83,19 +78,20 @@ export default function EmergencyResponseStatusScreen() {
     router.replace('/help/pending' as never);
   }, [report.chatbotOrigin, router]);
 
-  useEffect(() => {
-    if (report.chatbotOrigin && incident?.status === 'RESOLVED') {
-      useChatbotStore.getState().clearReportToIdle();
-    }
-  }, [incident?.status, report.chatbotOrigin]);
+  const returnHome = useCallback(() => {
+    useEmergencyReportStore.getState().resetReport();
+    useChatbotStore.getState().clearReportToIdle();
+    router.replace((isGuest ? '/' : '/(tabs)') as never);
+  }, [isGuest, router]);
 
   useEffect(() => {
     if (!report.id) return;
     let mounted = true;
     let refreshing = false;
+    let responseComplete = false;
     const requestId = report.id;
     const load = async () => {
-      if (refreshing) return;
+      if (refreshing || responseComplete) return;
       refreshing = true;
       try {
         const apiUrl = getMobileApiBaseUrl();
@@ -135,8 +131,14 @@ export default function EmergencyResponseStatusScreen() {
           status: remoteIncident.status,
           responderId: remoteIncident.responderId ?? remoteIncident.responder_id ?? null,
           transportStatus: remoteIncident.transportStatus ?? result.data.transport?.status ?? 'NONE',
-          transportHospitalName: result.data.transport?.hospital?.name ?? null,
         } : null;
+
+        responseComplete = result.data.publicStatus === 'COMPLETED_AT_SCENE'
+          || getPublicResponseMode({
+            incidentStatus: nextIncident?.status,
+            transportStatus: nextIncident?.transportStatus,
+            hasResponder: Boolean(nextIncident?.responderId),
+          }) === 'RESPONSE_COMPLETE';
 
         setIncident(nextIncident);
         setLastCheckedAt(new Date());
@@ -195,9 +197,9 @@ export default function EmergencyResponseStatusScreen() {
     <View style={styles.card}>
       <StatusStep icon={<CheckCircle2 color="#16A34A" size={21} />} title="Report received" subtitle="Your incident details and location were recorded." active />
       <StatusStep icon={<Clock3 color={agencies.length > 0 || recoveryState ? '#16A34A' : '#F97316'} size={21} />} title="Response coordination" subtitle={recoveryState ? 'PACC is selecting another available responder after the previous offer expired.' : coordinationText(agencies) || 'PACC is coordinating the appropriate response.'} active={agencies.length > 0 || Boolean(recoveryState)} />
-      <StatusStep icon={<MapPinned color={mode === 'WAITING' ? '#94A3B8' : '#16A34A'} size={21} />} title={mode === 'HELP_ARRIVED' ? 'Help has arrived' : mode === 'DOCUMENTATION_PENDING' ? 'Field response complete' : mode === 'TRANSPORT_TRACKING' ? 'Patient transport' : mode === 'TRANSPORT_COMPLETE' ? 'Patient transport complete' : 'Responder movement'} subtitle={mode === 'HELP_ARRIVED' ? 'The responder is assisting at the scene. Live inbound tracking has ended.' : mode === 'DOCUMENTATION_PENDING' ? 'The field response is complete. The responder is finishing incident documentation for PACC.' : mode === 'TRANSPORT_TRACKING' ? `The responder is travelling${incident?.transportHospitalName ? ` to ${incident.transportHospitalName}` : ' to hospital'}.` : mode === 'TRANSPORT_COMPLETE' ? 'The responder has arrived at the selected hospital.' : incident?.responderId ? 'Responders are on the way. Please remain available for further instructions.' : 'This updates when a responder is assigned.'} active={mode !== 'WAITING'} />
+      <StatusStep icon={<MapPinned color={mode === 'WAITING' ? '#94A3B8' : '#16A34A'} size={21} />} title={mode === 'RESPONSE_COMPLETE' ? 'Response completed' : 'Responder movement'} subtitle={mode === 'RESPONSE_COMPLETE' ? 'The responder has reached the reported scene. Live responder tracking has ended.' : incident?.responderId ? 'Responders are on the way. Please remain available for further instructions.' : 'This updates when a responder is assigned.'} active={mode !== 'WAITING'} />
     </View>
-    {mode === 'TRANSPORT_COMPLETE' ? <TouchableOpacity style={[styles.mapButton, styles.completeButton]} onPress={() => router.replace('/help/resolution?completion=transport' as any)}><Text style={styles.mapButtonText}>View transport completion</Text></TouchableOpacity> : mode === 'INBOUND_TRACKING' || mode === 'TRANSPORT_TRACKING' ? <TouchableOpacity style={styles.mapButton} onPress={() => router.replace('/help/tracking' as any)}><Text style={styles.mapButtonText}>{mode === 'TRANSPORT_TRACKING' ? 'Track patient transport' : 'Open live ambulance map'}</Text></TouchableOpacity> : null}
+    {mode === 'RESPONSE_COMPLETE' ? <TouchableOpacity style={[styles.mapButton, styles.completeButton]} onPress={returnHome}><Text style={styles.mapButtonText}>Return to Home</Text></TouchableOpacity> : mode === 'INBOUND_TRACKING' ? <TouchableOpacity style={styles.mapButton} onPress={() => router.replace('/help/tracking' as any)}><Text style={styles.mapButtonText}>Open live ambulance map</Text></TouchableOpacity> : null}
   </ScrollView>;
 }
 

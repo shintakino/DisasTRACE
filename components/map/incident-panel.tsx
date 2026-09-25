@@ -3,11 +3,15 @@
 import * as React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapIncident } from "@/types/map";
-import { Activity, Flame, Car, ShieldAlert, Clock, MapPin } from "lucide-react";
+import { Activity, CalendarIcon, Flame, Car, ShieldAlert, Clock, MapPin, PanelLeftClose } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { compareOperationalIncidents, isOperationalIncidentActive } from "@/lib/incident-display-priority";
+import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface IncidentPanelProps {
   incidents: MapIncident[];
@@ -19,8 +23,13 @@ interface IncidentPanelProps {
   category?: "user" | "responder";
   onCategoryChange?: (category: "user" | "responder") => void;
   onPriorityChange?: (incidentId: string | undefined) => void;
+  barangay?: string;
+  onBarangayChange?: (barangay: string) => void;
   period?: "today" | "weekly" | "monthly" | "yearly";
   onPeriodChange?: (period: "today" | "weekly" | "monthly" | "yearly") => void;
+  date?: string;
+  onDateChange?: (date: string | undefined) => void;
+  onTogglePanel?: () => void;
 }
 
 export function IncidentPanel({
@@ -33,12 +42,16 @@ export function IncidentPanel({
   category: externalCategory,
   onCategoryChange,
   onPriorityChange,
+  barangay = "all",
+  onBarangayChange,
   period = "today",
   onPeriodChange,
+  date,
+  onDateChange,
+  onTogglePanel,
 }: IncidentPanelProps) {
   const [internalCategory, setInternalCategory] = React.useState<"user" | "responder">("user");
   const category = externalCategory !== undefined ? externalCategory : internalCategory;
-  const [barangay, setBarangay] = React.useState("all");
 
   // Auto-scroll list when an incident pin is selected on the map
   React.useEffect(() => {
@@ -66,9 +79,14 @@ export function IncidentPanel({
     onFilterChange("ALL");
   };
 
-  const barangays = React.useMemo(() => Array.from(new Set(
-    incidents.map((incident) => incident.barangay).filter((value): value is string => Boolean(value)),
-  )).sort((first, second) => first.localeCompare(second)), [incidents]);
+  const barangays = React.useMemo(() => BALIWAG_BARANGAYS.map(({ name }) => name), []);
+  const selectedCalendarDate = date ? new Date(`${date}T00:00:00`) : undefined;
+
+  const formatCalendarDate = (value: Date) => [
+    value.getFullYear(),
+    String(value.getMonth() + 1).padStart(2, "0"),
+    String(value.getDate()).padStart(2, "0"),
+  ].join("-");
 
   const normaliseStatus = (incident: MapIncident) => {
     if (incident.status === "REJECTED" || incident.status === "DUPLICATE") return "REJECTED";
@@ -109,7 +127,7 @@ export function IncidentPanel({
   }, [onPriorityChange, priorityIncidentId]);
 
   return (
-    <div className="flex h-full min-h-0 w-[400px] flex-col border-r bg-white shadow-xl z-10">
+    <div className="flex h-full min-h-0 w-[480px] flex-col border-r bg-white shadow-xl z-10">
       {/* Header */}
       <div className="flex flex-col px-6 pt-6 pb-4 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-20 gap-4">
         <div className="flex items-center justify-between">
@@ -117,17 +135,36 @@ export function IncidentPanel({
             <h1 className="text-2xl font-bold capitalize text-[#1E3A8A] tracking-tight">Incident Reports</h1>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Real-time Command Feed</p>
           </div>
+          <Button type="button" variant="outline" size="icon" className="size-11 shrink-0 border-slate-200 text-[#1E3A8A] shadow-sm" onClick={onTogglePanel} aria-label="Hide incident panel">
+            <PanelLeftClose className="size-5" />
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Select value={barangay} onValueChange={(value) => setBarangay(value ?? "all")}>
-            <SelectTrigger aria-label="Filter incidents by Barangay" className="h-9 text-xs font-semibold"><SelectValue placeholder="All Barangays" /></SelectTrigger>
+        <div className="flex gap-2">
+          <Select value={barangay} onValueChange={(value) => onBarangayChange?.(value ?? "all")}>
+            <SelectTrigger aria-label="Filter incidents by Barangay" className="h-11 min-w-0 flex-1 text-sm font-semibold"><SelectValue placeholder="All Barangays" /></SelectTrigger>
             <SelectContent><SelectItem value="all">All Barangays</SelectItem>{barangays.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent>
           </Select>
           <Select value={period} onValueChange={(value) => { if (value) onPeriodChange?.(value as "today" | "weekly" | "monthly" | "yearly"); }}>
-            <SelectTrigger aria-label="Filter incidents by time period" className="h-9 text-xs font-semibold"><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label="Filter incidents by time period" className="h-11 w-28 shrink-0 text-sm font-semibold"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="today">Today</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem></SelectContent>
           </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" size="icon" className={cn("h-11 w-11 shrink-0", date && "border-[#1E3A8A] bg-blue-50 text-[#1E3A8A]")} aria-label="Choose a specific incident date">
+                <CalendarIcon className="size-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={selectedCalendarDate}
+                onSelect={(value) => onDateChange?.(value ? formatCalendarDate(value) : undefined)}
+                disabled={{ after: new Date() }}
+              />
+              {date ? <Button type="button" variant="ghost" className="mx-2 mb-2 w-[calc(100%-1rem)]" onClick={() => onDateChange?.(undefined)}>Clear selected date</Button> : null}
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Category Toggles (User vs Responder) */}

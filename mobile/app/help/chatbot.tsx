@@ -126,10 +126,12 @@ export default function EmergencyChatbotScreen() {
     draft,
     activeReport,
     editTarget,
+    restoredDraftNotice,
     hasHydrated,
     startDraft,
     updateDraft,
     setEditTarget,
+    consumeRestoredDraftNotice,
     markSubmitting,
     restoreDraftAfterFailure,
     markSubmitted,
@@ -145,12 +147,12 @@ export default function EmergencyChatbotScreen() {
   const [capturingLocation, setCapturingLocation] = useState(false);
   const [officialLocationLabel, setOfficialLocationLabel] = useState<string | null>(null);
   const [actorReady, setActorReady] = useState(false);
+  const [verifiedActor, setVerifiedActor] = useState<{ mode: ChatbotReporterMode; ownerId: string } | null>(null);
   const [pendingEvidence, setPendingEvidence] = useState<PendingEvidence | null>(null);
   const [reviewMode, setReviewMode] = useState(false);
   const [changingIncidentCategory, setChangingIncidentCategory] = useState(false);
   const submissionLock = useRef(false);
   const requestedLocation = useRef(false);
-  const restoredPromptShown = useRef(false);
   const appliedPhotoPrefill = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -187,7 +189,10 @@ export default function EmergencyChatbotScreen() {
         }
       }
       useChatbotStore.getState().setActor(requestedMode, expectedOwnerId);
-      if (mounted) setActorReady(true);
+      if (mounted) {
+        setVerifiedActor({ mode: requestedMode, ownerId: expectedOwnerId });
+        setActorReady(true);
+      }
     };
     void verifyActor();
     return () => { mounted = false; };
@@ -213,10 +218,10 @@ export default function EmergencyChatbotScreen() {
   }, [activeReport, actorReady, draft, router, submissionId]);
 
   useEffect(() => {
-    if (!hasHydrated || lifecycle !== 'DRAFT' || restoredPromptShown.current) return;
-    restoredPromptShown.current = true;
+    if (!actorReady || !verifiedActor || !restoredDraftNotice) return;
+    if (!consumeRestoredDraftNotice(verifiedActor.mode, verifiedActor.ownerId)) return;
     addMessage('bot', `Your unfinished report draft was restored. ${promptFor(activeSlot, reporterMode, languageStyle)}`);
-  }, [activeSlot, hasHydrated, languageStyle, lifecycle, reporterMode]);
+  }, [activeSlot, actorReady, consumeRestoredDraftNotice, languageStyle, reporterMode, restoredDraftNotice, verifiedActor]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -311,7 +316,6 @@ export default function EmergencyChatbotScreen() {
             setPendingEvidence(null);
             setChangingIncidentCategory(false);
             requestedLocation.current = false;
-            restoredPromptShown.current = false;
             setMessages([makeMessage('bot', `${WELCOME} Your draft was cancelled and no report was sent.`)]);
           },
         },

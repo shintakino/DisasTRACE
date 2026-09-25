@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, User, MapPin, Award, CheckCircle, Edit3, XCircle } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
 import { formatBaliwagLocation } from '../../../lib/baliwag-location';
+import { isPublicResponseComplete } from '../../../lib/public-response-lifecycle';
 
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -160,8 +161,8 @@ export default function IncidentDetailScreen() {
 
   const hasSubmittedFeedback = !!existingFeedback && !isEditing;
   const isRejected = report.status === 'REJECTED';
-  const isCaseClosed = !isRejected && (report.incidentStatus === 'RESOLVED' || report.status === 'CASE_CLOSED');
-  const reportStatusLabel = isRejected ? 'Rejected' : isCaseClosed ? 'Case Closed' : report.status;
+  const isCaseClosed = !isRejected && (isPublicResponseComplete(report.incidentStatus) || report.status === 'CASE_CLOSED');
+  const reportStatusLabel = isRejected ? 'Rejected' : isCaseClosed ? 'Completed' : report.status;
   const rejectionReason = typeof report.rejectionReason === 'string' && report.rejectionReason.trim()
     ? report.rejectionReason.trim()
     : 'No rejection reason was recorded for this earlier report.';

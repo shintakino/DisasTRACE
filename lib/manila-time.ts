@@ -35,6 +35,21 @@ export function currentManilaDayBounds() {
   };
 }
 
+export type ManilaRecentReportRange = 'today' | 'last_7_days' | 'last_30_days';
+
+/** Calendar-day bounds for a resident's own report history in Asia/Manila. */
+export function manilaRecentReportBounds(range: ManilaRecentReportRange) {
+  const offsetDays = {
+    today: 0,
+    last_7_days: 6,
+    last_30_days: 29,
+  }[range];
+  return {
+    start: sql`((date_trunc('day', now() AT TIME ZONE ${MANILA_TIME_ZONE}) - (${offsetDays} * interval '1 day')) AT TIME ZONE ${MANILA_TIME_ZONE})`,
+    end: sql`((date_trunc('day', now() AT TIME ZONE ${MANILA_TIME_ZONE}) + interval '1 day') AT TIME ZONE ${MANILA_TIME_ZONE})`,
+  };
+}
+
 export type ManilaOperationalPeriod = 'today' | 'weekly' | 'monthly' | 'yearly';
 
 /**

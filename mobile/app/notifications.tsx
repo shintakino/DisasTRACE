@@ -187,16 +187,10 @@ export default function NotificationsScreen() {
       }
       if (item.type === 'dispatch_alert' || item.type === 'new_incident') {
         router.replace('/(tabs)/index' as any);
-      } else if (
-        item.type === 'ambulance_dispatched' || 
-        item.type === 'responder_arrived' ||
-        item.type === 'patient_transport_started'
-      ) {
-        router.replace((item.type === 'patient_transport_started' && transportRequestId
-          ? '/help/response-status'
-          : '/help/tracking') as any);
-      } else if (item.type === 'patient_transport_completed') {
-        router.replace('/help/resolution?completion=transport' as any);
+      } else if (item.type === 'ambulance_dispatched') {
+        router.replace('/help/tracking' as any);
+      } else if (item.type === 'responder_arrived') {
+        router.replace('/help/response-status' as any);
       } else if (
         item.type === 'registration_approved' || 
         item.type === 'registration_rejected'

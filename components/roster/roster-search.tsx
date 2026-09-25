@@ -11,10 +11,10 @@ interface RosterSearchProps {
 export function RosterSearch({ onSearch }: RosterSearchProps) {
   return (
     <div className="relative w-full md:w-64 group">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-blue-100" />
       <Input
         placeholder="Search responders..."
-        className="pl-9 h-10 bg-white border-none rounded-full text-sm font-medium text-gray-900 placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-white/20 transition-all shadow-sm"
+        className="h-10 rounded-xl border border-white/20 bg-white/10 pl-9 text-sm font-medium text-white placeholder:text-blue-100 focus-visible:border-white/40 focus-visible:ring-2 focus-visible:ring-white/40 transition-all"
         onChange={(e) => onSearch(e.target.value)}
       />
     </div>

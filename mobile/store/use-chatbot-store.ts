@@ -2,10 +2,13 @@ import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import {
+  canShowRestoredDraftNotice,
+  deriveRestoredDraftNotice,
   type ChatbotActiveReport,
   type ChatbotDraft,
   type ChatbotLifecycle,
   type ChatbotReporterMode,
+  type ChatbotRestoredDraftNotice,
   type ChatbotSlot,
   createInitialChatbotState,
   restorePersistedChatbotState,
@@ -43,9 +46,11 @@ interface ChatbotStore {
   draft: ChatbotDraft;
   activeReport: ChatbotActiveReport | null;
   editTarget: ChatbotSlot | null;
+  restoredDraftNotice: ChatbotRestoredDraftNotice | null;
   hasHydrated: boolean;
   setHasHydrated: (value: boolean) => void;
   setActor: (mode: ChatbotReporterMode, ownerId: string) => void;
+  consumeRestoredDraftNotice: (mode: ChatbotReporterMode, ownerId: string) => boolean;
   startDraft: (updates?: Partial<ChatbotDraft>) => void;
   updateDraft: (updates: Partial<ChatbotDraft>) => void;
   setEditTarget: (slot: ChatbotSlot | null) => void;
@@ -60,13 +65,20 @@ interface ChatbotStore {
 
 export const useChatbotStore = create<ChatbotStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...createInitialChatbotState(),
+      restoredDraftNotice: null,
       hasHydrated: false,
       setHasHydrated: (value) => set({ hasHydrated: value }),
       setActor: (reporterMode, ownerId) => set((state) => (
         state.lifecycle === 'IDLE' && !state.activeReport ? { reporterMode, ownerId } : state
       )),
+      consumeRestoredDraftNotice: (reporterMode, ownerId) => {
+        const state = get();
+        if (!canShowRestoredDraftNotice(state.restoredDraftNotice, state, reporterMode, ownerId)) return false;
+        set({ restoredDraftNotice: null });
+        return true;
+      },
       startDraft: (updates = {}) => set((state) => {
         if (state.activeReport) return state;
         return {
@@ -74,6 +86,7 @@ export const useChatbotStore = create<ChatbotStore>()(
           submissionId: state.submissionId ?? createSubmissionId(),
           draft: { ...state.draft, ...updates },
           editTarget: null,
+          restoredDraftNotice: null,
         };
       }),
       updateDraft: (updates) => set((state) => ({ draft: { ...state.draft, ...updates } })),
@@ -85,11 +98,13 @@ export const useChatbotStore = create<ChatbotStore>()(
       })),
       restoreDraftAfterFailure: () => set((state) => ({
         lifecycle: state.activeReport ? state.lifecycle : 'DRAFT',
+        restoredDraftNotice: null,
       })),
       markSubmitted: (activeReport) => set({
         lifecycle: activeReport.hasIncident ? 'ACTIVE_RESPONSE' : 'SUBMITTED_PENDING',
         activeReport,
         editTarget: null,
+        restoredDraftNotice: null,
       }),
       updateActiveReport: (updates) => set((state) => {
         if (!state.activeReport) return state;
@@ -104,10 +119,12 @@ export const useChatbotStore = create<ChatbotStore>()(
       markActiveResponse: () => set({ lifecycle: 'ACTIVE_RESPONSE' }),
       discardDraft: () => set((state) => ({
         ...createInitialChatbotState(state.reporterMode, state.ownerId),
+        restoredDraftNotice: null,
         hasHydrated: state.hasHydrated,
       })),
       clearReportToIdle: () => set((state) => ({
         ...createInitialChatbotState(state.reporterMode, state.ownerId),
+        restoredDraftNotice: null,
         hasHydrated: state.hasHydrated,
       })),
     }),
@@ -123,10 +140,14 @@ export const useChatbotStore = create<ChatbotStore>()(
         activeReport: state.activeReport,
         editTarget: state.editTarget,
       }),
-      merge: (persisted, current) => ({
-        ...current,
-        ...restorePersistedChatbotState(persisted),
-      }),
+      merge: (persisted, current) => {
+        const restoredState = restorePersistedChatbotState(persisted);
+        return {
+          ...current,
+          ...restoredState,
+          restoredDraftNotice: deriveRestoredDraftNotice(restoredState),
+        };
+      },
       onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
     },
   ),

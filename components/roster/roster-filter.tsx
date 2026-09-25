@@ -37,10 +37,10 @@ export function RosterFilter({ onFilterChange }: RosterFilterProps) {
         <PopoverTrigger 
           className={cn(
             buttonVariants({ variant: "outline" }),
-            "h-10 bg-white border-none shadow-sm rounded-full px-4 flex items-center gap-2 text-gray-600 font-medium hover:bg-gray-50 transition-all"
+            "h-10 rounded-xl border border-white/20 bg-white/10 px-4 flex items-center gap-2 text-white font-medium hover:bg-white/20 transition-all"
           )}
         >
-          <Filter className="size-4 text-gray-500" />
+          <Filter className="size-4 text-blue-100" />
           <span>Filter</span>
         </PopoverTrigger>
         <PopoverContent className="w-64 p-4 rounded-xl shadow-xl border border-gray-100 bg-white mt-2" align="end">

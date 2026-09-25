@@ -104,6 +104,8 @@ export const ChatbotStatusResponseSchema = z.object({
   data: z.object({
     status: z.string().min(1),
     outcome: z.enum(['ACTIVE', 'REJECTED', 'CANCELLED', 'CASE_CLOSED']).optional(),
+    publicStatus: z.enum(['WAITING', 'INBOUND_TRACKING', 'COMPLETED_AT_SCENE', 'REJECTED']).optional(),
+    trackingActive: z.boolean().optional(),
     rejectionReason: z.string().min(1).nullable().optional(),
     triageClassification: z.string().nullable().optional(),
     coordinationAgencies: z.array(z.string()).optional(),
@@ -143,6 +145,53 @@ export interface PersistedChatbotState {
   draft: ChatbotDraft;
   activeReport: ChatbotActiveReport | null;
   editTarget: ChatbotSlot | null;
+}
+
+/**
+ * Runtime-only proof that a resumable draft came from SecureStore hydration.
+ * This is intentionally not part of PersistedChatbotState: a draft created in
+ * the current session must never be presented as a restored draft.
+ */
+export interface ChatbotRestoredDraftNotice {
+  submissionId: string;
+  reporterMode: ChatbotReporterMode;
+  ownerId: string;
+}
+
+export function deriveRestoredDraftNotice(
+  state: PersistedChatbotState,
+): ChatbotRestoredDraftNotice | null {
+  if (
+    state.lifecycle !== 'DRAFT'
+    || state.activeReport
+    || !state.submissionId
+    || !state.ownerId
+  ) {
+    return null;
+  }
+  return {
+    submissionId: state.submissionId,
+    reporterMode: state.reporterMode,
+    ownerId: state.ownerId,
+  };
+}
+
+export function canShowRestoredDraftNotice(
+  notice: ChatbotRestoredDraftNotice | null,
+  state: Pick<PersistedChatbotState, 'lifecycle' | 'reporterMode' | 'ownerId' | 'submissionId' | 'activeReport'>,
+  reporterMode: ChatbotReporterMode,
+  ownerId: string,
+): boolean {
+  return Boolean(
+    notice
+    && state.lifecycle === 'DRAFT'
+    && !state.activeReport
+    && state.submissionId === notice.submissionId
+    && state.reporterMode === notice.reporterMode
+    && state.ownerId === notice.ownerId
+    && reporterMode === notice.reporterMode
+    && ownerId === notice.ownerId,
+  );
 }
 
 const numberWords: Record<string, number> = {

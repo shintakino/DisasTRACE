@@ -21,7 +21,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 2. Phone number is verified via OTP (textbee.dev).
 3. Account enters "Pending Approval" — user is blocked from all features until a CDRRMO Super Admin verifies the registration (PACC Admins no longer perform user validations).
 4. Once verified, user can submit emergency or non-emergency incident reports with photos, GPS location, and a structured WH form.
-5. After dispatch, user tracks the assigned ambulance on a live map with ETA.
+5. After dispatch, user tracks the assigned ambulance on a live map with ETA until the responder reaches the reported scene. Scene arrival completes the public response view; hospital transport and later responder movement remain operationally private.
 6. User receives in-app notifications for report status updates.
 
 ### Ambulance Responder (Android — Expo)
@@ -48,7 +48,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 - The guest chatbot captures a valid Philippine mobile callback number, automatic GPS, a nearby landmark/reference, incident details, the exact number of people affected, condition, and required photo/evidence. The registered-resident chatbot uses the verified phone number already stored on the account and follows the same automatic GPS/landmark process; location permission is required to continue.
 - Guest Mode keeps a bounded report and chatbot history on the submitting device, including final status or rejection feedback, and displays the remaining lifetime Guest Mode allowance with a registration reminder.
 - Automated initial triage sends high-confidence emergencies into ambulance dispatch and routes non-emergency or flagged reports to PACC.
-- When a response starts, the device can view its live response/tracking status.
+- When a response starts, the device can view its live response/tracking status until the responder reaches the reported scene. Hospital transport is not exposed to the reporter.
 - PACC can record coordination with PNP, BFP, CDRRMO, Barangay, DSWD, or Hospital; residents and guests see the dynamic agencies and responder status.
 
 ## Features
@@ -70,7 +70,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 
 ### Real-Time Tracking & Maps
 
-- Live ambulance GPS tracking with ETA for public users post-dispatch.
+- Live ambulance GPS tracking with ETA for public users from dispatch through server-confirmed scene arrival only.
 - Real-time incident map for PACC Admin and CDRRMO Super Admin.
 - Hospital map view for public users.
 - All mapping via OpenFreeMap + MapLibre (free, open-source, no API key).
@@ -131,7 +131,7 @@ DisasTRACE is a centralized digital platform for emergency incident reporting an
 2. A CDRRMO Super Admin can verify pending registrations.
 3. Unverified mobile users are fully blocked from app functionality.
 4. A dispatcher can triage reports and dispatch the nearest ambulance.
-5. A public user can track a dispatched ambulance in real time with ETA.
+5. A public user can track a dispatched ambulance in real time with ETA until server-confirmed scene arrival, after which the public report is completed without exposing hospital transport.
 6. A responder can accept a dispatch, navigate, and submit an incident report.
 7. The CDRRMO Super Admin can view KPI dashboards, manage users, and export reports.
 8. All real-time sync works via Supabase Realtime without significant delay.

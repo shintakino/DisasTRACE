@@ -4,7 +4,6 @@ import { db } from '@/db';
 import { verificationRequests } from '@/db/schema/verification_requests';
 import { incidents } from '@/db/schema/incidents';
 import { users } from '@/db/schema/users';
-import { hospitals } from '@/db/schema/hospitals';
 import { createClient } from '@/lib/supabase-server';
 import { cascadeIncident } from '@/lib/dispatch-engine';
 import { requiresPaccReassignment } from '@/lib/dispatch-policy';
@@ -13,6 +12,7 @@ import { systemSettings } from '@/db/schema/system_settings';
 import { guestDeviceReportQuotas } from '@/db/schema/guest_device_report_quotas';
 import { DEFAULT_GUEST_REPORTS_PER_PHONE_LIMIT } from '@/lib/guest-report-limit';
 import { philippineMobileNumberVariants } from '@/lib/phone-number';
+import { projectPublicResponseLifecycle } from '@/lib/public-response-policy';
 
 export async function GET(request: NextRequest) {
   const requestId = request.nextUrl.searchParams.get('requestId');
@@ -55,16 +55,17 @@ export async function GET(request: NextRequest) {
   }
 
   const needsPaccReassignment = requiresPaccReassignment(incident);
-  const responder = incident?.responderId
+  const publicLifecycle = projectPublicResponseLifecycle({
+    requestStatus: report.status,
+    incidentStatus: incident?.status,
+    responderId: incident?.responderId,
+  });
+  const publicResponseComplete = publicLifecycle.responseComplete;
+  const publicTrackingActive = publicLifecycle.trackingActive;
+  const responder = publicTrackingActive && incident?.responderId
     ? await db.query.users.findFirst({
       where: eq(users.id, incident.responderId),
       columns: { id: true, fullName: true, lastLatitude: true, lastLongitude: true, unitId: true },
-    })
-    : null;
-  const transportHospital = incident?.transportHospitalId
-    ? await db.query.hospitals.findFirst({
-      where: eq(hospitals.id, incident.transportHospitalId),
-      columns: { id: true, name: true, lat: true, lng: true },
     })
     : null;
   const agencies = trackingReport.coordinationAgencies;
@@ -84,16 +85,8 @@ export async function GET(request: NextRequest) {
       ? 'Your report is linked to an existing incident. PACC is reviewing the primary response.'
       : needsPaccReassignment
         ? `${coordinationText ? `${coordinationText} ` : ''}PACC is arranging another available responder. Please remain available for updates.`
-      : incident?.status === 'RESOLVED'
-        ? 'Response coordination for this incident has been completed.'
-        : incident?.status === 'DOCUMENTATION_PENDING'
-          ? 'The field response has been completed. The responder is finishing incident documentation for PACC.'
-        : incident?.transportStatus === 'ARRIVED_AT_HOSPITAL'
-          ? `${coordinationText ? `${coordinationText} ` : ''}Responder has arrived at the selected hospital and is completing the incident report.`
-        : incident?.transportStatus === 'TO_HOSPITAL'
-          ? `${coordinationText ? `${coordinationText} ` : ''}Responder is transporting the patient to the selected hospital.`
-        : incident?.status === 'ARRIVED'
-          ? 'Responders have arrived at your location.'
+      : publicResponseComplete
+        ? 'The responder has arrived at your location. Your live tracking session is complete.'
           : incident?.status === 'EN_ROUTE' || incident?.responderId
       ? `${coordinationText ? `${coordinationText} ` : ''}Responders are on the way. Please remain available for further instructions.`
       : trackingReport.triageClassification === 'HIGH_CONFIDENCE_NON_EMERGENCY'
@@ -125,6 +118,8 @@ export async function GET(request: NextRequest) {
     data: {
       status: report.status,
       outcome,
+      publicStatus: publicLifecycle.status,
+      trackingActive: publicTrackingActive,
       rejectionReason: report.status === 'REJECTED' ? rejectionProjection.rejectionReason : null,
       triageClassification: trackingReport.triageClassification,
       coordinationAgencies: agencies,
@@ -132,25 +127,19 @@ export async function GET(request: NextRequest) {
       incident: incident ? {
         id: incident.id,
         status: incident.status,
-        responderId: incident.responderId,
+        responderId: publicTrackingActive ? incident.responderId : null,
         assignedAmbulance: incident.assignedAmbulance,
-        etaMinutes: incident.etaMinutes,
-        transportStatus: incident.transportStatus,
+        etaMinutes: publicTrackingActive ? incident.etaMinutes : null,
+        transportStatus: 'NONE',
       } : null,
-      responder,
+      responder: publicTrackingActive ? responder : null,
       incidentLocation: {
         latitude: trackingReport.latitude,
         longitude: trackingReport.longitude,
       },
       transport: {
-        status: incident?.transportStatus ?? 'NONE',
-        hospital: transportHospital
-          ? {
-            id: transportHospital.id,
-            name: transportHospital.name,
-            coordinates: { latitude: transportHospital.lat, longitude: transportHospital.lng },
-          }
-          : null,
+        status: 'NONE',
+        hospital: null,
       },
       trackingRequestId,
       isMergedDuplicate: trackingRequestId !== report.id,

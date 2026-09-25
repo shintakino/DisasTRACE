@@ -16,6 +16,8 @@ import {
   parseResponderReportListQuery,
   type ResponderReportListQuery,
 } from "@/lib/responder-report-management";
+import { manilaRecentReportBounds } from "@/lib/manila-time";
+import { parsePublicReportHistoryQuery } from "@/lib/public-report-history";
 
 const SubmitReportSchema = z.object({
   incidentId: z.string().uuid(),
@@ -74,6 +76,12 @@ export async function GET(req: NextRequest) {
 
     if (category === "user") {
       const whereConditions: SQL<unknown>[] = [];
+      let publicQuery;
+      try {
+        publicQuery = parsePublicReportHistoryQuery(searchParams);
+      } catch {
+        return NextResponse.json({ error: 'Invalid public report-history filter.' }, { status: 400 });
+      }
       if (userProfile && userProfile.role === 'public_user') {
         whereConditions.push(eq(verificationRequests.residentId, user.id));
       } else if (!userProfile || (userProfile.role !== 'pacc_admin' && userProfile.role !== 'cdrrmo_super_admin')) {
@@ -82,14 +90,28 @@ export async function GET(req: NextRequest) {
       if (reporterSourceCondition) {
         whereConditions.push(reporterSourceCondition);
       }
+      if (publicQuery.type) {
+        whereConditions.push(eq(verificationRequests.type, publicQuery.type));
+      }
+      if (publicQuery.barangay) {
+        whereConditions.push(eq(verificationRequests.barangay, publicQuery.barangay));
+      }
+      if (publicQuery.dateRange !== 'all') {
+        const bounds = manilaRecentReportBounds(publicQuery.dateRange);
+        whereConditions.push(
+          gte(verificationRequests.createdAt, bounds.start),
+          lt(verificationRequests.createdAt, bounds.end),
+        );
+      }
 
-      const dbRequests = await db
+      const publicRequestQuery = db
         .select({
           id: verificationRequests.id,
           requestId: verificationRequests.requestId,
           residentName: users.fullName,
           type: verificationRequests.type,
           status: verificationRequests.status,
+          parentRequestId: verificationRequests.parentRequestId,
           rejectionReason: verificationRequests.rejectionReason,
           createdAt: verificationRequests.createdAt,
           location: verificationRequests.locationDescription,
@@ -102,11 +124,18 @@ export async function GET(req: NextRequest) {
         .from(verificationRequests)
         .leftJoin(users, eq(verificationRequests.residentId, users.id))
         .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
-        .orderBy(desc(verificationRequests.createdAt));
+        .orderBy(desc(verificationRequests.createdAt))
+        .$dynamic();
+      // A resident history remains bounded; command-center users retain their
+      // existing complete administrative view of user-submitted reports.
+      const dbRequests = userProfile.role === 'public_user'
+        ? await publicRequestQuery.limit(100)
+        : await publicRequestQuery;
 
       let filtered = [...dbRequests].map((r) => ({
         id: r.id,
         requestId: r.requestId,
+        parentRequestId: r.parentRequestId,
         createdAt: r.createdAt.toISOString(),
         responderName: r.residentName || 'Guest Reporter',
         type: r.type,
@@ -143,7 +172,11 @@ export async function GET(req: NextRequest) {
       }));
 
       if (dbRequests.length > 0) {
-        const requestIds = dbRequests.map((request) => request.id);
+        const requestIds = dbRequests.map((request) => (
+          request.status === 'DUPLICATE' && request.parentRequestId
+            ? request.parentRequestId
+            : request.id
+        ));
         const incidentStates = await db
           .select({ requestId: incidents.requestId, status: incidents.status })
           .from(incidents)
@@ -153,7 +186,11 @@ export async function GET(req: NextRequest) {
         );
         filtered = filtered.map((request) => ({
           ...request,
-          incidentStatus: incidentStatusByRequest.get(request.id) ?? null,
+          incidentStatus: incidentStatusByRequest.get(
+            request.status === 'DUPLICATE' && request.parentRequestId
+              ? request.parentRequestId
+              : request.id,
+          ) ?? null,
         }));
       }
 

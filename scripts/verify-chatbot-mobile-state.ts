@@ -8,6 +8,8 @@ import {
   parseExactPeopleInput,
   restorePersistedChatbotState,
   deriveChatbotNature,
+  deriveRestoredDraftNotice,
+  canShowRestoredDraftNotice,
 } from '../mobile/lib/chatbot-contracts';
 import { shouldResumeResidentRequest } from '../mobile/lib/active-incident';
 
@@ -135,6 +137,37 @@ check('an interrupted submission restores as a retryable draft with the same ide
   assert.equal(restored.lifecycle, 'DRAFT');
   assert.equal(restored.submissionId, '28123602-c8ee-42a8-a2a9-c16c43098650');
   assert.equal(restored.draft.imageUrl, 'https://example.test/evidence.jpg');
+});
+
+check('only a persisted draft creates a restoration notice', () => {
+  const fresh = createInitialChatbotState('registered', 'resident-123');
+  assert.equal(deriveRestoredDraftNotice(fresh), null);
+
+  const restored = restorePersistedChatbotState({
+    ...fresh,
+    lifecycle: 'DRAFT',
+    submissionId: 'f2df78f4-c5a4-48a7-92c5-2ef7288ce104',
+    draft: { photoUri: 'file://evidence.jpg' },
+  });
+  assert.deepEqual(deriveRestoredDraftNotice(restored), {
+    submissionId: 'f2df78f4-c5a4-48a7-92c5-2ef7288ce104',
+    reporterMode: 'registered',
+    ownerId: 'resident-123',
+  });
+});
+
+check('a restored-draft notice is shown only to its matching actor and draft', () => {
+  const restored = restorePersistedChatbotState({
+    ...createInitialChatbotState('registered', 'resident-123'),
+    lifecycle: 'DRAFT',
+    submissionId: 'f2df78f4-c5a4-48a7-92c5-2ef7288ce104',
+    draft: { photoUri: 'file://evidence.jpg' },
+  });
+  const notice = deriveRestoredDraftNotice(restored);
+  assert.ok(notice);
+  assert.equal(canShowRestoredDraftNotice(notice, restored, 'registered', 'resident-123'), true);
+  assert.equal(canShowRestoredDraftNotice(notice, restored, 'guest', 'guest'), false);
+  assert.equal(canShowRestoredDraftNotice(notice, { ...restored, submissionId: '6f2df78f-c5a4-48a7-92c5-2ef7288ce104' }, 'registered', 'resident-123'), false);
 });
 
 check('a persisted rejected report restores to idle so the reporter can submit again', () => {

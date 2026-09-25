@@ -4,7 +4,7 @@ import { Activity, CheckCircle2, Clock3, FileText, MapPinned, ShieldX } from "lu
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CDRRMOIncidentSummary } from "@/components/dashboard/cdrrmo-incident-summary";
-import { CDRRMORecentActivity } from "@/components/dashboard/cdrrmo-recent-activity";
+import { CDRRMOAuditPreview } from "@/components/dashboard/cdrrmo-audit-preview";
 import { CDRRMOResponderOverview } from "@/components/dashboard/cdrrmo-responder-overview";
 import type { DashboardData } from "@/types/dashboard";
 import { formatDurationMinutes } from "@/lib/incident-presentation";
@@ -14,7 +14,6 @@ interface CDRRMOOperationsDashboardProps {
   displayName: string;
   distributionFilter: string;
   onDistributionFilterChange: (filter: string) => void;
-  onSelectReport: (id: string) => void;
   onViewAnalytics: () => void;
   onViewAudit: () => void;
   onViewRoster: () => void;
@@ -48,7 +47,6 @@ export function CDRRMOOperationsDashboard({
   displayName,
   distributionFilter,
   onDistributionFilterChange,
-  onSelectReport,
   onViewAnalytics,
   onViewAudit,
   onViewRoster,
@@ -87,17 +85,15 @@ export function CDRRMOOperationsDashboard({
 
         <CDRRMOIncidentSummary data={data.distribution} filter={distributionFilter} onFilterChange={onDistributionFilterChange} />
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,.85fr)_minmax(0,1.35fr)]">
-          <div className="space-y-5">
-            <CDRRMOResponderOverview responders={data.responders} onViewRoster={onViewRoster} />
-            <Card className="border-slate-200 p-5 shadow-sm">
-              <h2 className="text-base font-bold text-[#1E3A8A]">Incident Trends</h2>
-              <p className="mt-1 text-xs text-slate-500">Full breakdown in Command Analytics</p>
-              <dl className="mt-5 space-y-4 text-sm"><div className="flex justify-between gap-4"><dt className="text-slate-500">Today</dt><dd className="font-bold text-slate-900">{data.kpis.totalIncidentsToday} incidents</dd></div><div className="flex justify-between gap-4"><dt className="text-slate-500">Selected period</dt><dd className="font-bold text-slate-900">{totalPeriodReports} incidents</dd></div><div className="flex justify-between gap-4"><dt className="text-slate-500">Most reported</dt><dd className="text-right font-bold text-slate-900">{leadingType?.name ?? "No reports"}</dd></div></dl>
-              <Button type="button" className="mt-6 w-full bg-[#1E3A8A] text-xs font-bold hover:bg-[#172F6E]" onClick={onViewAnalytics}>View analytics</Button>
-            </Card>
-          </div>
-          <CDRRMORecentActivity reports={data.reports} onViewAudit={onViewAudit} onSelectReport={onSelectReport} />
+        <section className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,3fr)_minmax(0,4fr)]">
+          <CDRRMOResponderOverview responders={data.responders} onViewRoster={onViewRoster} />
+          <Card className="h-full border-slate-200 p-5 shadow-sm">
+            <h2 className="text-base font-bold text-[#1E3A8A]">Incident Trends</h2>
+            <p className="mt-1 text-xs text-slate-500">Full breakdown in Command Analytics</p>
+            <dl className="mt-5 space-y-4 text-sm"><div className="flex justify-between gap-4"><dt className="text-slate-500">Today</dt><dd className="font-bold text-slate-900">{data.kpis.totalIncidentsToday} incidents</dd></div><div className="flex justify-between gap-4"><dt className="text-slate-500">Selected period</dt><dd className="font-bold text-slate-900">{totalPeriodReports} incidents</dd></div><div className="flex justify-between gap-4"><dt className="text-slate-500">Most reported</dt><dd className="text-right font-bold text-slate-900">{leadingType?.name ?? "No reports"}</dd></div></dl>
+            <Button type="button" className="mt-6 w-full bg-[#1E3A8A] text-xs font-bold hover:bg-[#172F6E]" onClick={onViewAnalytics}>View analytics</Button>
+          </Card>
+          <CDRRMOAuditPreview entries={data.auditPreview} onViewAudit={onViewAudit} />
         </section>
       </div>
     </div>

@@ -28,7 +28,8 @@ const panel = "components/verification/resident-panel.tsx"
 for (const label of ["PACC actions", "External emergency assistance", "Dispatch log", "Call"]) expectIncludes(panel, label)
 expectIncludes(panel, "getPaccEmergencyAssistance")
 expectIncludes(panel, "assistance.telHref")
-expectIncludes(panel, "overflow-hidden")
+expectIncludes(panel, "overflow-y-auto overscroll-contain")
+expectIncludes(panel, "sticky top-0")
 expectIncludes(panel, "Reporter context")
 
 const assistance = "lib/pacc-emergency-assistance.ts"
@@ -39,6 +40,9 @@ expectIncludes("components/verification/reject-incident-dialog.tsx", "w-[min(96v
 expectIncludes("components/account/settings-view.tsx", "PasswordInput")
 expectIncludes("components/map/command-map-overlays.tsx", "INCIDENT_PRESENTATION")
 expectIncludes("components/verification/verification-details.tsx", "Advanced review controls")
-expectIncludes("components/verification/verification-details.tsx", "overflow-hidden")
+expectIncludes("components/verification/verification-details.tsx", "overflow-y-auto overscroll-contain")
+if (source("components/verification/verification-details.tsx").includes("max-h-72 space-y-3 overflow-y-auto")) {
+  throw new Error("Advanced review controls must use the primary details scrollbar.")
+}
 
 console.log("PACC verification workspace checks passed.")

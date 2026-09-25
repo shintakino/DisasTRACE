@@ -10,30 +10,28 @@ export type PublicTransportStatus = 'NONE' | 'TO_HOSPITAL' | 'ARRIVED_AT_HOSPITA
 export type PublicResponseMode =
   | 'WAITING'
   | 'INBOUND_TRACKING'
-  | 'HELP_ARRIVED'
-  | 'DOCUMENTATION_PENDING'
-  | 'TRANSPORT_TRACKING'
-  | 'TRANSPORT_COMPLETE'
-  | 'CASE_CLOSED';
+  | 'RESPONSE_COMPLETE';
 
 /**
- * Maps server-owned incident state to the one public-facing response state.
- * An on-scene documentation state is terminal for public live tracking. A
- * responder may already be available for another assignment while their
- * original incident retains responderId for audit ownership, so that ID must
- * never be treated as proof that their later GPS location is authorized for
- * the original reporter.
+ * Maps the server-owned operational incident state to the public lifecycle.
+ * Scene arrival permanently ends reporter tracking. Hospital transport,
+ * documentation, and final case closure remain operational states for the
+ * responder and command center and must never reopen the public map.
  */
 export function getPublicResponseMode(input: {
   incidentStatus?: PublicIncidentStatus | null;
   transportStatus?: PublicTransportStatus | null;
   hasResponder?: boolean;
 }): PublicResponseMode {
-  if (input.incidentStatus === 'DOCUMENTATION_PENDING') return 'DOCUMENTATION_PENDING';
-  if (input.transportStatus === 'ARRIVED_AT_HOSPITAL') return 'TRANSPORT_COMPLETE';
-  if (input.transportStatus === 'TO_HOSPITAL') return 'TRANSPORT_TRACKING';
-  if (input.incidentStatus === 'RESOLVED') return 'CASE_CLOSED';
-  if (input.incidentStatus === 'ARRIVED') return 'HELP_ARRIVED';
+  if (
+    input.incidentStatus === 'ARRIVED'
+    || input.incidentStatus === 'DOCUMENTATION_PENDING'
+    || input.incidentStatus === 'RESOLVED'
+  ) return 'RESPONSE_COMPLETE';
   if (input.incidentStatus === 'EN_ROUTE' || input.hasResponder) return 'INBOUND_TRACKING';
   return 'WAITING';
+}
+
+export function isPublicResponseComplete(status: string | null | undefined): boolean {
+  return status === 'ARRIVED' || status === 'DOCUMENTATION_PENDING' || status === 'RESOLVED';
 }

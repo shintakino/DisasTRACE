@@ -17,6 +17,7 @@ import {
   Activity,
   AlertTriangle,
   CarFront,
+  CalendarDays,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -30,6 +31,7 @@ import { useAuthStatus } from '../../../hooks/use-auth-status';
 import { ReportDetailModal } from '../../../components/responder/ReportDetailModal';
 import { supabase } from '../../../lib/supabase';
 import { BALIWAG_BARANGAY_NAMES, formatBaliwagLocation } from '../../../lib/baliwag-location';
+import { isPublicResponseComplete } from '../../../lib/public-response-lifecycle';
 import { readResidentReportCache, writeResidentReportCache } from '../../../lib/resident-report-cache';
 
 const RESPONDER_PAGE_SIZE = 15;
@@ -124,15 +126,15 @@ function mapReportItems(items: ReportApiItem[], isResponder: boolean): ReportLis
     }
 
     const rawStatus = report.status || 'COMPLETED';
-    const status = !isResponder && rawStatus !== 'REJECTED' && report.incidentStatus === 'RESOLVED'
-      ? 'CASE_CLOSED'
+    const status = !isResponder && rawStatus !== 'REJECTED' && isPublicResponseComplete(report.incidentStatus)
+      ? 'COMPLETED'
       : rawStatus;
     const responseLabel = isResponder
       ? (report.vehicleId ? `${report.vehicleId} assigned` : 'Responder report')
       : status === 'REJECTED'
         ? 'Rejected by PACC'
-        : status === 'CASE_CLOSED'
-          ? 'Case closed'
+        : status === 'COMPLETED'
+          ? 'Responder arrived at the scene'
           : status === 'DUPLICATE'
             ? 'Linked to primary report'
             : status === 'PENDING'
@@ -215,6 +217,10 @@ export default function MyReportsScreen() {
         }
         params.set('page', String(pagination.page));
         params.set('limit', String(RESPONDER_PAGE_SIZE));
+      } else {
+        if (typeFilter) params.set('type', typeFilter);
+        if (barangayFilter) params.set('barangay', barangayFilter);
+        if (dateFilter !== 'all') params.set('dateRange', dateFilter);
       }
 
       const response = await fetch(`${apiUrl}/api/reports?${params.toString()}`, {
@@ -320,7 +326,7 @@ export default function MyReportsScreen() {
     let statusBgColor = 'bg-[#1E3A8A]';
     if (report.status === 'RESPONDING') statusBgColor = 'bg-[#10B981]';
     if (report.status === 'ONGOING') statusBgColor = 'bg-[#F59E0B]';
-    if (report.status === 'CASE_CLOSED') statusBgColor = 'bg-[#22C55E]';
+    if (report.status === 'CASE_CLOSED' || report.status === 'COMPLETED') statusBgColor = 'bg-[#22C55E]';
     if (report.status === 'REJECTED') statusBgColor = 'bg-[#DC2626]';
     const statusLabel = report.status === 'CASE_CLOSED' ? 'CASE CLOSED' : report.status;
     return (
@@ -489,6 +495,56 @@ export default function MyReportsScreen() {
     </View>
   );
 
+  const residentControls = (
+    <View className="pt-5 pb-2">
+      <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Date</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+        {DATE_FILTERS.map((option) => (
+          <TouchableOpacity
+            key={option.value}
+            onPress={() => chooseDate(option.value)}
+            className={`px-4 py-2 rounded-full mr-2 border flex-row items-center ${dateFilter === option.value ? 'bg-[#1E3A8A] border-[#1E3A8A]' : 'bg-white border-slate-200'}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: dateFilter === option.value }}
+            accessibilityLabel={`Show reports from ${option.label.toLowerCase()}`}
+          >
+            {option.value === 'all' ? null : <CalendarDays size={14} color={dateFilter === option.value ? '#FFFFFF' : '#64748B'} className="mr-1.5" />}
+            <Text className={`text-xs font-bold ${dateFilter === option.value ? 'text-white' : 'text-slate-600'}`}>{option.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Incident type</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+        {TYPE_FILTERS.map((option) => (
+          <TouchableOpacity
+            key={option.label}
+            onPress={() => chooseType(option.value)}
+            className={`px-4 py-2 rounded-full mr-2 border ${typeFilter === option.value ? 'bg-[#1E3A8A] border-[#1E3A8A]' : 'bg-white border-slate-200'}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: typeFilter === option.value }}
+          >
+            <Text className={`text-xs font-bold ${typeFilter === option.value ? 'text-white' : 'text-slate-600'}`}>{option.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Barangay</Text>
+      <TouchableOpacity
+        onPress={() => setBarangayPickerVisible(true)}
+        className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex-row items-center justify-between mb-4"
+        accessibilityRole="button"
+        accessibilityLabel={`Filter reports by barangay. Current selection: ${barangayFilter || 'all barangays'}`}
+      >
+        <View className="flex-row items-center flex-1">
+          <MapPin size={18} color="#1E3A8A" />
+          <Text className="ml-3 text-sm font-bold text-slate-700" numberOfLines={1}>{barangayFilter || 'All barangays'}</Text>
+        </View>
+        <ChevronDown size={18} color="#64748B" />
+      </TouchableOpacity>
+    </View>
+  );
+
   const paginationFooter = !displayLoading && !error && reports.length > 0 ? (
     <View className="flex-row items-center justify-between bg-white border border-slate-200 rounded-2xl px-3 py-3 mb-24 mt-1">
       <TouchableOpacity
@@ -550,6 +606,7 @@ export default function MyReportsScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E3A8A']} />}
         >
+          {residentControls}
           {displayLoading ? (
             <View className="items-center py-20"><ActivityIndicator size="large" color="#1E3A8A" /></View>
           ) : error ? (

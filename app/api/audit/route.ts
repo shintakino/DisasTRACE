@@ -4,6 +4,9 @@ import { auditLogs } from "@/db/schema/audit_logs";
 import { users } from "@/db/schema/users";
 import { eq, desc } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+import { z } from "zod";
+
+const AuditLimitSchema = z.coerce.number().int().min(1).max(200).optional();
 
 export async function GET(request: Request) {
   try {
@@ -22,6 +25,10 @@ export async function GET(request: Request) {
     const role = searchParams.get("role");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
+    const parsedLimit = AuditLimitSchema.safeParse(searchParams.get("limit") ?? undefined);
+    if (!parsedLimit.success) {
+      return NextResponse.json({ error: 'Audit log limit must be between 1 and 200.' }, { status: 400 });
+    }
 
     // Query real audit logs from the database
     const queryBuilder = db
@@ -39,13 +46,15 @@ export async function GET(request: Request) {
       .from(auditLogs)
       .leftJoin(users, eq(auditLogs.userId, users.id));
 
-    const dbLogs = await queryBuilder.orderBy(desc(auditLogs.createdAt)).limit(200);
+    const dbLogs = await queryBuilder.orderBy(desc(auditLogs.createdAt)).limit(parsedLimit.data ?? 200);
 
     let mapped = dbLogs.map((log) => ({
       id: log.id,
       userName: log.actorName ?? log.userName ?? 'Former system user',
+      actorName: log.actorName ?? log.userName ?? 'Former system user',
       actorRole: log.actorRole ?? 'unknown',
       action: log.action,
+      entityType: log.entityType || 'Generic',
       contextPath: `System > ${log.entityType || "Generic"} Operations`,
       entityId: log.entityId,
       details: log.details && typeof log.details === 'object' ? log.details as Record<string, unknown> : {},

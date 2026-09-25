@@ -58,12 +58,25 @@ export const ResponderSchema = z.object({
 
 export type Responder = z.infer<typeof ResponderSchema>;
 
+export const AuditPreviewSchema = z.object({
+  id: z.string(),
+  actorName: z.string(),
+  actorRole: z.string(),
+  action: z.string(),
+  entityType: z.string(),
+  entityId: z.string().nullable(),
+  timestamp: z.string(),
+});
+
+export type AuditPreview = z.infer<typeof AuditPreviewSchema>;
+
 export const DashboardDataSchema = z.object({
   kpis: KpiDataSchema,
   trends: z.array(IncidentTrendSchema),
   distribution: z.array(IncidentDistributionSchema),
   reports: z.array(RecentReportSchema),
   responders: z.array(ResponderSchema),
+  auditPreview: z.array(AuditPreviewSchema),
 });
 
 export type DashboardData = z.infer<typeof DashboardDataSchema>;

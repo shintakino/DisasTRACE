@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { MapDemandZone, MapDemandZoneSchema, MapIncident, MapResponder, MapSummary, MapHospital, MapIncidentSchema, MapResponderSchema, MapSummarySchema, MapHospitalSchema } from "@/types/map";
+import { MapActiveRoute, MapActiveRouteSchema, MapDemandZone, MapDemandZoneSchema, MapIncident, MapResponder, MapSummary, MapHospital, MapIncidentSchema, MapResponderSchema, MapSummarySchema, MapHospitalSchema } from "@/types/map";
 import { z } from "zod";
 import { createClientBrowser } from "@/lib/supabase";
 
@@ -37,9 +37,10 @@ async function readMapResponse<T>(
   }
 }
 
-export function useMapData({ date, period }: { date?: string; period?: 'today' | 'weekly' | 'monthly' | 'yearly' } = {}) {
+export function useMapData({ date, period, barangay }: { date?: string; period?: 'today' | 'weekly' | 'monthly' | 'yearly'; barangay?: string } = {}) {
   const [incidents, setIncidents] = useState<MapIncident[]>([]);
   const [responders, setResponders] = useState<MapResponder[]>([]);
+  const [activeRoutes, setActiveRoutes] = useState<MapActiveRoute[]>([]);
   const [hospitals, setHospitals] = useState<MapHospital[]>([]);
   const [demandZones, setDemandZones] = useState<MapDemandZone[]>([]);
   const [summary, setSummary] = useState<MapSummary>({ new: 0, ongoing: 0, completed: 0, standby: 0 });
@@ -57,26 +58,32 @@ export function useMapData({ date, period }: { date?: string; period?: 'today' |
     setError(null);
     setWarning(null);
     try {
-      const query = date ? `date=${encodeURIComponent(date)}` : period ? `period=${encodeURIComponent(period)}` : '';
-      const incidentQuery = query ? `?${query}` : '';
+      const params = new URLSearchParams();
+      if (date) params.set('date', date);
+      else if (period) params.set('period', period);
+      if (barangay) params.set('barangay', barangay);
+      const incidentQuery = params.size > 0 ? `?${params.toString()}` : '';
       const results = await Promise.allSettled([
         fetch(`/api/map/incidents${incidentQuery}`),
         fetch("/api/map/responders"),
+        fetch("/api/map/routes"),
         fetch("/api/map/summary"),
         fetch("/api/map/hospitals"),
         fetch("/api/map/hotspots"),
       ]);
       const failedEndpoints: string[] = [];
-      const [incidentsData, respondersData, summaryData, hospitalsData, hotspotsData] = await Promise.all([
+      const [incidentsData, respondersData, activeRoutesData, summaryData, hospitalsData, hotspotsData] = await Promise.all([
         readMapResponse(results[0], "incident reports", (payload) => z.array(MapIncidentSchema).parse(payload), [], failedEndpoints),
         readMapResponse(results[1], "responder locations", (payload) => z.array(MapResponderSchema).parse(payload), [], failedEndpoints),
-        readMapResponse(results[2], "map summary", (payload) => MapSummarySchema.parse(payload), { new: 0, ongoing: 0, completed: 0, standby: 0 }, failedEndpoints),
-        readMapResponse(results[3], "hospital locations", (payload) => z.array(MapHospitalSchema).parse(payload), [], failedEndpoints),
-        readMapResponse(results[4], "historical demand zones", (payload) => z.array(MapDemandZoneSchema).parse((payload as { data?: unknown }).data), [], failedEndpoints),
+        readMapResponse(results[2], "active responder routes", (payload) => z.array(MapActiveRouteSchema).parse(payload), [], failedEndpoints),
+        readMapResponse(results[3], "map summary", (payload) => MapSummarySchema.parse(payload), { new: 0, ongoing: 0, completed: 0, standby: 0 }, failedEndpoints),
+        readMapResponse(results[4], "hospital locations", (payload) => z.array(MapHospitalSchema).parse(payload), [], failedEndpoints),
+        readMapResponse(results[5], "historical demand zones", (payload) => z.array(MapDemandZoneSchema).parse((payload as { data?: unknown }).data), [], failedEndpoints),
       ]);
 
       setIncidents(incidentsData);
       setResponders(respondersData);
+      setActiveRoutes(activeRoutesData);
       setSummary(summaryData);
       setHospitals(hospitalsData);
       setDemandZones(hotspotsData);
@@ -91,7 +98,7 @@ export function useMapData({ date, period }: { date?: string; period?: 'today' |
       setError(err instanceof Error ? err.message : "An unknown error occurred");
       if (showSkeleton) setIsLoading(false);
     }
-  }, [date, period]);
+  }, [barangay, date, period]);
 
   useEffect(() => {
     void fetchData(true);
@@ -166,6 +173,16 @@ export function useMapData({ date, period }: { date?: string; period?: 'today' |
                 }
               : responder
           )));
+          setActiveRoutes((currentRoutes) => currentRoutes.map((route) => (
+            route.incidentId === incidentId
+              ? {
+                  ...route,
+                  responderLat: telemetry.data.latitude,
+                  responderLng: telemetry.data.longitude,
+                  responderLastUpdated: telemetry.data.timestamp,
+                }
+              : route
+          )));
         })
         .subscribe()
     ));
@@ -177,5 +194,5 @@ export function useMapData({ date, period }: { date?: string; period?: 'today' |
     };
   }, [activeDispatchKey]);
 
-  return { incidents, responders, hospitals, demandZones, summary, isLoading, error, warning, refresh: () => fetchData(true) };
+  return { incidents, responders, activeRoutes, hospitals, demandZones, summary, isLoading, error, warning, refresh: () => fetchData(true) };
 }

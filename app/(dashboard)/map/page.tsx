@@ -7,7 +7,7 @@ import { MapContainer } from "@/components/map/map-container";
 import { useMapData } from "@/hooks/use-map-data";
 import { MapIncident } from "@/types/map";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertCircle, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ReportDetailSheet } from "@/components/reports/report-detail-sheet";
@@ -17,7 +17,13 @@ import { WebPreloader } from "@/components/ui/web-preloader";
 
 function MapPageContent() {
   const [period, setPeriod] = useState<"today" | "weekly" | "monthly" | "yearly">("today");
-  const { incidents, responders, hospitals, demandZones, isLoading, error, warning, refresh } = useMapData({ period });
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
+  const [barangay, setBarangay] = useState("all");
+  const { incidents, responders, activeRoutes, hospitals, demandZones, isLoading, error, warning, refresh } = useMapData({
+    date: selectedDate,
+    period: selectedDate ? undefined : period,
+    barangay: barangay === "all" ? undefined : barangay,
+  });
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | undefined>();
   const [filter, setFilter] = useState("ALL");
   const [category, setCategory] = useState<"user" | "responder">("user");
@@ -81,6 +87,7 @@ function MapPageContent() {
   };
 
   const displayedIncidents = incidents.filter((incident) => {
+    if (barangay !== "all" && incident.barangay !== barangay) return false;
     if (incident.category === "user" && !layers.requests) return false;
     if (incident.category === "responder" && !layers.reports) return false;
     if ((incident.status === "REJECTED" || incident.status === "DUPLICATE") && !layers.rejected && filter !== "REJECTED") return false;
@@ -117,7 +124,7 @@ function MapPageContent() {
         <>
           <div className={cn(
             "z-10 flex h-full min-h-0 shrink-0 overflow-hidden border-r border-slate-200 transition-all duration-300 ease-in-out",
-            isSidebarOpen ? "w-[400px]" : "w-0"
+            isSidebarOpen ? "w-[480px]" : "w-0"
           )}>
             <IncidentPanel
               incidents={incidents}
@@ -129,23 +136,30 @@ function MapPageContent() {
               category={category}
               onCategoryChange={setCategory}
               onPriorityChange={setPriorityIncidentId}
+              barangay={barangay}
+              onBarangayChange={setBarangay}
               period={period}
-              onPeriodChange={setPeriod}
+              onPeriodChange={(nextPeriod) => {
+                setSelectedDate(undefined);
+                setPeriod(nextPeriod);
+              }}
+              date={selectedDate}
+              onDateChange={setSelectedDate}
+              onTogglePanel={() => setIsSidebarOpen(false)}
             />
           </div>
 
-          <Button
-            variant="outline"
-            size="icon"
-            className={cn(
-              "absolute top-4 z-20 border-slate-200 bg-white shadow-sm transition-all duration-300",
-              isSidebarOpen ? "left-[386px]" : "left-4"
-            )}
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            aria-label={isSidebarOpen ? "Hide incident panel" : "Show incident panel"}
-          >
-            {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
+          {!isSidebarOpen ? (
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute left-4 top-4 z-20 border-slate-200 bg-white text-[#1E3A8A] shadow-sm"
+              onClick={() => setIsSidebarOpen(true)}
+              aria-label="Show incident panel"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+            </Button>
+          ) : null}
 
           <CommandMapOverlays
             layers={layers}
@@ -157,6 +171,7 @@ function MapPageContent() {
             <MapContainer
               incidents={displayedIncidents}
               responders={responders}
+              activeRoutes={activeRoutes}
               hospitals={hospitals}
               demandZones={demandZones}
               showDemandZones={layers.demandZones}

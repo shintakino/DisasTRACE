@@ -21,6 +21,14 @@ const RESPONDER_ONLY_NOTIFICATION_TYPES = new Set([
   'report_audited',
 ]);
 
+const POST_ARRIVAL_OPERATIONAL_NOTIFICATION_TYPES = new Set([
+  'patient_transport_started',
+  'patient_transport_completed',
+]);
+
 export function isNotificationVisibleForRole(type: string, role: string | null | undefined): boolean {
-  return role !== 'public_user' || !RESPONDER_ONLY_NOTIFICATION_TYPES.has(type);
+  return role !== 'public_user' || (
+    !RESPONDER_ONLY_NOTIFICATION_TYPES.has(type)
+    && !POST_ARRIVAL_OPERATIONAL_NOTIFICATION_TYPES.has(type)
+  );
 }

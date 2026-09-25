@@ -136,8 +136,11 @@ export async function GET(
       }
 
       // Check if there is an associated incident and responder
+      const trackingRequestId = userReq.status === 'DUPLICATE' && userReq.parentRequestId
+        ? userReq.parentRequestId
+        : userReq.id;
       const incident = await db.query.incidents.findFirst({
-        where: eq(incidents.requestId, userReq.id),
+        where: eq(incidents.requestId, trackingRequestId),
       });
 
       let responderName = "None Assigned";

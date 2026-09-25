@@ -162,7 +162,7 @@ export default function ChatbotPendingScreen() {
       });
       if (activeReporterMode === 'guest') {
         void updateGuestReportHistory(activeReportId, {
-          status: status.status,
+          status: status.publicStatus === 'COMPLETED_AT_SCENE' ? 'COMPLETED' : status.status,
           responseStatus: status.responseStatus,
           rejectionReason: status.rejectionReason ?? undefined,
           reportsRemaining: status.guestAllowance?.remaining,

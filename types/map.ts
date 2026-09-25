@@ -46,6 +46,18 @@ export const MapResponderSchema = z.object({
 });
 export type MapResponder = z.infer<typeof MapResponderSchema>;
 
+export const MapActiveRouteSchema = z.object({
+  incidentId: z.string(),
+  responderId: z.string(),
+  responderLat: z.number(),
+  responderLng: z.number(),
+  responderLastUpdated: z.string(),
+  incidentLat: z.number(),
+  incidentLng: z.number(),
+  severity: z.enum(["Low", "Medium", "High", "Critical"]),
+});
+export type MapActiveRoute = z.infer<typeof MapActiveRouteSchema>;
+
 export const MapSummarySchema = z.object({
   new: z.number(),
   ongoing: z.number(),

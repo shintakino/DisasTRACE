@@ -4,7 +4,7 @@ import React, { useCallback, useMemo, useRef, useEffect, useState } from "react"
 import Map, { NavigationControl, Marker, MapRef, Source, Layer } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { AlertCircle, RefreshCw } from "lucide-react";
-import { MapDemandZone, MapIncident, MapResponder, MapHospital } from "@/types/map";
+import { MapActiveRoute, MapDemandZone, MapIncident, MapResponder, MapHospital } from "@/types/map";
 import { MapMarker } from "./map-marker";
 import { configureMapLibreWorker } from "./maplibre-worker";
 
@@ -13,6 +13,7 @@ configureMapLibreWorker();
 interface RouteGeometry {
   id: string;
   color: string;
+  isFallback: boolean;
   data: {
     type: "Feature";
     properties: Record<string, never>;
@@ -24,14 +25,19 @@ interface RouteGeometry {
 }
 
 interface RouteCacheEntry {
+  incidentId: string;
   responderLat: number;
   responderLng: number;
+  incidentLat: number;
+  incidentLng: number;
+  fetchedAt: number;
   route: RouteGeometry;
 }
 
 interface MapContainerProps {
   incidents: MapIncident[];
   responders: MapResponder[];
+  activeRoutes: MapActiveRoute[];
   hospitals: MapHospital[];
   demandZones?: MapDemandZone[];
   showDemandZones?: boolean;
@@ -63,9 +69,45 @@ function distanceInMeters(firstLat: number, firstLng: number, secondLat: number,
   return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function routeKey(route: MapActiveRoute) {
+  return `${route.responderId}:${route.incidentId}`;
+}
+
+function routeColor(severity: MapActiveRoute['severity']) {
+  return severity === 'Critical' ? '#DC2626' : '#F97316';
+}
+
+function fallbackRoute(route: MapActiveRoute): RouteGeometry {
+  return {
+    id: routeKey(route),
+    color: routeColor(route.severity),
+    isFallback: true,
+    data: {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [route.responderLng, route.responderLat],
+          [route.incidentLng, route.incidentLat],
+        ],
+      },
+    },
+  };
+}
+
+function shouldRefreshRoute(cachedRoute: RouteCacheEntry | undefined, route: MapActiveRoute) {
+  if (!cachedRoute) return true;
+  if (cachedRoute.incidentId !== route.incidentId) return true;
+  if (cachedRoute.incidentLat !== route.incidentLat || cachedRoute.incidentLng !== route.incidentLng) return true;
+  if (distanceInMeters(cachedRoute.responderLat, cachedRoute.responderLng, route.responderLat, route.responderLng) >= 50) return true;
+  return cachedRoute.route.isFallback && Date.now() - cachedRoute.fetchedAt >= 30_000;
+}
+
 export function MapContainer({
   incidents,
   responders,
+  activeRoutes,
   hospitals,
   demandZones = [],
   showDemandZones = false,
@@ -152,61 +194,90 @@ export function MapContainer({
     });
   }, [incidents, isMapReady, mapInstanceKey, selectedIncidentId, visibleIncidentKey]);
 
-  // Keep a live road route for every active dispatched ambulance, not just the selected incident.
+  // Route pairs come from an admin-only, unfiltered active-assignment feed. Marker
+  // filters and historical date ranges must never remove a responder's live route.
   useEffect(() => {
-    let active = true;
-    const dispatchedPairs = responders.flatMap((responder) => {
-      if (responder.status !== "DISPATCHED" || !responder.activeIncidentId) return [];
+    const active = new AbortController();
+    const activeRouteKeys = new Set(activeRoutes.map(routeKey));
+    for (const cachedKey of routeCacheRef.current.keys()) {
+      if (!activeRouteKeys.has(cachedKey)) routeCacheRef.current.delete(cachedKey);
+    }
 
-      const incident = incidents.find((item) => item.id === responder.activeIncidentId && item.status === "ONGOING");
-      return incident ? [{ responder, incident }] : [];
-    });
-
-    if (dispatchedPairs.length === 0) {
+    if (activeRoutes.length === 0) {
       setRouteGeometries([]);
       return () => {
-        active = false;
+        active.abort();
       };
     }
 
     const updateRoutes = async () => {
-      const nextRoutes = await Promise.all(dispatchedPairs.map(async ({ responder, incident }) => {
-        const cachedRoute = routeCacheRef.current.get(responder.id);
-        const hasMoved = !cachedRoute || distanceInMeters(cachedRoute.responderLat, cachedRoute.responderLng, responder.lat, responder.lng) >= 50;
+      const immediatelyVisibleRoutes = activeRoutes.map((route) => {
+        const cachedRoute = routeCacheRef.current.get(routeKey(route));
+        return cachedRoute && !shouldRefreshRoute(cachedRoute, route)
+          ? cachedRoute.route
+          : fallbackRoute(route);
+      });
+      setRouteGeometries(immediatelyVisibleRoutes);
 
-        if (cachedRoute && !hasMoved) {
-          return cachedRoute.route;
-        }
+      const nextRoutes = await Promise.all(activeRoutes.map(async (route) => {
+        const key = routeKey(route);
+        const cachedRoute = routeCacheRef.current.get(key);
+        if (cachedRoute && !shouldRefreshRoute(cachedRoute, route)) return cachedRoute.route;
+
+        const fallback = fallbackRoute(route);
+        const routeRequest = new AbortController();
+        const cancelRouteRequest = () => routeRequest.abort();
+        active.signal.addEventListener('abort', cancelRouteRequest, { once: true });
+        const timeoutId = window.setTimeout(cancelRouteRequest, 8_000);
 
         try {
-          const url = `https://router.project-osrm.org/route/v1/driving/${responder.lng},${responder.lat};${incident.lng},${incident.lat}?overview=full&geometries=geojson`;
-          const response = await fetch(url);
+          const url = `https://router.project-osrm.org/route/v1/driving/${route.responderLng},${route.responderLat};${route.incidentLng},${route.incidentLat}?overview=full&geometries=geojson`;
+          const response = await fetch(url, { signal: routeRequest.signal });
+          if (!response.ok) throw new Error(`Routing request failed with ${response.status}.`);
           const routeResponse: { routes?: Array<{ geometry?: RouteGeometry["data"]["geometry"] }> } = await response.json();
           const geometry = routeResponse.routes?.[0]?.geometry;
 
           if (!geometry || geometry.type !== "LineString") {
-            return cachedRoute?.route;
+            throw new Error('Routing service returned no usable road geometry.');
           }
 
-          const route: RouteGeometry = {
-            id: responder.id,
-            color: incident.severity === "Critical" ? "#DC2626" : "#F97316",
+          const roadRoute: RouteGeometry = {
+            id: key,
+            color: routeColor(route.severity),
+            isFallback: false,
             data: { type: "Feature", properties: {}, geometry },
           };
 
-          routeCacheRef.current.set(responder.id, {
-            responderLat: responder.lat,
-            responderLng: responder.lng,
-            route,
+          routeCacheRef.current.set(key, {
+            incidentId: route.incidentId,
+            responderLat: route.responderLat,
+            responderLng: route.responderLng,
+            incidentLat: route.incidentLat,
+            incidentLng: route.incidentLng,
+            fetchedAt: Date.now(),
+            route: roadRoute,
           });
-          return route;
+          return roadRoute;
         } catch (error) {
-          console.error("Failed to fetch road navigation route:", error);
-          return cachedRoute?.route;
+          if (active.signal.aborted) return fallback;
+          if (!routeRequest.signal.aborted) console.error("Failed to fetch road navigation route:", error);
+          routeCacheRef.current.set(key, {
+            incidentId: route.incidentId,
+            responderLat: route.responderLat,
+            responderLng: route.responderLng,
+            incidentLat: route.incidentLat,
+            incidentLng: route.incidentLng,
+            fetchedAt: Date.now(),
+            route: fallback,
+          });
+          return fallback;
+        } finally {
+          window.clearTimeout(timeoutId);
+          active.signal.removeEventListener('abort', cancelRouteRequest);
         }
       }));
 
-      if (active) {
+      if (!active.signal.aborted) {
         setRouteGeometries(nextRoutes.filter((route): route is RouteGeometry => Boolean(route)));
       }
     };
@@ -214,9 +285,9 @@ export function MapContainer({
     void updateRoutes();
 
     return () => {
-      active = false;
+      active.abort();
     };
-  }, [incidents, responders]);
+  }, [activeRoutes]);
 
   const handleMarkerClick = useCallback((id: string, lat: number, lng: number) => {
     onSelectIncident(id);
@@ -261,7 +332,12 @@ export function MapContainer({
               id={`route-layer-${route.id}`}
               type="line"
               layout={{ "line-join": "round", "line-cap": "round" }}
-              paint={{ "line-color": route.color, "line-width": 5, "line-opacity": 0.85 }}
+              paint={{
+                "line-color": route.color,
+                "line-width": route.isFallback ? 3 : 5,
+                "line-opacity": route.isFallback ? 0.8 : 0.85,
+                ...(route.isFallback ? { "line-dasharray": [2, 2] } : {}),
+              }}
             />
           </Source>
         ))}

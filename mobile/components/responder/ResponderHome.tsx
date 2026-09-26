@@ -14,7 +14,6 @@ import { ArrivalConfirmDialog } from './ArrivalConfirmDialog';
 import { HospitalArrivalConfirmDialog } from './HospitalArrivalConfirmDialog';
 import { HospitalDocumentationSheet } from './HospitalDocumentationSheet';
 import { ToHospitalSheet } from './ToHospitalSheet';
-import { IncidentReportForm } from './IncidentReportForm';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FolderDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -1603,7 +1602,6 @@ export function ResponderHome() {
       <ArrivalConfirmDialog />
       <HospitalArrivalConfirmDialog />
       <HospitalDocumentationSheet />
-      <IncidentReportForm />
     </View>
   );
 }

@@ -24,6 +24,7 @@ function reconcileResponderStoreAccount(nextAccountId: string | null, clearTrans
     || (activeMobileAccountId && activeMobileAccountId !== nextAccountId)
   ) {
     useResponderStore.getState().clearTransientDispatch();
+    useResponderStore.getState().clearReportFormSession();
   }
   activeMobileAccountId = nextAccountId;
 }

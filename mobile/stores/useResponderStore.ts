@@ -10,6 +10,14 @@ import {
 import { fetchWithTimeout } from '../lib/network-timeout';
 import { normalizeResponderDistanceKm } from '../lib/responder-report-summary';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
+import {
+  createReportFormSession,
+  getReportFormCloseStatus,
+  shouldClearActiveDispatchAfterReport,
+  type ReportFormSession,
+  type ResponderFieldOutcome,
+  type ResponderOperationalStatus,
+} from '../lib/responder-report-form-session';
 
 const DRAFTS_FILE_PATH = `${FileSystem.documentDirectory}disas_trace_drafts.json`;
 
@@ -37,8 +45,8 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
   return R * c; // in metres
 }
 
-export type DispatchState = 'idle' | 'dispatch_offered' | 'en_route' | 'on_scene' | 'to_hospital' | 'at_hospital' | 'report_filling';
-export type FieldOutcome = 'HANDLED_ON_SCENE' | 'PATIENT_REFUSED' | 'HOSPITAL_ARRIVAL';
+export type DispatchState = ResponderOperationalStatus;
+export type FieldOutcome = ResponderFieldOutcome;
 
 export interface QueueAction {
   id: string; // unique timestamp/uuid
@@ -105,6 +113,7 @@ export interface DraftForm {
 interface ResponderState {
   status: DispatchState;
   activeDispatch: DispatchDetails | null;
+  reportFormSession: ReportFormSession<DispatchDetails> | null;
   targetHospital: HospitalDetails | null;
   sceneTimeSeconds: number;
   elapsedTimeSeconds: number;
@@ -157,16 +166,18 @@ interface ResponderState {
   deferDocumentation: (formData?: Record<string, unknown>) => Promise<boolean>;
   submitReport: (incidentId?: string, formData?: any) => Promise<void>;
   finishAndClose: () => void;
-  completeIncident: () => void;
+  completeIncident: (incidentId?: string) => void;
   releaseDispatchOffer: (notice: DispatchReleaseNotice) => void;
   dismissDispatchReleaseNotice: () => void;
   /** Clears only in-memory dispatch UI when the authenticated responder changes or the server has no live assignment. */
   clearTransientDispatch: () => void;
+  clearReportFormSession: () => void;
   
   // Forms & Drafts Actions
   saveDraft: (incident: DispatchDetails, formData: any, explicitlySaved?: boolean) => Promise<void>;
   removeDraft: (draftId: string) => void;
-  openFormForIncident: (incident: DispatchDetails) => void;
+  openFormForIncident: (incident: DispatchDetails, draftId?: string) => void;
+  closeReportForm: () => void;
 
   enqueueAction: (action: Omit<QueueAction, 'id' | 'timestamp' | 'ownerUserId'>) => Promise<void>;
   dequeueAction: (id: string) => Promise<void>;
@@ -207,6 +218,7 @@ export const checkConnectivity = async (): Promise<boolean> => {
 export const useResponderStore = create<ResponderState>((set) => ({
   status: 'idle',
   activeDispatch: null,
+  reportFormSession: null,
   targetHospital: null,
   sceneTimeSeconds: 0,
   elapsedTimeSeconds: 0,
@@ -501,25 +513,39 @@ export const useResponderStore = create<ResponderState>((set) => ({
         }
       }
     }
-    set({
-      status: 'report_filling'
-    });
+    if (activeDispatch) {
+      set({
+        status: 'report_filling',
+        reportFormSession: createReportFormSession(
+          activeDispatch,
+          'ACTIVE_DISPATCH',
+          undefined,
+          currentState.status,
+        ),
+      });
+    }
   },
 
   deferDocumentation: async (formData = {}) => {
     const currentState = useResponderStore.getState();
-    const activeDispatch = currentState.activeDispatch;
-    if (!activeDispatch) {
+    const reportFormSession = currentState.reportFormSession;
+    const formIncident = reportFormSession?.incident ?? currentState.activeDispatch;
+    if (!formIncident) {
       alert('Confirm the field outcome before saving documentation for later.');
       return false;
     }
 
-    await useResponderStore.getState().saveDraft(activeDispatch, formData, true);
+    await useResponderStore.getState().saveDraft(formIncident, formData, true);
 
-    if (activeDispatch.documentationPending) {
-      set({ status: 'idle', activeDispatch: null, fieldOutcome: null });
+    if (reportFormSession?.source === 'DOCUMENTATION_DRAFT' || formIncident.documentationPending) {
+      set({ reportFormSession: null });
       alert('Draft updated. This incident is already pending documentation, so you remain available for dispatch.');
       return true;
+    }
+    const activeDispatch = currentState.activeDispatch;
+    if (!activeDispatch || activeDispatch.id !== formIncident.id) {
+      alert('This draft is no longer the active field response. It remains saved in Forms.');
+      return false;
     }
     if (!currentState.fieldOutcome) {
       alert('Confirm the field outcome before saving documentation for later.');
@@ -575,6 +601,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       set({
         status: 'idle',
         activeDispatch: null,
+        reportFormSession: null,
         targetHospital: null,
         fieldOutcome: null,
         sceneTimeSeconds: 0,
@@ -599,13 +626,21 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
   submitReport: async (incidentId?: string, formData?: any) => {
     set({ isSubmittingReport: true, lastReportDelivery: null });
-    const idToSubmit = incidentId || useResponderStore.getState().activeDispatch?.id;
+    const submissionState = useResponderStore.getState();
+    const reportFormSession = submissionState.reportFormSession;
+    const idToSubmit = incidentId
+      || reportFormSession?.incident.id
+      || submissionState.activeDispatch?.id;
     if (!idToSubmit) {
       set({ isSubmittingReport: false });
       return;
     }
 
-    const responseTimeSecs = useResponderStore.getState().responseTimeSeconds;
+    const isActiveDispatchReport = shouldClearActiveDispatchAfterReport(
+      reportFormSession,
+      submissionState.activeDispatch?.id ?? null,
+    );
+    const responseTimeSecs = isActiveDispatchReport ? submissionState.responseTimeSeconds : 0;
     let responseTimeStr = '0s';
     if (responseTimeSecs > 0) {
       const mins = Math.floor(responseTimeSecs / 60);
@@ -617,10 +652,12 @@ export const useResponderStore = create<ResponderState>((set) => ({
       }
     }
 
-    let initialDist = normalizeResponderDistanceKm(useResponderStore.getState().initialDistanceKm);
-    if (initialDist === 0) {
-      const currentDispatch = useResponderStore.getState().activeDispatch;
-      const currentLoc = useResponderStore.getState().currentLocation;
+    let initialDist = isActiveDispatchReport
+      ? normalizeResponderDistanceKm(submissionState.initialDistanceKm)
+      : 0;
+    if (initialDist === 0 && isActiveDispatchReport) {
+      const currentDispatch = submissionState.activeDispatch;
+      const currentLoc = submissionState.currentLocation;
       if (currentLoc && currentDispatch?.coordinates) {
         const meters = calculateDistanceMeters(
           currentLoc[1],
@@ -631,7 +668,9 @@ export const useResponderStore = create<ResponderState>((set) => ({
         initialDist = Number((meters / 1000).toFixed(1));
       }
     }
-    const hospDist = normalizeResponderDistanceKm(useResponderStore.getState().hospitalDistanceKm);
+    const hospDist = isActiveDispatchReport
+      ? normalizeResponderDistanceKm(submissionState.hospitalDistanceKm)
+      : 0;
     const totalDistance = initialDist + hospDist;
 
     const summary = {
@@ -666,7 +705,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
         console.error('Failed to submit report:', res?.error || response.status);
         if (res?.code === 'INCIDENT_REASSIGNED') {
           alert(res.error);
-          useResponderStore.getState().completeIncident();
+          useResponderStore.getState().completeIncident(idToSubmit);
           return;
         }
         alert(res?.error || `Failed to submit report (HTTP ${response.status}).`);
@@ -677,9 +716,13 @@ export const useResponderStore = create<ResponderState>((set) => ({
         const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
         set((state) => ({
           isSubmittingReport: false,
-          showReportSuccess: true,
-          lastReportDelivery: 'CONFIRMED',
-          lastSubmittedSummary: summary,
+          showReportSuccess: state.reportFormSession?.incident.id === idToSubmit,
+          lastReportDelivery: state.reportFormSession?.incident.id === idToSubmit
+            ? 'CONFIRMED'
+            : null,
+          lastSubmittedSummary: state.reportFormSession?.incident.id === idToSubmit
+            ? summary
+            : null,
           submittedIncidentIds: [...state.submittedIncidentIds, idToSubmit],
           drafts: nextDrafts
         }));
@@ -702,47 +745,73 @@ export const useResponderStore = create<ResponderState>((set) => ({
         }
       });
 
-      set(() => ({
+      set((state) => ({
         isSubmittingReport: false,
-        showReportSuccess: true,
-        lastReportDelivery: 'QUEUED_OFFLINE',
-        lastSubmittedSummary: summary,
+        showReportSuccess: state.reportFormSession?.incident.id === idToSubmit,
+        lastReportDelivery: state.reportFormSession?.incident.id === idToSubmit
+          ? 'QUEUED_OFFLINE'
+          : null,
+        lastSubmittedSummary: state.reportFormSession?.incident.id === idToSubmit
+          ? summary
+          : null,
       }));
     }
   },
 
-  finishAndClose: () => set({
-    status: 'idle', 
-    activeDispatch: null,
-    targetHospital: null,
-    sceneTimeSeconds: 0,
-    elapsedTimeSeconds: 0,
-    isArrivalConfirmVisible: false,
-    isSubmittingReport: false,
-    showReportSuccess: false,
-    lastReportDelivery: null,
-    lastArrivalDelivery: null,
-    currentSpeedKph: 0,
-    hospitalDistanceKm: null,
-    hospitalEtaMins: null,
-    fieldOutcome: null,
-    lastSubmittedSummary: null
+  finishAndClose: () => set((state) => {
+    const clearActiveDispatch = shouldClearActiveDispatchAfterReport(
+      state.reportFormSession,
+      state.activeDispatch?.id ?? null,
+    );
+    return {
+      reportFormSession: null,
+      isSubmittingReport: false,
+      showReportSuccess: false,
+      lastReportDelivery: null,
+      lastSubmittedSummary: null,
+      ...(clearActiveDispatch ? {
+        status: 'idle' as const,
+        activeDispatch: null,
+        targetHospital: null,
+        sceneTimeSeconds: 0,
+        elapsedTimeSeconds: 0,
+        isArrivalConfirmVisible: false,
+        isHospitalArrivalConfirmVisible: false,
+        lastArrivalDelivery: null,
+        currentSpeedKph: 0,
+        hospitalDistanceKm: null,
+        hospitalEtaMins: null,
+        fieldOutcome: null,
+      } : {}),
+    };
   }),
 
-  completeIncident: () => set({ 
-    status: 'idle', 
-    activeDispatch: null,
-    targetHospital: null,
-    sceneTimeSeconds: 0,
-    elapsedTimeSeconds: 0,
-    isArrivalConfirmVisible: false,
-    isSubmittingReport: false,
-    showReportSuccess: false,
-    currentSpeedKph: 0,
-    hospitalDistanceKm: null,
-    hospitalEtaMins: null,
-    fieldOutcome: null,
-    lastSubmittedSummary: null
+  completeIncident: (incidentId) => set((state) => {
+    const targetIncidentId = incidentId
+      ?? state.activeDispatch?.id
+      ?? state.reportFormSession?.incident.id
+      ?? null;
+    const clearActiveDispatch = !targetIncidentId || state.activeDispatch?.id === targetIncidentId;
+    const clearReportForm = !targetIncidentId || state.reportFormSession?.incident.id === targetIncidentId;
+    return {
+      ...(clearActiveDispatch ? {
+        status: 'idle' as const,
+        activeDispatch: null,
+        targetHospital: null,
+        sceneTimeSeconds: 0,
+        elapsedTimeSeconds: 0,
+        isArrivalConfirmVisible: false,
+        isHospitalArrivalConfirmVisible: false,
+        currentSpeedKph: 0,
+        hospitalDistanceKm: null,
+        hospitalEtaMins: null,
+        fieldOutcome: null,
+      } : {}),
+      ...(clearReportForm ? { reportFormSession: null } : {}),
+      isSubmittingReport: false,
+      showReportSuccess: false,
+      lastSubmittedSummary: null,
+    };
   }),
 
   releaseDispatchOffer: (notice) => set({
@@ -765,26 +834,45 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
   dismissDispatchReleaseNotice: () => set({ dispatchReleaseNotice: null }),
 
-  clearTransientDispatch: () => set({
+  clearTransientDispatch: () => set((state) => ({
     status: 'idle',
     activeDispatch: null,
+    reportFormSession: state.reportFormSession?.source === 'ACTIVE_DISPATCH'
+      ? null
+      : state.reportFormSession,
     targetHospital: null,
     sceneTimeSeconds: 0,
     elapsedTimeSeconds: 0,
     isArrivalConfirmVisible: false,
     isHospitalArrivalConfirmVisible: false,
-    isSubmittingReport: false,
-    showReportSuccess: false,
-    lastReportDelivery: null,
+    isSubmittingReport: state.reportFormSession?.source === 'DOCUMENTATION_DRAFT'
+      ? state.isSubmittingReport
+      : false,
+    showReportSuccess: state.reportFormSession?.source === 'DOCUMENTATION_DRAFT'
+      ? state.showReportSuccess
+      : false,
+    lastReportDelivery: state.reportFormSession?.source === 'DOCUMENTATION_DRAFT'
+      ? state.lastReportDelivery
+      : null,
     lastArrivalDelivery: null,
     currentSpeedKph: 0,
     hospitalDistanceKm: null,
     hospitalEtaMins: null,
     responseTimeSeconds: 0,
     initialDistanceKm: 0,
-    lastSubmittedSummary: null,
+    lastSubmittedSummary: state.reportFormSession?.source === 'DOCUMENTATION_DRAFT'
+      ? state.lastSubmittedSummary
+      : null,
     fieldOutcome: null,
     dispatchReleaseNotice: null,
+  })),
+
+  clearReportFormSession: () => set({
+    reportFormSession: null,
+    isSubmittingReport: false,
+    showReportSuccess: false,
+    lastReportDelivery: null,
+    lastSubmittedSummary: null,
   }),
 
   saveDraft: async (incident, formData, explicitlySaved = false) => {
@@ -823,10 +911,25 @@ export const useResponderStore = create<ResponderState>((set) => ({
     drafts: state.drafts.filter((draft) => draft.id !== draftId),
   })),
 
-  openFormForIncident: (incident) => set({
-    activeDispatch: incident,
-    fieldOutcome: incident.fieldOutcome ?? null,
-    status: 'report_filling'
+  openFormForIncident: (incident, draftId) => set({
+    reportFormSession: createReportFormSession(
+      incident,
+      'DOCUMENTATION_DRAFT',
+      draftId,
+    ),
+  }),
+
+  closeReportForm: () => set((state) => {
+    if (!state.reportFormSession) return {};
+    return {
+      status: getReportFormCloseStatus({
+        session: state.reportFormSession,
+        currentStatus: state.status,
+        fieldOutcome: state.fieldOutcome,
+        activeDispatchId: state.activeDispatch?.id ?? null,
+      }),
+      reportFormSession: null,
+    };
   }),
 
   enqueueAction: async (action) => {

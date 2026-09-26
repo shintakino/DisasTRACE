@@ -36,8 +36,10 @@ assert.match(store, /queueDocumentationRelease/);
 assert.match(store, /fetchWithTimeout\([^\n]+\/api\/incidents\/status/);
 assert.match(store, /documentationReleaseIndex/);
 assert.match(store, /clearTransientDispatch/);
-assert.match(store, /clearTransientDispatch: \(\) => set\(\{/);
-assert.doesNotMatch(store.match(/clearTransientDispatch: \(\) => set\(\{[\s\S]*?\n  \}\),/)?.[0] ?? '', /drafts:|offlineQueue:/);
+assert.match(store, /clearTransientDispatch: \(\) => set\(\(state\) => \(\{/);
+const clearTransientDispatch = store.match(/clearTransientDispatch: \(\) => set\(\(state\) => \(\{[\s\S]*?\n  \}\)\),/)?.[0] ?? '';
+assert.doesNotMatch(clearTransientDispatch, /drafts:|offlineQueue:/);
+assert.match(clearTransientDispatch, /reportFormSession: state\.reportFormSession\?\.source === 'ACTIVE_DISPATCH'/);
 
 const authStatus = read('mobile/hooks/use-auth-status.ts');
 assert.match(authStatus, /activeMobileAccountId/);
@@ -66,7 +68,7 @@ assert.match(hospitalSheet, /Save Draft &amp; Become Available/);
 assert.match(hospitalSheet, /void deferDocumentation/);
 
 const incidentReportForm = read('mobile/components/responder/IncidentReportForm.tsx');
-assert.match(incidentReportForm, /Save Draft &amp; Become Available/);
+assert.match(incidentReportForm, /Save Draft & Become Available/);
 assert.match(incidentReportForm, /void deferDocumentation/);
 
 const selector = read('mobile/components/responder/SelectIncidentModal.tsx');

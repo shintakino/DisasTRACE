@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Add, FolderOpen } from 'iconsax-react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
 import { SelectIncidentModal } from '../../components/responder/SelectIncidentModal';
-import { IncidentReportForm } from '../../components/responder/IncidentReportForm';
 
 export default function FormsScreen() {
   const { drafts, submittedIncidentIds, openFormForIncident, removeDraft } = useResponderStore();
@@ -64,7 +63,7 @@ export default function FormsScreen() {
           visibleDrafts.map((draft) => (
             <TouchableOpacity 
               key={draft.id}
-              onPress={() => openFormForIncident(draft.incidentDetails!)}
+              onPress={() => openFormForIncident(draft.incidentDetails!, draft.id)}
               className="bg-[#FEFCE8] border border-[#FEF08A] rounded-2xl p-5 mb-4 shadow-sm"
             >
               <View className="flex-row items-start justify-between">
@@ -102,7 +101,6 @@ export default function FormsScreen() {
         visible={modalVisible} 
         onClose={() => setModalVisible(false)} 
       />
-      <IncidentReportForm />
     </SafeAreaView>
   );
 }

@@ -5,7 +5,8 @@ import { AlertTriangle, FolderCheck } from 'lucide-react-native';
 import { formatResponderDistanceKm } from '../../lib/responder-report-summary';
 
 export function ReportSubmittedModal() {
-  const { showReportSuccess, activeDispatch, lastSubmittedSummary, lastReportDelivery, finishAndClose } = useResponderStore();
+  const { showReportSuccess, reportFormSession, lastSubmittedSummary, lastReportDelivery, finishAndClose } = useResponderStore();
+  const submittedIncidentId = reportFormSession?.incident.id || 'This report';
 
   if (!showReportSuccess) return null;
 
@@ -24,8 +25,8 @@ export function ReportSubmittedModal() {
 
           <Text className="text-slate-500 text-center text-sm leading-relaxed mb-6 px-2">
             {lastReportDelivery === 'QUEUED_OFFLINE'
-              ? `${activeDispatch?.id || 'This report'} has not reached PACC yet. Reconnect and keep the app open; automatic sync is pending.`
-              : `${activeDispatch?.id || 'This report'} is closed. The server confirmed resolution, and the report is now available to CDRRMO and PACC.`}
+              ? `${submittedIncidentId} has not reached PACC yet. Reconnect and keep the app open; automatic sync is pending.`
+              : `${submittedIncidentId} is closed. The server confirmed resolution, and the report is now available to CDRRMO and PACC.`}
           </Text>
 
           <View className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 mb-8">

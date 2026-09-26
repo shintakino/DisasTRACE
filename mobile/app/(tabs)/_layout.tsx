@@ -8,12 +8,15 @@ import { useBroadcastTracker } from '../../hooks/use-broadcast-tracker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocationPermission } from '../../hooks/use-location-permission';
 import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
+import { getOperationalTrackingIncidentId } from '../../lib/responder-report-form-session';
+import { IncidentReportForm } from '../../components/responder/IncidentReportForm';
 
 function ResponderAvailabilityTracker() {
   const { role } = useAuthStatus();
   const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
   const responderStatus = useResponderStore((state) => state.status);
   const activeDispatch = useResponderStore((state) => state.activeDispatch);
+  const reportFormSession = useResponderStore((state) => state.reportFormSession);
   const targetHospital = useResponderStore((state) => state.targetHospital);
   const shouldTrack = role === 'ambulance_responder' && (
     dutyStatus === 'ON_DUTY'
@@ -22,13 +25,18 @@ function ResponderAvailabilityTracker() {
     || responderStatus === 'on_scene'
     || responderStatus === 'to_hospital'
   );
+  const trackedIncidentId = getOperationalTrackingIncidentId({
+    status: responderStatus,
+    activeDispatchId: activeDispatch?.id ?? null,
+    formSource: reportFormSession?.source ?? null,
+  });
 
   useBroadcastTracker(
-    activeDispatch?.id || null,
+    trackedIncidentId,
     shouldTrack,
     responderStatus,
     targetHospital,
-    activeDispatch,
+    trackedIncidentId ? activeDispatch : null,
   );
   return null;
 }
@@ -52,6 +60,7 @@ export default function TabLayout() {
   return (
     <>
       <ResponderAvailabilityTracker />
+      {isResponder && <IncidentReportForm />}
       <Tabs screenOptions={{
       tabBarActiveTintColor: '#FFFFFF',
       tabBarInactiveTintColor: '#94A3B8',

@@ -67,15 +67,18 @@ function InlineDropdown({
 }
 
 export function IncidentReportForm() {
-  const status = useResponderStore((state) => state.status);
-  const setStatus = useResponderStore((state) => state.setStatus);
-  const activeDispatch = useResponderStore((state) => state.activeDispatch);
+  const responderStatus = useResponderStore((state) => state.status);
+  const reportFormSession = useResponderStore((state) => state.reportFormSession);
+  const closeReportForm = useResponderStore((state) => state.closeReportForm);
   const isSubmittingReport = useResponderStore((state) => state.isSubmittingReport);
   const submitReport = useResponderStore((state) => state.submitReport);
   const saveDraft = useResponderStore((state) => state.saveDraft);
   const deferDocumentation = useResponderStore((state) => state.deferDocumentation);
-  const fieldOutcome = useResponderStore((state) => state.fieldOutcome);
   const { profile } = useAuthStatus();
+  const formIncident = reportFormSession?.incident ?? null;
+  const formSessionKey = reportFormSession
+    ? `${reportFormSession.source}:${reportFormSession.draftId ?? reportFormSession.incident.id}`
+    : null;
   
   const [natureOfCall, setNatureOfCall] = useState('Emergency');
   const [typeOfEmergency, setTypeOfEmergency] = useState('Medical Emergency');
@@ -93,36 +96,40 @@ export function IncidentReportForm() {
   const [tripTicketData, setTripTicketData] = useState<any>(null);
 
   const [dispatchLocation, setDispatchLocation] = useState('');
+  const [hydratedSessionKey, setHydratedSessionKey] = useState<string | null>(null);
 
 
   React.useEffect(() => {
-    if (status === 'report_filling' && activeDispatch) {
+    if (formSessionKey && formIncident) {
+      setHydratedSessionKey(null);
       // 1. Check if there is an existing local draft for this incident
       const currentDrafts = useResponderStore.getState().drafts;
-      const existingDraft = currentDrafts.find(d => d.incidentId === activeDispatch.id);
+      const existingDraft = reportFormSession?.draftId
+        ? currentDrafts.find((draft) => draft.id === reportFormSession.draftId)
+        : currentDrafts.find((draft) => draft.incidentId === formIncident.id);
       
       if (existingDraft && existingDraft.formData) {
         console.log('[IncidentReportForm] Loading existing draft data:', existingDraft);
         setNatureOfCall(existingDraft.formData.natureOfCall || 'Emergency');
-        setTypeOfEmergency(existingDraft.formData.typeOfEmergency || activeDispatch.typeOfEmergency || activeDispatch.type || 'Medical Emergency');
+        setTypeOfEmergency(existingDraft.formData.typeOfEmergency || formIncident.typeOfEmergency || formIncident.type || 'Medical Emergency');
         setSeverityLevel(existingDraft.formData.severityLevel || 'Medium');
         setCrewNotes(existingDraft.formData.crewNotes || '');
-        setDispatchLocation(existingDraft.formData.location || getReportLocation(activeDispatch.locationName));
+        setDispatchLocation(existingDraft.formData.location || getReportLocation(formIncident.locationName));
         setPatients(existingDraft.formData.patients || [
           { id: 1, status: 'Stable — Conscious', bp: '', hr: '', spo2: '', pcrDetails: null }
         ]);
         setTripTicketData(existingDraft.formData.tripTicketData || null);
       } else {
-        console.log('[IncidentReportForm] Initializing fresh form from active dispatch pre-fills:', activeDispatch);
-        setNatureOfCall(activeDispatch.natureOfCall || 'Emergency');
-        setTypeOfEmergency(activeDispatch.typeOfEmergency || activeDispatch.type || 'Medical Emergency');
+        console.log('[IncidentReportForm] Initializing fresh form from incident pre-fills:', formIncident);
+        setNatureOfCall(formIncident.natureOfCall || 'Emergency');
+        setTypeOfEmergency(formIncident.typeOfEmergency || formIncident.type || 'Medical Emergency');
         setSeverityLevel('Medium');
         setCrewNotes('');
-        setDispatchLocation(getReportLocation(activeDispatch.locationName));
+        setDispatchLocation(getReportLocation(formIncident.locationName));
         setTripTicketData(null);
         
         // Match the number of people involved from resident findings
-        const count = activeDispatch.peopleInvolved || 1;
+        const count = formIncident.peopleInvolved || 1;
         const initialPatients = Array.from({ length: count }, (_, i) => ({
           id: i + 1,
           status: 'Stable — Conscious',
@@ -133,15 +140,21 @@ export function IncidentReportForm() {
         }));
         setPatients(initialPatients);
       }
+      setOpenDropdown(null);
+      setActivePcrPatientIndex(null);
+      setIsTripTicketOpen(false);
+      setHydratedSessionKey(formSessionKey);
+    } else {
+      setHydratedSessionKey(null);
     }
-  }, [status, activeDispatch?.id]);
+  }, [formIncident, formSessionKey, reportFormSession?.draftId]);
 
   // Background Auto-Save Effect
   React.useEffect(() => {
-    if (status === 'report_filling' && activeDispatch) {
+    if (formSessionKey && hydratedSessionKey === formSessionKey && formIncident) {
       const timer = setTimeout(() => {
         console.log('[IncidentReportForm] Auto-saving draft in background...');
-        saveDraft(activeDispatch, { 
+        saveDraft(formIncident, {
           natureOfCall, 
           typeOfEmergency, 
           severityLevel, 
@@ -154,7 +167,46 @@ export function IncidentReportForm() {
       
       return () => clearTimeout(timer);
     }
-  }, [natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, dispatchLocation, tripTicketData, status, activeDispatch?.id]);
+  }, [natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, dispatchLocation, tripTicketData, formIncident, formSessionKey, hydratedSessionKey, saveDraft]);
+
+  React.useEffect(() => {
+    if (
+      responderStatus !== 'dispatch_offered'
+      || reportFormSession?.source !== 'DOCUMENTATION_DRAFT'
+      || !formIncident
+    ) return;
+
+    // An urgent offer must not remain hidden behind an older documentation
+    // draft. Preserve the latest hydrated values, then reveal the offer while
+    // leaving the operational dispatch state untouched.
+    if (formSessionKey && hydratedSessionKey === formSessionKey) {
+      void saveDraft(formIncident, {
+        natureOfCall,
+        typeOfEmergency,
+        severityLevel,
+        patients,
+        crewNotes,
+        location: dispatchLocation,
+        tripTicketData,
+      });
+    }
+    closeReportForm();
+  }, [
+    closeReportForm,
+    crewNotes,
+    dispatchLocation,
+    formIncident,
+    formSessionKey,
+    hydratedSessionKey,
+    natureOfCall,
+    patients,
+    reportFormSession?.source,
+    responderStatus,
+    saveDraft,
+    severityLevel,
+    tripTicketData,
+    typeOfEmergency,
+  ]);
 
 
   const toggleDropdown = (id: string) => {
@@ -162,7 +214,7 @@ export function IncidentReportForm() {
     setOpenDropdown(openDropdown === id ? null : id);
   };
 
-  if (status !== 'report_filling' && status !== 'idle') {
+  if (!reportFormSession || !formIncident) {
     return null;
   }
 
@@ -187,7 +239,7 @@ export function IncidentReportForm() {
   };
 
   const handleSaveDraft = () => {
-    if (activeDispatch) {
+    if (formIncident) {
       void deferDocumentation({
         natureOfCall,
         typeOfEmergency,
@@ -201,17 +253,7 @@ export function IncidentReportForm() {
   };
 
   const returnToFieldWorkflow = () => {
-    if (activeDispatch?.documentationPending) {
-      setStatus('idle');
-    } else if (fieldOutcome === 'HOSPITAL_ARRIVAL') {
-      setStatus('at_hospital');
-    } else if (fieldOutcome) {
-      setStatus('on_scene');
-    } else {
-      // A documentation-pending draft is already server-released, so closing
-      // it must preserve that availability rather than recreate field work.
-      setStatus('idle');
-    }
+    closeReportForm();
   };
 
   const handleSavePcr = (pcrData: any) => {
@@ -227,7 +269,7 @@ export function IncidentReportForm() {
   };
 
   const handleSubmit = () => {
-    if (activeDispatch && submissionValidation.valid) {
+    if (formIncident && submissionValidation.valid) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       const responderName = profile?.fullName || 'Ambulance Responder';
@@ -245,7 +287,7 @@ export function IncidentReportForm() {
           patientGender: 'Male',
           dispatchInfo: {
             date: todayDate,
-            unit: activeDispatch.assignedAmbulance || 'AMB-001',
+            unit: formIncident.assignedAmbulance || 'AMB-001',
             hqDprtTime: '', hqArrTime: '',
             sceneDprtTime: '', sceneArrTime: '',
             hospitalDprtTime: '', hospitalArrTime: ''
@@ -303,7 +345,7 @@ export function IncidentReportForm() {
       const finalTripTicket = tripTicketData || {
         date: todayDate,
         driverName: 'Ambulance Driver',
-        vehiclePlate: activeDispatch.assignedAmbulance || 'AMB-001',
+        vehiclePlate: formIncident.assignedAmbulance || 'AMB-001',
         passengerName: 'Responder Crew',
         placesVisited: dispatchLocation,
         purpose: 'Emergency Response',
@@ -323,12 +365,12 @@ export function IncidentReportForm() {
         patientCareReports: finalPcrList,
         driverTripTicket: finalTripTicket
       };
-      submitReport(activeDispatch.id, formData);
+      submitReport(formIncident.id, formData);
     }
   };
 
   const submissionValidation = validateIncidentReportForSubmission({
-    activeDispatchId: activeDispatch?.id,
+    activeDispatchId: formIncident.id,
     location: dispatchLocation,
     patients,
   });
@@ -338,7 +380,7 @@ export function IncidentReportForm() {
   return (
     <>
     <Modal
-      visible={status === 'report_filling'}
+      visible={Boolean(reportFormSession)}
       animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
       presentationStyle={Platform.OS === 'ios' ? 'formSheet' : undefined}
       hardwareAccelerated
@@ -394,25 +436,25 @@ export function IncidentReportForm() {
             <View className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm shadow-slate-200 mb-8">
               <View className="flex-row justify-between mb-4">
                 <Text className="text-slate-500 text-sm">Nature of Call</Text>
-                <Text className="text-[#1E3A8A] font-bold text-sm">{activeDispatch?.natureOfCall || 'Emergency'}</Text>
+                <Text className="text-[#1E3A8A] font-bold text-sm">{formIncident.natureOfCall || 'Emergency'}</Text>
               </View>
               <View className="flex-row justify-between mb-6">
                 <Text className="text-slate-500 text-sm">Type of Emergency</Text>
-                <Text className="text-[#1E3A8A] font-bold text-sm">{activeDispatch?.typeOfEmergency || 'Fire / Explosion'}</Text>
+                <Text className="text-[#1E3A8A] font-bold text-sm">{formIncident.typeOfEmergency || 'Fire / Explosion'}</Text>
               </View>
               
               <View className="flex-row justify-between mb-4">
                 <Text className="text-slate-500 text-sm">People Involved</Text>
-                <Text className="text-[#1E3A8A] font-bold text-sm">{activeDispatch?.peopleInvolved || 3}</Text>
+                <Text className="text-[#1E3A8A] font-bold text-sm">{formIncident.peopleInvolved || 3}</Text>
               </View>
               <View className="flex-row justify-between mb-4">
                 <Text className="text-slate-500 text-sm">Location</Text>
-                <Text className="text-[#1E3A8A] font-bold text-sm">{activeDispatch?.locationName || 'Sabang, Baliwag City'}</Text>
+                <Text className="text-[#1E3A8A] font-bold text-sm">{formIncident.locationName || 'Sabang, Baliwag City'}</Text>
               </View>
               
-              {activeDispatch?.attachmentUrl && (
+              {formIncident.attachmentUrl && (
                 <View className="rounded-xl overflow-hidden relative h-32 bg-slate-100 mt-2">
-                  <Image source={{ uri: activeDispatch.attachmentUrl }} className="w-full h-full" resizeMode="cover" />
+                  <Image source={{ uri: formIncident.attachmentUrl }} className="w-full h-full" resizeMode="cover" />
                   <View className="absolute bottom-0 left-0 right-0 bg-black/60 p-2">
                     <Text className="text-white text-xs font-medium">IMG_7904.jpg</Text>
                   </View>
@@ -616,7 +658,9 @@ export function IncidentReportForm() {
                 className="flex-1 bg-yellow-50 border border-yellow-100 rounded-2xl py-4 flex-row justify-center items-center shadow-sm"
               >
                 <FolderDown size={18} color="#92400E" />
-                <Text className="text-[#92400E] font-bold ml-2 text-base">Save Draft &amp; Become Available</Text>
+                <Text className="text-[#92400E] font-bold ml-2 text-base">
+                  {reportFormSession.source === 'DOCUMENTATION_DRAFT' ? 'Save Draft' : 'Save Draft & Become Available'}
+                </Text>
               </TouchableOpacity>
             
               <TouchableOpacity
@@ -658,7 +702,7 @@ export function IncidentReportForm() {
           onClose={() => setActivePcrPatientIndex(null)}
           patientIndex={activePcrPatientIndex}
           data={patients[activePcrPatientIndex]?.pcrDetails}
-          respondingUnit={activeDispatch?.assignedAmbulance || profile?.unitId || null}
+          respondingUnit={formIncident.assignedAmbulance || profile?.unitId || null}
           onSave={handleSavePcr}
         />
       )}

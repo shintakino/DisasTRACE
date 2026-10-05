@@ -28,6 +28,10 @@ const statusConfig: Record<RosterStatus, { label: string, className: string }> =
     label: "ACTIVE", 
     className: "bg-[#E6F4EA] text-[#1E8E3E] hover:bg-[#E6F4EA]/80 border-none px-4" 
   },
+  PENDING: {
+    label: "PENDING",
+    className: "bg-[#FFF4E5] text-[#C2410C] hover:bg-[#FFF4E5]/80 border-none px-4",
+  },
   DEACTIVATED: { 
     label: "DEACTIVATED", 
     className: "bg-[#FCE8E6] text-[#D93025] hover:bg-[#FCE8E6]/80 border-none px-4" 

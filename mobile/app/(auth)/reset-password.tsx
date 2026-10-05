@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -41,12 +41,13 @@ type ResetPasswordType = z.infer<typeof ResetPasswordSchema>;
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
-  const { phone, token, access_token, refresh_token, code } = useLocalSearchParams<{
+  const { phone, token, access_token, refresh_token, code, '#': recoveryHash } = useLocalSearchParams<{
     phone?: string;
     token?: string;
     access_token?: string;
     refresh_token?: string;
     code?: string;
+    '#'?: string;
   }>();
   const isOtpFlow = !!(phone && token);
   const url = Linking.useURL();
@@ -56,6 +57,8 @@ export default function ResetPasswordScreen() {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [isVerifyingLink, setIsVerifyingLink] = useState(false);
   const [recoveryReady, setRecoveryReady] = useState(isOtpFlow);
+  const [initialRecoveryUrl, setInitialRecoveryUrl] = useState<string | null | undefined>(undefined);
+  const handledRecoveryRef = useRef<string | null>(null);
 
   // Success Modal & Redirect
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -66,19 +69,51 @@ export default function ResetPasswordScreen() {
     defaultValues: { password: '', confirmPassword: '' }
   });
 
+  // Expo Router can hydrate route parameters before Linking has returned the
+  // URL that launched Android. Retain the initial URL as a fallback rather
+  // than declaring a valid recovery email invalid during that short window.
+  useEffect(() => {
+    let mounted = true;
+    void Linking.getInitialURL()
+      .then((initialUrl) => { if (mounted) setInitialRecoveryUrl(initialUrl); })
+      .catch(() => { if (mounted) setInitialRecoveryUrl(null); });
+    return () => { mounted = false; };
+  }, []);
+
+  const recoveryUrl = url ?? initialRecoveryUrl ?? null;
+  const recovery = useMemo(
+    () => getRecoveryCredentials(recoveryUrl, { access_token, refresh_token, code, '#': recoveryHash }),
+    [access_token, code, recoveryHash, recoveryUrl, refresh_token],
+  );
+  const recoveryFingerprint = recovery
+    ? recovery.kind === 'tokens'
+      ? `tokens:${recovery.accessToken}:${recovery.refreshToken}`
+      : `code:${recovery.code}`
+    : null;
+  const hasRecoveryRouteParameter = Boolean(access_token || refresh_token || code || recoveryHash);
+  const isWaitingForRecoveryUrl = !isOtpFlow && !hasRecoveryRouteParameter && initialRecoveryUrl === undefined;
+
   // Capture and process both Supabase recovery link formats. Depending on the
   // project auth settings, Supabase can send either hash tokens or a PKCE code.
   useEffect(() => {
     if (isOtpFlow) return;
 
     async function handleRecoveryLink() {
+      if (!recovery) {
+        // Wait for the native launch URL before deciding that a link is
+        // missing. This avoids a false error and disabled action on cold open.
+        if (isWaitingForRecoveryUrl) return;
+        setRecoveryReady(false);
+        setGlobalError('Open the password reset link from your email before saving a new password.');
+        return;
+      }
+      if (handledRecoveryRef.current === recoveryFingerprint) return;
+      handledRecoveryRef.current = recoveryFingerprint;
+
       setIsVerifyingLink(true);
       setGlobalError(null);
 
       try {
-        const recovery = getRecoveryCredentials(url, { access_token, refresh_token, code });
-        if (!recovery) throw new Error('Open the password reset link from your email before saving a new password.');
-
         const result = recovery.kind === 'tokens'
           ? await supabase.auth.setSession({ access_token: recovery.accessToken!, refresh_token: recovery.refreshToken! })
           : await supabase.auth.exchangeCodeForSession(recovery.code!);
@@ -101,7 +136,7 @@ export default function ResetPasswordScreen() {
     }
 
     void handleRecoveryLink();
-  }, [access_token, code, isOtpFlow, refresh_token, url]);
+  }, [isOtpFlow, isWaitingForRecoveryUrl, recovery, recoveryFingerprint]);
 
   // Success Redirect Countdown Timer
   useEffect(() => {
@@ -284,6 +319,14 @@ export default function ResetPasswordScreen() {
               {globalError && (
                 <View className="bg-red-50 p-3 rounded-lg mb-4 mt-4 border border-red-200">
                   <Text className="text-red-600 text-center text-sm font-medium">{globalError}</Text>
+                  {!isOtpFlow && !recoveryReady && !isVerifyingLink && (
+                    <TouchableOpacity
+                      onPress={() => router.replace('/(auth)/forgot-password' as any)}
+                      className="mt-3 items-center"
+                    >
+                      <Text className="text-[#15286A] font-bold text-sm">Request a new reset link</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
 
@@ -292,7 +335,7 @@ export default function ResetPasswordScreen() {
                 disabled={isSubmitting || isVerifyingLink || (!isOtpFlow && !recoveryReady)}
                 className={`mt-8 bg-[#15286A] p-4 rounded-xl items-center justify-center min-h-[56px] ${(isSubmitting || isVerifyingLink || (!isOtpFlow && !recoveryReady)) ? 'opacity-70' : ''}`}
               >
-                {isVerifyingLink ? (
+                {isVerifyingLink || isWaitingForRecoveryUrl ? (
                   <View className="flex-row items-center justify-center">
                     <ActivityIndicator color="white" size="small" />
                     <Text className="text-white font-bold ml-2 text-lg">Verifying link...</Text>

@@ -143,7 +143,12 @@ async function seed() {
         user_metadata: {
           first_name: account.firstName,
           last_name: account.lastName,
-          role: account.role
+          role: account.role,
+          ...(account.role === 'public_user' ? {
+            privacy_consent_at: new Date().toISOString(),
+            privacy_policy_version: 'seed-policy',
+            privacy_policy_accepted: true,
+          } : {}),
         }
       });
 

@@ -115,6 +115,7 @@ interface ResponderState {
   activeDispatch: DispatchDetails | null;
   reportFormSession: ReportFormSession<DispatchDetails> | null;
   targetHospital: HospitalDetails | null;
+  isStartingHospitalTransport: boolean;
   sceneTimeSeconds: number;
   elapsedTimeSeconds: number;
   isArrivalConfirmVisible: boolean;
@@ -161,7 +162,7 @@ interface ResponderState {
   hideHospitalArrivalConfirm: () => void;
   arriveAtHospital: () => Promise<void>;
   arriveAtScene: () => Promise<void>;
-  transportToHospital: () => void;
+  startHospitalTransport: () => Promise<boolean>;
   startReport: () => Promise<void>;
   deferDocumentation: (formData?: Record<string, unknown>) => Promise<boolean>;
   submitReport: (incidentId?: string, formData?: any) => Promise<void>;
@@ -220,6 +221,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
   activeDispatch: null,
   reportFormSession: null,
   targetHospital: null,
+  isStartingHospitalTransport: false,
   sceneTimeSeconds: 0,
   elapsedTimeSeconds: 0,
   isArrivalConfirmVisible: false,
@@ -363,18 +365,74 @@ export const useResponderStore = create<ResponderState>((set) => ({
     });
   },
 
-  transportToHospital: () => {
-    if (!canStartHospitalTransport(useResponderStore.getState().status)) {
+  startHospitalTransport: async () => {
+    const currentState = useResponderStore.getState();
+    const activeDispatch = currentState.activeDispatch;
+    const targetHospital = currentState.targetHospital;
+    if (!canStartHospitalTransport(currentState.status)) {
       console.warn('[useResponderStore] Hospital transport is only available after scene arrival.');
-      return;
+      return false;
     }
-    set({
-      status: 'to_hospital',
-      targetHospital: null, // Reset so it can be dynamically chosen
-      hospitalDistanceKm: null,
-      hospitalEtaMins: null,
-      elapsedTimeSeconds: 0,
-    });
+    if (!activeDispatch || !isEligibleHospitalDestination(targetHospital) || !currentState.currentLocation) {
+      alert('Keep live GPS active and wait for an available hospital recommendation before starting transport.');
+      return false;
+    }
+    if (currentState.isStartingHospitalTransport) return false;
+
+    set({ isStartingHospitalTransport: true });
+    try {
+      const isOnline = await checkConnectivity();
+      if (!isOnline) {
+        alert('A connection is required to start hospital transport so PACC can track this response. Please try again when online.');
+        return false;
+      }
+
+      const apiUrl = getMobileApiBaseUrl();
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetchWithTimeout(`${apiUrl}/api/incidents/transport/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ incidentId: activeDispatch.id, hospitalId: targetHospital.id }),
+      }, 12_000, 'starting hospital transport');
+      const result = await response.json().catch(() => null) as {
+        error?: string;
+        code?: string;
+        incident?: { transportHospitalId?: string | null };
+      } | null;
+
+      if (!response.ok) {
+        if (result?.code === 'INCIDENT_REASSIGNED') {
+          useResponderStore.getState().completeIncident(activeDispatch.id);
+        }
+        alert(result?.error || 'Hospital transport could not be started. Please try again.');
+        return false;
+      }
+
+      set((state) => {
+        if (state.activeDispatch?.id !== activeDispatch.id) return {};
+        return {
+          status: 'to_hospital',
+          activeDispatch: {
+            ...state.activeDispatch,
+            transportHospitalId: result?.incident?.transportHospitalId || targetHospital.id,
+          },
+          targetHospital,
+          hospitalDistanceKm: null,
+          hospitalEtaMins: null,
+          elapsedTimeSeconds: 0,
+        };
+      });
+      return true;
+    } catch (error) {
+      console.error('[useResponderStore] Failed to start hospital transport:', error);
+      alert('Hospital transport could not be started. Check your connection and try again.');
+      return false;
+    } finally {
+      set({ isStartingHospitalTransport: false });
+    }
   },
 
   arriveAtHospital: async () => {
@@ -714,6 +772,9 @@ export const useResponderStore = create<ResponderState>((set) => ({
       }
       if (res.success) {
         const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
+        const nextOfflineQueue = useResponderStore.getState().offlineQueue.filter((action) => !(
+          action.endpoint === '/api/reports' && action.payload?.incidentId === idToSubmit
+        ));
         set((state) => ({
           isSubmittingReport: false,
           showReportSuccess: state.reportFormSession?.incident.id === idToSubmit,
@@ -724,8 +785,10 @@ export const useResponderStore = create<ResponderState>((set) => ({
             ? summary
             : null,
           submittedIncidentIds: [...state.submittedIncidentIds, idToSubmit],
-          drafts: nextDrafts
+          drafts: nextDrafts,
+          offlineQueue: nextOfflineQueue,
         }));
+        await serializeSecureStoreWrite(nextOfflineQueue);
       }
     } catch (err) {
       console.error('Error submitting report to API, queuing offline:', err);

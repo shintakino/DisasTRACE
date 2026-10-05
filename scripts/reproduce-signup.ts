@@ -20,7 +20,10 @@ async function reproduce() {
       data: {
         first_name: 'Test',
         last_name: 'User',
-        role: 'public_user'
+        role: 'public_user',
+        privacy_consent_at: new Date().toISOString(),
+        privacy_policy_version: 'test-policy',
+        privacy_policy_accepted: true,
       }
     }
   });
@@ -36,7 +39,10 @@ async function reproduce() {
       data: {
         first_name: 'Test',
         last_name: 'User',
-        role: 'public_user'
+        role: 'public_user',
+        privacy_consent_at: new Date().toISOString(),
+        privacy_policy_version: 'test-policy',
+        privacy_policy_accepted: true,
       }
     }
   });

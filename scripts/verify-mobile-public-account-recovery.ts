@@ -27,13 +27,24 @@ check('parses Supabase recovery tokens from an Android deep-link fragment', () =
     { kind: 'code', code: 'recovery-code' },
   );
   assert.equal(getRecoveryCredentials('disastrace://reset-password', {}), null);
+
+  // Expo Router can surface a URL fragment as the reserved "#" route
+  // parameter even when React Native Linking no longer exposes it in url.
+  assert.deepEqual(
+    getRecoveryCredentials(null, { '#': 'access_token=access&refresh_token=refresh' }),
+    { kind: 'tokens', accessToken: 'access', refreshToken: 'refresh' },
+  );
 });
 
 check('password updates require the recovery credential rather than a stale app session', () => {
   const screen = source('mobile/app/(auth)/reset-password.tsx');
-  assert.match(screen, /getRecoveryCredentials\(url, \{ access_token, refresh_token, code \}\)/);
+  assert.match(screen, /getRecoveryCredentials\(recoveryUrl, \{ access_token, refresh_token, code, '#': recoveryHash \}\)/);
   assert.match(screen, /supabase\.auth\.setSession/);
   assert.match(screen, /supabase\.auth\.exchangeCodeForSession/);
+  assert.match(screen, /handledRecoveryRef/);
+  assert.match(screen, /handledRecoveryRef\.current === recoveryFingerprint/);
+  assert.match(screen, /Linking\.getInitialURL/);
+  assert.match(screen, /Request a new reset link/);
   assert.doesNotMatch(screen, /const existing = await supabase\.auth\.getSession\(\)/);
 });
 

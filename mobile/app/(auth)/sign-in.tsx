@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
-import { signInOnMobile } from '../../lib/mobile-auth';
+import { Alert, View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { MobileSignInError, signInOnMobile } from '../../lib/mobile-auth';
 import { useRouter, Link } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -50,16 +50,40 @@ export default function SignInScreen() {
         }
       }
 
-      const signInData = await signInOnMobile(emailToUse, data.password);
+      const completeSignIn = async (replaceExistingDevice = false) => {
+        const signInData = await signInOnMobile(emailToUse, data.password, replaceExistingDevice);
 
-      if (!signInData.user) {
-        setGlobalError('Unable to start your mobile session.');
-        return;
-      }
+        if (!signInData.user) {
+          setGlobalError('Unable to start your mobile session.');
+          return;
+        }
 
-      if (signInData.user) {
         // Auth state change will handle routing in root layout.
         router.replace('/');
+      };
+
+      try {
+        await completeSignIn();
+      } catch (error) {
+        if (error instanceof MobileSignInError && error.code === 'MOBILE_DEVICE_ALREADY_ACTIVE') {
+          Alert.alert(
+            'Account active on another device',
+            'Switching will securely sign out the other mobile device. Continue only if it is your account.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Switch to this device',
+                onPress: () => {
+                  void completeSignIn(true).catch((switchError) => {
+                    setGlobalError(switchError instanceof Error ? switchError.message : 'Unable to switch devices right now.');
+                  });
+                },
+              },
+            ],
+          );
+          return;
+        }
+        throw error;
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign in failed';

@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
       fullName: z.string(),
       email: z.string().email(),
       password: z.string().min(6),
-      role: z.enum(["public_user", "ambulance_responder", "pacc_admin", "cdrrmo_super_admin"]),
+      role: z.enum(["ambulance_responder", "pacc_admin", "cdrrmo_super_admin"]),
       phone: z.string().optional(),
       address: z.string().optional(),
       responderType: z.enum(["barangay", "cdrrmo_hq"]).optional(),
@@ -276,6 +276,9 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Enter a valid Philippine mobile number." }, { status: 400 });
     }
     const targetRole = role ?? existingUser.role;
+    if (role && role !== existingUser.role && (role === 'public_user' || existingUser.role === 'public_user')) {
+      return NextResponse.json({ error: 'Public User roles are assigned only through consent-backed mobile registration.' }, { status: 400 });
+    }
     const isPromotingToResponder = targetRole === 'ambulance_responder' && existingUser.role !== 'ambulance_responder';
     const isRemovingResponderRole = existingUser.role === 'ambulance_responder' && targetRole !== 'ambulance_responder';
     const normalizedUnitId = requestedUnitId === undefined ? undefined : normalizeAmbulanceUnitId(requestedUnitId);

@@ -185,6 +185,7 @@ In Supabase Dashboard > Authentication > URL Configuration:
 - Site URL: `https://disas-trace.vercel.app`
 - `https://disas-trace.vercel.app/reset-password`
 - `disastrace://reset-password`
+- `disastrace://**` (required so Android recovery query/hash credentials are retained through the app redirect)
 
 The web URL serves dashboard recovery; the custom scheme opens the Android
 resident/responder reset-password screen. Do not leave localhost as the

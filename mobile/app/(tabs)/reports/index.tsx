@@ -33,6 +33,7 @@ import { supabase } from '../../../lib/supabase';
 import { BALIWAG_BARANGAY_NAMES, formatBaliwagLocation } from '../../../lib/baliwag-location';
 import { isPublicResponseComplete } from '../../../lib/public-response-lifecycle';
 import { readResidentReportCache, writeResidentReportCache } from '../../../lib/resident-report-cache';
+import { shouldKeepReportsVisibleWhileFetching } from '../../../lib/report-list-loading-policy';
 
 const RESPONDER_PAGE_SIZE = 15;
 const TYPE_FILTERS = [
@@ -172,9 +173,13 @@ export default function MyReportsScreen() {
   const [pagination, setPagination] = useState<Pagination>({ page: 1, total: 0, totalPages: 1 });
   const requestSequence = useRef(0);
   const activeRequest = useRef<AbortController | null>(null);
-  const { role, isLoaded, user } = useAuthStatus();
+  const hasLoadedReports = useRef(false);
+  const { role, user } = useAuthStatus();
   const isResponder = role?.includes('responder') ?? false;
-  const displayLoading = loading && (!isLoaded || Boolean(user));
+  const displayLoading = loading && !shouldKeepReportsVisibleWhileFetching({
+    hasLoadedOnce: hasLoadedReports.current,
+    isFetching: loading,
+  });
 
   useEffect(() => {
     if (!isResponder) return;
@@ -233,6 +238,7 @@ export default function MyReportsScreen() {
 
       const mappedReports = mapReportItems(Array.isArray(result?.data) ? result.data : [], isResponder);
 
+      hasLoadedReports.current = true;
       setReports(mappedReports);
       setOfflineSavedAt(null);
       if (!isResponder && user?.id) {
@@ -259,7 +265,7 @@ export default function MyReportsScreen() {
           setError(fetchError instanceof Error ? fetchError.message : 'Reports could not be loaded. Please try again.');
         }
       } else {
-        setReports([]);
+        if (!hasLoadedReports.current) setReports([]);
         setError(fetchError instanceof Error ? fetchError.message : 'Reports could not be loaded. Please try again.');
       }
     } finally {
@@ -284,6 +290,7 @@ export default function MyReportsScreen() {
     // Never render the previous account's report list while a new session is
     // hydrating or its scoped request is still in flight.
     setReports([]);
+    hasLoadedReports.current = false;
     setOfflineSavedAt(null);
     setError(null);
   }, [user?.id]);

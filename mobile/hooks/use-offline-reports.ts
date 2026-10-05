@@ -4,12 +4,10 @@ import { useResponderStore } from '../stores/useResponderStore';
 import { supabase } from '../lib/supabase';
 import { fetchWithTimeout } from '../lib/network-timeout';
 import * as Haptics from 'expo-haptics';
-import * as Notifications from 'expo-notifications';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
 import { normalizeResponderLocationPayload } from '../lib/responder-location-status';
 
 const OFFLINE_REPORTS_KEY = 'disas_trace_offline_reports';
-const DRAFT_REMINDER_NOTIFICATION_KEY = 'disas_trace_draft_reminder_notification_id';
 
 export function useOfflineReports() {
   const { 
@@ -42,68 +40,6 @@ export function useOfflineReports() {
       clearInterval(interval);
     };
   }, []);
-
-  // 5-Minute Recurring Draft Reminder Loop (Triggers when device is online & pending drafts exist)
-  useEffect(() => {
-    if (!isOnline || drafts.length === 0) return;
-
-    const sendDraftReminderNotification = async () => {
-      try {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: '⚠️ Pending Incident Draft Reminder',
-            body: `You have ${drafts.length} unsent incident report draft(s). Please review and submit your report to CDRRMO HQ.`,
-            data: { type: 'DRAFT_REMINDER' },
-            sound: true,
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-          },
-          trigger: null, // Send immediately
-        });
-        console.log(`[DraftReminder] Sent 5-minute reminder for ${drafts.length} pending draft(s).`);
-      } catch (err) {
-        console.error('[DraftReminder] Failed to present notification reminder:', err);
-      }
-    };
-
-    // Initial reminder upon connection return if drafts exist
-    sendDraftReminderNotification();
-
-    return undefined;
-  }, [isOnline, drafts.length]);
-
-  // Native notifications continue after React is paused or Android later stops
-  // the process. This is separate from the foreground immediate reminder above.
-  useEffect(() => {
-    let cancelled = false;
-    const syncDraftReminder = async () => {
-      const existingId = await SecureStore.getItemAsync(DRAFT_REMINDER_NOTIFICATION_KEY);
-      if (drafts.length === 0) {
-        if (existingId) await Notifications.cancelScheduledNotificationAsync(existingId).catch(() => undefined);
-        await SecureStore.deleteItemAsync(DRAFT_REMINDER_NOTIFICATION_KEY);
-        return;
-      }
-      if (existingId || cancelled) return;
-      const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Pending Incident Draft Reminder',
-          body: 'You have an unsent incident report draft. Open DisasTRACE to review and submit it.',
-          data: { kind: 'draft_reminder' },
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          android: { channelId: 'emergency-alerts' },
-        } as Notifications.NotificationContentInput,
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: 5 * 60,
-          repeats: true,
-        },
-      });
-      if (!cancelled) await SecureStore.setItemAsync(DRAFT_REMINDER_NOTIFICATION_KEY, id);
-    };
-    syncDraftReminder().catch((error) => console.error('[DraftReminder] Unable to schedule reminder:', error));
-    return () => { cancelled = true; };
-  }, [drafts.length]);
 
   // Trigger background sync when device transitions to online
   useEffect(() => {

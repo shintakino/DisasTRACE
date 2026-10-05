@@ -39,6 +39,7 @@ import {
 import {
   getResponderStatusLabel,
   getRestoredResponderState,
+  shouldPreserveConfirmedTransport,
   shouldRequestResponderRoute,
 } from '../../lib/responder-lifecycle-policy';
 
@@ -728,6 +729,12 @@ export function ResponderHome() {
       if (assignedToResponder) {
         const restoredStatus = getRestoredResponderState(incident.status, incident.transport_status);
         const reconciledHospitalId = incident.transport_hospital_id || current.activeDispatch?.transportHospitalId;
+        const hasLocallyConfirmedTransport = shouldPreserveConfirmedTransport({
+          localStatus: current.status,
+          localTransportHospitalId: current.activeDispatch?.transportHospitalId,
+          serverIncidentStatus: incident.status,
+          serverTransportStatus: incident.transport_status,
+        });
         const canReconcileLifecycle = [
           'dispatch_offered',
           'en_route',
@@ -736,7 +743,7 @@ export function ResponderHome() {
           'at_hospital',
         ].includes(current.status);
 
-        if (restoredStatus && canReconcileLifecycle) {
+        if (restoredStatus && canReconcileLifecycle && !(hasLocallyConfirmedTransport && restoredStatus === 'on_scene')) {
           useResponderStore.setState({
             status: restoredStatus,
             activeDispatch: current.activeDispatch
@@ -804,7 +811,7 @@ export function ResponderHome() {
       mounted = false;
       supabase.removeChannel(channel);
     };
-  }, [activeDispatch?.id, releaseDispatchOffer, status, user?.id]);
+  }, [activeDispatch?.id, releaseDispatchOffer, user?.id]);
 
   useEffect(() => {
     const fetchHospitals = async () => {
@@ -1290,7 +1297,11 @@ export function ResponderHome() {
               <TouchableOpacity 
                 className="w-12 h-12 rounded-full bg-red-600 items-center justify-center border border-red-700 shadow-sm"
                 onPress={async () => {
-                  await signOutFromMobile();
+                  try {
+                    await signOutFromMobile();
+                  } catch (error) {
+                    Alert.alert('Sign out unavailable', error instanceof Error ? error.message : 'Please try again while connected to the internet.');
+                  }
                 }}
               >
                 <LogOut size={20} color="white" />

@@ -50,7 +50,7 @@ export function getPaccRejectionConflict(input: {
     if (Number.isFinite(expiresAt) && expiresAt + DISPATCH_ACCEPTANCE_GRACE_MS <= (input.now ?? new Date()).getTime()) {
       return {
         code: 'OFFER_RECOVERY_PENDING',
-        error: 'The responder offer just expired and is being reconciled. Refresh the queue and try again.',
+        error: 'The responder offer has expired. Rejecting will reconcile the offer before the decision is applied.',
       };
     }
     return {
@@ -78,6 +78,16 @@ export function canPaccRejectVerificationRequest(input: {
 }) {
   return getPaccRejectionConflict(input) === null
     && (input.requestStatus === 'PENDING' || input.incident?.incidentStatus === 'DISPATCHED');
+}
+
+/**
+ * The PACC UI may submit an expired-offer rejection so the server can first
+ * reconcile the expired reservation. A still-live offer or accepted response
+ * remains non-actionable; the final mutation is always rechecked server-side.
+ */
+export function canPaccRequestRejection(input: Parameters<typeof getPaccRejectionConflict>[0]) {
+  return canPaccRejectVerificationRequest(input)
+    || getPaccRejectionConflict(input)?.code === 'OFFER_RECOVERY_PENDING';
 }
 
 /**

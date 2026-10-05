@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const RosterStatusSchema = z.enum(["ACTIVE", "DEACTIVATED", "SUSPENDED"]);
+export const RosterStatusSchema = z.enum(["ACTIVE", "PENDING", "DEACTIVATED", "SUSPENDED"]);
 export type RosterStatus = z.infer<typeof RosterStatusSchema>;
 
 export const RosterEntrySchema = z.object({

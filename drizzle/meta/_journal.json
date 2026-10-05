@@ -225,6 +225,13 @@
       "when": 1790262180635,
       "tag": "0031_cooing_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791125359808,
+      "tag": "0032_square_guardian",
+      "breakpoints": true
     }
   ]
 }

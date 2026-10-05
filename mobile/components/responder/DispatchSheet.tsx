@@ -39,7 +39,7 @@ export function DispatchSheet() {
     mountedRef.current = false;
   }, []);
 
-  const releaseExpiredOffer = useCallback(async (incidentId: string) => {
+  const reconcileExpiredOffer = useCallback(async (incidentId: string) => {
     const currentDispatch = useResponderStore.getState().activeDispatch;
     if (
       !currentDispatch
@@ -55,40 +55,47 @@ export function DispatchSheet() {
     try {
       const apiUrl = getMobileApiBaseUrl();
       const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const headers: Record<string, string> = {};
       if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
 
-      const response = await fetch(`${apiUrl}/api/incidents/respond`, {
-        method: 'POST',
+      // The server scheduler owns expiry and reassignment. The app must not
+      // submit a competing REJECT beside an in-flight Accept request.
+      const response = await fetch(`${apiUrl}/api/incidents/offer?incidentId=${encodeURIComponent(incidentId)}`, {
         headers,
-        body: JSON.stringify({ incidentId, action: 'REJECT' }),
       });
-      const payload = await response.json().catch(() => null) as { transferred?: boolean; reassignmentRequired?: boolean; error?: string } | null;
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
 
-      // A 409 means the server has already accepted, expired, or reassigned
-      // this offer. In every case this phone must release its stale offer UI.
-      if (response.ok || response.status === 409) {
+      if (response.status === 409) {
         if (
           useResponderStore.getState().status === 'dispatch_offered'
           && useResponderStore.getState().activeDispatch?.id === incidentId
         ) {
           releaseDispatchOffer({
             incidentId,
-            ...getDispatchReleaseNotice(payload || {}),
+            ...getDispatchReleaseNotice({}),
           });
         }
         return;
       }
 
-      throw new Error(`Offer expiry release failed with ${response.status}`);
+      // A server that still recognizes the offer wins over a local clock
+      // estimate. Retry shortly rather than declaring a false expiry.
+      if (response.ok) {
+        expiryHandledRef.current = false;
+        setTimeout(() => {
+          if (mountedRef.current) void reconcileExpiredOffer(incidentId);
+        }, 1_000);
+        return;
+      }
+
+      throw new Error(payload?.error || `Offer expiry reconciliation failed with ${response.status}`);
     } catch (error) {
-      // Do not clear local state unless the server confirmed that this offer is
-      // no longer ours. Retrying is safer than falsely showing standby while a
-      // live offer remains assigned to this responder.
+      // Do not clear local state unless the server confirms this offer is no
+      // longer available. Retrying preserves a live offer during weak signal.
       expiryHandledRef.current = false;
-      console.error('Failed to release expired dispatch offer:', error);
+      console.error('Failed to reconcile expired dispatch offer:', error);
       setTimeout(() => {
-        if (mountedRef.current) void releaseExpiredOffer(incidentId);
+        if (mountedRef.current) void reconcileExpiredOffer(incidentId);
       }, 3_000);
     }
   }, [releaseDispatchOffer]);
@@ -175,10 +182,9 @@ export function DispatchSheet() {
 
       // Auto-dismiss timeout
       const timeoutId = setTimeout(() => {
-        // Never send a competing REJECT while the responder has already
-        // pressed Accept. The server's conditional accept update is the final
-        // authority for the deadline.
-        if (!acceptingRef.current && activeDispatch?.id) void releaseExpiredOffer(activeDispatch.id);
+        // Expiry is server-authoritative. Reconcile the offer state instead of
+        // racing the accept endpoint with a client-side rejection.
+        if (!acceptingRef.current && activeDispatch?.id) void reconcileExpiredOffer(activeDispatch.id);
       }, Math.max(0, expiresAt - currentServerTime()));
 
       return () => {
@@ -201,7 +207,7 @@ export function DispatchSheet() {
     offerDurationSeconds,
     serverExpiry,
     serverClockOffsetMs,
-    releaseExpiredOffer,
+    reconcileExpiredOffer,
     progress,
     translateY,
   ]);
@@ -358,6 +364,7 @@ export function DispatchSheet() {
                 progress.value = 100; // Cancel animation
                 acceptingRef.current = true;
                 setAccepting(true);
+                let accepted = false;
                 try {
                   const apiUrl = getMobileApiBaseUrl();
                   const { data: { session } } = await supabase.auth.getSession();
@@ -376,6 +383,7 @@ export function DispatchSheet() {
                   });
                   const res = await response.json();
                   if (res.success) {
+                    accepted = true;
                     acceptDispatch();
                   } else if (response.status === 409) {
                     const disposition = res as { transferred?: boolean; reassignmentRequired?: boolean };
@@ -398,8 +406,8 @@ export function DispatchSheet() {
                 } finally {
                   acceptingRef.current = false;
                   setAccepting(false);
-                  if (Date.now() + serverClockOffsetMs >= serverExpiry) {
-                    if (activeDispatch?.id) void releaseExpiredOffer(activeDispatch.id);
+                  if (!accepted && Date.now() + serverClockOffsetMs >= serverExpiry) {
+                    if (activeDispatch?.id) void reconcileExpiredOffer(activeDispatch.id);
                   }
                 }
               }}

@@ -70,7 +70,7 @@ assert.equal(getAutomaticHospitalRecommendation({
   currentTarget: null,
   candidates: hospitals,
   origin,
-}), null);
+})?.id, 'nearest-a', 'the transport destination must be prepared before the responder starts the server-confirmed transport leg');
 
 assert.equal(canEnterHospitalReport('to_hospital', hospitals[0]), false);
 assert.equal(canEnterHospitalReport('at_hospital', hospitals[0]), true);

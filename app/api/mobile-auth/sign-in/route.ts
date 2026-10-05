@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createHash, randomUUID } from 'crypto';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
 import { auditLogs, mobileDeviceSessions, mobilePushTokens, users } from '@/db/schema';
@@ -13,6 +13,7 @@ const MobileSignInSchema = z.object({
   email: z.string().trim().email().max(254),
   password: z.string().min(1).max(512),
   deviceId: z.string().trim().min(8).max(256),
+  replaceExistingDevice: z.boolean().optional().default(false),
 }).strict();
 
 const alreadyActiveMessage = 'Account already logged in to different device. Log out of the first device before signing in on this device.';
@@ -91,12 +92,38 @@ export async function POST(request: Request) {
       })
       .returning({ userId: mobileDeviceSessions.userId });
 
-    if (claimed.length === 0) {
+    if (claimed.length === 0 && !parsed.data.replaceExistingDevice) {
       await revokeSession(data.session.access_token, 'local').catch(() => undefined);
       await db.insert(auditLogs).values({
         id: randomUUID(), userId: dbUser.id, action: 'MOBILE_SESSION_REJECTED', entityType: 'MOBILE_SESSION', entityId: dbUser.id,
       });
       return NextResponse.json({ code: 'MOBILE_DEVICE_ALREADY_ACTIVE', error: alreadyActiveMessage }, { status: 409 });
+    }
+
+    const previousBinding = claimed.length === 0 && parsed.data.replaceExistingDevice
+      ? await db.query.mobileDeviceSessions.findFirst({
+        where: eq(mobileDeviceSessions.userId, dbUser.id),
+        columns: { deviceHash: true, activeSessionId: true, createdAt: true },
+      })
+      : null;
+
+    if (claimed.length === 0) {
+      // The password sign-in has already proven account control. Replacing the
+      // row first makes every protected mobile API reject the old JWT; Auth
+      // session revocation below closes the remaining Supabase session too.
+      const transferred = await db.update(mobileDeviceSessions)
+        .set({ deviceHash: hashedDeviceId, activeSessionId: sessionId, lastSeenAt: now, updatedAt: now })
+        .where(previousBinding ? and(
+          eq(mobileDeviceSessions.userId, dbUser.id),
+          eq(mobileDeviceSessions.deviceHash, previousBinding.deviceHash),
+          eq(mobileDeviceSessions.activeSessionId, previousBinding.activeSessionId),
+        ) : eq(mobileDeviceSessions.userId, dbUser.id))
+        .returning({ userId: mobileDeviceSessions.userId });
+
+      if (!transferred.length) {
+        await revokeSession(data.session.access_token, 'local').catch(() => undefined);
+        return NextResponse.json({ error: 'Unable to transfer the mobile session. Please try again.' }, { status: 503 });
+      }
     }
 
     await db.update(mobilePushTokens)
@@ -108,14 +135,29 @@ export async function POST(request: Request) {
       // for this mobile account unusable as well as replacing the DB binding.
       await revokeSession(data.session.access_token, 'others');
     } catch (revokeError) {
-      await db.delete(mobileDeviceSessions).where(eq(mobileDeviceSessions.activeSessionId, sessionId));
+      if (previousBinding) {
+        await db.update(mobileDeviceSessions)
+          .set({
+            deviceHash: previousBinding.deviceHash,
+            activeSessionId: previousBinding.activeSessionId,
+            createdAt: previousBinding.createdAt,
+            updatedAt: now,
+          })
+          .where(and(
+            eq(mobileDeviceSessions.userId, dbUser.id),
+            eq(mobileDeviceSessions.deviceHash, hashedDeviceId),
+            eq(mobileDeviceSessions.activeSessionId, sessionId),
+          ));
+      } else {
+        await db.delete(mobileDeviceSessions).where(eq(mobileDeviceSessions.activeSessionId, sessionId));
+      }
       await revokeSession(data.session.access_token, 'local').catch(() => undefined);
       console.error('Unable to revoke previous mobile sessions:', revokeError);
       return NextResponse.json({ error: 'Unable to establish a secure mobile session.' }, { status: 503 });
     }
 
     await db.insert(auditLogs).values({
-      id: randomUUID(), userId: dbUser.id, action: 'MOBILE_SESSION_ESTABLISHED', entityType: 'MOBILE_SESSION', entityId: dbUser.id,
+      id: randomUUID(), userId: dbUser.id, action: parsed.data.replaceExistingDevice ? 'MOBILE_SESSION_TRANSFERRED' : 'MOBILE_SESSION_ESTABLISHED', entityType: 'MOBILE_SESSION', entityId: dbUser.id,
     });
 
     return NextResponse.json({

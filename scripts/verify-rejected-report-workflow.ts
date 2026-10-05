@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   canPaccRejectVerificationRequest,
+  canPaccRequestRejection,
   classifyActiveVerificationBucket,
   classifyVerificationQueueItem,
   getPaccRejectionConflict,
@@ -86,12 +87,25 @@ check('explains an active or expired offer without treating it as a safe rejecti
   assert.deepEqual(getPaccRejectionConflict({
     requestStatus: 'VERIFIED',
     incident: { incidentStatus: 'DISPATCHED', responderId: null, currentOfferResponderId: 'offered-responder', offerExpiresAt: new Date('2026-09-25T10:00:00.000Z') },
-    now: new Date('2026-09-25T10:00:05.000Z'),
+    now: new Date('2026-09-25T10:01:05.000Z'),
   })?.code, 'OFFER_RECOVERY_PENDING');
   assert.deepEqual(getPaccRejectionConflict({
     requestStatus: 'VERIFIED',
     incident: { incidentStatus: 'EN_ROUTE', responderId: 'accepted-responder', currentOfferResponderId: null },
   })?.code, 'ACTIVE_RESPONSE');
+});
+
+check('lets PACC request server reconciliation for an expired offer without enabling a live offer', () => {
+  assert.equal(canPaccRequestRejection({
+    requestStatus: 'VERIFIED',
+    incident: { incidentStatus: 'DISPATCHED', responderId: null, currentOfferResponderId: 'offered-responder', offerExpiresAt: new Date('2026-09-25T10:01:00.000Z') },
+    now: new Date('2026-09-25T10:01:05.000Z'),
+  }), true);
+  assert.equal(canPaccRequestRejection({
+    requestStatus: 'VERIFIED',
+    incident: { incidentStatus: 'DISPATCHED', responderId: null, currentOfferResponderId: 'offered-responder', offerExpiresAt: new Date('2026-09-25T10:01:00.000Z') },
+    now: new Date('2026-09-25T10:00:00.000Z'),
+  }), false);
 });
 
 check('projects rejection as a terminal reporter status with the exact reason', () => {

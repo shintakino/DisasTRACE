@@ -17,7 +17,11 @@ export default function RejectedVerificationScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleSignOut = async () => {
-    await signOutFromMobile();
+    try {
+      await signOutFromMobile();
+    } catch (error) {
+      Alert.alert('Sign out unavailable', error instanceof Error ? error.message : 'Please try again while connected to the internet.');
+    }
   };
 
   const takePhoto = async () => {

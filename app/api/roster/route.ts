@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { users } from '@/db/schema/users';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
+import { normalizeRosterAccountStatus } from '@/lib/roster-status';
 
 export async function GET() {
   const role = await getUserRole();
@@ -34,20 +35,12 @@ export async function GET() {
       .where(eq(users.role, "ambulance_responder"));
 
     const mapped = dbResponders.map((r) => {
-      // Map user status ("ACTIVE", "SUSPENDED", "DEACTIVATED", "PENDING") to RosterStatusSchema ("ACTIVE", "DEACTIVATED", "SUSPENDED")
-      let mappedStatus: "ACTIVE" | "DEACTIVATED" | "SUSPENDED" = "DEACTIVATED";
-      if (r.status === "ACTIVE") {
-        mappedStatus = "ACTIVE";
-      } else if (r.status === "SUSPENDED") {
-        mappedStatus = "SUSPENDED";
-      }
-
       return {
         id: r.id,
         fullName: r.fullName,
         email: r.email,
         role: "RESPONDER",
-        status: mappedStatus,
+        status: normalizeRosterAccountStatus(r.status),
         responderType: r.responderType,
         barangay: r.barangay,
         unitId: r.unitId,

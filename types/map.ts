@@ -6,6 +6,9 @@ export const IncidentStatusSchema = z.enum([
 ]);
 export type IncidentStatus = z.infer<typeof IncidentStatusSchema>;
 
+export const MapDisplayStatusSchema = z.enum(["ACTIVE", "RESOLVED", "REJECTED"]);
+export type MapDisplayStatus = z.infer<typeof MapDisplayStatusSchema>;
+
 export const MapIncidentSchema = z.object({
   id: z.string(),
   caseId: z.string(),
@@ -13,6 +16,7 @@ export const MapIncidentSchema = z.object({
   severity: z.enum(["Low", "Medium", "High", "Critical"]),
   nature: z.enum(["EMERGENCY", "NON-EMERGENCY"]),
   status: IncidentStatusSchema,
+  displayStatus: MapDisplayStatusSchema,
   type: z.string(),
   origin: z.string(),
   destination: z.string(),

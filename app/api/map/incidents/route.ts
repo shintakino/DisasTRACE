@@ -10,6 +10,7 @@ import { z } from "zod";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 import { manilaDayBounds, manilaOperationalPeriodBounds } from "@/lib/manila-time";
 import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
+import { projectMapDisplayStatus } from '@/lib/map-display-status';
 
 const MAP_RECORD_LIMIT = 200;
 const MapDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
@@ -66,6 +67,7 @@ export async function GET(request: Request) {
         assignedAmbulance: incidents.assignedAmbulance,
         responderId: incidents.responderId,
         status: incidents.status,
+        requestStatus: verificationRequests.status,
         type: verificationRequests.type,
         severity: verificationRequests.severity,
         nature: verificationRequests.nature,
@@ -104,8 +106,10 @@ export async function GET(request: Request) {
         reporterPhone: users.phone,
         reporterType: verificationRequests.reporterType,
         contactNumber: verificationRequests.contactNumber,
+        incidentStatus: incidents.status,
       })
       .from(verificationRequests)
+      .leftJoin(incidents, eq(incidents.requestId, verificationRequests.id))
       .leftJoin(users, eq(verificationRequests.residentId, users.id))
       .where(requestWhere)
       .orderBy(desc(verificationRequests.createdAt))
@@ -124,6 +128,10 @@ export async function GET(request: Request) {
         severity: inc.severity,
         nature: inc.nature,
         status: mappedStatus,
+        displayStatus: projectMapDisplayStatus({
+          requestStatus: inc.requestStatus,
+          incidentStatus: inc.status,
+        }),
         type: inc.type,
         origin: "CDRRMO HQ",
         destination: formatOfficialBaliwagLocation(inc.barangay),
@@ -158,6 +166,10 @@ export async function GET(request: Request) {
         severity: req.severity,
         nature: req.nature,
         status: req.status as "PENDING" | "VERIFIED" | "REJECTED" | "DUPLICATE",
+        displayStatus: projectMapDisplayStatus({
+          requestStatus: req.status,
+          incidentStatus: req.incidentStatus,
+        }),
         type: req.type,
         origin: "CDRRMO HQ",
         destination: formatOfficialBaliwagLocation(req.barangay),

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from 'react-native';
 import { ShieldAlert } from 'lucide-react-native';
 import { signOutFromMobile } from '../../lib/mobile-auth';
 
@@ -11,6 +11,8 @@ export default function BannedAccountScreen() {
     setIsSigningOut(true);
     try {
       await signOutFromMobile();
+    } catch (error) {
+      Alert.alert('Sign out unavailable', error instanceof Error ? error.message : 'Please try again while connected to the internet.');
     } finally {
       setIsSigningOut(false);
     }

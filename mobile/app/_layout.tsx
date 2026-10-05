@@ -1,6 +1,6 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LogBox, TextInput } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
@@ -8,6 +8,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStatus } from '../hooks/use-auth-status';
 import { registerResponderPushNotifications, subscribeToPushTokenChanges } from '../lib/push-notifications';
+import { resolveResponderNotificationRoute } from '../lib/responder-notification-route';
+import { resolvePublicNotificationRoute } from '../lib/public-notification-route';
+import { useEmergencyReportStore } from '../store/use-emergency-report-store';
 import "../global.css";
 
 // Ignore known React Native third-party warnings
@@ -32,27 +35,62 @@ function InitialLayout() {
   const segments = useSegments();
   const router = useRouter();
   const [isAppReady, setIsAppReady] = useState(false);
+  const [notificationResponseVersion, setNotificationResponseVersion] = useState(0);
+  const pendingNotificationResponseRef = useRef<Notifications.NotificationResponse | null>(null);
+  const handledNotificationResponseIdsRef = useRef(new Set<string>());
 
-  // The app always reloads the offer from the server after a notification tap.
-  // A tap opens the normal offer sheet; it never silently accepts an emergency.
+  // Preserve notification taps until auth and the root navigator are ready.
+  // Android must never fall back to a bare `disastrace:///` URI for a responder alert.
   useEffect(() => {
-    const openDispatchOffer = (response: Notifications.NotificationResponse | null) => {
-      const data = response?.notification.request.content.data;
-      if (data?.kind === 'dispatch_offer' && typeof data.incidentId === 'string') {
-        // A notification may be tapped after the app was backgrounded, when
-        // the realtime subscription is no longer alive. Pass the server offer
-        // ID through the route so Home hydrates the exact still-valid offer.
-        router.replace({ pathname: '/(tabs)', params: { dispatchOfferId: data.incidentId } });
-      } else if (data?.kind === 'active_dispatch') {
-        router.replace('/(tabs)');
-      }
+    const queueNotificationResponse = (response: Notifications.NotificationResponse | null) => {
+      if (!response) return;
+      const responseId = response.notification.request.identifier;
+      if (handledNotificationResponseIdsRef.current.has(responseId)) return;
+      pendingNotificationResponseRef.current = response;
+      setNotificationResponseVersion((version) => version + 1);
     };
 
-    const subscription = Notifications.addNotificationResponseReceivedListener(openDispatchOffer);
-    Notifications.getLastNotificationResponseAsync().then(openDispatchOffer).catch(() => undefined);
+    const subscription = Notifications.addNotificationResponseReceivedListener(queueNotificationResponse);
+    Notifications.getLastNotificationResponseAsync().then(queueNotificationResponse).catch(() => undefined);
 
     return () => subscription.remove();
-  }, [router]);
+  }, []);
+
+  // Consume notification taps only after the approved account and navigator
+  // are ready. Each role has an allow-listed internal resolver; an unknown
+  // Public User payload opens Notifications instead of a bare custom URL.
+  useEffect(() => {
+    if (!isAppReady || !isSignedIn || verificationStatus !== 'approved') return;
+    const response = pendingNotificationResponseRef.current;
+    if (!response) return;
+
+    const responseId = response.notification.request.identifier;
+    const data = response.notification.request.content.data;
+
+    if (role === 'ambulance_responder') {
+      const route = resolveResponderNotificationRoute(data);
+      if (!route) return;
+      handledNotificationResponseIdsRef.current.add(responseId);
+      pendingNotificationResponseRef.current = null;
+      router.replace(route as never);
+      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+      return;
+    }
+
+    if (role === 'public_user') {
+      const payload = data && typeof data === 'object' ? data as Record<string, unknown> : {};
+      const route = resolvePublicNotificationRoute({
+        type: payload.type,
+        kind: payload.kind,
+        metadata: payload.metadata ?? payload,
+      });
+      handledNotificationResponseIdsRef.current.add(responseId);
+      pendingNotificationResponseRef.current = null;
+      if (route?.details) useEmergencyReportStore.getState().setDetails(route.details);
+      router.replace((route?.pathname ?? '/notifications') as never);
+      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+    }
+  }, [isAppReady, isSignedIn, notificationResponseVersion, role, router, verificationStatus]);
 
   useEffect(() => {
     if (!isSignedIn || verificationStatus !== 'approved' || role !== 'ambulance_responder') return;
@@ -123,7 +161,7 @@ function InitialLayout() {
         }
       }
     }
-  }, [isSignedIn, isAppReady, verificationStatus, segments]);
+  }, [isSignedIn, isAppReady, router, verificationStatus, segments]);
 
   if (!isAppReady) {
     return null;

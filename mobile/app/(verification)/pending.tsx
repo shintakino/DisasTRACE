@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View, Text, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, View, Text, TouchableOpacity } from 'react-native';
 import { signOutFromMobile } from '../../lib/mobile-auth';
 import { Clock, ShieldAlert } from 'lucide-react-native';
 import { getGovernmentIDStatus } from '../../lib/storage';
@@ -32,7 +32,11 @@ export default function PendingVerificationScreen() {
   }, [loadDocumentStatus]);
 
   const handleSignOut = async () => {
-    await signOutFromMobile();
+    try {
+      await signOutFromMobile();
+    } catch (error) {
+      Alert.alert('Sign out unavailable', error instanceof Error ? error.message : 'Please try again while connected to the internet.');
+    }
   };
 
   if (showUploader) {

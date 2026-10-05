@@ -33,7 +33,16 @@ const OUTCOMES = [
 ];
 
 export function OnSceneSheet() {
-  const { status, activeDispatch, sceneTimeSeconds, setFieldOutcome, deferDocumentation, startReport } = useResponderStore();
+  const {
+    status,
+    activeDispatch,
+    sceneTimeSeconds,
+    isStartingHospitalTransport,
+    setFieldOutcome,
+    deferDocumentation,
+    startHospitalTransport,
+    startReport,
+  } = useResponderStore();
   const bottomSheetRef = useRef<BottomSheet>(null);
 
   const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null);
@@ -178,21 +187,18 @@ export function OnSceneSheet() {
           className={`rounded-2xl py-4 items-center shadow-lg ${
             selectedOutcome ? 'bg-[#1E3A8A] shadow-blue-900/20' : 'bg-slate-300 shadow-transparent'
           }`}
-          disabled={!selectedOutcome}
+          disabled={!selectedOutcome || isStartingHospitalTransport}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             if (selectedOutcome === 'transport') {
-              bottomSheetRef.current?.close();
-              setTimeout(() => {
-                useResponderStore.getState().transportToHospital();
-              }, 300);
+              void startHospitalTransport();
             } else if (selectedOutcome) {
               setShowNextStep(true);
             }
           }}
         >
           <Text className={`font-bold text-lg ${selectedOutcome ? 'text-white' : 'text-slate-500'}`}>
-            {getButtonText()}
+            {isStartingHospitalTransport ? 'Preparing Hospital Transport...' : getButtonText()}
           </Text>
         </TouchableOpacity>
         </>}

@@ -2,11 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, Trash, CloudLightning, Megaphone, FileText, XCircle } from 'lucide-react-native';
+import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, CloudLightning, Megaphone, FileText, XCircle } from 'lucide-react-native';
 import { useAuthStatus } from '../hooks/use-auth-status';
 import { supabase } from '../lib/supabase';
 import { isNotificationVisibleForRole } from '../lib/report-location';
 import { useEmergencyReportStore } from '../store/use-emergency-report-store';
+import { resolveResponderNotificationRoute } from '../lib/responder-notification-route';
+import { resolvePublicNotificationRoute } from '../lib/public-notification-route';
+import { getMobileApiBaseUrl } from '../lib/api-base-url';
 
 type Notification = {
   id: string;
@@ -41,7 +44,7 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const navigationInProgressRef = useRef(false);
 
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
+  const apiUrl = getMobileApiBaseUrl();
 
   const getAuthHeaders = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -171,54 +174,35 @@ export default function NotificationsScreen() {
 
     // Route only to screens that are valid for the current mobile account.
     try {
-      const transportRequestId = typeof item.metadata?.requestId === 'string'
-        ? item.metadata.requestId
-        : null;
-      const transportIncidentId = typeof item.metadata?.incidentId === 'string'
-        ? item.metadata.incidentId
-        : null;
-      if (transportRequestId && transportIncidentId) {
-        useEmergencyReportStore.getState().setDetails({
-          id: transportRequestId,
-          incidentId: transportIncidentId,
-          trackingRequestId: transportRequestId,
-          reporterMode: 'resident',
+      // Responder operational notifications never write to the public emergency
+      // report store. They carry the exact incident ID to Home, where the offer
+      // is re-hydrated through the responder-authorized API.
+      if (role === 'ambulance_responder') {
+        const responderRoute = resolveResponderNotificationRoute({
+          type: item.type,
+          metadata: item.metadata,
         });
+        if (responderRoute) {
+          router.replace(responderRoute as any);
+          return;
+        }
       }
-      if (item.type === 'dispatch_alert' || item.type === 'new_incident') {
-        router.replace('/(tabs)/index' as any);
-      } else if (item.type === 'ambulance_dispatched') {
-        router.replace('/help/tracking' as any);
-      } else if (item.type === 'responder_arrived') {
-        router.replace('/help/response-status' as any);
-      } else if (
-        item.type === 'registration_approved' || 
-        item.type === 'registration_rejected'
-      ) {
-        router.replace('/(tabs)/profile' as any);
-      } else if (item.type === 'incident_resolved') {
-        const incidentId = typeof item.metadata?.incidentId === 'string'
-          ? item.metadata.incidentId
-          : null;
-        if (incidentId) {
-          router.push(`/(tabs)/reports/${incidentId}` as any);
-        } else {
-          router.push('/(tabs)/reports' as any);
+
+      if (role === 'public_user') {
+        const publicRoute = resolvePublicNotificationRoute({
+          type: item.type,
+          metadata: item.metadata,
+        });
+        if (publicRoute) {
+          if (publicRoute.details) {
+            useEmergencyReportStore.getState().setDetails(publicRoute.details);
+          }
+          router.replace(publicRoute.pathname as any);
+          return;
         }
-      } else if (item.type === 'incident_rejected') {
-        const requestId = typeof item.metadata?.requestId === 'string'
-          ? item.metadata.requestId
-          : null;
-        if (requestId) {
-          router.push(`/(tabs)/reports/${requestId}` as any);
-        } else {
-          router.push('/(tabs)/reports' as any);
-        }
-      } else if (item.type === 'report_audited') {
-        router.replace('/(tabs)/profile' as any);
-      } else if (item.type === 'pagasa_alert') {
-        router.replace('/(tabs)/map' as any);
-      } else if (item.type === 'system_announcement') {
+      }
+
+      if (item.type === 'system_announcement') {
         // Display System Notices directly inside a native overlay alert dialog
         Alert.alert(
           item.title,
@@ -227,21 +211,19 @@ export default function NotificationsScreen() {
           { cancelable: true }
         );
       }
+      // No route was opened (for example, a system notice), so another card
+      // may be selected after the overlay is dismissed.
+      navigationInProgressRef.current = false;
     } catch (err) {
       console.error('[Notifications] Redirection action failed:', err);
-    } finally {
       navigationInProgressRef.current = false;
     }
   };
 
   const handleBack = () => {
-    // Preserve the screen that opened notifications, including guest help
-    // flows. The tab fallback is only for a cold-open notification route.
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-    router.replace('/(tabs)/index' as any);
+    // Notifications are an authenticated account surface. Returning to the
+    // stable tab root avoids replaying a stale detail/tracking route.
+    router.replace('/(tabs)' as any);
   };
 
 

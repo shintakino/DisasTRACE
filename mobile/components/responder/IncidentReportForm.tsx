@@ -97,6 +97,7 @@ export function IncidentReportForm() {
 
   const [dispatchLocation, setDispatchLocation] = useState('');
   const [hydratedSessionKey, setHydratedSessionKey] = useState<string | null>(null);
+  const autoSaveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
   React.useEffect(() => {
@@ -151,8 +152,9 @@ export function IncidentReportForm() {
 
   // Background Auto-Save Effect
   React.useEffect(() => {
-    if (formSessionKey && hydratedSessionKey === formSessionKey && formIncident) {
+    if (!isSubmittingReport && formSessionKey && hydratedSessionKey === formSessionKey && formIncident) {
       const timer = setTimeout(() => {
+        autoSaveTimerRef.current = null;
         console.log('[IncidentReportForm] Auto-saving draft in background...');
         saveDraft(formIncident, {
           natureOfCall, 
@@ -164,10 +166,14 @@ export function IncidentReportForm() {
           tripTicketData 
         });
       }, 1500); // 1.5s debounce
+      autoSaveTimerRef.current = timer;
       
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        if (autoSaveTimerRef.current === timer) autoSaveTimerRef.current = null;
+      };
     }
-  }, [natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, dispatchLocation, tripTicketData, formIncident, formSessionKey, hydratedSessionKey, saveDraft]);
+  }, [natureOfCall, typeOfEmergency, severityLevel, patients, crewNotes, dispatchLocation, tripTicketData, formIncident, formSessionKey, hydratedSessionKey, isSubmittingReport, saveDraft]);
 
   React.useEffect(() => {
     if (
@@ -268,8 +274,12 @@ export function IncidentReportForm() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (formIncident && submissionValidation.valid) {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       const responderName = profile?.fullName || 'Ambulance Responder';
@@ -365,7 +375,7 @@ export function IncidentReportForm() {
         patientCareReports: finalPcrList,
         driverTripTicket: finalTripTicket
       };
-      submitReport(formIncident.id, formData);
+      await submitReport(formIncident.id, formData);
     }
   };
 

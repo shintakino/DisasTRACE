@@ -52,6 +52,24 @@ export function getResponderStatusLabel(status: DispatchState) {
   return labels[status];
 }
 
+/**
+ * A transport start is persisted before the device enters `to_hospital`.
+ * An initial reconciliation request started just before that mutation can
+ * still return the older ARRIVED/NONE snapshot. Preserve the confirmed local
+ * leg until Realtime or a later reconciliation observes the server transport
+ * state, rather than sending the responder back to the on-scene choices.
+ */
+export function shouldPreserveConfirmedTransport(input: {
+  localStatus: DispatchState;
+  localTransportHospitalId: string | null | undefined;
+  serverIncidentStatus: string | null | undefined;
+  serverTransportStatus: string | null | undefined;
+}): boolean {
+  return input.localStatus === 'to_hospital'
+    && Boolean(input.localTransportHospitalId)
+    && getRestoredResponderState(input.serverIncidentStatus, input.serverTransportStatus) === 'on_scene';
+}
+
 export function shouldRequestResponderRoute(input: {
   status: DispatchState;
   hasLiveLocation: boolean;

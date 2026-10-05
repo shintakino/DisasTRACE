@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
   getResponderStatusLabel,
   getRestoredResponderState,
+  shouldPreserveConfirmedTransport,
   shouldRequestResponderRoute,
 } from '../mobile/lib/responder-lifecycle-policy';
 
@@ -21,6 +22,18 @@ assert.equal(getResponderStatusLabel('on_scene'), 'On Scene');
 assert.equal(getResponderStatusLabel('to_hospital'), 'To Hospital');
 assert.equal(getResponderStatusLabel('at_hospital'), 'At Hospital');
 assert.equal(getResponderStatusLabel('report_filling'), 'Documentation');
+assert.equal(shouldPreserveConfirmedTransport({
+  localStatus: 'to_hospital',
+  localTransportHospitalId: 'hospital-1',
+  serverIncidentStatus: 'ARRIVED',
+  serverTransportStatus: 'NONE',
+}), true, 'an older ARRIVED/NONE snapshot must not overwrite a server-confirmed transport start');
+assert.equal(shouldPreserveConfirmedTransport({
+  localStatus: 'to_hospital',
+  localTransportHospitalId: null,
+  serverIncidentStatus: 'ARRIVED',
+  serverTransportStatus: 'NONE',
+}), false, 'an unconfirmed local transport must continue to reconcile from the server');
 
 assert.equal(shouldRequestResponderRoute({
   status: 'en_route',

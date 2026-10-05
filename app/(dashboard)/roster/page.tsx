@@ -287,8 +287,8 @@ export default function RosterPage() {
       <div className="flex-1 w-full max-w-full">
         <RosterTable 
           data={filteredData} 
-          searchComponent={<RosterSearch onSearch={setSearchQuery} />}
-          filterComponent={<RosterFilter onFilterChange={setFilters} />}
+          searchComponent={<RosterSearch value={searchQuery} onSearch={setSearchQuery} />}
+          filterComponent={<RosterFilter filters={filters} onFilterChange={setFilters} />}
           onManage={handleManage}
           onDelete={handleDelete}
         />

@@ -10,9 +10,10 @@ import { useLocationPermission } from '../../hooks/use-location-permission';
 import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
 import { getOperationalTrackingIncidentId } from '../../lib/responder-report-form-session';
 import { IncidentReportForm } from '../../components/responder/IncidentReportForm';
+import { useDraftReminder } from '../../hooks/use-draft-reminder';
 
 function ResponderAvailabilityTracker() {
-  const { role } = useAuthStatus();
+  const { role, user } = useAuthStatus();
   const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
   const responderStatus = useResponderStore((state) => state.status);
   const activeDispatch = useResponderStore((state) => state.activeDispatch);
@@ -49,6 +50,7 @@ export default function TabLayout() {
   const { isLocationGateActive, requestPermissions, servicesEnabled } = useLocationPermission();
 
   const isResponder = role === 'ambulance_responder';
+  useDraftReminder(isResponder ? user?.id : null);
 
   useEffect(() => {
     if (isResponder && (responderStatus === 'dispatch_offered' || responderStatus === 'en_route')) {

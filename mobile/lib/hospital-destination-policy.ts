@@ -85,7 +85,7 @@ export function getAutomaticHospitalRecommendation<T extends HospitalDestination
   candidates: readonly T[];
   origin: GeoPoint | null | undefined;
 }): RankedHospital<T> | null {
-  if (input.status !== 'to_hospital' || input.currentTarget || !isValidGeoPoint(input.origin)) {
+  if (!['on_scene', 'to_hospital'].includes(input.status) || input.currentTarget || !isValidGeoPoint(input.origin)) {
     return null;
   }
 

@@ -19,16 +19,29 @@ import { RosterFilter as RosterFilterType, RosterStatus } from "@/types/roster"
 import { cn } from "@/lib/utils"
 
 interface RosterFilterProps {
+  filters: RosterFilterType
   onFilterChange: (filters: RosterFilterType) => void
 }
 
-export function RosterFilter({ onFilterChange }: RosterFilterProps) {
-  const [status, setStatus] = React.useState<string>("all")
+export function RosterFilter({ filters, onFilterChange }: RosterFilterProps) {
+  const [status, setStatus] = React.useState<string>(filters.status ?? "all")
+  const appliedStatusLabel = filters.status
+    ? `${filters.status.charAt(0)}${filters.status.slice(1).toLowerCase()}`
+    : null
+
+  React.useEffect(() => {
+    setStatus(filters.status ?? "all")
+  }, [filters.status])
 
   const handleApply = () => {
     onFilterChange({
       status: status === "all" ? undefined : status as RosterStatus,
     })
+  }
+
+  const handleClear = () => {
+    setStatus("all")
+    onFilterChange({})
   }
 
   return (
@@ -41,7 +54,7 @@ export function RosterFilter({ onFilterChange }: RosterFilterProps) {
           )}
         >
           <Filter className="size-4 text-blue-100" />
-          <span>Filter</span>
+          <span>{appliedStatusLabel ? `Filter: ${appliedStatusLabel}` : 'Filter'}</span>
         </PopoverTrigger>
         <PopoverContent className="w-64 p-4 rounded-xl shadow-xl border border-gray-100 bg-white mt-2" align="end">
           <div className="space-y-4">
@@ -54,18 +67,22 @@ export function RosterFilter({ onFilterChange }: RosterFilterProps) {
                 <SelectContent className="rounded-md border-none shadow-md">
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="PENDING">Pending</SelectItem>
                   <SelectItem value="DEACTIVATED">Deactivated</SelectItem>
                   <SelectItem value="SUSPENDED">Suspended</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <Button 
-              className="w-full h-10 bg-[#2B4C9B] hover:bg-[#2B4C9B]/90 text-white font-medium rounded-md shadow-sm transition-all mt-2"
-              onClick={handleApply}
-            >
-              Apply Filter
-            </Button>
+            <div className="flex gap-2 pt-2">
+              {filters.status ? <Button type="button" variant="outline" className="h-10 flex-1" onClick={handleClear}>Clear</Button> : null}
+              <Button
+                className="h-10 flex-1 bg-[#2B4C9B] hover:bg-[#2B4C9B]/90 text-white font-medium rounded-md shadow-sm transition-all"
+                onClick={handleApply}
+              >
+                Apply Filter
+              </Button>
+            </div>
           </div>
         </PopoverContent>
       </Popover>

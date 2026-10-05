@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Modal, BackHandler } from 'react-native';
+import { Alert, View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Modal, BackHandler } from 'react-native';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { Phone, MessageSquare, Check, AlertCircle, ChevronUp, ChevronDown, MapPin, CheckCircle2, Truck, Navigation, LogOut } from 'lucide-react-native';
@@ -941,10 +941,14 @@ export default function TrackingScreen() {
               shadowRadius: 3.84,
               elevation: 5,
             }}
-            onPress={async () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          onPress={async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            try {
               await signOutFromMobile();
-            }}
+            } catch (error) {
+              Alert.alert('Sign out unavailable', error instanceof Error ? error.message : 'Please try again while connected to the internet.');
+            }
+          }}
           >
             <LogOut size={14} color="#FFF" style={{ marginRight: 6 }} />
             <Text style={{ color: '#FFF', fontSize: 11, fontWeight: 'bold' }}>Dev Logout</Text>

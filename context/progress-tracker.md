@@ -1,5 +1,29 @@
 # Progress Tracker
 
+## 2026-10-04 - Command-map lifecycle and responder-roster status repair
+
+- Added a shared server-owned command-map display-status projection. A `VERIFIED` request linked to a `RESOLVED` incident now appears as Resolved in both User Submitted and Responder Submitted map views, while rejected/duplicate records remain Rejected. Shared counters and filters consume the same projection, eliminating the prior Active-count/card disagreement.
+- Kept PACC rejection safety intact while making the blocked reason visible beside the disabled action. A live responder, active offer, or terminal case cannot be accidentally rejected; an expired offer can reach the existing server reconciliation before the final rejection decision, avoiding a client-side disabled-action dead end.
+- Stopped converting Pending responder accounts into Deactivated records. Responder Roster now exposes Pending as its own status, keeps search controlled, and provides a clear-filter action. These changes are confined to dashboard map/roster/verification surfaces; mobile endpoints and workflows are unchanged.
+- Added `scripts/verify-map-and-roster-statuses.ts` for lifecycle and roster-status regression coverage.
+
+## 2026-10-04 - Public registration privacy consent and notification return safety
+
+- Made Data Privacy consent a separate required sign-up control. The mobile client now retrieves the current policy through the production-safe API origin, records an explicit consent flag alongside the existing timestamp/version metadata, and keeps registration unavailable if the current policy cannot be displayed. The existing signup trigger continues to persist the timestamp and policy version with the user profile.
+- Added a typed public-notification resolver that accepts only compatible request/incident identifiers for tracking and response-status screens. Missing or stale metadata now returns the Public User to Home, resolved/rejected notices open report history rather than constructing an incompatible detail ID, and the Notifications back action always returns to the stable tab root. Responder notification routing remains unchanged.
+
+## 2026-10-04 - Public consent enforcement and native notification safety
+
+- Added the auditable `users.privacy_consent_given` field and migration `0032_square_guardian`. The profile trigger now rejects any Public User Auth signup that lacks an explicit accepted flag, valid consent timestamp, or policy version; existing evidence-bearing profiles are backfilled. The Super Admin account endpoint no longer accepts `public_user`, matching the resident self-registration flow and preventing fabricated consent.
+- Extended the existing queued native-notification handler to Public Users. Approved Public User taps use the same validated resolver as in-app notifications, hydrate tracking state only for compatible request/incident metadata, clear the consumed native response once, and open Notifications for unknown payloads. Responder behavior is unchanged. Added focused privacy-enforcement and public native-navigation regression checks.
+
+## 2026-10-04 - Responder notification routing and offer-expiry race repair
+
+- Added one typed responder-notification route resolver shared by in-app and Android notification handling. **Report Audited** now opens responder Reports rather than Profile, and every dispatch alert retains its incident ID for Home's existing server-authorized offer hydration. The global listener queues a notification until an approved responder session is ready, consumes it once, and clears the native last-response record so Android cannot reopen the app at a bare `disastrace:///` route.
+- Prevented responder dispatch notifications from writing to the public emergency-report store, which had mixed responder alerts with resident navigation state. Public notification flows retain their existing routes and state behavior.
+- Replaced the mobile countdown's automatic `REJECT` mutation with a read-only reconciliation of the server-owned offer endpoint. Acceptance locks the local offer until its result is known; a true server expiry/reassignment releases the sheet, while a successful acceptance remains En Route. This preserves the server compare-and-swap contract and prevents a false **Dispatch offer expired** dialog after acceptance.
+- Added focused notification-routing/expiry regression coverage. The focused check, mobile and root strict TypeScript checks, and whitespace validation pass.
+
 ## 2026-09-26 - Map filter display labels
 
 - Updated the shared PACC/CDRRMO map filter selects to resolve their user-facing labels as `All Barangays` and `Today` while preserving the existing `all` and `today` filter values and query behavior.
@@ -9,6 +33,12 @@
 - Fixed the Public User chatbot so the “unfinished report draft was restored” message is created only from a valid `DRAFT` recovered during SecureStore hydration. Fresh report starts, evidence-photo starts, chatbot-triggered starts, and same-session failed-send recovery explicitly clear the non-persisted restoration marker.
 - Restoration feedback now waits for the resident or Guest Mode actor check and consumes the marker only when the rehydrated submission ID, reporter mode, and owner match the verified actor. This preserves genuine same-user draft recovery while preventing a misleading message or cross-mode/account carryover.
 - Added focused regression checks for fresh-versus-rehydrated drafts and actor/submission matching. Mobile TypeScript, the chatbot state suite, whitespace validation, and the root Next.js production build pass.
+
+## 2026-10-04 - Responder hospital-transport transition repair
+
+- Replaced the responder’s local-only **Transport to Hospital** switch with a dedicated, authenticated, idempotent `POST /api/incidents/transport/start` transition. The endpoint locks the responder-owned `ARRIVED` incident, validates the selected configured emergency-receiving hospital, and atomically saves `TO_HOSPITAL`, hospital ID, and start time before the mobile tracker is shown.
+- The mobile app now prepares the nearest eligible destination while the responder is on scene, blocks repeated start taps, and retains the scene view with a clear message when a live GPS position, destination, or connection is unavailable. GPS telemetry remains responsible only for location updates and hospital-arrival confirmation.
+- Prevented a stale initial reconciliation snapshot (`ARRIVED`/`NONE`) from overwriting a confirmed local transport leg, and stopped lifecycle-state changes from recreating the reconciliation subscription. Focused transport-start, hospital-destination, and route-lifecycle checks, root/mobile TypeScript, and targeted lint pass.
 
 ## 2026-09-26 - Public tracking completion at scene arrival
 
@@ -1181,3 +1211,11 @@ Update this file whenever the current phase, active feature, or implementation s
 - **Responder Draft Form-Session Isolation**: Separated the mobile report editor from the live `activeDispatch` lifecycle so reopening a `DOCUMENTATION_PENDING` draft no longer triggers Home-tab dispatch reconciliation, closes the modal, or associates location telemetry with the old incident. Consolidated the report form into one tab-layout-level native modal, added one-time session hydration before autosave, preserved a newer live response when an older draft is closed or submitted, clears the draft editor after saving if a new urgent offer arrives, and clears editor state on account changes. Active-dispatch report forms retain their incident-scoped foreground telemetry channel, while documentation drafts never attach to one. Added a focused regression check and retained the existing REST/database contracts. Focused draft/documentation checks, mobile and root TypeScript, targeted mobile lint (no errors), Android Expo export, and the production Next.js build pass.
 
 ## Open Questions
+## 2026-10-05 - Mobile report resilience and secure device switching
+
+- Preserved the existing mobile report list during date/filter refreshes, replacing the disruptive full-list loading state with an initial-load-only state so Android filter controls no longer flicker or reset.
+- Consolidated responder draft reminders into one responder-owned native schedule, removed duplicate foreground scheduling, migrated the former global reminder key, and cancel reminders on confirmed submission/logout. Form autosave is cancelled and disabled while submission is active, and a confirmed submission removes any queued duplicate report action for that incident.
+- Made one-device logout server-confirmed before local credentials are cleared. After password authentication, a user can explicitly transfer the mobile session to a replacement device; the binding changes atomically, the previous Supabase session is revoked, and web administrator sessions remain outside the mobile-only rule.
+- Added `scripts/verify-mobile-resilience.ts`; its regression checks, mobile TypeScript, root TypeScript, and whitespace validation pass.
+- Closed the secure-logout error-handling review finding across verification, responder, and public emergency screens. A failed server-confirmed release now preserves the session and presents a clear retry message instead of raising an unhandled mobile promise rejection.
+- Corrected Android email password recovery: the reset route now retains the initial native URL, reads Expo Router's reserved fragment parameter, exchanges each recovery credential once only, and exposes a safe resend-link action after an invalid/expired link. The web recovery flow remains unchanged; the deployment guide now requires the mobile Supabase redirect wildcard.

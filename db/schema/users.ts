@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, timestamp, doublePrecision, index, uniqueIndex, customType } from 'drizzle-orm/pg-core';
+import { pgTable, text, varchar, timestamp, doublePrecision, index, uniqueIndex, customType, boolean } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Custom PostGIS Geometry Point Type definition for Drizzle
@@ -23,6 +23,7 @@ export const users = pgTable('users', {
   idImageUrl: text('id_image_url'),
   privacyConsentAt: timestamp('privacy_consent_at', { withTimezone: true }),
   privacyPolicyVersion: varchar('privacy_policy_version', { length: 100 }),
+  privacyConsentGiven: boolean('privacy_consent_given').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   

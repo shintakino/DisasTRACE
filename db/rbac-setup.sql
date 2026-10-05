@@ -36,6 +36,8 @@ returns trigger as $$
 declare
   user_role text;
   privacy_consent_at_value timestamptz;
+  privacy_policy_version_value text;
+  privacy_consent_given_value boolean;
 begin
   -- Note: new.raw_user_meta_data is typed as jsonb in newer Supabase, but some envs treat it as text
   -- We cast to jsonb explicitly for robustness
@@ -49,6 +51,24 @@ begin
   exception when others then
     privacy_consent_at_value := null;
   end;
+
+  privacy_policy_version_value := nullif((new.raw_user_meta_data::jsonb)->>'privacy_policy_version', '');
+  begin
+    privacy_consent_given_value := coalesce(
+      nullif((new.raw_user_meta_data::jsonb)->>'privacy_policy_accepted', '')::boolean,
+      false
+    );
+  exception when others then
+    privacy_consent_given_value := false;
+  end;
+
+  if user_role = 'public_user' and (
+    not privacy_consent_given_value
+    or privacy_consent_at_value is null
+    or privacy_policy_version_value is null
+  ) then
+    raise exception 'Public User registration requires explicit Data Privacy consent.' using errcode = '23514';
+  end if;
 
   insert into public.users (
     id, 
@@ -65,7 +85,8 @@ begin
     responder_type,
     barangay,
     privacy_consent_at,
-    privacy_policy_version
+    privacy_policy_version,
+    privacy_consent_given
   )
   values (
     new.id::text,
@@ -92,7 +113,8 @@ begin
     (new.raw_user_meta_data::jsonb)->>'responder_type',
     (new.raw_user_meta_data::jsonb)->>'barangay',
     privacy_consent_at_value,
-    (new.raw_user_meta_data::jsonb)->>'privacy_policy_version'
+    privacy_policy_version_value,
+    privacy_consent_given_value
   );
   return new;
 end;

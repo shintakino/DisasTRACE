@@ -88,22 +88,17 @@ export function IncidentPanel({
     String(value.getDate()).padStart(2, "0"),
   ].join("-");
 
-  const normaliseStatus = (incident: MapIncident) => {
-    if (incident.status === "REJECTED" || incident.status === "DUPLICATE") return "REJECTED";
-    if (incident.status === "COMPLETED") return "RESOLVED";
-    return "ACTIVE";
-  };
-
-  // The top controls and overview deliberately use the same four categories.
+  // The API projects request and incident lifecycle into one display status.
+  // Counters and filters deliberately consume that same server-owned value.
   const stats = React.useMemo(() => {
     const categoryIncidents = incidents.filter((incident) => (
       incident.category === category && (barangay === "all" || incident.barangay === barangay)
     ));
     return {
       ALL: categoryIncidents.length,
-      ACTIVE: categoryIncidents.filter((incident) => normaliseStatus(incident) === "ACTIVE").length,
-      RESOLVED: categoryIncidents.filter((incident) => normaliseStatus(incident) === "RESOLVED").length,
-      REJECTED: categoryIncidents.filter((incident) => normaliseStatus(incident) === "REJECTED").length,
+      ACTIVE: categoryIncidents.filter((incident) => incident.displayStatus === "ACTIVE").length,
+      RESOLVED: categoryIncidents.filter((incident) => incident.displayStatus === "RESOLVED").length,
+      REJECTED: categoryIncidents.filter((incident) => incident.displayStatus === "REJECTED").length,
     };
   }, [barangay, category, incidents]);
 
@@ -112,7 +107,7 @@ export function IncidentPanel({
     if (incident.category !== category) return false;
 
     // 1. Status Filter
-    const statusMatch = filter === "ALL" || normaliseStatus(incident) === filter;
+    const statusMatch = filter === "ALL" || incident.displayStatus === filter;
 
     if (!statusMatch) return false;
 
@@ -260,7 +255,7 @@ export function IncidentPanel({
               className="flex flex-col items-center justify-center py-20 text-slate-300"
             >
               <ShieldAlert size={48} strokeWidth={1} className="mb-4 opacity-20" />
-              <p className="text-sm font-medium">No active reports in this sector</p>
+              <p className="text-sm font-medium">No {filter.toLowerCase()} reports in this sector</p>
             </motion.div>
           )}
         </div>
@@ -311,16 +306,18 @@ function IncidentCard({
     return <ShieldAlert size={14} className="text-slate-500" />;
   };
 
-  const statusColors: Record<string, string> = {
-    NEW: "bg-blue-500",
-    ONGOING: "bg-orange-500",
-    COMPLETED: "bg-emerald-500",
-    STANDBY: "bg-amber-500",
-    PENDING: "bg-orange-500",
-    VERIFIED: "bg-green-500",
+  const statusColors: Record<MapIncident['displayStatus'], string> = {
+    ACTIVE: "bg-blue-500",
+    RESOLVED: "bg-emerald-500",
     REJECTED: "bg-red-500",
-    DUPLICATE: "bg-slate-500",
   };
+  const statusLabel = incident.displayStatus === 'RESOLVED'
+    ? 'Case Closed'
+    : incident.displayStatus === 'REJECTED'
+      ? 'Rejected'
+      : incident.status === 'PENDING'
+        ? 'Pending'
+        : 'Active';
 
   return (
     <div
@@ -335,7 +332,7 @@ function IncidentCard({
       onClick={onClick}
     >
       {/* Status Accent Line */}
-      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusColors[incident.status] || "bg-slate-400")} />
+      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusColors[incident.displayStatus])} />
 
       <div className="p-5 pl-6 flex-1">
         {isPriority ? (
@@ -366,9 +363,9 @@ function IncidentCard({
           
           <div className={cn(
             "px-2 py-1 rounded-full text-[9px] font-black tracking-widest uppercase text-white shadow-sm",
-            statusColors[incident.status] || "bg-slate-500"
+            statusColors[incident.displayStatus]
           )}>
-            {incident.status}
+            {statusLabel}
           </div>
         </div>
 

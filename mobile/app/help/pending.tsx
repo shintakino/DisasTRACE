@@ -499,7 +499,11 @@ export default function PendingScreen() {
           }}
           onPress={async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await signOutFromMobile();
+            try {
+              await signOutFromMobile();
+            } catch (error) {
+              Alert.alert('Sign out unavailable', error instanceof Error ? error.message : 'Please try again while connected to the internet.');
+            }
           }}
         >
           <LogOut size={14} color="#FFF" style={{ marginRight: 6 }} />

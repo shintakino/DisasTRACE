@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const accessToken = getBearerToken(request);
     if (!accessToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const state = await getMobileSessionState(user.id, accessToken);
-    if (!state.exists || !state.mobile) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (!state.exists || !state.mobile || !state.active) return NextResponse.json({ error: 'This mobile session is no longer active.' }, { status: 409 });
     const sessionId = getSupabaseSessionId(accessToken);
     if (!sessionId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -31,20 +31,19 @@ export async function POST(request: Request) {
       eq(mobileDeviceSessions.deviceHash, createHash('sha256').update(parsed.data.deviceId).digest('hex')),
       eq(mobileDeviceSessions.activeSessionId, sessionId),
     )).returning({ userId: mobileDeviceSessions.userId });
-    if (deleted.length) {
-      await db.delete(mobilePushTokens).where(and(
-        eq(mobilePushTokens.userId, user.id),
-        eq(mobilePushTokens.sessionId, sessionId),
-      ));
-      await db.insert(auditLogs).values({
-        id: randomUUID(), userId: user.id, action: 'MOBILE_SESSION_ENDED', entityType: 'MOBILE_SESSION', entityId: user.id,
-      });
-    }
+    if (!deleted.length) return NextResponse.json({ error: 'This mobile session is no longer active.' }, { status: 409 });
+    await db.delete(mobilePushTokens).where(and(
+      eq(mobilePushTokens.userId, user.id),
+      eq(mobilePushTokens.sessionId, sessionId),
+    ));
+    await db.insert(auditLogs).values({
+      id: randomUUID(), userId: user.id, action: 'MOBILE_SESSION_ENDED', entityType: 'MOBILE_SESSION', entityId: user.id,
+    });
     // Revoke the refresh token at the Auth boundary too. RLS/proxy already
     // deny this JWT once the binding is removed, even before it expires.
     const { error: revokeError } = await supabase.auth.admin.signOut(accessToken, 'local');
     if (revokeError) console.warn('Supabase local session revocation failed after binding removal:', revokeError);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, released: true });
   } catch (error) {
     console.error('Mobile sign-out failed:', error);
     return NextResponse.json({ error: 'Unable to sign out right now.' }, { status: 500 });

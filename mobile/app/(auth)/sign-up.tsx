@@ -51,6 +51,7 @@ export default function SignUpScreen() {
         { key: 'idCardType', label: 'ID Type' }
         ,{ key: 'privacyConsentAt', label: 'Data Privacy Consent' }
         ,{ key: 'privacyPolicyVersion', label: 'Privacy Policy Version' }
+        ,{ key: 'privacyPolicyAccepted', label: 'Data Privacy Policy Acceptance' }
       ];
 
       for (const field of requiredFields) {
@@ -85,6 +86,7 @@ export default function SignUpScreen() {
                 id_type: currentData.idCardType,
                 privacy_consent_at: currentData.privacyConsentAt,
                 privacy_policy_version: currentData.privacyPolicyVersion,
+                privacy_policy_accepted: currentData.privacyPolicyAccepted,
               },
             },
           }), 20_000, 'account registration');

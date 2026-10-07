@@ -17,6 +17,7 @@ import {
   type ResponderReportListQuery,
 } from "@/lib/responder-report-management";
 import { manilaRecentReportBounds } from "@/lib/manila-time";
+import { formatManilaDate, formatManilaTime } from "@/lib/manila-presentation";
 import { parsePublicReportHistoryQuery } from "@/lib/public-report-history";
 
 const SubmitReportSchema = z.object({
@@ -142,15 +143,8 @@ export async function GET(req: NextRequest) {
         status: r.status, // PENDING, VERIFIED, REJECTED, DUPLICATE
         rejectionReason: r.rejectionReason,
         incidentStatus: null as string | null,
-        date: new Date(r.createdAt).toLocaleDateString("en-US", {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        time: new Date(r.createdAt).toLocaleTimeString("en-US", {
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
+        date: formatManilaDate(r.createdAt),
+        time: formatManilaTime(r.createdAt),
         location: formatOfficialBaliwagLocation(r.barangay),
         barangay: r.barangay,
         residentPhotoUrl: r.imageUrl,
@@ -364,15 +358,8 @@ export async function GET(req: NextRequest) {
           residentName: d.residentName,
           type: d.type,
           status: d.status,
-          date: new Date(d.createdAt).toLocaleDateString("en-US", {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          }),
-          time: new Date(d.createdAt).toLocaleTimeString("en-US", {
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
+          date: formatManilaDate(d.createdAt),
+          time: formatManilaTime(d.createdAt),
           location: formatOfficialBaliwagLocation(d.barangay),
           barangay: d.barangay,
           residentPhotoUrl: d.imageUrl,
@@ -392,15 +379,8 @@ export async function GET(req: NextRequest) {
         vehicleId: r.vehicleId,
         type: r.type,
         status: r.status === 'SUBMITTED' ? 'COMPLETED' : 'ONGOING',
-        date: new Date(r.createdAt).toLocaleDateString("en-US", {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        time: new Date(r.createdAt).toLocaleTimeString("en-US", {
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
+        date: formatManilaDate(r.createdAt),
+        time: formatManilaTime(r.createdAt),
         location: formatOfficialBaliwagLocation(r.barangay),
         barangay: r.barangay,
         residentPhotoUrl: r.residentPhotoUrl,

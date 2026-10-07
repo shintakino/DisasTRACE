@@ -221,7 +221,9 @@ export default function IncidentDetailScreen() {
                 </View>
                 <View className="flex-1 pb-2">
                   <Text className="text-base font-bold text-slate-800">{log.action}</Text>
-                  <Text className="text-sm text-slate-500">{report.date} · {log.time}</Text>
+                  <Text className="text-sm text-slate-500">
+                    {log.date ? `${log.date} · ${log.time}` : log.time}
+                  </Text>
                 </View>
               </View>
             );
@@ -258,7 +260,7 @@ export default function IncidentDetailScreen() {
           </View>
         </View>
 
-        {!isRejected && (
+        {!isRejected && typeof report.crewFindings === 'string' && report.crewFindings.trim().length > 0 && (
           <>
             <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">RESPONDER NOTE</Text>
             <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">

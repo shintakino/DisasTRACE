@@ -1,5 +1,60 @@
 # Progress Tracker
 
+## 2026-10-08 - Public mobile privacy and Android safe-area repair
+
+- Removed responder documentation from the Public User report-detail contract and UI. The authenticated report endpoint now omits `crewFindings` for Public Users; responder/admin operational views retain their existing findings. This aligns report detail with the existing public response boundary, which ends at confirmed scene arrival.
+- Restyled the Public User Notifications header to use the same safe-area-aware navy header treatment as Privacy & Security, retaining its back navigation, Clear All action, loading state, and notification behavior.
+- Replaced Android-unsafe React Native safe-area wrappers in the guest/public chatbot, pending-chatbot, and guest-history flows with `react-native-safe-area-context` on all screen edges. The responder map header now uses the existing measured safe-area inset instead of a status-bar-height estimate.
+- Added `scripts/verify-public-mobile-ui-boundaries.ts` to protect the public documentation boundary and Android inset/header contract.
+
+## 2026-10-08 - PACC verification, support-message, and web filter clarity
+
+- Removed the confusing **Advanced review controls** accordion shell from the PACC Verification detail view while preserving the related-report decision, classification override, and agency-coordination controls it contained. No triage action, authorization, or API contract changed.
+- Replaced the Support Messages eye-only control with an explicit keyboard-accessible **View** button; opening, automatic read marking, message status actions, and dialog behavior are unchanged.
+- Centralized the CDRRMO Incident Summary period labels on the existing title-case report-date label map and corrected Analytics to **All Barangays**. Filter values remain canonical (`this_month`, `all`, and so on), so query behavior and mobile clients are unaffected.
+- Updated focused CDRRMO UI regression coverage. Focused UI/filter checks, root TypeScript, and whitespace validation pass.
+
+## 2026-10-08 - Responder mobile Manila-time correction
+
+- Applied the existing mobile Manila-time presentation helper to Responder dispatch offers, direct PACC dispatches, and the documentation-pending incident selector. These incident timestamps no longer depend on the Android device timezone.
+- Changed responder report date presets to calculate absolute API bounds from the Manila calendar day. **Today**, **Last 7 days**, and **Last 30 days** now produce the same record set for responders regardless of handset timezone.
+- Extended the focused public/mobile time regression script with responder display and Manila-date-bound checks. Root/mobile strict TypeScript, the focused regression, and whitespace validation pass.
+
+## 2026-10-08 - Public mobile timeline and notification time correction
+
+- Added tracked migration `0034_elite_menace`: converted legacy notification timestamps from the verified UTC timezone-naive representation to `timestamptz` without changing their instants, and added a nullable incident key/index to responder status logs. The database audit confirms the 1,976 notification rows and their UTC range were retained.
+- Updated the incident-status trigger to store the incident identifier for new dispatched, arrived, and completed lifecycle events. Existing status rows deliberately remain unlinked because no reliable historical incident key exists.
+- Replaced the Public User report-detail endpoint's fabricated dispatch/arrival times (which reused the report-submission time) with the incident-bound event timestamps. Its response remains backward compatible and adds ISO `occurredAt` plus an event-level Manila `date`; legacy event timestamps are explicitly returned as **Not recorded**.
+- Added a shared mobile Manila formatter and applied it to Notifications, Guest History, report refresh feedback, and the report-list offline-sync indicator, so absolute API times render in `Asia/Manila` regardless of the Android handset timezone. The report-detail screen now uses each timeline event's own date/time instead of the report creation date for every row.
+- Added `scripts/verify-public-timeline-and-mobile-time.ts`. Focused contract checks, migration/storage audit, root and mobile strict TypeScript checks, and whitespace validation pass.
+- Updated the pre-existing public-response lifecycle regression to test the current shared notification-route resolver, replacing its stale assertion against notification code that had already been deliberately centralized.
+
+## 2026-10-07 - Operational timestamp persistence and filter-label correction
+
+- Converted `audit_logs.created_at`, `status_logs.created_at`, and `reports.created_at`/`updated_at` from timezone-naive timestamps to PostgreSQL `timestamptz` in tracked migration `0033_yielding_xavin`. The configured database was verified as UTC before migration, and each legacy value was converted with `AT TIME ZONE 'UTC'`, preserving its original instant. The report cutover uniqueness index was recreated with its equivalent UTC `timestamptz` predicate.
+- Added one Manila-time presentation helper and applied it to the CDRRMO/PACC Status & Logs, CDRRMO Audit Logs, report lists, report details, PDF-report input path, PACC verification receipt, and command-map details/marker timestamps. A stored UTC instant is now rendered explicitly in `Asia/Manila`, so the web runtime timezone cannot turn daytime operational activity into an AM-only display.
+- Made Logs and Audit date pickers carry an exact `YYYY-MM-DD` calendar day to the server. The API validates the day and applies Manila start-inclusive/end-exclusive database bounds before ordering/limiting results, preventing device-timezone drift and truncated filtered results.
+- Kept API field names, ISO transport timestamps, canonical filter values, and mobile source untouched. No records were removed; the audited row counts remain unchanged after the conversion.
+- Added explicit Base UI select label maps for status, role, and report-date presets. Operators see labels such as **On Scene**, **PACC Admin**, and **This Month**, while filtering still sends the stable `ON-SCENE`, `pacc_admin`, and `this_month` values.
+- Added `scripts/verify-operational-time-and-labels.ts` to guard the fixed Manila instant, server formatter adoption, and value/label boundaries.
+- The focused timestamp/label check, existing filter/audit regression check, root and mobile strict TypeScript checks, root lint, and production build pass.
+
+## 2026-10-07 - CDRRMO dashboard activity layout refinement
+
+- Reorganized only the CDRRMO web dashboard's operations section to place Incident Trends directly below Responder Status and allow Recent Activity to use the full right-side column, matching the approved dashboard reference while eliminating the unused desktop whitespace.
+- On desktop, the content-driven Responder Status card and the height-filling Incident Trends card now share the complete left column, including the inter-card gap, so the stack exactly matches the Recent Activity panel's height.
+- The CDRRMO layout stacks naturally below the `lg` breakpoint. PACC dashboards, mobile clients, dashboard data contracts, API behavior, and actions remain unchanged.
+- The focused dashboard-layout regression check, root and mobile strict TypeScript checks, root lint, production build, and whitespace validation pass.
+
+## 2026-10-07 - CDRRMO command UI refinement and User Management hardening
+
+- Enlarged the CDRRMO incident-distribution pie without changing its data request or responsive dashboard flow, and removed the isolated Audit Log Preview header icon for visual consistency.
+- Made shared CDRRMO/PACC command-map incident icons more visible with a fixed marker target and stronger strokes. Resolved command-map records now use the documented deep-green `#047857` accent; Android map components and mapping APIs were not changed.
+- Updated web-only CDRRMO wording and form affordances: the administrator sign-in action now reads **Log in**, the User Management Create Account dialog omits its redundant header close icon while retaining Cancel/Escape dismissal, and the locked Responder Roster city field no longer appears editable-required.
+- Connected Responder Roster suspension/block reason controls to the request, disabled submission without a reason, and enforced the same requirement at the API boundary. Suspend uses the documented primary navy action color; Block uses an intentional destructive red.
+- Restricted User Management records and the `/users` dashboard route to CDRRMO Super Admins, closing a route-level exposure of user contact data to non-administrator authenticated sessions. Added `scripts/verify-cdrrmo-ui-refinements.ts` for UI, reason-contract, and authorization regressions.
+- The focused refinement check, existing command-map/roster and filter/audit checks, root and mobile strict TypeScript checks, root lint, production Next.js build, and whitespace validation pass.
+
 ## 2026-10-04 - Command-map lifecycle and responder-roster status repair
 
 - Added a shared server-owned command-map display-status projection. A `VERIFIED` request linked to a `RESOLVED` incident now appears as Resolved in both User Submitted and Responder Submitted map views, while rejected/duplicate records remain Rejected. Shared counters and filters consume the same projection, eliminating the prior Active-count/card disagreement.

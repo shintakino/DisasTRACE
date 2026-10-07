@@ -11,6 +11,7 @@
 - **Warning**: #F97316 (Orange) - Pending incidents and average response indicators.
 - **Info**: #3B82F6 (Blue) - General incident counts and informational badges.
 - **Error**: #EF4444 (Red) - Critical incident markers and urgent system alerts.
+- **Command-map resolved reports**: #047857 (Deep Green) - A calmer resolved state that remains distinct from active blue and urgent red for both CDRRMO and PACC.
 
 ## Typography
 - **Font Family**: Sans-serif (Inter preferred).

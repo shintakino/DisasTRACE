@@ -19,6 +19,7 @@ import {
 import { LogStatus, LogFilter } from "@/types/logs";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { STATUS_LOG_FILTER_LABELS } from "@/lib/operational-display-labels";
 
 interface LogsHeaderProps {
   onFilterChange: (filters: LogFilter) => void;
@@ -40,8 +41,8 @@ export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
       search: (next.search ?? search) || undefined,
       status: nextStatus === "all" ? undefined : nextStatus,
       dateRange: start || end ? {
-        from: start ? new Date(`${start}T00:00:00`) : undefined,
-        to: end ? new Date(`${end}T23:59:59.999`) : undefined,
+        from: start || undefined,
+        to: end || undefined,
       } : undefined,
     });
   };
@@ -89,7 +90,7 @@ export function LogsHeader({ onFilterChange }: LogsHeaderProps) {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</label>
-                <Select value={status} onValueChange={handleStatusChange}>
+                <Select value={status} onValueChange={handleStatusChange} items={STATUS_LOG_FILTER_LABELS}>
                   <SelectTrigger>
                     <SelectValue placeholder="All" />
                   </SelectTrigger>

@@ -81,18 +81,21 @@ export default function PrivacySecurityScreen() {
 
   return (
     <View className="flex-1 bg-[#F8FAFC]">
-      <View className="bg-[#1E3A8A] pt-16 pb-6 px-6 rounded-b-3xl relative z-10 shadow-sm">
-        <View className="flex-row items-center">
-          <TouchableOpacity 
-            onPress={() => router.back()}
-            disabled={loading}
-            className="w-10 h-10 bg-white/20 rounded-full items-center justify-center mr-4"
-          >
-            <ArrowLeft2 size={24} color="#FFFFFF" variant="Outline" />
-          </TouchableOpacity>
-          <Text className="text-2xl font-bold text-white">Privacy & Security</Text>
+      <StatusBar barStyle="light-content" />
+      <SafeAreaView edges={['top', 'left', 'right']} className="bg-[#1E3A8A] rounded-b-3xl overflow-hidden">
+        <View className="px-6 pt-4 pb-6 relative z-10 shadow-sm">
+          <View className="flex-row items-center">
+            <TouchableOpacity
+              onPress={() => router.back()}
+              disabled={loading}
+              className="w-10 h-10 bg-white/20 rounded-full items-center justify-center mr-4"
+            >
+              <ArrowLeft2 size={24} color="#FFFFFF" variant="Outline" />
+            </TouchableOpacity>
+            <Text className="text-2xl font-bold text-white">Privacy & Security</Text>
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
 
       <ScrollView className="flex-1 px-6 pt-6" showsVerticalScrollIndicator={false}>
         

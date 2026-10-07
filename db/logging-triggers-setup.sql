@@ -14,10 +14,11 @@ begin
   if TG_OP = 'UPDATE' then
     -- EN_ROUTE -> DISPATCHED status log
     if new.status = 'EN_ROUTE' and old.status <> 'EN_ROUTE' and new.responder_id is not null then
-      insert into public.status_logs (id, user_id, status, action, description, created_at)
+      insert into public.status_logs (id, user_id, incident_id, status, action, description, created_at)
       values (
         gen_random_uuid()::text,
         new.responder_id,
+        new.id,
         'DISPATCHED',
         'DISPATCHED',
         'Responder ' || coalesce(responder_name, 'Unit') || ' is en route to scene with ambulance ' || coalesce(new.assigned_ambulance, 'Unit'),
@@ -27,10 +28,11 @@ begin
 
     -- ARRIVED -> ON-SCENE status log
     if new.status = 'ARRIVED' and old.status <> 'ARRIVED' and new.responder_id is not null then
-      insert into public.status_logs (id, user_id, status, action, description, created_at)
+      insert into public.status_logs (id, user_id, incident_id, status, action, description, created_at)
       values (
         gen_random_uuid()::text,
         new.responder_id,
+        new.id,
         'ON-SCENE',
         'ARRIVED',
         'Responder ' || coalesce(responder_name, 'Unit') || ' arrived on scene',
@@ -40,10 +42,11 @@ begin
 
     -- RESOLVED -> STANDBY status log
     if new.status = 'RESOLVED' and old.status <> 'RESOLVED' and new.responder_id is not null then
-      insert into public.status_logs (id, user_id, status, action, description, created_at)
+      insert into public.status_logs (id, user_id, incident_id, status, action, description, created_at)
       values (
         gen_random_uuid()::text,
         new.responder_id,
+        new.id,
         'STANDBY',
         'COMPLETED',
         'Responder ' || coalesce(responder_name, 'Unit') || ' completed incident response',

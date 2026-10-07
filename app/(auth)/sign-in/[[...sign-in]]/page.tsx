@@ -240,7 +240,7 @@ export default function SignInPage() {
                       <span>Signing in...</span>
                     </div>
                   ) : (
-                    "Login"
+                    "Log in"
                   )}
                 </Button>
               </div>

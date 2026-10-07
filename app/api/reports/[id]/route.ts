@@ -4,11 +4,21 @@ import { reports } from "@/db/schema/reports";
 import { incidents } from "@/db/schema/incidents";
 import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
+import { statusLogs } from "@/db/schema/status_logs";
 import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
-import { and, eq, or } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { formatOfficialBaliwagLocation, getReportDetailText, getReportLocation } from "@/lib/report-location";
+import { formatManilaDate, formatManilaTime } from "@/lib/manila-presentation";
 
+function timelineEntry(action: string, occurredAt: Date | null) {
+  return {
+    action,
+    occurredAt: occurredAt?.toISOString() ?? null,
+    date: occurredAt ? formatManilaDate(occurredAt) : null,
+    time: occurredAt ? formatManilaTime(occurredAt) : "Not recorded",
+  };
+}
 
 export async function GET(
   req: NextRequest,
@@ -164,20 +174,18 @@ export async function GET(
         status: userReq.status, // PENDING, VERIFIED, REJECTED, DUPLICATE
         rejectionReason: userReq.rejectionReason,
         incidentStatus: incident?.status ?? null,
-        date: new Date(userReq.createdAt).toLocaleDateString("en-US", {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        time: new Date(userReq.createdAt).toLocaleTimeString("en-US", {
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
+        date: formatManilaDate(userReq.createdAt),
+        time: formatManilaTime(userReq.createdAt),
         location: formatOfficialBaliwagLocation(userReq.barangay),
         barangay: userReq.barangay,
         residentReportDescription: getReportDetailText(userReq.locationDescription, "Awaiting detail logs."),
         residentPhotoUrl: userReq.imageUrl,
-        crewFindings: "No responder findings available yet (User Submitted Report).",
+        // Public reporters must not receive responder-only documentation, even
+        // as a placeholder. Operational roles retain the existing indication
+        // that a responder report has not been submitted yet.
+        crewFindings: canViewOperationalDetails
+          ? "No responder findings available yet (User Submitted Report)."
+          : undefined,
         natureOfCall: userReq.nature,
         severityLevel: userReq.severity,
         peopleInvolved: (() => {
@@ -196,10 +204,10 @@ export async function GET(
         residentPhone: userReq.resident?.phone || userReq.contactNumber || "N/A",
         residentAddress: userReq.resident?.address || (userReq.reporterType === 'GUEST' ? 'Guest report — no home address collected' : 'N/A'),
         logs: [
-          { action: "Incident Reported by Resident", time: new Date(userReq.createdAt).toLocaleTimeString() },
-          ...(userReq.status === "VERIFIED" ? [{ action: "Incident Verified by Dispatcher", time: new Date(userReq.updatedAt).toLocaleTimeString() }] : []),
-          ...(userReq.status === "REJECTED" ? [{ action: "Incident Rejected by Dispatcher", time: new Date(userReq.updatedAt).toLocaleTimeString() }] : []),
-          ...(userReq.status === "DUPLICATE" ? [{ action: "Incident Merged as Duplicate", time: new Date(userReq.updatedAt).toLocaleTimeString() }] : []),
+          timelineEntry("Incident Reported by Resident", userReq.createdAt),
+          ...(userReq.status === "VERIFIED" ? [timelineEntry("Incident Verified by Dispatcher", userReq.updatedAt)] : []),
+          ...(userReq.status === "REJECTED" ? [timelineEntry("Incident Rejected by Dispatcher", userReq.updatedAt)] : []),
+          ...(userReq.status === "DUPLICATE" ? [timelineEntry("Incident Merged as Duplicate", userReq.updatedAt)] : []),
         ],
         participants: [],
       };
@@ -230,15 +238,8 @@ export async function GET(
         residentName: d.residentName,
         type: d.type,
         status: d.status,
-        date: new Date(d.createdAt).toLocaleDateString("en-US", {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        time: new Date(d.createdAt).toLocaleTimeString("en-US", {
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
+        date: formatManilaDate(d.createdAt),
+        time: formatManilaTime(d.createdAt),
         location: formatOfficialBaliwagLocation(d.barangay),
         barangay: d.barangay,
         residentPhotoUrl: d.imageUrl,
@@ -255,6 +256,16 @@ export async function GET(
     }
 
     const r = results[0];
+    const lifecycleLogs = await db
+      .select({ action: statusLogs.action, createdAt: statusLogs.createdAt })
+      .from(statusLogs)
+      .where(and(
+        eq(statusLogs.incidentId, r.incidentId),
+        inArray(statusLogs.action, ["DISPATCHED", "ARRIVED"]),
+      ))
+      .orderBy(asc(statusLogs.createdAt));
+    const dispatchedAt = lifecycleLogs.find((log) => log.action === "DISPATCHED")?.createdAt ?? null;
+    const arrivedAt = lifecycleLogs.find((log) => log.action === "ARRIVED")?.createdAt ?? null;
 
     // Fetch resident user details separately
     let residentName = r.reporterType === 'GUEST' ? 'Guest Reporter' : 'Anonymous';
@@ -305,22 +316,18 @@ export async function GET(
       status: r.status === 'SUBMITTED' ? 'COMPLETED' : 'ONGOING',
       rejectionReason: r.rejectionReason,
       incidentStatus: 'RESOLVED',
-      date: new Date(r.createdAt).toLocaleDateString("en-US", {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      }),
-      time: new Date(r.createdAt).toLocaleTimeString("en-US", {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
+      date: formatManilaDate(r.createdAt),
+      time: formatManilaTime(r.createdAt),
       location: formatOfficialBaliwagLocation(r.barangay),
       barangay: r.barangay,
       residentReportDescription: getReportDetailText(r.residentReportDescription, "Awaiting detail logs."),
       residentPhotoUrl: r.residentPhotoUrl,
+      // Keep crew documentation inside the responder/admin boundary. Omitting
+      // the field for Public Users prevents a client from treating an
+      // operational note as public report content.
       crewFindings: canViewOperationalDetails
         ? (r.crewFindings || "No findings recorded.")
-        : "Responder documentation was submitted.",
+        : undefined,
       natureOfCall: r.natureOfCall,
       severityLevel: r.severityLevel,
       peopleInvolved: (() => {
@@ -345,9 +352,9 @@ export async function GET(
       residentPhone: residentPhone,
       residentAddress: residentAddress,
       logs: [
-        { action: "Incident Dispatched", time: new Date(r.createdAt).toLocaleTimeString() },
-        { action: "Ambulance Arrived at Scene", time: new Date(r.createdAt).toLocaleTimeString() },
-        { action: "Report Logs Submitted", time: new Date(r.createdAt).toLocaleTimeString() },
+        timelineEntry("Incident Dispatched", dispatchedAt),
+        timelineEntry("Ambulance Arrived at Scene", arrivedAt),
+        timelineEntry("Report Logs Submitted", r.createdAt),
       ],
       participants: canViewOperationalDetails && Array.isArray(r.participants) ? r.participants : [],
       patientCareReports: canViewOperationalDetails ? normalizedPatientCare : [],
@@ -380,15 +387,8 @@ export async function GET(
       residentName: d.residentName,
       type: d.type,
       status: d.status,
-      date: new Date(d.createdAt).toLocaleDateString("en-US", {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      }),
-      time: new Date(d.createdAt).toLocaleTimeString("en-US", {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
+      date: formatManilaDate(d.createdAt),
+      time: formatManilaTime(d.createdAt),
       location: formatOfficialBaliwagLocation(d.barangay),
       barangay: d.barangay,
       residentPhotoUrl: d.imageUrl,

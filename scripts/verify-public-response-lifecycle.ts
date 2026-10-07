@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { projectPublicResponseLifecycle } from '../lib/public-response-policy';
 import { getPublicResponseMode } from '../mobile/lib/public-response-lifecycle';
 import { isNotificationVisibleForRole } from '../mobile/lib/report-location';
+import { resolvePublicNotificationRoute } from '../mobile/lib/public-notification-route';
 
 assert.equal(getPublicResponseMode({ incidentStatus: 'EN_ROUTE', transportStatus: 'NONE', hasResponder: true }), 'INBOUND_TRACKING');
 assert.equal(getPublicResponseMode({ incidentStatus: 'ARRIVED', transportStatus: 'NONE', hasResponder: true }), 'RESPONSE_COMPLETE');
@@ -47,9 +48,14 @@ assert.doesNotMatch(trackingScreen, /targetHospital|to_hospital|Transporting to|
 const guestHistory = readFileSync('mobile/app/help/guest-history.tsx', 'utf8');
 assert.match(guestHistory, /latest\.publicStatus === 'COMPLETED_AT_SCENE'[\s\S]*\? 'COMPLETED'/);
 
-const notifications = readFileSync('mobile/app/notifications.tsx', 'utf8');
-assert.match(notifications, /item\.type === 'responder_arrived'[\s\S]*\/help\/response-status/);
-assert.doesNotMatch(notifications, /patient_transport_started'[\s\S]{0,250}\/help\/response-status/);
+assert.deepEqual(
+  resolvePublicNotificationRoute({ type: 'responder_arrived', metadata: { incidentId: 'incident-1', requestId: 'request-1' } }),
+  {
+    pathname: '/help/response-status',
+    details: { id: 'request-1', incidentId: 'incident-1', trackingRequestId: 'request-1', reporterMode: 'resident' },
+  },
+);
+assert.equal(resolvePublicNotificationRoute({ type: 'patient_transport_started' }), null);
 
 const locationRoute = readFileSync('app/api/responder/location/route.ts', 'utf8');
 assert.doesNotMatch(locationRoute, /createNotification\([\s\S]{0,500}patient_transport_started/);

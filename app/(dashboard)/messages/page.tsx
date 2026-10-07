@@ -9,7 +9,6 @@ import {
   CheckCircle, 
   Calendar, 
   User, 
-  Eye, 
   Check, 
   Inbox,
   X
@@ -317,13 +316,13 @@ export default function SupportMessagesPage() {
                       <TableCell className="text-right pr-6 py-4" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           <Button
-                            variant="ghost"
-                            size="icon"
+                            variant="outline"
+                            size="sm"
                             title="View Message"
                             onClick={() => handleOpenDetails(msg)}
-                            className="text-[#1E3A8A] hover:bg-slate-100 h-8 w-8 cursor-pointer"
+                            className="h-8 border-blue-200 text-[#1E3A8A] hover:bg-blue-50 cursor-pointer"
                           >
-                            <Eye className="h-4 w-4" />
+                            View
                           </Button>
                           
                           {msg.status === "UNREAD" && (

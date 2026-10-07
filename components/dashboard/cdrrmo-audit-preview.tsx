@@ -1,7 +1,6 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AuditPreview } from "@/types/dashboard";
@@ -23,7 +22,7 @@ export function CDRRMOAuditPreview({ entries, onViewAudit }: CDRRMOAuditPreviewP
   return (
     <Card className="h-full border-slate-200 shadow-sm">
       <CardHeader className="p-5 pb-3">
-        <CardTitle className="flex items-center gap-2 text-base font-bold text-[#1E3A8A]"><ShieldCheck className="size-4" /> Audit Log Preview</CardTitle>
+        <CardTitle className="text-base font-bold text-[#1E3A8A]">Audit Log Preview</CardTitle>
         <p className="mt-1 text-xs text-slate-500">Latest accountable system activity</p>
       </CardHeader>
       <CardContent className="flex h-[calc(100%-75px)] min-h-0 flex-col p-5 pt-1">

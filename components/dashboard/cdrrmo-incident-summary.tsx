@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { IncidentDistribution } from "@/types/dashboard";
+import { REPORT_DATE_PRESET_LABELS } from "@/lib/operational-display-labels";
 
 interface CDRRMOIncidentSummaryProps {
   data: IncidentDistribution[];
@@ -12,12 +13,7 @@ interface CDRRMOIncidentSummaryProps {
   onFilterChange: (filter: string) => void;
 }
 
-const filterLabels: Record<string, string> = {
-  today: "Today",
-  this_week: "This week",
-  this_month: "This month",
-  this_year: "This year",
-};
+const filterLabels: Record<string, string> = REPORT_DATE_PRESET_LABELS;
 
 export function CDRRMOIncidentSummary({ data, filter, onFilterChange }: CDRRMOIncidentSummaryProps) {
   const reported = data.filter((item) => item.value > 0);
@@ -33,7 +29,7 @@ export function CDRRMOIncidentSummary({ data, filter, onFilterChange }: CDRRMOIn
         </div>
         <Select value={filter} onValueChange={(value) => { if (value) onFilterChange(value); }}>
           <SelectTrigger aria-label="Incident summary period" className="h-9 w-32 border-slate-200 bg-white text-xs font-semibold">
-            <SelectValue>{filterLabels[filter] ?? "This month"}</SelectValue>
+            <SelectValue>{filterLabels[filter] ?? "This Month"}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {Object.entries(filterLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
@@ -45,11 +41,11 @@ export function CDRRMOIncidentSummary({ data, filter, onFilterChange }: CDRRMOIn
           <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">No incidents reported for this period.</div>
         ) : (
           <>
-            <div className="grid gap-5 lg:grid-cols-[190px_1fr]">
-              <div className="grid grid-cols-[144px_1fr] items-center gap-3 lg:block">
-                <div className="relative size-36">
-                  <PieChart width={144} height={144} aria-label="Incident type distribution">
-                    <Pie data={reported} dataKey="value" nameKey="name" innerRadius={45} outerRadius={68} paddingAngle={2} stroke="none">
+            <div className="grid gap-5 lg:grid-cols-[220px_1fr]">
+              <div className="grid grid-cols-[176px_1fr] items-center gap-3 lg:block">
+                <div className="relative size-44">
+                  <PieChart width={176} height={176} aria-label="Incident type distribution">
+                    <Pie data={reported} dataKey="value" nameKey="name" innerRadius={56} outerRadius={82} paddingAngle={2} stroke="none">
                       {reported.map((item) => <Cell key={item.name} fill={item.fill} />)}
                     </Pie>
                   </PieChart>

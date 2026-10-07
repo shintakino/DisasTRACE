@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Clock3, RefreshCw, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../../lib/guest-report-history';
 import { getChatbotReportStatus } from '../../services/chatbot-api';
 import { GuestAllowanceBanner } from '../../components/guest/GuestAllowanceBanner';
+import { formatManilaMobileDateTime } from '../../lib/manila-presentation';
 
 export default function GuestHistoryScreen() {
   const router = useRouter();
@@ -51,7 +53,7 @@ export default function GuestHistoryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.page}>
+    <SafeAreaView style={styles.page} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.header}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" style={styles.icon} onPress={() => router.back()}><ChevronLeft color="#0F172A" /></TouchableOpacity>
         <View><Text style={styles.title}>Guest Report History</Text><Text style={styles.subtitle}>Saved only on this device</Text></View>
@@ -67,7 +69,7 @@ export default function GuestHistoryScreen() {
               <Text style={styles.type}>{entry.incidentType}</Text>
               <Text style={styles.response}>{entry.responseStatus}</Text>
               {entry.rejectionReason ? <Text style={styles.reason}>Reason: {entry.rejectionReason}</Text> : null}
-              <Text style={styles.date}>{new Date(entry.createdAt).toLocaleString()}</Text>
+              <Text style={styles.date}>{formatManilaMobileDateTime(entry.createdAt) ?? 'Date unavailable'}</Text>
               {expandedId === entry.id ? (
                 <View style={styles.transcript}>
                   {entry.messages.map((message, index) => (

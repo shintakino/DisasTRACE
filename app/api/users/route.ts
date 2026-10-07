@@ -21,12 +21,20 @@ const UpdateUserSchema = z.object({
   id: z.string(),
   status: z.enum(["ACTIVE", "SUSPENDED", "DEACTIVATED", "PENDING"]).optional(),
   role: z.enum(["public_user", "ambulance_responder", "pacc_admin", "cdrrmo_super_admin"]).optional(),
-  rejectionReason: z.string().optional(),
+  rejectionReason: z.string().trim().max(500).optional(),
   fullName: z.string().trim().min(2).max(200).optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),
   address: z.string().trim().max(500).optional(),
   unitId: z.string().trim().max(50).optional(),
+}).superRefine((value, context) => {
+  if ((value.status === 'SUSPENDED' || value.status === 'DEACTIVATED') && !value.rejectionReason) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['rejectionReason'],
+      message: 'A reason is required when suspending or blocking an account.',
+    });
+  }
 });
 
 function isUnitIdConflict(error: unknown): boolean {
@@ -72,6 +80,11 @@ export async function GET() {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const currentUserRole = await getUserRole();
+    if (currentUserRole !== 'cdrrmo_super_admin') {
+      return NextResponse.json({ error: "Forbidden: Super Admin access required" }, { status: 403 });
     }
 
     // Query real users from database
@@ -260,6 +273,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const { id, status, role, rejectionReason, fullName, email, phone, address, unitId: requestedUnitId } = result.data;
+    const normalizedRejectionReason = rejectionReason?.trim();
     const adminClient = createAdminClient();
 
     const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
@@ -318,7 +332,7 @@ export async function PATCH(req: NextRequest) {
     const updatePayload: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
     if (status) updatePayload.status = status;
     if (role) updatePayload.role = role;
-    if (rejectionReason) updatePayload.rejectionReason = rejectionReason;
+    if (normalizedRejectionReason) updatePayload.rejectionReason = normalizedRejectionReason;
     if (fullName !== undefined) updatePayload.fullName = fullName;
     if (email !== undefined) updatePayload.email = email.toLowerCase();
     if (normalizedPhone !== undefined) updatePayload.phone = normalizedPhone;
@@ -360,7 +374,7 @@ export async function PATCH(req: NextRequest) {
     await db.insert(auditLogs).values({
       id: crypto.randomUUID(),
       userId: user.id,
-      action: `Updated user: ${updatedUser?.fullName || id} (Role: ${role || 'unchanged'}, Status: ${status || 'unchanged'}${fullName !== undefined || email !== undefined || phone !== undefined || address !== undefined || unitIdWillChange ? ', Profile: updated' : ''})`,
+      action: `Updated user: ${updatedUser?.fullName || id} (Role: ${role || 'unchanged'}, Status: ${status || 'unchanged'}${normalizedRejectionReason ? `, Reason: ${normalizedRejectionReason}` : ''}${fullName !== undefined || email !== undefined || phone !== undefined || address !== undefined || unitIdWillChange ? ', Profile: updated' : ''})`,
       entityType: "USER",
       entityId: id,
     });

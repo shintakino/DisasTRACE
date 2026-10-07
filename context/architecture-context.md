@@ -39,6 +39,8 @@
 - **Supabase Storage**: Binary assets — government ID photos at `ids/{userId}/`, scene photos at `scenes/{incidentId}/`, exported PDFs at `exports/`. When a scene photo supplies EXIF GPS, its coordinates are retained as optional evidence metadata on the verification record; the separately captured report GPS remains the authoritative dispatch location.
 - **Drizzle ORM**: All database access goes through Drizzle — no raw SQL in application code.
 - The storage bucket URL/path is stored in the database as the reference to the file.
+- **Operational timestamps:** Audit logs, responder status logs, responder-report creation/update times, and notifications use PostgreSQL `timestamptz` values representing UTC instants. Web and mobile operational displays and date-only filters project those instants to `Asia/Manila`; raw ISO API timestamp fields remain transport values rather than presentation strings.
+- **Incident lifecycle timestamps:** New responder status transitions store the owning `incident_id` with their timestamp. A Public User report-detail timeline reads only those incident-bound `DISPATCHED` and `ARRIVED` events, while legacy status rows that predate this key remain unlinked and are presented as **Not recorded** rather than inferred from a different event.
 
 ## Auth and Verification Model
 

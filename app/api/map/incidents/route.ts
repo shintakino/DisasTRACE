@@ -11,6 +11,7 @@ import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 import { manilaDayBounds, manilaOperationalPeriodBounds } from "@/lib/manila-time";
 import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
 import { projectMapDisplayStatus } from '@/lib/map-display-status';
+import { formatManilaDate, formatManilaTime } from "@/lib/manila-presentation";
 
 const MAP_RECORD_LIMIT = 200;
 const MapDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
@@ -141,18 +142,9 @@ export async function GET(request: Request) {
         createdAt: inc.createdAt.toISOString(),
         updatedAt: inc.createdAt.toISOString(),
         category: "responder" as const,
-        submittedDate: new Date(inc.createdAt).toLocaleDateString("en-US", {
-          timeZone: 'Asia/Manila',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        submittedTime: new Date(inc.createdAt).toLocaleTimeString("en-US", {
-          timeZone: 'Asia/Manila',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        lastUpdated: new Date(inc.createdAt).toLocaleString("en-US"),
+        submittedDate: formatManilaDate(inc.createdAt),
+        submittedTime: formatManilaTime(inc.createdAt),
+        lastUpdated: inc.createdAt.toISOString(),
         reporterName: inc.reporterName || (inc.reporterType === 'GUEST' ? 'Guest Reporter' : 'Resident'),
         reporterPhone: inc.reporterPhone || inc.contactNumber,
       };
@@ -179,18 +171,9 @@ export async function GET(request: Request) {
         createdAt: req.createdAt.toISOString(),
         updatedAt: req.updatedAt.toISOString(),
         category: "user" as const,
-        submittedDate: new Date(req.createdAt).toLocaleDateString("en-US", {
-          timeZone: 'Asia/Manila',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        submittedTime: new Date(req.createdAt).toLocaleTimeString("en-US", {
-          timeZone: 'Asia/Manila',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        lastUpdated: new Date(req.updatedAt).toLocaleString("en-US"),
+        submittedDate: formatManilaDate(req.createdAt),
+        submittedTime: formatManilaTime(req.createdAt),
+        lastUpdated: req.updatedAt.toISOString(),
         reporterName: req.reporterName || (req.reporterType === 'GUEST' ? 'Guest Reporter' : 'Resident'),
         reporterPhone: req.reporterPhone || req.contactNumber,
       };

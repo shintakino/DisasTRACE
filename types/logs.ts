@@ -22,8 +22,8 @@ export const LogFilterSchema = z.object({
   search: z.string().optional(),
   status: LogStatusSchema.optional(),
   dateRange: z.object({
-    from: z.date().optional(),
-    to: z.date().optional(),
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   }).optional(),
 });
 export type LogFilter = z.infer<typeof LogFilterSchema>;

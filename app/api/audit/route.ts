@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { auditLogs } from "@/db/schema/audit_logs";
 import { users } from "@/db/schema/users";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc, gte, lt } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
+import { formatManilaDate, formatManilaTime } from "@/lib/manila-presentation";
+import { manilaDayBounds } from "@/lib/manila-time";
 import { z } from "zod";
 
 const AuditLimitSchema = z.coerce.number().int().min(1).max(200).optional();
@@ -30,6 +32,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Audit log limit must be between 1 and 200.' }, { status: 400 });
     }
 
+    let fromBounds: ReturnType<typeof manilaDayBounds> | null = null;
+    let toBounds: ReturnType<typeof manilaDayBounds> | null = null;
+    try {
+      fromBounds = from ? manilaDayBounds(from) : null;
+      toBounds = to ? manilaDayBounds(to) : null;
+    } catch {
+      return NextResponse.json({ error: 'Dates must use valid YYYY-MM-DD calendar days.' }, { status: 400 });
+    }
+    if (fromBounds && toBounds && from! > to!) {
+      return NextResponse.json({ error: 'The end date cannot be earlier than the start date.' }, { status: 400 });
+    }
+    const dateScope = fromBounds || toBounds
+      ? and(
+        ...(fromBounds ? [gte(auditLogs.createdAt, fromBounds.start)] : []),
+        ...(toBounds ? [lt(auditLogs.createdAt, toBounds.end)] : []),
+      )
+      : undefined;
+
     // Query real audit logs from the database
     const queryBuilder = db
       .select({
@@ -44,7 +64,8 @@ export async function GET(request: Request) {
         createdAt: auditLogs.createdAt,
       })
       .from(auditLogs)
-      .leftJoin(users, eq(auditLogs.userId, users.id));
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .where(dateScope);
 
     const dbLogs = await queryBuilder.orderBy(desc(auditLogs.createdAt)).limit(parsedLimit.data ?? 200);
 
@@ -59,15 +80,8 @@ export async function GET(request: Request) {
       entityId: log.entityId,
       details: log.details && typeof log.details === 'object' ? log.details as Record<string, unknown> : {},
       timestamp: log.createdAt.toISOString(),
-      date: new Date(log.createdAt).toLocaleDateString("en-US", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
-      time: new Date(log.createdAt).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      date: formatManilaDate(log.createdAt),
+      time: formatManilaTime(log.createdAt),
     }));
 
     if (role && role !== 'all') {
@@ -82,15 +96,6 @@ export async function GET(request: Request) {
           log.contextPath.toLowerCase().includes(query) ||
           log.actorRole.toLowerCase().includes(query)
       );
-    }
-
-    const fromDate = from ? new Date(from) : null;
-    const toDate = to ? new Date(to) : null;
-    if (fromDate && !Number.isNaN(fromDate.getTime())) {
-      mapped = mapped.filter((log) => new Date(log.timestamp) >= fromDate);
-    }
-    if (toDate && !Number.isNaN(toDate.getTime())) {
-      mapped = mapped.filter((log) => new Date(log.timestamp) <= toDate);
     }
 
     return NextResponse.json(mapped);

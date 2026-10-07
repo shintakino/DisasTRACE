@@ -208,7 +208,7 @@ export function AnalyticsDashboard() {
           <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
             Barangay
             <select value={barangay} onChange={(event) => setBarangay(event.target.value)} className="h-9 max-w-48 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800">
-              <option value="">All barangays</option>
+              <option value="">All Barangays</option>
               {BALIWAG_BARANGAYS.map((item) => <option key={item.psgcCode} value={item.name}>{item.name}</option>)}
             </select>
           </label>

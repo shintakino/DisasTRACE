@@ -5,7 +5,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -770,11 +770,11 @@ export default function EmergencyChatbotScreen() {
   };
 
   if (!hasHydrated || !actorReady) {
-    return <SafeAreaView style={styles.loadingPage}><ActivityIndicator color={NAVY} size="large" /></SafeAreaView>;
+    return <SafeAreaView style={styles.loadingPage} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator color={NAVY} size="large" /></SafeAreaView>;
   }
 
   return (
-    <SafeAreaView style={styles.page}>
+    <SafeAreaView style={styles.page} edges={['top', 'bottom', 'left', 'right']}>
       <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
       <View style={styles.header}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={handleBack} style={styles.iconButton}><ChevronLeft color="#1E293B" size={22} /></TouchableOpacity>

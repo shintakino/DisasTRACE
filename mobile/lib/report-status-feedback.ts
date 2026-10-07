@@ -13,6 +13,7 @@ export function reportRefreshCopy(state: ReportRefreshState) {
   if (!state.lastCheckedAt) return { tone: 'neutral' as const, text: 'Checking for the latest confirmed status…' };
   return {
     tone: 'confirmed' as const,
-    text: `Last checked ${state.lastCheckedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+    text: `Last checked ${formatManilaMobileTime(state.lastCheckedAt) ?? 'just now'}`,
   };
 }
+import { formatManilaMobileTime } from './manila-presentation';

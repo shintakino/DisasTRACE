@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { CheckCircle2, MapPin, Navigation, Hospital, Siren } from "lucide-react";
 import { incidentPresentationForType } from "@/lib/incident-presentation";
+import { formatManilaTime } from "@/lib/manila-presentation";
 
 interface MapMarkerProps {
   type: "incident" | "responder" | "hospital";
@@ -130,10 +131,10 @@ export function MapMarker({
 
         {/* Marker Icon */}
         <div className={cn(
-          "relative z-10 rounded-full border-2 p-1 transition-transform",
+          "relative z-10 grid size-9 place-items-center rounded-full border-2 transition-transform",
           isSelected && "scale-125 ring-4 ring-blue-200"
         )} style={{ backgroundColor: presentation.color, borderColor: isSelected ? "#1D4ED8" : presentation.color, color: isLightPresentation ? "#334155" : "#FFFFFF" }}>
-          {isResolved ? <CheckCircle2 size={16} fill="currentColor" /> : isEmergency ? <Siren size={16} fill="currentColor" /> : <MapPin size={16} fill="currentColor" />}
+          {isResolved ? <CheckCircle2 aria-hidden="true" size={18} strokeWidth={2.75} /> : isEmergency ? <Siren aria-hidden="true" size={18} strokeWidth={2.75} /> : <MapPin aria-hidden="true" size={18} strokeWidth={2.75} fill="currentColor" />}
         </div>
       </div>
     );
@@ -151,7 +152,7 @@ export function MapMarker({
       <div className="absolute bottom-full mb-2 w-56 p-3 rounded-lg bg-white border border-slate-200 shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 text-left">
         <p className="text-xs font-bold text-slate-900">{responderName || label}</p>
         <p className="mt-1 text-[10px] font-medium text-slate-500">{status === "ONGOING" ? "Live dispatched ambulance" : "Responder location"}</p>
-        {lastUpdated && <p className="mt-1 text-[10px] text-slate-400">Updated {new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
+        {lastUpdated && <p className="mt-1 text-[10px] text-slate-400">Updated {formatManilaTime(lastUpdated)}</p>}
       </div>
 
       {/* Marker Icon */}

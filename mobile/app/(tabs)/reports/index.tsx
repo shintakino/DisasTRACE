@@ -34,6 +34,7 @@ import { BALIWAG_BARANGAY_NAMES, formatBaliwagLocation } from '../../../lib/bali
 import { isPublicResponseComplete } from '../../../lib/public-response-lifecycle';
 import { readResidentReportCache, writeResidentReportCache } from '../../../lib/resident-report-cache';
 import { shouldKeepReportsVisibleWhileFetching } from '../../../lib/report-list-loading-policy';
+import { formatManilaMobileDateTime, manilaCalendarDateBounds } from '../../../lib/manila-presentation';
 
 const RESPONDER_PAGE_SIZE = 15;
 const TYPE_FILTERS = [
@@ -61,14 +62,8 @@ const DATE_FILTERS: Array<{ label: string; value: DateFilter }> = [
 
 function responderDateBounds(filter: DateFilter, now = new Date()) {
   if (filter === 'all') return null;
-  const end = new Date(now);
-  end.setHours(0, 0, 0, 0);
-  end.setDate(end.getDate() + 1);
-  const start = new Date(end);
-  if (filter === 'today') start.setDate(start.getDate() - 1);
-  if (filter === 'last_7_days') start.setDate(start.getDate() - 7);
-  if (filter === 'last_30_days') start.setDate(start.getDate() - 30);
-  return { createdAfter: start.toISOString(), createdBefore: end.toISOString() };
+  const days = filter === 'today' ? 1 : filter === 'last_7_days' ? 7 : 30;
+  return manilaCalendarDateBounds(days, now);
 }
 
 type Pagination = {
@@ -620,7 +615,7 @@ export default function MyReportsScreen() {
             <>
               <View className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
                 <Text className="text-amber-800 font-bold text-center mb-2">{error}</Text>
-                {offlineSavedAt ? <Text className="text-amber-700 text-xs text-center mb-2">Last synced {new Date(offlineSavedAt).toLocaleString()}</Text> : null}
+                {offlineSavedAt ? <Text className="text-amber-700 text-xs text-center mb-2">Last synced {formatManilaMobileDateTime(offlineSavedAt) ?? 'recently'}</Text> : null}
                 <TouchableOpacity onPress={() => void fetchReports()}><Text className="font-bold text-[#1E3A8A] text-center">Try again</Text></TouchableOpacity>
               </View>
               {reports.length > 0 ? (

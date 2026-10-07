@@ -12,6 +12,7 @@ import { BALIWAG_BARANGAYS } from "@/lib/barangay-boundaries";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatManilaDateTime } from "@/lib/manila-presentation";
 
 interface IncidentPanelProps {
   incidents: MapIncident[];
@@ -308,7 +309,7 @@ function IncidentCard({
 
   const statusColors: Record<MapIncident['displayStatus'], string> = {
     ACTIVE: "bg-blue-500",
-    RESOLVED: "bg-emerald-500",
+    RESOLVED: "bg-[#047857]",
     REJECTED: "bg-red-500",
   };
   const statusLabel = incident.displayStatus === 'RESOLVED'
@@ -402,7 +403,7 @@ function IncidentCard({
           </div>
           <div>
             <span className="font-bold uppercase tracking-wider block text-[8px] text-slate-400">Last Updated</span>
-            <span className="font-medium text-slate-700">{incident.lastUpdated || "N/A"}</span>
+            <span className="font-medium text-slate-700">{incident.lastUpdated ? formatManilaDateTime(incident.lastUpdated) : "N/A"}</span>
           </div>
         </div>
       </div>

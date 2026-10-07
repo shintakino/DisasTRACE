@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserRole, UserStatus, UserFilter } from "@/types/users";
 import { cn } from "@/lib/utils";
+import { OPERATIONAL_ROLE_FILTER_LABELS } from "@/lib/operational-display-labels";
 
 interface UsersHeaderProps {
   onFilterChange: (filters: UserFilter) => void;
@@ -93,7 +94,7 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Role</label>
-                <Select value={role} onValueChange={handleRoleChange}>
+                <Select value={role} onValueChange={handleRoleChange} items={OPERATIONAL_ROLE_FILTER_LABELS}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>

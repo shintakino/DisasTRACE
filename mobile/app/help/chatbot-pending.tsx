@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView,
   Linking,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, ChevronLeft, Phone, RefreshCw, Send, ShieldAlert, UserRound, WifiOff, X } from 'lucide-react-native';
 import { syncChatbotReportToEmergencyStore } from '../../lib/chatbot-report-bridge';
@@ -277,7 +277,7 @@ export default function ChatbotPendingScreen() {
   };
 
   if (!hasHydrated || !actorReady || !activeReport) {
-    return <SafeAreaView style={styles.loading}><ActivityIndicator color={NAVY} size="large" /></SafeAreaView>;
+    return <SafeAreaView style={styles.loading} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator color={NAVY} size="large" /></SafeAreaView>;
   }
 
   const canCancel = activeReport.status === 'PENDING' && !activeReport.hasIncident;
@@ -302,7 +302,7 @@ export default function ChatbotPendingScreen() {
     );
   };
   return (
-    <SafeAreaView style={styles.page}>
+    <SafeAreaView style={styles.page} edges={['top', 'bottom', 'left', 'right']}>
       <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
       <View style={styles.header}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Return home" style={styles.iconButton} onPress={returnHome}><ChevronLeft color="#1E293B" size={22} /></TouchableOpacity>

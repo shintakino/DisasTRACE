@@ -11,5 +11,5 @@ export const auditLogs = pgTable('audit_logs', {
   entityId: varchar('entity_id', { length: 255 }),
   details: jsonb('details'),
   ipAddress: varchar('ip_address', { length: 45 }),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });

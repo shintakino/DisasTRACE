@@ -32,6 +32,8 @@ export default function RosterPage() {
   const [userToDelete, setUserToDelete] = React.useState<RosterEntry | null>(null)
   const [userToBan, setUserToBan] = React.useState<RosterEntry | null>(null)
   const [banAction, setBanAction] = React.useState<'SUSPENDED' | 'DEACTIVATED'>('SUSPENDED')
+  const [actionReasons, setActionReasons] = React.useState({ spamming: false, abusive: false, other: false })
+  const [actionDetails, setActionDetails] = React.useState('')
   const [unitIdDraft, setUnitIdDraft] = React.useState('')
   const [unitIdSaving, setUnitIdSaving] = React.useState(false)
 
@@ -56,6 +58,12 @@ export default function RosterPage() {
   const [addError, setAddError] = React.useState('')
 
   const barangays = RESPONDER_ASSIGNMENT_BARANGAYS
+  const responderActionReason = [
+    actionReasons.spamming ? 'Spamming' : null,
+    actionReasons.abusive ? 'Abusive behavior' : null,
+    actionReasons.other ? 'Other' : null,
+    actionDetails.trim() || null,
+  ].filter((reason): reason is string => Boolean(reason)).join('; ')
 
   const fetchRosterData = React.useCallback(async () => {
     try {
@@ -112,6 +120,8 @@ export default function RosterPage() {
     if (user) {
       setUserToBan(user)
       setUnitIdDraft(user.unitId || '')
+      setActionReasons({ spamming: false, abusive: false, other: false })
+      setActionDetails('')
     }
   }, [data])
 
@@ -165,6 +175,10 @@ export default function RosterPage() {
 
   const confirmBan = async () => {
     if (!userToBan) return
+    if (!responderActionReason) {
+      toast.error('Select at least one reason before continuing.')
+      return
+    }
     try {
       const response = await fetch("/api/users", {
         method: "PATCH",
@@ -172,7 +186,7 @@ export default function RosterPage() {
         body: JSON.stringify({
           id: userToBan.id,
           status: banAction,
-          rejectionReason: "Administrative action on responder roster",
+          rejectionReason: responderActionReason,
         }),
       })
 
@@ -189,6 +203,8 @@ export default function RosterPage() {
     } finally {
       setUserToBan(null)
       setBanAction('SUSPENDED')
+      setActionReasons({ spamming: false, abusive: false, other: false })
+      setActionDetails('')
     }
   }
   const handleAddResponder = async (e: React.FormEvent) => {
@@ -388,20 +404,20 @@ export default function RosterPage() {
               <p className="text-[#1E3A8A] font-bold text-xs mb-4 uppercase tracking-widest">Why are you taking this action?</p>
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
-                  <Checkbox id="reason-spam" className="w-5 h-5 rounded border-slate-300" />
+                  <Checkbox id="reason-spam" className="w-5 h-5 rounded border-slate-300" checked={actionReasons.spamming} onCheckedChange={(checked) => setActionReasons((current) => ({ ...current, spamming: checked === true }))} />
                   <label htmlFor="reason-spam" className="text-sm font-semibold text-slate-700 cursor-pointer">Spamming</label>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Checkbox id="reason-abuse" className="w-5 h-5 rounded border-slate-300" />
+                  <Checkbox id="reason-abuse" className="w-5 h-5 rounded border-slate-300" checked={actionReasons.abusive} onCheckedChange={(checked) => setActionReasons((current) => ({ ...current, abusive: checked === true }))} />
                   <label htmlFor="reason-abuse" className="text-sm font-semibold text-slate-700 cursor-pointer">Abusive Behavior</label>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Checkbox id="reason-other" className="w-5 h-5 rounded border-slate-300" />
+                  <Checkbox id="reason-other" className="w-5 h-5 rounded border-slate-300" checked={actionReasons.other} onCheckedChange={(checked) => setActionReasons((current) => ({ ...current, other: checked === true }))} />
                   <label htmlFor="reason-other" className="text-sm font-semibold text-slate-700 cursor-pointer">Other</label>
                 </div>
               </div>
               <div className="mt-4">
-                <Textarea className="w-full border-slate-200 bg-white rounded-xl resize-none min-h-[100px] focus-visible:ring-1 focus-visible:ring-[#2B4C9B] font-medium" placeholder="Additional details..." />
+                <Textarea value={actionDetails} onChange={(event) => setActionDetails(event.target.value)} maxLength={450} className="w-full border-slate-200 bg-white rounded-xl resize-none min-h-[100px] focus-visible:ring-1 focus-visible:ring-[#2B4C9B] font-medium" placeholder="Additional details..." />
               </div>
             </div>
           </div>
@@ -415,8 +431,9 @@ export default function RosterPage() {
               Cancel
             </Button>
             <Button 
-              className="w-full bg-[#1e1b4b] hover:bg-[#1e1b4b]/90 text-white rounded-xl py-5 h-auto font-bold text-sm"
+              className={banAction === 'SUSPENDED' ? 'w-full bg-[#1E3A8A] text-white hover:bg-[#172F6E] rounded-xl py-5 h-auto font-bold text-sm' : 'w-full bg-[#B91C1C] text-white hover:bg-[#991B1B] rounded-xl py-5 h-auto font-bold text-sm'}
               onClick={confirmBan}
+              disabled={!responderActionReason}
             >
               {banAction === 'SUSPENDED' ? 'Suspend responder' : 'Block responder'}
             </Button>
@@ -593,7 +610,7 @@ export default function RosterPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">City / Municipality <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">City / Municipality</label>
                     <Input 
                       disabled
                       value={newResponder.city}

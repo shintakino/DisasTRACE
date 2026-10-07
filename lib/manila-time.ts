@@ -3,6 +3,19 @@ import { sql } from 'drizzle-orm';
 const MANILA_TIME_ZONE = 'Asia/Manila';
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
+function assertCalendarDay(day: string) {
+  if (!ISO_DAY.test(day)) throw new Error('Expected a calendar date formatted YYYY-MM-DD.');
+  const [year, month, date] = day.split('-').map(Number);
+  const candidate = new Date(Date.UTC(year, month - 1, date));
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== date
+  ) {
+    throw new Error('Expected a valid calendar date.');
+  }
+}
+
 /** Formats a UTC instant as the operational calendar date in Baliwag. */
 export function manilaCalendarDate(at = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -20,7 +33,7 @@ export function manilaCalendarDate(at = new Date()): string {
  * keeps server and database time zones from changing operational day metrics.
  */
 export function manilaDayBounds(day: string) {
-  if (!ISO_DAY.test(day)) throw new Error('Expected a calendar date formatted YYYY-MM-DD.');
+  assertCalendarDay(day);
   return {
     start: sql`(${day}::date::timestamp AT TIME ZONE ${MANILA_TIME_ZONE})`,
     end: sql`((${day}::date + interval '1 day') AT TIME ZONE ${MANILA_TIME_ZONE})`,

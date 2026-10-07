@@ -19,6 +19,7 @@ import {
 import { AuditFilter } from "@/types/audit";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { OPERATIONAL_ROLE_FILTER_LABELS } from "@/lib/operational-display-labels";
 
 interface AuditHeaderProps {
   onFilterChange: (filters: AuditFilter) => void;
@@ -39,8 +40,8 @@ export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
       search: (next.search ?? search) || undefined,
       role: (next.role ?? role) === "all" ? undefined : (next.role ?? role),
       dateRange: start || end ? {
-        from: start ? new Date(`${start}T00:00:00`) : undefined,
-        to: end ? new Date(`${end}T23:59:59.999`) : undefined,
+        from: start || undefined,
+        to: end || undefined,
       } : undefined,
     });
   };
@@ -88,7 +89,7 @@ export function AuditHeader({ onFilterChange }: AuditHeaderProps) {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">User Role</label>
-                <Select value={role} onValueChange={handleRoleChange}>
+                <Select value={role} onValueChange={handleRoleChange} items={OPERATIONAL_ROLE_FILTER_LABELS}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>

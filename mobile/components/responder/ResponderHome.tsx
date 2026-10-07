@@ -28,6 +28,7 @@ import { ensureResponderEmergencyAlertChannels, getResponderEmergencyAlert } fro
 import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 import { getMobileApiBaseUrl } from '../../lib/api-base-url';
+import { formatManilaMobileTime } from '../../lib/manila-presentation';
 import { getDispatchReleaseNotice } from '../../lib/dispatch-release';
 import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
 import {
@@ -188,7 +189,7 @@ export function ResponderHome() {
   const [routeBounds, setRouteBounds] = useState<any>(null);
   const [cameraMode, setCameraMode] = useState<'follow' | 'overview'>('follow');
   const [isCameraCentered, setIsCameraCentered] = useState(true);
-  const [reorientationTop, setReorientationTop] = useState((StatusBar.currentHeight || 24) + 72);
+  const [reorientationTop, setReorientationTop] = useState(insets.top + 72);
   const isMarkerPress = useRef(false);
   const lastDbUpdateRef = useRef<number>(0);
   const lastDbLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -560,10 +561,7 @@ export function ResponderHome() {
                 reporterName,
                 reporterInitials,
                 reporterPhone,
-                timestamp: new Date(inc.created_at).toLocaleTimeString("en-US", {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                }),
+                timestamp: formatManilaMobileTime(inc.created_at) ?? 'Time unavailable',
                 coordinates: {
                   latitude: incidentLat,
                   longitude: incidentLng,
@@ -666,10 +664,7 @@ export function ResponderHome() {
                 reporterName,
                 reporterInitials,
                 reporterPhone,
-                timestamp: new Date(inc.created_at).toLocaleTimeString("en-US", {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                }),
+                timestamp: formatManilaMobileTime(inc.created_at) ?? 'Time unavailable',
                 coordinates: {
                   latitude: incidentLat,
                   longitude: incidentLng,
@@ -1278,7 +1273,7 @@ export function ResponderHome() {
       />
 
       {/* Overlay UI */}
-      <View className="absolute top-0 w-full" style={{ paddingTop: (StatusBar.currentHeight || 24) + 12 }} pointerEvents="box-none">
+      <View className="absolute top-0 w-full" style={{ paddingTop: insets.top + 12 }} pointerEvents="box-none">
         
         {/* Top Header */}
         <View className="px-4 flex-row justify-between items-start pointer-events-auto">

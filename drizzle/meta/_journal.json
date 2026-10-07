@@ -232,6 +232,20 @@
       "when": 1791125359808,
       "tag": "0032_square_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791380746774,
+      "tag": "0033_yielding_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791382476776,
+      "tag": "0034_elite_menace",
+      "breakpoints": true
     }
   ]
 }

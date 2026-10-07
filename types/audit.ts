@@ -18,8 +18,8 @@ export const AuditFilterSchema = z.object({
   search: z.string().optional(),
   role: z.string().optional(),
   dateRange: z.object({
-    from: z.date().optional(),
-    to: z.date().optional(),
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   }).optional(),
 });
 export type AuditFilter = z.infer<typeof AuditFilterSchema>;

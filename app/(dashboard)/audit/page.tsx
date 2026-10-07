@@ -32,8 +32,8 @@ export default function AuditPage() {
       const queryParams = new URLSearchParams();
       if (filters.search) queryParams.append("query", filters.search);
       if (filters.role) queryParams.append("role", filters.role);
-      if (filters.dateRange?.from) queryParams.append("from", filters.dateRange.from.toISOString());
-      if (filters.dateRange?.to) queryParams.append("to", filters.dateRange.to.toISOString());
+      if (filters.dateRange?.from) queryParams.append("from", filters.dateRange.from);
+      if (filters.dateRange?.to) queryParams.append("to", filters.dateRange.to);
       
       const response = await fetch(`/api/audit?${queryParams.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch audit logs");

@@ -5,6 +5,7 @@ import { X } from 'lucide-react-native';
 import { useResponderStore, DispatchDetails } from '../../stores/useResponderStore';
 import { supabase } from '../../lib/supabase';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
+import { formatManilaMobileTime } from '../../lib/manila-presentation';
 
 interface SelectIncidentModalProps {
   visible: boolean;
@@ -92,10 +93,7 @@ export function SelectIncidentModal({ visible, onClose }: SelectIncidentModalPro
           eta: 'Completed',
           reporterName: 'Resident',
           reporterInitials: 'R',
-          timestamp: new Date(inc.created_at).toLocaleTimeString("en-US", {
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
+          timestamp: formatManilaMobileTime(inc.created_at) ?? 'Time unavailable',
           coordinates: { 
             latitude: vReq?.latitude ? Number(vReq.latitude) : 14.9516, 
             longitude: vReq?.longitude ? Number(vReq.longitude) : 120.9011 

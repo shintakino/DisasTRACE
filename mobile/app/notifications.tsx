@@ -10,6 +10,7 @@ import { useEmergencyReportStore } from '../store/use-emergency-report-store';
 import { resolveResponderNotificationRoute } from '../lib/responder-notification-route';
 import { resolvePublicNotificationRoute } from '../lib/public-notification-route';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
+import { formatManilaMobileDateTime } from '../lib/manila-presentation';
 
 type Notification = {
   id: string;
@@ -259,14 +260,13 @@ export default function NotificationsScreen() {
   const formatTime = (dateStr: string) => {
     const timestamp = Date.parse(dateStr || '');
     if (!Number.isFinite(timestamp)) return 'Recently';
-    const d = new Date(timestamp);
     const diffMs = Date.now() - timestamp;
     const diffMins = Math.floor(diffMs / 60000);
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} min ago`;
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours} hrs ago`;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return formatManilaMobileDateTime(timestamp) ?? 'Recently';
   };
 
   const renderIcon = (type: string) => {
@@ -296,17 +296,19 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <View className="flex-1 bg-[#1E3A8A]">
+    <View className="flex-1 bg-[#F8FAFC]">
       <StatusBar barStyle="light-content" />
-      <SafeAreaView edges={['top', 'left', 'right']}>
-        <View className="px-6 py-4 flex-row items-center justify-between">
+      <SafeAreaView edges={['top', 'left', 'right']} className="bg-[#1E3A8A] rounded-b-3xl overflow-hidden">
+        <View className="px-6 pt-4 pb-6 flex-row items-center justify-between">
           <TouchableOpacity 
             onPress={handleBack}
-            className="flex-row items-center"
+            className="flex-row items-center flex-1"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <ChevronLeft color="white" size={24} />
-            <Text className="text-white font-bold text-xl ml-2 tracking-tight">Notifications</Text>
+            <View className="w-10 h-10 bg-white/20 rounded-full items-center justify-center mr-4">
+              <ChevronLeft color="white" size={24} />
+            </View>
+            <Text className="text-2xl font-bold text-white">Notifications</Text>
           </TouchableOpacity>
           {notifications.length > 0 && (
             <TouchableOpacity 
@@ -324,7 +326,7 @@ export default function NotificationsScreen() {
         </View>
       </SafeAreaView>
 
-      <View className="flex-1 bg-white rounded-t-[32px] overflow-hidden">
+      <View className="flex-1 bg-[#F8FAFC] overflow-hidden">
         {loading ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator color="#1E3A8A" size="large" />

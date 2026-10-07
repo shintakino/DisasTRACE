@@ -19,6 +19,7 @@ import {
 import { IncidentType, ReportFilter, DatePreset } from "@/types/reports";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { REPORT_DATE_PRESET_LABELS } from "@/lib/operational-display-labels";
 
 interface ReportsHeaderProps {
   onFilterChange: (filters: ReportFilter | ((prev: ReportFilter) => ReportFilter)) => void;
@@ -163,7 +164,7 @@ export function ReportsHeader({
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Date</label>
-                <Select value={datePreset} onValueChange={handleDatePresetChange}>
+                <Select value={datePreset} onValueChange={handleDatePresetChange} items={REPORT_DATE_PRESET_LABELS}>
                   <SelectTrigger>
                     <SelectValue placeholder="All time" />
                   </SelectTrigger>

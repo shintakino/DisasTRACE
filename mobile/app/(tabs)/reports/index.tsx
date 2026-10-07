@@ -174,7 +174,7 @@ export default function MyReportsScreen() {
   const requestSequence = useRef(0);
   const activeRequest = useRef<AbortController | null>(null);
   const hasLoadedReports = useRef(false);
-  const { role, user } = useAuthStatus();
+  const { role, isLoaded, user } = useAuthStatus();
   const isResponder = role?.includes('responder') ?? false;
   const displayLoading = loading && !shouldKeepReportsVisibleWhileFetching({
     hasLoadedOnce: hasLoadedReports.current,

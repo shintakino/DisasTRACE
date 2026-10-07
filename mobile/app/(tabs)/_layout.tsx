@@ -44,7 +44,7 @@ function ResponderAvailabilityTracker() {
 
 export default function TabLayout() {
   const router = useRouter();
-  const { role } = useAuthStatus();
+  const { role, user } = useAuthStatus();
   const responderStatus = useResponderStore((state) => state.status);
   const insets = useSafeAreaInsets();
   const { isLocationGateActive, requestPermissions, servicesEnabled } = useLocationPermission();

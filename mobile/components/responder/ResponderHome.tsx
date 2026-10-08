@@ -751,6 +751,7 @@ export function ResponderHome() {
               : current.responseTimeSeconds,
             isArrivalConfirmVisible: false,
             isHospitalArrivalConfirmVisible: false,
+            isHospitalArrivalPendingSync: restoredStatus === 'at_hospital' ? false : current.isHospitalArrivalPendingSync,
           });
         }
         return;
@@ -1106,7 +1107,7 @@ export function ResponderHome() {
           setSelectedHospital(null);
         }}
         onRegionWillChange={(event) => {
-          if ((event as any).properties?.isUserGesture) {
+          if (event.nativeEvent.userInteraction) {
             setIsCameraCentered(false);
           }
         }}
@@ -1334,15 +1335,17 @@ export function ResponderHome() {
             onPress={() => router.push('/(tabs)/forms')}
             activeOpacity={0.9}
             className="mx-4 mt-3 bg-[#1E3A8A] border-2 border-amber-400 rounded-2xl p-3 flex-row items-center justify-between shadow-xl pointer-events-auto"
+            accessibilityLabel={`${drafts.length} unsent incident draft${drafts.length > 1 ? 's' : ''}. Open Forms to review and submit it.`}
           >
-            <View className="flex-row items-center space-x-3 flex-1 pr-2">
+            <View className="flex-row items-center gap-3 flex-1 pr-2">
               <View className="w-9 h-9 rounded-xl bg-amber-500/20 items-center justify-center border border-amber-400/40">
                 <FolderDown size={20} color="#F59E0B" />
               </View>
               <View className="flex-1">
-                <Text className="text-white font-extrabold text-xs">
-                  ⚠️ {drafts.length} Unsent Incident Draft{drafts.length > 1 ? 's' : ''}
-                </Text>
+                <View className="flex-row items-baseline gap-1">
+                  <Text className="text-white font-extrabold text-xs">{drafts.length}</Text>
+                  <Text className="text-white font-extrabold text-xs">Unsent Incident Draft{drafts.length > 1 ? 's' : ''}</Text>
+                </View>
                 <Text className="text-blue-100 text-[10px] font-medium mt-0.5" numberOfLines={1}>
                   Internet active · 5-min reminder active to submit to HQ.
                 </Text>
@@ -1494,32 +1497,29 @@ export function ResponderHome() {
                 </View>
               </View>
               <View className={`px-3 py-1.5 rounded-full border flex-row items-center shadow-sm shrink-0 ${
-                profile?.dutyStatus === 'ON_DUTY'
+                dutyStatus === 'ON_DUTY'
                   ? "bg-green-50 border-green-200"
-                  : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                  : dutyStatus === 'ACTIVE_DISPATCH'
                     ? "bg-red-50 border-red-200"
                     : "bg-slate-50 border-slate-200"
               }`}>
                 <View className={`w-1.5 h-1.5 rounded-full mr-2 ${
-                  profile?.dutyStatus === 'ON_DUTY'
+                  dutyStatus === 'ON_DUTY'
                     ? "bg-green-500"
-                    : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                    : dutyStatus === 'ACTIVE_DISPATCH'
                       ? "bg-red-500"
                       : "bg-slate-500"
                 }`} />
                 <Text className={`text-[9px] font-black uppercase tracking-widest ${
-                  profile?.dutyStatus === 'ON_DUTY'
+                  dutyStatus === 'ON_DUTY'
                     ? "text-green-600"
-                    : profile?.dutyStatus === 'ACTIVE_DISPATCH'
+                    : dutyStatus === 'ACTIVE_DISPATCH'
                       ? "text-red-600"
                       : "text-slate-600"
                 }`}>
-                  {profile?.dutyStatus === 'ACTIVE_DISPATCH'
-                    // This card is rendered only while the local responder state
-                    // is idle. An active accepted incident uses the dispatch card
-                    // below, so this is necessarily a pending offer here.
-                    ? "Offer Pending"
-                    : profile?.dutyStatus === 'ON_DUTY'
+                  {dutyStatus === 'ACTIVE_DISPATCH'
+                    ? "Active Dispatch"
+                    : dutyStatus === 'ON_DUTY'
                       ? "On Duty"
                       : "Off Duty"}
                 </Text>

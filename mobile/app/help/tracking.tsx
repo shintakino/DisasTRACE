@@ -848,7 +848,7 @@ export default function TrackingScreen() {
         logo={false}
         attribution={true}
         onRegionWillChange={(event) => {
-          if ((event as any).properties?.isUserGesture) {
+          if (event.nativeEvent.userInteraction) {
             setIsCameraCentered(false);
           }
         }}

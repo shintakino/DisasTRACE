@@ -4,7 +4,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { supabase } from '../lib/supabase';
 import { useResponderStore, checkConnectivity } from '../stores/useResponderStore';
-import { isMockedLocation } from '../lib/location-integrity';
+import { isFreshOperationalLocation, isMockedLocation } from '../lib/location-integrity';
 import {
   canApplyAutomaticHospitalArrival,
   isEligibleHospitalDestination,
@@ -194,7 +194,7 @@ export function useBroadcastTracker(
         console.warn('[Broadcast GPS] High accuracy request failed/timed out, trying cached position:', err);
         try {
           const lastLoc = await Location.getLastKnownPositionAsync();
-          if (lastLoc && lastLoc.coords) {
+          if (lastLoc && lastLoc.coords && isFreshOperationalLocation(lastLoc)) {
             return {
               latitude: lastLoc.coords.latitude,
               longitude: lastLoc.coords.longitude,
@@ -204,6 +204,7 @@ export function useBroadcastTracker(
               isMockedLocation: isMockedLocation(lastLoc),
             };
           }
+          console.warn('[Broadcast GPS] Cached position is missing or stale; waiting for a fresh GPS reading.');
         } catch (cacheErr) {
           console.warn('[Broadcast GPS] Cached position failed, using default Baliwag position:', cacheErr);
         }
@@ -373,7 +374,12 @@ export function useBroadcastTracker(
                     activeDispatchId: activeDispatchRef.current?.id,
                     targetHospital: targetHospitalRef.current,
                   })) {
-                    useResponderStore.setState({ status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL', isHospitalArrivalConfirmVisible: false });
+                    useResponderStore.setState({
+                      status: 'at_hospital',
+                      fieldOutcome: 'HOSPITAL_ARRIVAL',
+                      isHospitalArrivalConfirmVisible: false,
+                      isHospitalArrivalPendingSync: false,
+                    });
                     Alert.alert('Hospital arrival confirmed', 'Trusted GPS confirmed arrival at the selected hospital. Choose whether to finish documentation now or save it for later.');
                   }
                   return;
@@ -504,7 +510,12 @@ export function useBroadcastTracker(
                 activeDispatchId: activeDispatch?.id,
                 targetHospital,
               })) {
-                useResponderStore.setState({ status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL', isHospitalArrivalConfirmVisible: false });
+                useResponderStore.setState({
+                  status: 'at_hospital',
+                  fieldOutcome: 'HOSPITAL_ARRIVAL',
+                  isHospitalArrivalConfirmVisible: false,
+                  isHospitalArrivalPendingSync: false,
+                });
                 Alert.alert('Hospital arrival confirmed', 'Trusted GPS confirmed arrival at the selected hospital. Choose whether to finish documentation now or save it for later.');
               }
               return;

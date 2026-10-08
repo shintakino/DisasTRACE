@@ -51,6 +51,7 @@ export default function EmergencyResponseStatusScreen() {
   const isGuest = report.reporterMode === 'guest' && Boolean(report.guestAccessToken);
   const { handleRejectedReport } = useRejectedReportRecovery(isGuest ? 'guest' : 'registered');
   const hasRedirectedGuestRef = useRef(false);
+  const isLeavingRef = useRef(false);
 
   useEffect(() => {
     if (isGuest && report.chatbotOrigin && !hasRedirectedGuestRef.current) {
@@ -79,6 +80,9 @@ export default function EmergencyResponseStatusScreen() {
   }, [report.chatbotOrigin, router]);
 
   const returnHome = useCallback(() => {
+    // A request refresh may finish while navigation is transitioning. Mark the
+    // screen as inactive before clearing state so it cannot reopen a workflow.
+    isLeavingRef.current = true;
     useEmergencyReportStore.getState().resetReport();
     useChatbotStore.getState().clearReportToIdle();
     router.replace((isGuest ? '/' : '/(tabs)') as never);
@@ -91,7 +95,7 @@ export default function EmergencyResponseStatusScreen() {
     let responseComplete = false;
     const requestId = report.id;
     const load = async () => {
-      if (refreshing || responseComplete) return;
+      if (refreshing || responseComplete || isLeavingRef.current) return;
       refreshing = true;
       try {
         const apiUrl = getMobileApiBaseUrl();
@@ -118,7 +122,7 @@ export default function EmergencyResponseStatusScreen() {
         if (!response.ok || !result?.data) {
           throw new Error(result?.error || 'The latest status could not be loaded.');
         }
-        if (!mounted) return;
+        if (!mounted || isLeavingRef.current) return;
 
         if (result.data.status === 'REJECTED') {
           mounted = false;
@@ -162,10 +166,10 @@ export default function EmergencyResponseStatusScreen() {
         if (!remoteIncident && result.data.status === 'PENDING') returnToWaiting();
       } catch (error) {
         console.error('[ResponseStatus] Failed to refresh response status:', error);
-        if (mounted) setRefreshError(error instanceof Error ? error.message : 'Status refresh failed.');
+        if (mounted && !isLeavingRef.current) setRefreshError(error instanceof Error ? error.message : 'Status refresh failed.');
       } finally {
         refreshing = false;
-        if (mounted) setLoading(false);
+        if (mounted && !isLeavingRef.current) setLoading(false);
       }
     };
     void load();

@@ -459,8 +459,14 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
         animationType="slide"
         onRequestClose={() => setShowOtpModal(false)}
       >
-        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View className="flex-1 justify-end bg-black/60">
+        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          className="flex-1 bg-black/60"
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}
+        >
           <TouchableOpacity 
             className="flex-grow" 
             activeOpacity={1} 
@@ -521,7 +527,7 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
               )}
             </View>
           </View>
-        </View>
+        </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
     </View>

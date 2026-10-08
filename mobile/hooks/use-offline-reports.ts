@@ -6,6 +6,7 @@ import { fetchWithTimeout } from '../lib/network-timeout';
 import * as Haptics from 'expo-haptics';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
 import { normalizeResponderLocationPayload } from '../lib/responder-location-status';
+import { useResponderDutyStore } from '../stores/useResponderDutyStore';
 
 const OFFLINE_REPORTS_KEY = 'disas_trace_offline_reports';
 
@@ -99,6 +100,7 @@ export function useOfflineReports() {
                 }
                 if (action.endpoint === '/api/reports') {
                   const incidentId = action.payload.incidentId;
+                  useResponderDutyStore.getState().setDutyStatus(result?.dutyStatus);
                   useResponderStore.setState((state) => ({
                     submittedIncidentIds: state.submittedIncidentIds.includes(incidentId)
                       ? state.submittedIncidentIds
@@ -129,6 +131,39 @@ export function useOfflineReports() {
                   });
                   alert('Field response synced. Your documentation remains saved, and you are now available for another dispatch.');
                 }
+              } else if (action.type === 'HOSPITAL_ARRIVAL_CONFIRMATION') {
+                const response = await fetchWithTimeout(`${apiUrl}${action.endpoint}`, {
+                  method: action.method,
+                  headers,
+                  body: JSON.stringify(normalizeResponderLocationPayload(action.payload)),
+                }, 12_000, 'hospital arrival confirmation');
+                const result = await response.json().catch(() => null);
+                if (!response.ok || result?.held) {
+                  const message = result?.message || result?.error || 'Hospital arrival could not be confirmed.';
+                  if ([202, 400, 403, 404, 409, 422].includes(response.status)) {
+                    useResponderStore.setState((state) => ({
+                      isHospitalArrivalPendingSync: false,
+                      isHospitalArrivalConfirmVisible: false,
+                      lastQueueError: message,
+                      ...(state.activeDispatch?.id === action.payload?.incidentId
+                        ? { status: 'to_hospital', fieldOutcome: null }
+                        : {}),
+                    }));
+                    await dequeueAction(action.id);
+                    continue;
+                  }
+                  throw new Error(message);
+                }
+
+                useResponderStore.setState((state) => ({
+                  isHospitalArrivalPendingSync: false,
+                  isHospitalArrivalConfirmVisible: false,
+                  lastQueueError: null,
+                  ...(state.activeDispatch?.id === action.payload?.incidentId
+                    ? { status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL' as const }
+                    : {}),
+                }));
+                alert('Hospital arrival confirmed. You can now complete the documentation or save it for later.');
               } else if (action.type === 'TELEMETRY_SYNC') {
                 // Fire a standard REST location update via fetch against the specified endpoint
                 const response = await fetch(`${apiUrl}${action.endpoint}`, {

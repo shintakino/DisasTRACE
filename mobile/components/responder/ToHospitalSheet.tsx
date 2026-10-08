@@ -7,9 +7,26 @@ import { useResponderStore } from '../../stores/useResponderStore';
 import { isEligibleHospitalDestination } from '../../lib/hospital-destination-policy';
 
 export function ToHospitalSheet() {
-  const { status, elapsedTimeSeconds, targetHospital, confirmHospitalArrival, hospitalDistanceKm, hospitalEtaMins } = useResponderStore();
+  const {
+    status,
+    elapsedTimeSeconds,
+    targetHospital,
+    confirmHospitalArrival,
+    hospitalDistanceKm,
+    hospitalEtaMins,
+    isHospitalArrivalPendingSync,
+    lastQueueError,
+    activeDispatch,
+    offlineQueue,
+  } = useResponderStore();
   const bottomSheetRef = useRef<BottomSheet>(null);
   const hasEligibleDestination = isEligibleHospitalDestination(targetHospital);
+  const hasQueuedHospitalArrival = offlineQueue.some((action) => (
+    action.type === 'HOSPITAL_ARRIVAL_CONFIRMATION'
+    && action.payload?.incidentId === activeDispatch?.id
+  ));
+  const isArrivalPending = isHospitalArrivalPendingSync || hasQueuedHospitalArrival;
+  const canConfirmArrival = hasEligibleDestination && !isArrivalPending;
 
   const snapPoints = useMemo(() => ['15%', '50%', '90%'], []);
 
@@ -88,25 +105,33 @@ export function ToHospitalSheet() {
 
         {/* Arrived Button */}
         <TouchableOpacity 
-          disabled={!hasEligibleDestination}
+          disabled={!canConfirmArrival}
           accessibilityRole="button"
-          accessibilityState={{ disabled: !hasEligibleDestination }}
+          accessibilityState={{ disabled: !canConfirmArrival }}
           className={`rounded-2xl py-4 items-center ${
-            hasEligibleDestination
+            canConfirmArrival
               ? 'bg-[#1E3A8A] shadow-lg shadow-blue-900/20 active:bg-blue-900'
               : 'bg-slate-300'
           }`}
           onPress={confirmHospitalArrival}
         >
-          <Text className={`font-bold text-lg ${hasEligibleDestination ? 'text-white' : 'text-slate-500'}`}>
-            Confirm Hospital Arrival
+          <Text className={`font-bold text-lg ${canConfirmArrival ? 'text-white' : 'text-slate-500'}`}>
+            {isArrivalPending ? 'Arrival Waiting for Sync' : 'Confirm Hospital Arrival'}
           </Text>
         </TouchableOpacity>
-        {!hasEligibleDestination && (
+        {!hasEligibleDestination ? (
           <Text className="text-slate-500 text-xs text-center mt-2">
             This action becomes available after an eligible destination is selected.
           </Text>
-        )}
+        ) : isArrivalPending ? (
+          <Text className="text-amber-700 text-xs text-center mt-2">
+            Arrival is saved on this device. Keep the app connected; you remain assigned until PACC confirms it.
+          </Text>
+        ) : lastQueueError ? (
+          <Text className="text-rose-700 text-xs text-center mt-2">
+            {lastQueueError}
+          </Text>
+        ) : null}
 
       </BottomSheetScrollView>
     </BottomSheet>

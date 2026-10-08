@@ -13,6 +13,7 @@ import Step1 from '../../components/auth/Step1';
 import Step2 from '../../components/auth/Step2';
 import Step3 from '../../components/auth/Step3';
 import Step4 from '../../components/auth/Step4';
+import { SignUpPayloadSchema } from '../../schemas/auth';
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -36,57 +37,45 @@ export default function SignUpScreen() {
       // Fetch latest data from Zustand
       const currentData = useSignUpStore.getState().data;
 
-      // Comprehensive validation check to ensure all steps were completed correctly
-      const requiredFields = [
-        { key: 'email', label: 'Email' },
-        { key: 'password', label: 'Password' },
-        { key: 'firstName', label: 'First Name' },
-        { key: 'lastName', label: 'Surname' },
-        { key: 'mobileNumber', label: 'Mobile Number' },
-        { key: 'province', label: 'Province' },
-        { key: 'city', label: 'City' },
-        { key: 'barangay', label: 'Barangay' },
-        { key: 'street', label: 'Street' },
-        { key: 'idCardUri', label: 'ID Photo' },
-        { key: 'idCardType', label: 'ID Type' }
-        ,{ key: 'privacyConsentAt', label: 'Data Privacy Consent' }
-        ,{ key: 'privacyPolicyVersion', label: 'Privacy Policy Version' }
-        ,{ key: 'privacyPolicyAccepted', label: 'Data Privacy Policy Acceptance' }
-      ];
-
-      for (const field of requiredFields) {
-        if (!currentData[field.key as keyof typeof currentData]) {
-          throw new Error(`Registration data is incomplete: ${field.label} is missing.`);
-        }
+      // Revalidate the complete cross-step payload before calling Auth. A user
+      // can edit an earlier step after its local validation has passed, and an
+      // invalid final payload must never create a profile or reserve its phone.
+      const registration = SignUpPayloadSchema.safeParse(currentData);
+      if (!registration.success) {
+        throw new Error(registration.error.issues[0]?.message || 'Please correct the registration details and try again.');
+      }
+      const registrationData = registration.data;
+      if (!registrationData.privacyConsentAt || !registrationData.privacyPolicyVersion) {
+        throw new Error('Please review and accept the current Data Privacy Policy before registering.');
       }
 
       // If Auth succeeded on an earlier attempt but the required ID upload
       // timed out, reuse that authenticated account instead of creating a
       // duplicate or trapping the user on "already registered".
       const existingSession = await withTimeout(supabase.auth.getSession(), 10_000, 'registration recovery');
-      const matchingSession = existingSession.data.session?.user.email?.toLowerCase() === currentData.email?.toLowerCase()
+      const matchingSession = existingSession.data.session?.user.email?.toLowerCase() === registrationData.email.toLowerCase()
         ? existingSession.data.session
         : null;
       const signUpResult = matchingSession
         ? { data: { user: matchingSession.user, session: matchingSession }, error: null }
         : await withTimeout(supabase.auth.signUp({
-            email: currentData.email || '',
-            password: currentData.password || '',
+            email: registrationData.email,
+            password: registrationData.password,
             options: {
               data: {
-                first_name: currentData.firstName,
-                middle_name: currentData.middleName || '',
-                last_name: currentData.lastName,
-                suffix: currentData.suffix || '',
-                full_name: `${currentData.firstName} ${currentData.middleName ? currentData.middleName + ' ' : ''}${currentData.lastName}${currentData.suffix ? ' ' + currentData.suffix : ''}`.trim(),
-                role: currentData.role,
-                phone: currentData.mobileNumber,
-                barangay: currentData.barangay,
-                address: `${currentData.street}, ${currentData.barangay}, ${currentData.city}, ${currentData.province}`,
-                id_type: currentData.idCardType,
-                privacy_consent_at: currentData.privacyConsentAt,
-                privacy_policy_version: currentData.privacyPolicyVersion,
-                privacy_policy_accepted: currentData.privacyPolicyAccepted,
+                first_name: registrationData.firstName,
+                middle_name: registrationData.middleName || '',
+                last_name: registrationData.lastName,
+                suffix: registrationData.suffix || '',
+                full_name: `${registrationData.firstName} ${registrationData.middleName ? registrationData.middleName + ' ' : ''}${registrationData.lastName}${registrationData.suffix ? ' ' + registrationData.suffix : ''}`.trim(),
+                role: registrationData.role,
+                phone: registrationData.mobileNumber,
+                barangay: registrationData.barangay,
+                address: `${registrationData.street}, ${registrationData.barangay}, ${registrationData.city}, ${registrationData.province}`,
+                id_type: registrationData.idCardType,
+                privacy_consent_at: registrationData.privacyConsentAt,
+                privacy_policy_version: registrationData.privacyPolicyVersion,
+                privacy_policy_accepted: registrationData.privacyPolicyAccepted,
               },
             },
           }), 20_000, 'account registration');
@@ -117,7 +106,7 @@ export default function SignUpScreen() {
         await withTimeout(bindCurrentMobileSession(signUpData.session.access_token), 10_000, 'mobile session setup');
       }
 
-      if (currentData.idCardUri) {
+      if (registrationData.idCardUri) {
         if (!signUpData.session) {
           // Email confirmation intentionally creates no session. This is still
           // a successful registration; after the applicant confirms and signs
@@ -126,7 +115,7 @@ export default function SignUpScreen() {
         } else {
             // Use the just-issued token directly. Android SecureStore may not
             // have persisted getSession() yet even though sign-up succeeded.
-            await withTimeout(uploadGovernmentID(currentData.idCardUri, currentData.idCardType, signUpData.session.access_token), 30_000, 'government ID upload');
+            await withTimeout(uploadGovernmentID(registrationData.idCardUri, registrationData.idCardType, signUpData.session.access_token), 30_000, 'government ID upload');
         }
       }
 

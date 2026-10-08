@@ -5,6 +5,7 @@ export type PublicNotificationRoute =
   | { pathname: '/(tabs)/profile'; details?: undefined }
   | { pathname: '/(tabs)/map'; details?: undefined }
   | { pathname: '/(tabs)/reports'; details?: undefined }
+  | { pathname: `/(tabs)/reports/${string}`; details?: undefined }
   | {
       pathname: '/help/tracking' | '/help/response-status';
       details: Pick<EmergencyReportType, 'id' | 'incidentId' | 'trackingRequestId' | 'reporterMode'>;
@@ -67,7 +68,12 @@ export function resolvePublicNotificationRoute(
   }
 
   if (type === 'incident_resolved' || type === 'incident_rejected') {
-    return { pathname: '/(tabs)/reports' };
+    // The notification stores the verification request ID. The detail API
+    // accepts it and independently confirms ownership for the signed-in user.
+    const requestId = asNonEmptyString(getMetadata(input.metadata)?.requestId);
+    return requestId
+      ? { pathname: `/(tabs)/reports/${encodeURIComponent(requestId)}` }
+      : { pathname: '/(tabs)/reports' };
   }
 
   if (type === 'registration_approved' || type === 'registration_rejected') {

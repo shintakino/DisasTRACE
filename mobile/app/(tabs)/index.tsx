@@ -63,60 +63,73 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!notificationOfferId || !isLoaded || role !== 'ambulance_responder' || !user?.id) return;
     let active = true;
+    const controller = new AbortController();
 
     const hydrateOffer = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-      const response = await fetch(`${getMobileApiBaseUrl()}/api/incidents/offer?incidentId=${encodeURIComponent(notificationOfferId)}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      const result = await response.json().catch(() => null);
-      if (!active || !response.ok || !result?.data) {
-        if (active && response.status === 409) {
-          // The notification may have been delivered before the server expiry
-          // ran. Make the result explicit instead of silently returning Home.
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token || !active) return;
+        const response = await fetch(`${getMobileApiBaseUrl()}/api/incidents/offer?incidentId=${encodeURIComponent(notificationOfferId)}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          signal: controller.signal,
+        });
+        const result = await response.json().catch(() => null);
+        if (!active || !response.ok || !result?.data) {
+          if (!active) return;
           router.replace('/(tabs)');
-          Alert.alert(
-            'Dispatch offer released',
-            'You did not accept this report in time. It was released for reassignment to another available responder or PACC.',
-          );
+          if (response.status === 409) {
+            Alert.alert(
+              'Dispatch offer released',
+              'You did not accept this report in time. It was released for reassignment to another available responder or PACC.',
+            );
+          } else {
+            Alert.alert('Dispatch offer unavailable', 'This dispatch offer is no longer available.');
+          }
+          return;
         }
-        return;
-      }
 
-      const offer = result.data;
-      if (useResponderStore.getState().submittedIncidentIds.includes(offer.id)) {
+        const offer = result.data;
+        if (useResponderStore.getState().submittedIncidentIds.includes(offer.id)) {
+          router.replace('/(tabs)');
+          return;
+        }
+        const initials = offer.reporterName.split(' ').map((name: string) => name[0]).join('').slice(0, 2).toUpperCase() || 'R';
+        useResponderStore.setState({
+          status: 'dispatch_offered',
+          activeDispatch: {
+            id: offer.id,
+            type: offer.type || 'Emergency',
+            locationName: offer.locationName,
+            distance: 'Distance pending',
+            natureOfCall: offer.natureOfCall || 'EMERGENCY',
+            peopleInvolved: offer.peopleInvolved,
+            eta: offer.etaMinutes ? `~${offer.etaMinutes} min` : 'Calculating',
+            reporterName: offer.reporterName,
+            reporterInitials: initials,
+            reporterPhone: offer.reporterPhone || undefined,
+            timestamp: formatIncidentTimestamp(offer.createdAt),
+            coordinates: { latitude: Number(offer.latitude), longitude: Number(offer.longitude) },
+            typeOfEmergency: offer.type || 'Emergency',
+            dispatchOfferDurationSeconds: offer.dispatchOfferDurationSeconds || 30,
+            offerExpiresAt: offer.offerExpiresAt || undefined,
+            assignedAmbulance: offer.assignedAmbulance || 'AMB-001',
+            attachmentUrl: offer.attachmentUrl || undefined,
+          },
+        });
         router.replace('/(tabs)');
-        return;
+      } catch (error) {
+        if (!active || controller.signal.aborted) return;
+        console.error('[HomeScreen] Failed to hydrate responder dispatch offer:', error);
+        router.replace('/(tabs)');
+        Alert.alert('Dispatch offer unavailable', 'Unable to load this dispatch offer. Please check your connection and try again.');
       }
-      const initials = offer.reporterName.split(' ').map((name: string) => name[0]).join('').slice(0, 2).toUpperCase() || 'R';
-      useResponderStore.setState({
-        status: 'dispatch_offered',
-        activeDispatch: {
-          id: offer.id,
-          type: offer.type || 'Emergency',
-          locationName: offer.locationName,
-          distance: 'Distance pending',
-          natureOfCall: offer.natureOfCall || 'EMERGENCY',
-          peopleInvolved: offer.peopleInvolved,
-          eta: offer.etaMinutes ? `~${offer.etaMinutes} min` : 'Calculating',
-          reporterName: offer.reporterName,
-          reporterInitials: initials,
-          reporterPhone: offer.reporterPhone || undefined,
-          timestamp: formatIncidentTimestamp(offer.createdAt),
-          coordinates: { latitude: Number(offer.latitude), longitude: Number(offer.longitude) },
-          typeOfEmergency: offer.type || 'Emergency',
-          dispatchOfferDurationSeconds: offer.dispatchOfferDurationSeconds || 30,
-          offerExpiresAt: offer.offerExpiresAt || undefined,
-          assignedAmbulance: offer.assignedAmbulance || 'AMB-001',
-          attachmentUrl: offer.attachmentUrl || undefined,
-        },
-      });
-      router.replace('/(tabs)');
     };
 
     void hydrateOffer();
-    return () => { active = false; };
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [isLoaded, notificationOfferId, role, router, user?.id]);
 
   // Configure notifications channel
@@ -200,13 +213,19 @@ export default function HomeScreen() {
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          fetchUnreadCount();
-          if (payload.eventType === 'INSERT') {
-            const notif = payload.new as any;
-            if (notif && notif.id && isNotificationVisibleForRole(notif.type, role)) {
-              if (processedNotifIds.current.has(notif.id)) return;
-              processedNotifIds.current.add(notif.id);
+          (payload) => {
+            fetchUnreadCount();
+            if (payload.eventType === 'INSERT') {
+              const notif = payload.new as any;
+              if (notif && notif.id && isNotificationVisibleForRole(notif.type, role)) {
+                // ResponderHome already emits a typed, urgency-specific alert
+                // when an incident offer is received. Do not create a second
+                // generic banner for the same dispatch event.
+                const isResponderDispatchAlert = role === 'ambulance_responder'
+                  && ['new_incident', 'dispatch_alert', 'manual_dispatch_offered'].includes(notif.type);
+                if (isResponderDispatchAlert) return;
+                if (processedNotifIds.current.has(notif.id)) return;
+                processedNotifIds.current.add(notif.id);
 
               if (processedNotifIds.current.size > 100) {
                 const firstKey = processedNotifIds.current.values().next().value;
@@ -219,6 +238,7 @@ export default function HomeScreen() {
                   body: notif.body,
                   sound: true,
                   priority: Notifications.AndroidNotificationPriority.HIGH,
+                  data: { type: notif.type, metadata: notif.metadata },
                   android: {
                     channelId: notif.type === 'system_announcement' ? 'announcements' : 'emergency-alerts',
                   },
@@ -449,6 +469,7 @@ export default function HomeScreen() {
             useResponderStore.setState({
               status: storeStatus,
               fieldOutcome: storeStatus === 'at_hospital' ? 'HOSPITAL_ARRIVAL' : null,
+              isHospitalArrivalPendingSync: false,
               initialDistanceKm: parsedDistanceKm,
               activeDispatch: {
                 id: activeInc.id,

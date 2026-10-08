@@ -59,10 +59,36 @@ assert.match(
   /role === 'public_user'[\s\S]*?resolvePublicNotificationRoute[\s\S]*?useEmergencyReportStore\.getState\(\)\.setDetails/,
   'Only the public route resolver may write validated public tracking state.',
 );
+assert.match(
+  notificationScreen,
+  /role === 'ambulance_responder' && router\.canGoBack\(\)[\s\S]*?router\.back\(\)[\s\S]*?router\.replace\('\/\(tabs\)'/,
+  'Notification Back must pop a manually opened screen and only fall back to Home for cold-start notification launches.',
+);
 
 const rootLayout = read('mobile/app/_layout.tsx');
 assert.match(rootLayout, /clearLastNotificationResponseAsync/, 'Handled Android notification taps must be consumed once.');
 assert.match(rootLayout, /resolveResponderNotificationRoute/, 'Android responder pushes must use the same internal route resolver.');
 assert.match(rootLayout, /role === 'public_user'[\s\S]*?resolvePublicNotificationRoute/, 'Android public notification taps must use the public resolver.');
+
+const homeScreen = read('mobile/app/(tabs)/index.tsx');
+assert.match(
+  homeScreen,
+  /data:\s*\{ type: notif\.type, metadata: notif\.metadata \}/,
+  'Generic local notifications must preserve their typed route payload.',
+);
+assert.match(
+  homeScreen,
+  /isResponderDispatchAlert[\s\S]*?return;[\s\S]*?Notifications\.scheduleNotificationAsync/,
+  'Responder dispatch alerts must not be duplicated by the generic home notification listener.',
+);
+assert.match(
+  homeScreen,
+  /const controller = new AbortController\(\)[\s\S]*?signal: controller\.signal[\s\S]*?catch \(error\)[\s\S]*?controller\.abort\(\)/,
+  'Notification offer hydration must cancel on exit and catch failed network/session work.',
+);
+
+const tabsLayout = read('mobile/app/(tabs)/_layout.tsx');
+assert.match(tabsLayout, /responderStatus !== 'dispatch_offered'/, 'Only a new offer may auto-route a responder to Home.');
+assert.doesNotMatch(tabsLayout, /responderStatus === 'dispatch_offered'\s*\|\|\s*responderStatus === 'en_route'/, 'En-route state must not compete with report or notification navigation.');
 
 console.log('Responder notification routing and expiry race regression checks passed.');

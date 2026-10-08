@@ -585,9 +585,9 @@ export function IncidentReportForm() {
                       onToggle={() => toggleDropdown(`patient-${patient.id}`)}
                     />
 
-                    <View className="flex-row space-x-3 mt-2">
+                    <View className="flex-row gap-3 mt-2">
                       <View className="flex-1">
-                        <Text className="text-[#1E3A8A] font-black text-[9px] uppercase tracking-widest mb-1.5">BP</Text>
+                        <Text className="text-[#1E3A8A] font-black text-xs uppercase tracking-widest mb-1.5">BP</Text>
                         <TextInput 
                           className="border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-[#1E3A8A] font-medium text-sm"
                           placeholder="120/80"
@@ -599,7 +599,7 @@ export function IncidentReportForm() {
                         />
                       </View>
                       <View className="flex-1">
-                        <Text className="text-[#1E3A8A] font-black text-[9px] uppercase tracking-widest mb-1.5">HR</Text>
+                        <Text className="text-[#1E3A8A] font-black text-xs uppercase tracking-widest mb-1.5">HR</Text>
                         <TextInput 
                           className="border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-[#1E3A8A] font-medium text-sm"
                           placeholder="bpm"
@@ -611,7 +611,7 @@ export function IncidentReportForm() {
                         />
                       </View>
                       <View className="flex-1">
-                        <Text className="text-[#1E3A8A] font-black text-[9px] uppercase tracking-widest mb-1.5">SPO2</Text>
+                        <Text className="text-[#1E3A8A] font-black text-xs uppercase tracking-widest mb-1.5">SPO2</Text>
                         <TextInput 
                           className="border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-[#1E3A8A] font-medium text-sm"
                           placeholder="%"
@@ -662,7 +662,7 @@ export function IncidentReportForm() {
                 {submissionValidation.errors[0]}
               </Text>
             )}
-            <View className="flex-row space-x-3">
+            <View className="flex-row gap-4">
               <TouchableOpacity
                 onPress={handleSaveDraft}
                 className="flex-1 bg-yellow-50 border border-yellow-100 rounded-2xl py-4 flex-row justify-center items-center shadow-sm"

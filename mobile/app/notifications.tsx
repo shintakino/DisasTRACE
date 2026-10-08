@@ -44,6 +44,7 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const navigationInProgressRef = useRef(false);
+  const isLeavingRef = useRef(false);
 
   const apiUrl = getMobileApiBaseUrl();
 
@@ -222,8 +223,16 @@ export default function NotificationsScreen() {
   };
 
   const handleBack = () => {
-    // Notifications are an authenticated account surface. Returning to the
-    // stable tab root avoids replaying a stale detail/tracking route.
+    // A manually opened notification centre has a real previous route. Pop it
+    // instead of rebuilding the tab navigator while responder state listeners
+    // are active. Cold-start notification launches have no previous route, so
+    // they still land on the stable tab root.
+    if (isLeavingRef.current || navigationInProgressRef.current) return;
+    isLeavingRef.current = true;
+    if (role === 'ambulance_responder' && router.canGoBack()) {
+      router.back();
+      return;
+    }
     router.replace('/(tabs)' as any);
   };
 

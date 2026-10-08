@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select"
 import { RosterFilter as RosterFilterType, RosterStatus } from "@/types/roster"
 import { cn } from "@/lib/utils"
+import { ACCOUNT_STATUS_FILTER_LABELS } from "@/lib/operational-display-labels"
 
 interface RosterFilterProps {
   filters: RosterFilterType
@@ -60,7 +61,7 @@ export function RosterFilter({ filters, onFilterChange }: RosterFilterProps) {
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-xs font-semibold text-gray-700">Status</label>
-              <Select value={status} onValueChange={(val) => setStatus(val || "all")}>
+              <Select value={status} onValueChange={(val) => setStatus(val || "all")} items={ACCOUNT_STATUS_FILTER_LABELS}>
                 <SelectTrigger className="h-10 bg-gray-50 border-none rounded-md text-sm font-medium">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>

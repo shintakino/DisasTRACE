@@ -10,6 +10,7 @@ import {
 import { fetchWithTimeout } from '../lib/network-timeout';
 import { normalizeResponderDistanceKm } from '../lib/responder-report-summary';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
+import { useResponderDutyStore } from './useResponderDutyStore';
 import {
   createReportFormSession,
   getReportFormCloseStatus,
@@ -51,7 +52,7 @@ export type FieldOutcome = ResponderFieldOutcome;
 export interface QueueAction {
   id: string; // unique timestamp/uuid
   ownerUserId: string;
-  type: 'STATE_CHANGE' | 'TELEMETRY_SYNC';
+  type: 'STATE_CHANGE' | 'TELEMETRY_SYNC' | 'HOSPITAL_ARRIVAL_CONFIRMATION';
   timestamp: string; // ISO string
   endpoint: string; // target endpoint
   method: 'POST' | 'PATCH' | 'PUT';
@@ -120,6 +121,7 @@ interface ResponderState {
   elapsedTimeSeconds: number;
   isArrivalConfirmVisible: boolean;
   isHospitalArrivalConfirmVisible: boolean;
+  isHospitalArrivalPendingSync: boolean;
   isSubmittingReport: boolean;
   showReportSuccess: boolean;
   lastReportDelivery: 'CONFIRMED' | 'QUEUED_OFFLINE' | null;
@@ -226,6 +228,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
   elapsedTimeSeconds: 0,
   isArrivalConfirmVisible: false,
   isHospitalArrivalConfirmVisible: false,
+  isHospitalArrivalPendingSync: false,
   isSubmittingReport: false,
   showReportSuccess: false,
   lastReportDelivery: null,
@@ -478,7 +481,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
     if (!confirmed) {
       await useResponderStore.getState().enqueueAction({
-        type: 'TELEMETRY_SYNC',
+        type: 'HOSPITAL_ARRIVAL_CONFIRMATION',
         endpoint: '/api/responder/location',
         method: 'POST',
         payload: {
@@ -490,19 +493,29 @@ export const useResponderStore = create<ResponderState>((set) => ({
           confirmHospitalArrival: true,
         },
       });
-      alert('Hospital arrival was saved on this device and will sync with PACC after reconnection.');
+      set({
+        isHospitalArrivalPendingSync: true,
+        isHospitalArrivalConfirmVisible: false,
+      });
+      alert('Hospital arrival is pending sync with PACC. You remain assigned until it is confirmed.');
+      return;
     }
 
     set({
       status: 'at_hospital',
       fieldOutcome: 'HOSPITAL_ARRIVAL',
       isHospitalArrivalConfirmVisible: false,
+      isHospitalArrivalPendingSync: false,
     });
   },
 
   startReport: async () => {
     const currentState = useResponderStore.getState();
     const activeDispatch = currentState.activeDispatch;
+    if (currentState.isHospitalArrivalPendingSync) {
+      alert('Hospital arrival is still waiting for PACC confirmation. Keep the app connected, then continue after it syncs.');
+      return;
+    }
     if (!canEnterHospitalReport(currentState.status, currentState.targetHospital)) {
       alert(currentState.status === 'to_hospital'
         ? 'Confirm arrival at the selected hospital before continuing to the report.'
@@ -592,6 +605,11 @@ export const useResponderStore = create<ResponderState>((set) => ({
       alert('Confirm the field outcome before saving documentation for later.');
       return false;
     }
+    if (currentState.isHospitalArrivalPendingSync) {
+      await useResponderStore.getState().saveDraft(formIncident, formData, true);
+      alert('Your draft is saved on this device. Hospital arrival is still waiting for PACC confirmation, so you remain assigned.');
+      return false;
+    }
 
     await useResponderStore.getState().saveDraft(formIncident, formData, true);
 
@@ -666,6 +684,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
         elapsedTimeSeconds: 0,
         isArrivalConfirmVisible: false,
         isHospitalArrivalConfirmVisible: false,
+        isHospitalArrivalPendingSync: false,
         hospitalDistanceKm: null,
         hospitalEtaMins: null,
       });
@@ -771,6 +790,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
         return;
       }
       if (res.success) {
+        useResponderDutyStore.getState().setDutyStatus(res.dutyStatus);
         const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
         const nextOfflineQueue = useResponderStore.getState().offlineQueue.filter((action) => !(
           action.endpoint === '/api/reports' && action.payload?.incidentId === idToSubmit
@@ -840,6 +860,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
         elapsedTimeSeconds: 0,
         isArrivalConfirmVisible: false,
         isHospitalArrivalConfirmVisible: false,
+        isHospitalArrivalPendingSync: false,
         lastArrivalDelivery: null,
         currentSpeedKph: 0,
         hospitalDistanceKm: null,
@@ -865,6 +886,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
         elapsedTimeSeconds: 0,
         isArrivalConfirmVisible: false,
         isHospitalArrivalConfirmVisible: false,
+        isHospitalArrivalPendingSync: false,
         currentSpeedKph: 0,
         hospitalDistanceKm: null,
         hospitalEtaMins: null,
@@ -885,6 +907,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
     elapsedTimeSeconds: 0,
     isArrivalConfirmVisible: false,
     isHospitalArrivalConfirmVisible: false,
+    isHospitalArrivalPendingSync: false,
     isSubmittingReport: false,
     showReportSuccess: false,
     currentSpeedKph: 0,
@@ -908,6 +931,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
     elapsedTimeSeconds: 0,
     isArrivalConfirmVisible: false,
     isHospitalArrivalConfirmVisible: false,
+    isHospitalArrivalPendingSync: false,
     isSubmittingReport: state.reportFormSession?.source === 'DOCUMENTATION_DRAFT'
       ? state.isSubmittingReport
       : false,
@@ -1005,6 +1029,11 @@ export const useResponderStore = create<ResponderState>((set) => ({
     let updatedQueue: QueueAction[] = [];
     const currentQueue = useResponderStore.getState().offlineQueue;
     const telemetryIndex = currentQueue.findIndex(a => a.type === 'TELEMETRY_SYNC' && a.ownerUserId === session.user.id);
+    const hospitalArrivalConfirmationIndex = currentQueue.findIndex((queuedAction) => (
+      queuedAction.type === 'HOSPITAL_ARRIVAL_CONFIRMATION'
+      && queuedAction.ownerUserId === session.user.id
+      && queuedAction.payload?.incidentId === action.payload?.incidentId
+    ));
     const documentationReleaseIndex = currentQueue.findIndex((queuedAction) => (
       queuedAction.type === 'STATE_CHANGE'
       && queuedAction.ownerUserId === session.user.id
@@ -1020,6 +1049,14 @@ export const useResponderStore = create<ResponderState>((set) => ({
         ownerUserId: session.user.id,
         payload: action.payload,
         timestamp: new Date().toISOString()
+      };
+    } else if (action.type === 'HOSPITAL_ARRIVAL_CONFIRMATION' && hospitalArrivalConfirmationIndex !== -1) {
+      updatedQueue = [...currentQueue];
+      updatedQueue[hospitalArrivalConfirmationIndex] = {
+        ...updatedQueue[hospitalArrivalConfirmationIndex],
+        ownerUserId: session.user.id,
+        payload: action.payload,
+        timestamp: new Date().toISOString(),
       };
     } else if (documentationReleaseIndex !== -1) {
       return;

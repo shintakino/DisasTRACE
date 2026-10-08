@@ -546,7 +546,11 @@ export async function POST(req: NextRequest) {
             .set({ dutyStatus: 'ON_DUTY' })
             .where(and(eq(users.id, user.id), eq(users.dutyStatus, 'ACTIVE_DISPATCH')));
         }
-        return { kind: 'existing' as const, report: concurrentReport };
+        return {
+          kind: 'existing' as const,
+          report: concurrentReport,
+          dutyStatus: otherActiveIncident ? 'ACTIVE_DISPATCH' as const : 'ON_DUTY' as const,
+        };
       }
 
       if (!['ARRIVED', 'DOCUMENTATION_PENDING'].includes(lockedIncident.status)) {
@@ -639,7 +643,11 @@ export async function POST(req: NextRequest) {
           .where(and(eq(users.id, user.id), eq(users.dutyStatus, 'ACTIVE_DISPATCH')));
       }
 
-      return { kind: 'created' as const, report: insertedReport };
+      return {
+        kind: 'created' as const,
+        report: insertedReport,
+        dutyStatus: otherActiveIncident ? 'ACTIVE_DISPATCH' as const : 'ON_DUTY' as const,
+      };
     });
 
     if (completion.kind === 'reassigned') {
@@ -658,6 +666,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         report: completion.report,
+        dutyStatus: completion.dutyStatus,
         alreadySubmitted: true,
         message: "Incident report was already submitted.",
       });
@@ -687,6 +696,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       report: newReport,
+      dutyStatus: completion.dutyStatus,
       message: "Incident report successfully submitted. Incident resolved."
     });
   } catch (error) {

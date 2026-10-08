@@ -35,9 +35,15 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
+  resolvePublicNotificationRoute({ type: 'incident_resolved', metadata: { incidentId: 'incident-3', requestId: 'request-3' } }),
+  { pathname: '/(tabs)/reports/request-3' },
+  'Resolved notifications must open the owned report using its request ID, not its incident ID.',
+);
+
+assert.deepEqual(
   resolvePublicNotificationRoute({ type: 'incident_resolved', metadata: { incidentId: 'incident-3' } }),
   { pathname: '/(tabs)/reports' },
-  'Incident IDs must never be used as report-detail IDs.',
+  'Missing request metadata must use the safe report-list fallback.',
 );
 
 assert.match(notificationScreen, /resolvePublicNotificationRoute/, 'Public notification navigation must use the typed resolver.');
@@ -45,5 +51,6 @@ assert.match(notificationScreen, /router\.replace\('\/\(tabs\)' as any\)/, 'Noti
 assert.doesNotMatch(notificationScreen, /router\.push\(`\/\(tabs\)\/reports\/\$\{incidentId\}`/, 'Notification navigation must not construct report routes from incident IDs.');
 assert.match(rootLayout, /resolvePublicNotificationRoute/, 'Native Public User notification responses must use the same safe resolver.');
 assert.match(rootLayout, /route\?\.pathname \?\? '\/notifications'/, 'Unknown native Public User notification payloads must open Notifications safely.');
+assert.match(rootLayout, /Notifications\.getLastNotificationResponseAsync\(\)[\s\S]*Notifications\.clearLastNotificationResponseAsync/, 'The persisted native response must be cleared after it is copied into memory.');
 
 console.log('Public notification navigation regression checks passed.');

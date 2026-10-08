@@ -11,6 +11,7 @@ import { registerResponderPushNotifications, subscribeToPushTokenChanges } from 
 import { resolveResponderNotificationRoute } from '../lib/responder-notification-route';
 import { resolvePublicNotificationRoute } from '../lib/public-notification-route';
 import { useEmergencyReportStore } from '../store/use-emergency-report-store';
+import { useResponderStore } from '../stores/useResponderStore';
 import "../global.css";
 
 // Ignore known React Native third-party warnings
@@ -31,13 +32,15 @@ TextInputWithDefaults.defaultProps = {
 SplashScreen.preventAutoHideAsync();
 
 function InitialLayout() {
-  const { isLoaded, isSignedIn, verificationStatus, role } = useAuthStatus();
+  const { isLoaded, isSignedIn, verificationStatus, role, user } = useAuthStatus();
+  const loadOfflineQueue = useResponderStore((state) => state.loadOfflineQueue);
   const segments = useSegments();
   const router = useRouter();
   const [isAppReady, setIsAppReady] = useState(false);
   const [notificationResponseVersion, setNotificationResponseVersion] = useState(0);
   const pendingNotificationResponseRef = useRef<Notifications.NotificationResponse | null>(null);
   const handledNotificationResponseIdsRef = useRef(new Set<string>());
+  const queuedNotificationResponseIdsRef = useRef(new Set<string>());
 
   // Preserve notification taps until auth and the root navigator are ready.
   // Android must never fall back to a bare `disastrace:///` URI for a responder alert.
@@ -45,13 +48,22 @@ function InitialLayout() {
     const queueNotificationResponse = (response: Notifications.NotificationResponse | null) => {
       if (!response) return;
       const responseId = response.notification.request.identifier;
-      if (handledNotificationResponseIdsRef.current.has(responseId)) return;
+      if (handledNotificationResponseIdsRef.current.has(responseId) || queuedNotificationResponseIdsRef.current.has(responseId)) return;
+      queuedNotificationResponseIdsRef.current.add(responseId);
       pendingNotificationResponseRef.current = response;
       setNotificationResponseVersion((version) => version + 1);
     };
 
     const subscription = Notifications.addNotificationResponseReceivedListener(queueNotificationResponse);
-    Notifications.getLastNotificationResponseAsync().then(queueNotificationResponse).catch(() => undefined);
+    // Expo retains the last response across launches. Keep a valid launch tap
+    // in memory, but clear the native copy so an ordinary later launch cannot
+    // replay the old response into Notifications.
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        queueNotificationResponse(response);
+        if (response) void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+      })
+      .catch(() => undefined);
 
     return () => subscription.remove();
   }, []);
@@ -69,11 +81,14 @@ function InitialLayout() {
 
     if (role === 'ambulance_responder') {
       const route = resolveResponderNotificationRoute(data);
-      if (!route) return;
+      if (!route) {
+        handledNotificationResponseIdsRef.current.add(responseId);
+        pendingNotificationResponseRef.current = null;
+        return;
+      }
       handledNotificationResponseIdsRef.current.add(responseId);
       pendingNotificationResponseRef.current = null;
       router.replace(route as never);
-      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
       return;
     }
 
@@ -88,7 +103,6 @@ function InitialLayout() {
       pendingNotificationResponseRef.current = null;
       if (route?.details) useEmergencyReportStore.getState().setDetails(route.details);
       router.replace((route?.pathname ?? '/notifications') as never);
-      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
     }
   }, [isAppReady, isSignedIn, notificationResponseVersion, role, router, verificationStatus]);
 
@@ -100,6 +114,14 @@ function InitialLayout() {
     const subscription = subscribeToPushTokenChanges();
     return () => subscription.remove();
   }, [isSignedIn, role, verificationStatus]);
+
+  // Offline responder actions are account-bound. Hydrate them only after the
+  // approved responder session exists so a queued hospital confirmation can be
+  // replayed after an Android process restart without crossing accounts.
+  useEffect(() => {
+    if (!isSignedIn || verificationStatus !== 'approved' || role !== 'ambulance_responder' || !user?.id) return;
+    void loadOfflineQueue();
+  }, [isSignedIn, loadOfflineQueue, role, user?.id, verificationStatus]);
 
   console.log('[InitialLayout] Rendered. isLoaded:', isLoaded, 'isSignedIn:', isSignedIn, 'verificationStatus:', verificationStatus);
 

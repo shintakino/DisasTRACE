@@ -115,9 +115,11 @@ export function ManageUserDialog({ user, isOpen, onClose, onUpdate }: ManageUser
                   {status === "ACTIVE" && "Active"}
                   {status === "SUSPENDED" && "Suspended"}
                   {status === "DEACTIVATED" && "Deactivated"}
+                  {status === "PENDING" && "Pending"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="PENDING" disabled className="font-medium text-slate-500">Pending — use Users Approval</SelectItem>
                 <SelectItem value="ACTIVE" className="font-medium text-green-600">Active</SelectItem>
                 <SelectItem value="SUSPENDED" className="font-medium text-orange-600">Suspended</SelectItem>
                 <SelectItem value="DEACTIVATED" className="font-medium text-red-600">Deactivated</SelectItem>

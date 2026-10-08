@@ -16,6 +16,7 @@ import crypto from "crypto";
 import { isValidPhilippinePhone, normalizePhilippinePhone } from "@/lib/phone";
 import { isValidAmbulanceUnitId, normalizeAmbulanceUnitId } from "@/lib/ambulance-unit";
 import { isResponderAssignmentBarangay } from "@/lib/responder-assignment-barangays";
+import { deriveUserVerificationState, isMobileApprovalRole } from "@/lib/account-approval";
 
 const UpdateUserSchema = z.object({
   id: z.string(),
@@ -98,6 +99,9 @@ export async function GET() {
       email: u.email,
       role: u.role,
       status: u.status,
+      verificationStatus: u.verificationStatus,
+      verificationState: deriveUserVerificationState(u),
+      hasIdentityDocument: Boolean(u.idImageUrl),
       joinedDate: u.createdAt ? new Date(u.createdAt).toLocaleDateString("en-US", {
         year: 'numeric',
         month: 'long',
@@ -278,6 +282,16 @@ export async function PATCH(req: NextRequest) {
 
     const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
     if (!existingUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (
+      status === 'ACTIVE'
+      && isMobileApprovalRole(existingUser.role)
+      && existingUser.verificationStatus !== 'APPROVED'
+    ) {
+      return NextResponse.json(
+        { error: "Pending mobile registrations must be approved from Users Approval before they can be activated." },
+        { status: 409 },
+      );
+    }
     if ((fullName !== undefined || email !== undefined || phone !== undefined || address !== undefined) && existingUser.role !== 'public_user') {
       return NextResponse.json({ error: "Only registered public-user profile information can be edited here." }, { status: 400 });
     }

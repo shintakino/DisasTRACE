@@ -56,6 +56,11 @@ export default function UsersApprovalPage() {
     }
   };
 
+  const handleApprovalConflict = async () => {
+    toast.info("This application changed before it could be reviewed. The queue has been refreshed.");
+    await fetchApplicantsSilent();
+  };
+
   useEffect(() => {
     fetchApplicants();
 
@@ -91,7 +96,10 @@ export default function UsersApprovalPage() {
       const response = await fetch(`/api/users/approval/${selectedApplicant.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "APPROVED" }),
+        body: JSON.stringify({
+          status: "APPROVED",
+          documentPath: selectedApplicant.identityDocument.documentPath,
+        }),
       });
 
       if (response.ok) {
@@ -101,6 +109,8 @@ export default function UsersApprovalPage() {
         setApplicants(nextApplicants);
         setSummary(prev => ({ ...prev, pending: prev.pending - 1, reviewedToday: prev.reviewedToday + 1 }));
         setSelectedApplicant(nextApplicants.length > 0 ? nextApplicants[0] : null);
+      } else if (response.status === 409) {
+        await handleApprovalConflict();
       } else {
         toast.error("Failed to approve application");
       }
@@ -118,7 +128,11 @@ export default function UsersApprovalPage() {
       const response = await fetch(`/api/users/approval/${selectedApplicant.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "REJECTED", reason }),
+        body: JSON.stringify({
+          status: "REJECTED",
+          reason,
+          documentPath: selectedApplicant.identityDocument.documentPath,
+        }),
       });
 
       if (response.ok) {
@@ -128,6 +142,8 @@ export default function UsersApprovalPage() {
         setApplicants(nextApplicants);
         setSummary(prev => ({ ...prev, pending: prev.pending - 1, reviewedToday: prev.reviewedToday + 1 }));
         setSelectedApplicant(nextApplicants.length > 0 ? nextApplicants[0] : null);
+      } else if (response.status === 409) {
+        await handleApprovalConflict();
       } else {
         toast.error("Failed to reject application");
       }

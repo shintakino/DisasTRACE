@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
-import { eq, and, gte, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, gte, inArray, sql } from "drizzle-orm";
+import { approvalEligibilityWhere } from "@/lib/account-approval";
 
 export async function GET() {
   const supabase = await createClient();
@@ -16,7 +17,7 @@ export async function GET() {
   const pendingUsers = await db
     .select()
     .from(users)
-    .where(and(eq(users.verificationStatus, 'PENDING'), isNotNull(users.idImageUrl)));
+    .where(approvalEligibilityWhere());
 
   // Generate short-lived signed URLs (e.g., 60 seconds expiry)
   const applicants = await Promise.all(
@@ -41,6 +42,7 @@ export async function GET() {
         identityDocument: {
           type: u.idType || "Unknown",
           imageUrl: signedUrl,
+          documentPath: u.idImageUrl,
           uploadedAt: u.createdAt.toISOString(),
         },
         registeredAt: u.createdAt.toISOString(),

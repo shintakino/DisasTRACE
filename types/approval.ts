@@ -7,6 +7,7 @@ export type ApprovalStatus = z.infer<typeof ApprovalStatusSchema>;
 export const IdentityDocumentSchema = z.object({
   type: z.string(), // e.g., "Passport"
   imageUrl: z.string().url(),
+  documentPath: z.string().trim().min(1).max(512),
   uploadedAt: z.string(),
 });
 export type IdentityDocument = z.infer<typeof IdentityDocumentSchema>;
@@ -27,6 +28,7 @@ export type Applicant = z.infer<typeof ApplicantSchema>;
 
 export const VerificationActionSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
+  documentPath: z.string().trim().min(1).max(512),
   reason: z.string().optional(),
 });
 export type VerificationAction = z.infer<typeof VerificationActionSchema>;

@@ -1,5 +1,36 @@
 # Progress Tracker
 
+## 2026-10-09 - Super Admin registration-approval lifecycle clarity
+
+- Bound every Super Admin approval/rejection decision to the exact pending government-ID storage path displayed to the reviewer. If the applicant replaces that ID before the decision, the atomic update returns a conflict instead of approving or rejecting an unseen document.
+- Added one server-owned approval-eligibility policy: only pending Public User/Responder accounts with a submitted government ID may enter or be actioned from the CDRRMO approval queue. Suspended, deactivated, administrative, incomplete-ID, stale, and already-reviewed accounts cannot be approved through a stale dashboard action.
+- User Management now returns, displays, and filters a distinct verification state. Operators can differentiate **Awaiting ID**, **Ready for Approval**, **Approved**, and **Rejected** from the independent Account Status, so a pending registration no longer appears to be missing from Users Approval.
+- Prevented User Management from activating an unapproved mobile registration directly; approval remains the only path that atomically grants both `APPROVED` verification and `ACTIVE` account access. The Expo verification gate and mobile API contracts remain unchanged.
+- Added focused registration-lifecycle regression coverage for incomplete, ready, rejected, suspended/deactivated, and administrative account cases, plus shared list/mutation predicate checks.
+
+## 2026-10-08 - Responder reporting lifecycle reliability
+
+- Restored responder MapLibre manual pan and zoom by using the supported `nativeEvent.userInteraction` signal; the existing Recenter control remains the only way to resume automatic camera control.
+- Made hospital-arrival confirmation a dedicated authenticated offline action instead of coalesced GPS telemetry. A failed/offline confirmation now remains visibly pending, preserves the responder assignment, survives process restart, and can enter forms or release availability only after the server acknowledges it.
+- Hydrate responder-owned offline work after an approved responder session is available, and surface a pending-arrival state in the transport sheet rather than presenting an unconfirmed arrival as complete.
+- Added a server-authoritative duty-status projection to successful report completion responses. Foreground and queued report completion now update the responder duty store from that result, preventing a stale **Offer Pending** display after resolution.
+- Rejected stale cached GPS readings for responder operational telemetry and the public incident-form fallback; cached coordinates remain a display-only fallback elsewhere.
+- Added `scripts/verify-responder-report-reliability.ts`. Focused reporting, hospital-policy, root/mobile TypeScript, mobile lint, and whitespace checks pass.
+
+## 2026-10-08 - Responder notification handoff stability
+
+- Preserved typed route payloads on generic local notifications and suppressed their duplicate responder-dispatch banner, leaving ResponderHome as the single urgency-specific dispatch alert owner.
+- Made Notifications Back pop an actual prior screen, with a stable Home fallback only for cold-start notification launches.
+- Scoped tab auto-navigation to one newly received dispatch offer, removing the previous en-route redirect that could compete with report navigation.
+- Hardened notification offer hydration with cancellation, guarded failure handling, and explicit unavailable/expired feedback. Web routes, APIs, database contracts, and Public User notification behavior remain unchanged.
+
+## 2026-10-08 - Responder spacing and Super Admin filter labels
+
+- Replaced unreliable inline/text spacing in the Responder draft banner, vital-sign row, and report-form footer with explicit React Native layout gaps. The banner now separates the draft count from its label structurally, while Save Draft and Submit retain their existing actions and equal-width layout.
+- Raised BP, HR, and SpO2 labels to the mobile operational-text minimum for legibility.
+- Added one shared account-status display-label map so User Management and Responder Roster show **All** (not `all`) without changing their canonical query value or filtering behavior.
+- Added focused UI source coverage for the responder spacing and title-case filter-label contract.
+
 ## 2026-10-08 - Public mobile privacy and Android safe-area repair
 
 - Removed responder documentation from the Public User report-detail contract and UI. The authenticated report endpoint now omits `crewFindings` for Public Users; responder/admin operational views retain their existing findings. This aligns report detail with the existing public response boundary, which ends at confirmed scene arrival.
@@ -1276,3 +1307,11 @@ Update this file whenever the current phase, active feature, or implementation s
 - Added `scripts/verify-mobile-resilience.ts`; its regression checks, mobile TypeScript, root TypeScript, and whitespace validation pass.
 - Closed the secure-logout error-handling review finding across verification, responder, and public emergency screens. A failed server-confirmed release now preserves the session and presents a clear retry message instead of raising an unhandled mobile promise rejection.
 - Corrected Android email password recovery: the reset route now retains the initial native URL, reads Expo Router's reserved fragment parameter, exchanges each recovery credential once only, and exposes a safe resend-link action after an invalid/expired link. The web recovery flow remains unchanged; the deployment guide now requires the mobile Supabase redirect wildcard.
+## 2026-10-08 - Public mobile reliability fixes
+
+- Prevented stale Android notification responses from replaying on ordinary app launches. A launch-tap response is copied to the in-memory queue and its native persisted value is cleared immediately; allow-listed routing remains deferred until the approved account and navigator are ready.
+- Resolved Public User `incident_resolved` and `incident_rejected` notifications now open the owned report detail when their notification contains the verification request ID. Missing metadata remains safely routed to My Reports; incident IDs are never used as public detail IDs.
+- Guarded the public response-status return-home path against in-flight status refreshes that could write state or navigate after the screen has left.
+- Restored manual map pan/zoom by using MapLibre's typed `nativeEvent.userInteraction` signal to disable automatic camera centering. The explicit Recenter action retains the existing default-camera behavior.
+- Reworked the registration OTP sheet to scroll above Android's resized keyboard and added a full sign-up payload validation boundary immediately before Supabase Auth creation, preventing edited/invalid cross-step data from reserving an account phone number.
+- Added focused public-mobile reliability regression coverage. Public notification/navigation and reliability checks pass; mobile and root TypeScript checks emit no errors.

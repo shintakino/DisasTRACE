@@ -70,6 +70,10 @@ export default function UsersPage() {
       result = result.filter((u) => u.status === filters.status);
     }
 
+    if (filters.verificationState) {
+      result = result.filter((u) => u.verificationState === filters.verificationState);
+    }
+
     setFilteredUsers(result);
   };
 

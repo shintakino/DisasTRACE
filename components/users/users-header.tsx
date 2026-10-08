@@ -22,9 +22,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserRole, UserStatus, UserFilter } from "@/types/users";
+import { UserRole, UserStatus, UserFilter, UserVerificationState } from "@/types/users";
 import { cn } from "@/lib/utils";
-import { OPERATIONAL_ROLE_FILTER_LABELS } from "@/lib/operational-display-labels";
+import { ACCOUNT_STATUS_FILTER_LABELS, OPERATIONAL_ROLE_FILTER_LABELS } from "@/lib/operational-display-labels";
 
 interface UsersHeaderProps {
   onFilterChange: (filters: UserFilter) => void;
@@ -37,6 +37,7 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
   const [search, setSearch] = React.useState("");
   const [role, setRole] = React.useState<UserRole | "all">("all");
   const [status, setStatus] = React.useState<UserStatus | "all">("all");
+  const [verificationState, setVerificationState] = React.useState<UserVerificationState | "all">("all");
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
@@ -44,6 +45,7 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
       search: val || undefined,
       role: role === "all" ? undefined : role,
       status: status === "all" ? undefined : status,
+      verificationState: verificationState === "all" ? undefined : verificationState,
     });
   };
 
@@ -54,6 +56,7 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
       search: search || undefined,
       role: newRole === "all" ? undefined : newRole,
       status: status === "all" ? undefined : status,
+      verificationState: verificationState === "all" ? undefined : verificationState,
     });
   };
 
@@ -64,6 +67,18 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
       search: search || undefined,
       role: role === "all" ? undefined : role,
       status: newStatus === "all" ? undefined : newStatus,
+      verificationState: verificationState === "all" ? undefined : verificationState,
+    });
+  };
+
+  const handleVerificationStateChange = (val: string | null) => {
+    const newVerificationState = (val || "all") as UserVerificationState | "all";
+    setVerificationState(newVerificationState);
+    onFilterChange({
+      search: search || undefined,
+      role: role === "all" ? undefined : role,
+      status: status === "all" ? undefined : status,
+      verificationState: newVerificationState === "all" ? undefined : newVerificationState,
     });
   };
 
@@ -109,8 +124,8 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</label>
-                <Select value={status} onValueChange={handleStatusChange}>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Account Status</label>
+                <Select value={status} onValueChange={handleStatusChange} items={ACCOUNT_STATUS_FILTER_LABELS}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
@@ -120,6 +135,23 @@ export function UsersHeader({ onFilterChange, onExport, onCreateAccount, isExpor
                     <SelectItem value="SUSPENDED">Suspended</SelectItem>
                     <SelectItem value="DEACTIVATED">Deactivated</SelectItem>
                     <SelectItem value="PENDING">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Verification</label>
+                <Select value={verificationState} onValueChange={handleVerificationStateChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="AWAITING_ID">Awaiting ID</SelectItem>
+                    <SelectItem value="READY_FOR_APPROVAL">Ready for Approval</SelectItem>
+                    <SelectItem value="APPROVED">Approved</SelectItem>
+                    <SelectItem value="REJECTED">Rejected</SelectItem>
+                    <SelectItem value="NOT_REQUIRED">Not Required</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

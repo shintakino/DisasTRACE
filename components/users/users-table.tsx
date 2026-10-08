@@ -20,8 +20,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UserManagementEntry, UserStatus, UserRole } from "@/types/users";
+import { UserManagementEntry, UserStatus, UserRole, UserVerificationState } from "@/types/users";
 import { cn } from "@/lib/utils";
+import { USER_VERIFICATION_STATE_LABELS } from "@/lib/operational-display-labels";
 
 interface UsersTableProps {
   data: UserManagementEntry[];
@@ -54,6 +55,24 @@ const RoleLabel = ({ role }: { role: UserRole }) => {
   };
 
   return <span className="text-xs font-semibold text-slate-600">{labels[role]}</span>;
+};
+
+const VerificationBadge = ({ state }: { state: UserVerificationState }) => {
+  const styles: Record<UserVerificationState, string> = {
+    NOT_REQUIRED: "bg-slate-100 text-slate-600 border-slate-200",
+    AWAITING_ID: "bg-slate-100 text-slate-700 border-slate-200",
+    READY_FOR_APPROVAL: "bg-blue-100 text-blue-800 border-blue-200",
+    APPROVED: "bg-green-100 text-green-700 border-green-200",
+    REJECTED: "bg-red-100 text-red-700 border-red-200",
+    SUSPENDED: "bg-amber-100 text-amber-800 border-amber-200",
+    DEACTIVATED: "bg-red-100 text-red-700 border-red-200",
+  };
+
+  return (
+    <Badge variant="outline" className={cn("whitespace-nowrap px-2 py-0.5 font-bold text-[10px] tracking-wide", styles[state])}>
+      {USER_VERIFICATION_STATE_LABELS[state]}
+    </Badge>
+  );
 };
 
 export function UsersTable({ data, onManageStatus, onBan, onReleaseDevice }: UsersTableProps) {
@@ -93,8 +112,13 @@ export function UsersTable({ data, onManageStatus, onBan, onReleaseDevice }: Use
     },
     {
       accessorKey: "status",
-      header: "STATUS",
+      header: "ACCOUNT STATUS",
       cell: ({ row }) => <StatusBadge status={row.getValue("status") as UserStatus} />,
+    },
+    {
+      accessorKey: "verificationState",
+      header: "VERIFICATION",
+      cell: ({ row }) => <VerificationBadge state={row.getValue("verificationState") as UserVerificationState} />,
     },
     {
       accessorKey: "role",
@@ -163,7 +187,8 @@ export function UsersTable({ data, onManageStatus, onBan, onReleaseDevice }: Use
 
   return (
     <div className="bg-white rounded-b-xl border-x border-b shadow-sm overflow-hidden">
-      <Table>
+      <div className="overflow-x-auto">
+      <Table className="min-w-[1180px]">
         <TableHeader className="bg-slate-50/50">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
@@ -201,6 +226,7 @@ export function UsersTable({ data, onManageStatus, onBan, onReleaseDevice }: Use
           )}
         </TableBody>
       </Table>
+      </div>
 
       <div className="flex items-center justify-between px-6 py-4 bg-slate-50/30 border-t">
         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">

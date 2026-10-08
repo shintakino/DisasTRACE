@@ -3,6 +3,20 @@ import { z } from "zod";
 export const UserStatusSchema = z.enum(["ACTIVE", "SUSPENDED", "DEACTIVATED", "PENDING"]);
 export type UserStatus = z.infer<typeof UserStatusSchema>;
 
+export const UserVerificationStatusSchema = z.enum(["PENDING", "APPROVED", "REJECTED"]);
+export type UserVerificationStatus = z.infer<typeof UserVerificationStatusSchema>;
+
+export const UserVerificationStateSchema = z.enum([
+  "NOT_REQUIRED",
+  "AWAITING_ID",
+  "READY_FOR_APPROVAL",
+  "APPROVED",
+  "REJECTED",
+  "SUSPENDED",
+  "DEACTIVATED",
+]);
+export type UserVerificationState = z.infer<typeof UserVerificationStateSchema>;
+
 export const UserRoleSchema = z.enum([
   "public_user",
   "ambulance_responder",
@@ -16,6 +30,9 @@ export const UserManagementEntrySchema = z.object({
   fullName: z.string(),
   email: z.string().email(),
   status: UserStatusSchema,
+  verificationStatus: UserVerificationStatusSchema,
+  verificationState: UserVerificationStateSchema,
+  hasIdentityDocument: z.boolean(),
   role: UserRoleSchema,
   joinedDate: z.string(),
   lastActive: z.string(),
@@ -28,6 +45,7 @@ export const UserFilterSchema = z.object({
   search: z.string().optional(),
   role: UserRoleSchema.optional(),
   status: UserStatusSchema.optional(),
+  verificationState: UserVerificationStateSchema.optional(),
   fullName: z.string().optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),

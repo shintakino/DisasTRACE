@@ -3,7 +3,8 @@ import { VerificationActionSchema } from "@/types/approval";
 import { createClient } from "@/lib/supabase-server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { approvalEligibilityWhere } from "@/lib/account-approval";
 
 export async function PATCH(
   request: NextRequest,
@@ -27,7 +28,7 @@ export async function PATCH(
   const { status, reason } = result.data;
 
   try {
-    const updateData: any = {
+    const updateData: Partial<typeof users.$inferInsert> = {
       verificationStatus: status,
       updatedAt: new Date(),
     };
@@ -41,12 +42,20 @@ export async function PATCH(
       // but verificationStatus will be REJECTED.
     }
 
-    await db.update(users)
+    const [updatedUser] = await db.update(users)
       .set(updateData)
-      .where(eq(users.id, id));
+      .where(and(eq(users.id, id), approvalEligibilityWhere(result.data.documentPath)))
+      .returning({ id: users.id });
+
+    if (!updatedUser) {
+      return NextResponse.json(
+        { error: "This account is no longer eligible for approval. Refresh the queue and try again." },
+        { status: 409 },
+      );
+    }
 
     return NextResponse.json({ success: true, id, status });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating user verification:", error);
     return NextResponse.json({ error: "Failed to update user verification" }, { status: 500 });
   }

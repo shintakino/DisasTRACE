@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase-server";
 import { db } from "@/db";
-import { notifications, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { notifications, systemBroadcasts, users } from "@/db/schema";
+import { desc, eq } from "drizzle-orm";
 import crypto from "crypto";
 import { z } from "zod";
 import type { User } from "@supabase/supabase-js";
+import { sendSystemAnnouncementPush } from "@/lib/push-notifications";
 
 const PostAnnouncementSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  body: z.string().min(1, "Announcement body is required"),
+  title: z.string().trim().min(1, "Title is required").max(160, "Title must be 160 characters or fewer"),
+  body: z.string().trim().min(1, "Announcement body is required").max(2_000, "Announcement body must be 2,000 characters or fewer"),
   targetRole: z.enum(["all", "ambulance_responder", "public_user"]).default("all"),
 });
 
@@ -27,23 +28,39 @@ async function listAllAuthUsers() {
   }
 }
 
+async function requireAnnouncementAdmin() {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+
+  const dbUser = await db.query.users.findFirst({ where: eq(users.id, user.id) });
+  if (!dbUser || (dbUser.role !== "pacc_admin" && dbUser.role !== "cdrrmo_super_admin")) {
+    return { error: NextResponse.json({ error: "Forbidden: Admin privileges required" }, { status: 403 }) };
+  }
+  return { user };
+}
+
+export async function GET() {
+  try {
+    const authorization = await requireAnnouncementAdmin();
+    if (authorization.error) return authorization.error;
+    const broadcasts = await db.query.systemBroadcasts.findMany({
+      orderBy: [desc(systemBroadcasts.createdAt)],
+      limit: 20,
+    });
+    return NextResponse.json({ broadcasts });
+  } catch (error) {
+    console.error("[Announcement API] Failed to load broadcast history:", error);
+    return NextResponse.json({ error: "Unable to load announcement history" }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     // 1. Authorize: Ensure caller is logged in and is an administrator
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, user.id)
-    });
-
-    if (!dbUser || (dbUser.role !== "pacc_admin" && dbUser.role !== "cdrrmo_super_admin")) {
-      return NextResponse.json({ error: "Forbidden: Admin privileges required" }, { status: 403 });
-    }
+    const authorization = await requireAnnouncementAdmin();
+    if (authorization.error) return authorization.error;
+    const user = authorization.user;
 
     // 2. Validate input payload
     const bodyText = await req.json();
@@ -54,7 +71,8 @@ export async function POST(req: Request) {
 
     const { title, body, targetRole } = result.data;
 
-    // 3. Query all users from auth utilizing Admin Client to check their notification preferences
+    // Read Auth metadata once for the existing opt-out preference. The
+    // database user row remains the authoritative account/role record.
     let authUsers;
     try {
       authUsers = await listAllAuthUsers();
@@ -63,52 +81,117 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to query target users" }, { status: 500 });
     }
 
-    // 4. Retrieve database users to filter roles
-    let dbUsersList = await db.select().from(users).where(eq(users.status, "ACTIVE"));
-
-    if (targetRole !== "all") {
-      dbUsersList = dbUsersList.filter(u => u.role === targetRole);
-    }
-
-    const dbUserIds = new Set(dbUsersList.map(u => u.id));
-
-    // `system_notices` is the legacy web preference key. Honour both it and
-    // the canonical mobile `system` key so existing responders are not
-    // silently excluded from a broadcast.
-    const targetUsers = authUsers.filter((u) => {
-      if (!dbUserIds.has(u.id)) return false;
-      const prefs = u.user_metadata?.notification_preferences;
-      return prefs?.system !== false && prefs?.system_notices !== false;
+    // An account must be active to receive a system notice. This preserves the
+    // prior access policy while making inactive exclusions observable to admins.
+    const scopedAccounts = (await db.select().from(users)).filter((account) =>
+      targetRole === "all" || account.role === targetRole,
+    );
+    const activeAccounts = scopedAccounts.filter((account) => account.status === "ACTIVE");
+    const authUserById = new Map(authUsers.map((authUser) => [authUser.id, authUser]));
+    const activeWithAuth = activeAccounts.filter((account) => authUserById.has(account.id));
+    const optedOutAccounts = activeWithAuth.filter((account) => {
+      const prefs = authUserById.get(account.id)?.user_metadata?.notification_preferences;
+      // `system_notices` is the legacy web preference key. Honour both it and
+      // the canonical mobile `system` key so existing accounts stay consistent.
+      return prefs?.system === false || prefs?.system_notices === false;
     });
+    const optedOutIds = new Set(optedOutAccounts.map((account) => account.id));
+    const recipients = activeWithAuth.filter((account) => !optedOutIds.has(account.id));
+    const broadcastId = crypto.randomUUID();
+    const createdAt = new Date();
 
-    if (targetUsers.length === 0) {
-      return NextResponse.json({ success: true, message: "No active users matched the announcement scope." });
-    }
-
-    // 5. Bulk dispatch system announcements into notifications table
-    let dispatchedCount = 0;
-    for (const targetUser of targetUsers) {
-      const id = crypto.randomUUID();
-      await db.insert(notifications).values({
-        id,
-        userId: targetUser.id,
-        type: "system_announcement",
+    // Persist the audit row and every recipient inbox entry together. A failed
+    // insert can never produce a misleading partial "sent" success response.
+    await db.transaction(async (tx) => {
+      await tx.insert(systemBroadcasts).values({
+        id: broadcastId,
+        senderId: user.id,
         title,
         body,
-        unread: true,
-        createdAt: new Date(),
-        metadata: {
-          senderId: user.id,
-          scope: targetRole,
-          category: "system_notice"
-        }
+        targetRole,
+        eligibleCount: recipients.length,
+        persistedCount: recipients.length,
+        optedOutCount: optedOutAccounts.length,
+        inactiveCount: scopedAccounts.length - activeAccounts.length,
+        missingAuthCount: activeAccounts.length - activeWithAuth.length,
+        createdAt,
       });
-      dispatchedCount++;
+
+      if (recipients.length > 0) {
+        await tx.insert(notifications).values(recipients.map((recipient) => ({
+          id: crypto.randomUUID(),
+          userId: recipient.id,
+          broadcastId,
+          type: "system_announcement",
+          title,
+          body,
+          unread: true,
+          createdAt,
+          metadata: {
+            senderId: user.id,
+            scope: targetRole,
+            category: "system_notice",
+            broadcastId,
+          },
+        })));
+      }
+    });
+
+    // Push is advisory and starts only after the inbox is committed. Limit
+    // provider fan-out so a large audience does not create an unbounded burst.
+    const pushResults: Awaited<ReturnType<typeof sendSystemAnnouncementPush>>[] = [];
+    for (let index = 0; index < recipients.length; index += 20) {
+      const batch = recipients.slice(index, index + 20);
+      const batchResults = await Promise.allSettled(batch.map((recipient) => sendSystemAnnouncementPush({
+        userId: recipient.id,
+        title,
+        body,
+        broadcastId,
+      })));
+      for (const result of batchResults) {
+        pushResults.push(result.status === "fulfilled"
+          ? result.value
+          : { eligible: true, accepted: false, reason: "delivery_error" });
+      }
     }
+    const pushEligibleCount = pushResults.filter((result) => result.eligible).length;
+    const pushAcceptedCount = pushResults.filter((result) => result.accepted).length;
+    const pushFailures = pushResults.filter((result) => !result.accepted && result.eligible);
+    const pushFailureReason = pushFailures.length > 0
+      ? pushFailures.reduce<Record<string, number>>((counts, result) => {
+          const reason = "reason" in result ? result.reason : "delivery_error";
+          counts[reason] = (counts[reason] ?? 0) + 1;
+          return counts;
+        }, {})
+      : null;
+
+    await db.update(systemBroadcasts).set({
+      pushEligibleCount,
+      pushAcceptedCount,
+      pushFailedCount: pushFailures.length,
+      pushFailureReason,
+    }).where(eq(systemBroadcasts.id, broadcastId));
 
     return NextResponse.json({
       success: true,
-      message: `System announcement successfully broadcasted to ${dispatchedCount} users.`,
+      broadcast: {
+        id: broadcastId,
+        title,
+        body,
+        targetRole,
+        createdAt: createdAt.toISOString(),
+        eligibleCount: recipients.length,
+        persistedCount: recipients.length,
+        optedOutCount: optedOutAccounts.length,
+        inactiveCount: scopedAccounts.length - activeAccounts.length,
+        missingAuthCount: activeAccounts.length - activeWithAuth.length,
+        pushEligibleCount,
+        pushAcceptedCount,
+        pushFailedCount: pushFailures.length,
+      },
+      message: recipients.length > 0
+        ? `Announcement saved for ${recipients.length} eligible account${recipients.length === 1 ? "" : "s"}.`
+        : "Announcement saved, but no active recipients matched the selected audience.",
     });
   } catch (error: any) {
     console.error("[Announcement API] Broadcast failed:", error);

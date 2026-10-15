@@ -16,6 +16,8 @@ export interface ResponderPushRegistrationResult {
   message: string;
 }
 
+export type MobilePushRole = 'ambulance_responder' | 'public_user';
+
 const GENERIC_EMERGENCY_ALERT: ResponderEmergencyAlert = {
   channelId: 'emergency-alerts',
   channelName: 'Emergency Alerts',
@@ -80,6 +82,19 @@ export async function ensureResponderEmergencyAlertChannels() {
   })));
 }
 
+export async function ensureAnnouncementAlertChannel() {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('announcements', {
+    name: 'Announcements',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#8B5CF6',
+    enableLights: true,
+    enableVibrate: true,
+    showBadge: true,
+  });
+}
+
 async function postCurrentPushToken(pushToken: string) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) return;
@@ -94,24 +109,37 @@ async function postCurrentPushToken(pushToken: string) {
   }
 }
 
-export async function registerResponderPushNotifications(): Promise<ResponderPushRegistrationResult> {
+export async function registerMobilePushNotifications(role: MobilePushRole): Promise<ResponderPushRegistrationResult> {
   if (Platform.OS !== 'android') {
-    return { registered: false, message: 'Dispatch alerts require the Android responder app.' };
+    return { registered: false, message: 'Mobile notifications require the Android app.' };
   }
-  await ensureResponderEmergencyAlertChannels();
+  await ensureAnnouncementAlertChannel();
+  if (role === 'ambulance_responder') await ensureResponderEmergencyAlertChannels();
   const existing = await Notifications.getPermissionsAsync();
   const permission = existing.status === 'granted' ? existing : await Notifications.requestPermissionsAsync();
   if (permission.status !== 'granted') {
     return {
       registered: false,
-      message: 'Notifications are off. Keep DisasTRACE open for live offers, or enable notifications to receive offers in the background.',
+      message: role === 'ambulance_responder'
+        ? 'Notifications are off. Keep DisasTRACE open for live offers, or enable notifications to receive offers in the background.'
+        : 'Notifications are off. Enable them to receive CDRRMO announcements while DisasTRACE is closed.',
     };
   }
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) throw new Error('Expo project ID is missing.');
   const pushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   await postCurrentPushToken(pushToken);
-  return { registered: true, message: 'Dispatch alerts are enabled for this device.' };
+  return {
+    registered: true,
+    message: role === 'ambulance_responder'
+      ? 'Dispatch alerts and CDRRMO announcements are enabled for this device.'
+      : 'CDRRMO announcements are enabled for this device.',
+  };
+}
+
+/** Backwards-compatible responder entry point used by the duty-status UI. */
+export function registerResponderPushNotifications(): Promise<ResponderPushRegistrationResult> {
+  return registerMobilePushNotifications('ambulance_responder');
 }
 
 export function subscribeToPushTokenChanges() {

@@ -3,13 +3,17 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { LogBox, TextInput } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as SecureStore from 'expo-secure-store';
+import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStatus } from '../hooks/use-auth-status';
-import { registerResponderPushNotifications, subscribeToPushTokenChanges } from '../lib/push-notifications';
+import { registerMobilePushNotifications, subscribeToPushTokenChanges } from '../lib/push-notifications';
 import { resolveResponderNotificationRoute } from '../lib/responder-notification-route';
 import { resolvePublicNotificationRoute } from '../lib/public-notification-route';
+import { consumeNotificationResponseDurably } from '../lib/notification-response-consumption';
+import { rememberRecoveryUrl } from '../lib/recovery-link-inbox';
 import { useEmergencyReportStore } from '../store/use-emergency-report-store';
 import { useResponderStore } from '../stores/useResponderStore';
 import "../global.css";
@@ -28,6 +32,11 @@ TextInputWithDefaults.defaultProps = {
   placeholderTextColor: '#64748B',
 };
 
+// Android can return the last notification response after a process restart.
+// Keep the last consumed identifier in encrypted storage so a process crash
+// between receipt and navigation cannot reopen an old notification route.
+const LAST_HANDLED_NOTIFICATION_RESPONSE_KEY = 'disas_trace_last_handled_notification_response';
+
 // Prevent the native splash screen from auto-hiding.
 SplashScreen.preventAutoHideAsync();
 
@@ -41,6 +50,28 @@ function InitialLayout() {
   const pendingNotificationResponseRef = useRef<Notifications.NotificationResponse | null>(null);
   const handledNotificationResponseIdsRef = useRef(new Set<string>());
   const queuedNotificationResponseIdsRef = useRef(new Set<string>());
+  const consumingNotificationResponseIdRef = useRef<string | null>(null);
+  const notificationConsumptionRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Capture the complete native URL before Expo Router normalizes it into
+  // route segments. This covers cold starts and links opened while the app is
+  // already running without persisting one-time recovery credentials.
+  useEffect(() => {
+    let active = true;
+    const captureUrl = (incomingUrl: string | null) => {
+      if (active && incomingUrl) rememberRecoveryUrl(incomingUrl);
+    };
+
+    void Linking.getInitialURL()
+      .then(captureUrl)
+      .catch(() => undefined);
+
+    const subscription = Linking.addEventListener('url', ({ url }) => captureUrl(url));
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
 
   // Preserve notification taps until auth and the root navigator are ready.
   // Android must never fall back to a bare `disastrace:///` URI for a responder alert.
@@ -48,7 +79,11 @@ function InitialLayout() {
     const queueNotificationResponse = (response: Notifications.NotificationResponse | null) => {
       if (!response) return;
       const responseId = response.notification.request.identifier;
-      if (handledNotificationResponseIdsRef.current.has(responseId) || queuedNotificationResponseIdsRef.current.has(responseId)) return;
+      if (
+        pendingNotificationResponseRef.current
+        || handledNotificationResponseIdsRef.current.has(responseId)
+        || queuedNotificationResponseIdsRef.current.has(responseId)
+      ) return;
       queuedNotificationResponseIdsRef.current.add(responseId);
       pendingNotificationResponseRef.current = response;
       setNotificationResponseVersion((version) => version + 1);
@@ -59,13 +94,26 @@ function InitialLayout() {
     // in memory, but clear the native copy so an ordinary later launch cannot
     // replay the old response into Notifications.
     Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
+      .then(async (response) => {
+        if (!response) return;
+        const responseId = response.notification.request.identifier;
+        const lastHandledResponseId = await SecureStore.getItemAsync(LAST_HANDLED_NOTIFICATION_RESPONSE_KEY).catch(() => null);
+
+        // Clear the Android-owned copy before routing. A persisted handled ID
+        // remains a second line of defence if the native clear call is delayed.
+        await Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+        if (lastHandledResponseId === responseId) return;
         queueNotificationResponse(response);
-        if (response) void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
       })
       .catch(() => undefined);
 
     return () => subscription.remove();
+  }, []);
+
+  useEffect(() => () => {
+    if (notificationConsumptionRetryRef.current) {
+      clearTimeout(notificationConsumptionRetryRef.current);
+    }
   }, []);
 
   // Consume notification taps only after the approved account and navigator
@@ -78,38 +126,64 @@ function InitialLayout() {
 
     const responseId = response.notification.request.identifier;
     const data = response.notification.request.content.data;
+    if (consumingNotificationResponseIdRef.current === responseId) return;
+    consumingNotificationResponseIdRef.current = responseId;
 
-    if (role === 'ambulance_responder') {
-      const route = resolveResponderNotificationRoute(data);
-      if (!route) {
-        handledNotificationResponseIdsRef.current.add(responseId);
-        pendingNotificationResponseRef.current = null;
+    const scheduleConsumptionRetry = () => {
+      consumingNotificationResponseIdRef.current = null;
+      if (notificationConsumptionRetryRef.current) return;
+      notificationConsumptionRetryRef.current = setTimeout(() => {
+        notificationConsumptionRetryRef.current = null;
+        setNotificationResponseVersion((version) => version + 1);
+      }, 1_000);
+    };
+
+    const consumeAndRoute = async () => {
+      const consumed = await consumeNotificationResponseDurably({
+        responseId,
+        persistHandledResponseId: (id) => SecureStore.setItemAsync(LAST_HANDLED_NOTIFICATION_RESPONSE_KEY, id),
+        clearNativeResponse: () => Notifications.clearLastNotificationResponseAsync(),
+      });
+
+      if (!consumed) {
+        console.warn('[Notifications] Could not durably consume a notification response; routing will retry.');
+        scheduleConsumptionRetry();
         return;
       }
-      handledNotificationResponseIdsRef.current.add(responseId);
-      pendingNotificationResponseRef.current = null;
-      router.replace(route as never);
-      return;
-    }
 
-    if (role === 'public_user') {
-      const payload = data && typeof data === 'object' ? data as Record<string, unknown> : {};
-      const route = resolvePublicNotificationRoute({
-        type: payload.type,
-        kind: payload.kind,
-        metadata: payload.metadata ?? payload,
-      });
       handledNotificationResponseIdsRef.current.add(responseId);
+      queuedNotificationResponseIdsRef.current.delete(responseId);
       pendingNotificationResponseRef.current = null;
-      if (route?.details) useEmergencyReportStore.getState().setDetails(route.details);
-      router.replace((route?.pathname ?? '/notifications') as never);
-    }
+      consumingNotificationResponseIdRef.current = null;
+
+      if (role === 'ambulance_responder') {
+        const route = resolveResponderNotificationRoute(data);
+        if (route) router.replace(route as never);
+        return;
+      }
+
+      if (role === 'public_user') {
+        const payload = data && typeof data === 'object' ? data as Record<string, unknown> : {};
+        const route = resolvePublicNotificationRoute({
+          type: payload.type,
+          kind: payload.kind,
+          metadata: payload.metadata ?? payload,
+        });
+        if (route?.details) useEmergencyReportStore.getState().setDetails(route.details);
+        router.replace((route?.pathname ?? '/notifications') as never);
+      }
+    };
+
+    void consumeAndRoute().catch((error) => {
+      console.error('[Notifications] Failed to consume notification response:', error);
+      scheduleConsumptionRetry();
+    });
   }, [isAppReady, isSignedIn, notificationResponseVersion, role, router, verificationStatus]);
 
   useEffect(() => {
-    if (!isSignedIn || verificationStatus !== 'approved' || role !== 'ambulance_responder') return;
-    registerResponderPushNotifications().catch((error) => {
-      console.warn('[Push] Responder push setup was not completed.', error);
+    if (!isSignedIn || verificationStatus !== 'approved' || (role !== 'ambulance_responder' && role !== 'public_user')) return;
+    registerMobilePushNotifications(role).catch((error) => {
+      console.warn('[Push] Mobile push setup was not completed.', error);
     });
     const subscription = subscribeToPushTokenChanges();
     return () => subscription.remove();

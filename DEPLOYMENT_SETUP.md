@@ -116,6 +116,35 @@ The scheduler is the authority for an unanswered offer. The mobile countdown
 is only a display; a responder can accept only while the server-side deadline
 is still valid.
 
+### Retain scheduler diagnostics without unbounded database growth
+
+`pg_net` stores HTTP responses and `pg_cron` stores every job execution. These
+are internal diagnostics, not application data. After configuring the scheduler,
+run the guarded retention task once:
+
+```bash
+npx tsx scripts/prune-cron-history.ts --apply
+```
+
+It preserves the active `dispatch-offer-expiry` job, removes only HTTP-response
+logs older than 15 minutes and cron-history rows older than three days, then
+creates two maintenance jobs to keep those limits. Use the non-mutating check
+at any time:
+
+```bash
+npx tsx scripts/inspect-cron-retention.ts
+```
+
+PostgreSQL reuses deleted table pages by default. If an existing project needs
+its provisioned disk measurement to shrink immediately after a large cleanup,
+run the short, guarded compaction during a quiet maintenance window. It locks
+only the two internal diagnostic tables and refuses to run while a pg_net
+request is pending:
+
+```bash
+npx tsx scripts/compact-cron-history.ts --apply
+```
+
 ## 4. Configure the mobile app and push notifications
 
 Create `mobile/.env` for local development:
@@ -132,8 +161,11 @@ For preview and production, update `mobile/eas.json` with the deployed API and
 Supabase values. Keep `mobile/google-services.json` present and matched to the
 Android package in `mobile/app.json`. Push notifications use Expo Push/FCM;
 the server binds each token to the account's active mobile session and removes
-it on sign-out or provider invalidation. No Firebase Admin service-account key
-is required by this implementation.
+it on sign-out or provider invalidation. Approved Public Users register the
+same session-bound token for CDRRMO/PACC system announcements; Responders use
+it for both announcements and dispatch offers. The database inbox remains the
+authoritative record if Android or Expo cannot display an advisory push. No
+Firebase Admin service-account key is required by this implementation.
 
 ### Developer-owned Expo/EAS projects
 
@@ -173,10 +205,13 @@ npx eas build --platform android --profile preview
 npx eas build --platform android --profile production
 ```
 
-Test a physical Android device for background dispatch notifications, vibration,
-notification-tap hydration, location permission, and the one-active-device
-sign-in rule. Expo Go is not a substitute for testing push notifications or
-Android background services in a release build.
+Test a physical Android device for background dispatch and system-announcement
+notifications, vibration, notification-tap hydration, location permission, and
+the one-active-device sign-in rule. Verify that a Public User who permits
+notifications receives an announcement with the app closed, and that an opted-
+out user still has no push while the audit page reports the exclusion. Expo Go
+is not a substitute for testing push notifications or Android background
+services in a release build.
 
 ## 5. Configure Supabase Auth redirects
 

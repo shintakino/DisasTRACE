@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BackHandler, View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, CloudLightning, Megaphone, FileText, XCircle } from 'lucide-react-native';
@@ -222,19 +222,26 @@ export default function NotificationsScreen() {
     }
   };
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     // A manually opened notification centre has a real previous route. Pop it
     // instead of rebuilding the tab navigator while responder state listeners
     // are active. Cold-start notification launches have no previous route, so
     // they still land on the stable tab root.
     if (isLeavingRef.current || navigationInProgressRef.current) return;
     isLeavingRef.current = true;
-    if (role === 'ambulance_responder' && router.canGoBack()) {
-      router.back();
-      return;
-    }
+    // Always replace with the stable tab root. Popping a stack created by a
+    // cold-start notification can re-enter a half-initialized notification
+    // route, especially after a rapid Android hardware Back press.
     router.replace('/(tabs)' as any);
-  };
+  }, [router]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBack();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [handleBack]);
 
 
   const handleClearAll = async () => {

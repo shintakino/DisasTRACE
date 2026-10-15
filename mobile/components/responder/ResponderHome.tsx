@@ -7,7 +7,6 @@ import { Hospital, Location as LocationIcon, MessageQuestion, NotificationBing }
 import { useResponderStore, checkConnectivity } from '../../stores/useResponderStore';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useOfflineReports } from '../../hooks/use-offline-reports';
-import { DispatchSheet } from './DispatchSheet';
 import { EnRouteSheet } from './EnRouteSheet';
 import { OnSceneSheet } from './OnSceneSheet';
 import { ArrivalConfirmDialog } from './ArrivalConfirmDialog';
@@ -1601,7 +1600,6 @@ export function ResponderHome() {
       </Modal>
 
       {/* Sheets */}
-      <DispatchSheet />
       {status === 'en_route' && <EnRouteSheet />}
       {status === 'on_scene' && <OnSceneSheet />}
       {status === 'to_hospital' && <ToHospitalSheet />}

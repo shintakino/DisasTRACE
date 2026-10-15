@@ -24,6 +24,18 @@ interface DispatchOfferExpiredPushInput {
   incidentId: string;
 }
 
+interface SystemAnnouncementPushInput {
+  userId: string;
+  title: string;
+  body: string;
+  broadcastId: string;
+}
+
+export type MobilePushDeliveryResult =
+  | { eligible: false; accepted: false; reason: 'no_active_device' }
+  | { eligible: true; accepted: true }
+  | { eligible: true; accepted: false; reason: string };
+
 function responderAlertSoundFor(incidentType: string) {
   const normalized = incidentType.toLocaleLowerCase('en-PH');
   if (normalized.includes('fire') || normalized.includes('explosion')) {
@@ -41,23 +53,23 @@ function responderAlertSoundFor(incidentType: string) {
   return { channelId: 'responder-general-alerts', sound: 'responder_general_alert.wav' };
 }
 
-async function sendResponderPush(
-  responderId: string,
+async function sendMobilePush(
+  userId: string,
   payload: Record<string, unknown>,
-) {
+) : Promise<MobilePushDeliveryResult> {
   const device = await db.query.mobilePushTokens.findFirst({
-    where: eq(mobilePushTokens.userId, responderId),
+    where: eq(mobilePushTokens.userId, userId),
     columns: { pushToken: true, sessionId: true },
   });
-  if (!device) return;
+  if (!device) return { eligible: false, accepted: false, reason: 'no_active_device' };
   const activeSession = await db.query.mobileDeviceSessions.findFirst({
     where: and(
-      eq(mobileDeviceSessions.userId, responderId),
+      eq(mobileDeviceSessions.userId, userId),
       eq(mobileDeviceSessions.activeSessionId, device.sessionId),
     ),
     columns: { userId: true },
   });
-  if (!activeSession) return;
+  if (!activeSession) return { eligible: false, accepted: false, reason: 'no_active_device' };
 
   try {
     const response = await fetch(EXPO_PUSH_ENDPOINT, {
@@ -72,14 +84,20 @@ async function sendResponderPush(
     });
     const parsed = ExpoPushResponseSchema.safeParse(await response.json().catch(() => null));
     if (!response.ok || !parsed.success) {
-      console.error('[Push] Expo rejected a responder notification.', { responderId, status: response.status });
-      return;
+      console.error('[Push] Expo rejected a mobile notification.', { userId, status: response.status });
+      return { eligible: true, accepted: false, reason: `expo_http_${response.status}` };
     }
     if (parsed.data.data[0]?.details?.error === 'DeviceNotRegistered') {
       await db.delete(mobilePushTokens).where(eq(mobilePushTokens.pushToken, device.pushToken));
+      return { eligible: true, accepted: false, reason: 'device_not_registered' };
     }
+    if (parsed.data.data[0]?.status !== 'ok') {
+      return { eligible: true, accepted: false, reason: parsed.data.data[0]?.details?.error ?? 'expo_rejected' };
+    }
+    return { eligible: true, accepted: true };
   } catch (error) {
-    console.error('[Push] Responder notification delivery failed.', { responderId, error });
+    console.error('[Push] Mobile notification delivery failed.', { userId, error });
+    return { eligible: true, accepted: false, reason: 'delivery_error' };
   }
 }
 
@@ -89,7 +107,7 @@ export async function sendDispatchOfferPush({ responderId, incidentId, offerExpi
     ? Math.max(1, Math.ceil((offerExpiresAt.getTime() - Date.now()) / 1000))
     : 30;
   const alert = responderAlertSoundFor(incidentType);
-  await sendResponderPush(responderId, {
+  await sendMobilePush(responderId, {
     title: 'Emergency Dispatch Offer',
     body: `${incidentType} dispatch offer is waiting. Open DisasTRACE immediately.`,
     sound: alert.sound,
@@ -102,7 +120,7 @@ export async function sendDispatchOfferPush({ responderId, incidentId, offerExpi
 
 /** Tell the original responder that a server-authoritative offer expired. */
 export async function sendDispatchOfferExpiredPush({ responderId, incidentId }: DispatchOfferExpiredPushInput) {
-  await sendResponderPush(responderId, {
+  await sendMobilePush(responderId, {
     title: 'Dispatch offer released',
     body: 'You did not accept this report in time. It was released for reassignment.',
     sound: 'default',
@@ -110,5 +128,24 @@ export async function sendDispatchOfferExpiredPush({ responderId, incidentId }: 
     channelId: 'emergency-alerts',
     ttl: 60,
     data: { kind: 'dispatch_offer_expired', incidentId },
+  });
+}
+
+/**
+ * Announcement pushes are advisory. The linked inbox notification is created
+ * atomically before this call, so an Expo outage cannot lose an official
+ * notice and users can still read it when they reopen the app.
+ */
+export async function sendSystemAnnouncementPush({ userId, title, body, broadcastId }: SystemAnnouncementPushInput) {
+  return sendMobilePush(userId, {
+    title: `Announcement: ${title}`,
+    body,
+    sound: 'default',
+    priority: 'high',
+    channelId: 'announcements',
+    data: {
+      type: 'system_announcement',
+      metadata: { broadcastId, category: 'system_notice' },
+    },
   });
 }

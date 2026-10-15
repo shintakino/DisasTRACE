@@ -1,5 +1,34 @@
 # Progress Tracker
 
+## 2026-10-15 - Hospital locator readability and report-PDF status layout
+
+- Changed only the web Hospital Management coordinate-picker map from OpenFreeMap's dark style to the already-established light `liberty` style, with a matching light loading surface. Hospital API calls, stored coordinates, marker behavior, and every mobile map remain unchanged.
+- Rebalanced the Report Summary PDF's six fixed columns to exactly fit the printable A4 width, reduced cell padding, and centered a widened Status column so `REJECTED` and `DUPLICATE` remain whole and readable. Corrected the metadata heading to **REPORT STATUS**. Filtering and exported report data are unchanged.
+- Added focused source-layout regression coverage. Root TypeScript, PDF/map layout verification, and whitespace validation pass.
+
+## 2026-10-15 - Reliable CDRRMO/PACC announcement delivery
+
+- Replaced the Mass Broadcast dashboard's fabricated recipient counts and mock recent history with a persistent `system_broadcasts` audit trail. Migration `0035_uneven_firedrake.sql` is applied: each new announcement atomically creates its audit record and all recipient inbox notifications, linked by `broadcast_id`.
+- Announcement targeting now records active eligible recipients, user opt-outs, inactive scoped accounts, missing Auth profiles, and Expo push outcomes. A failure from Expo cannot discard an announcement because its in-app notification is committed before advisory push delivery begins.
+- Extended session-bound Expo push registration from Responders to approved Public Users. Public Users can now receive background CDRRMO/PACC system announcements; Responder dispatch-offer channels and authorization remain unchanged. System Notice preferences continue to opt users out of both inbox targeting and push.
+- Applied the additive migration to the configured Supabase database. Announcement-delivery regression coverage, web/mobile strict TypeScript, and whitespace validation pass. A fresh Android build and physical-device test remain required to exercise FCM/Expo background delivery and Android notification permissions.
+
+## 2026-10-15 - Scheduler diagnostic-retention hardening
+
+- Pruned 4,115 expired `net._http_response` rows and 532,137 stale `cron.job_run_details` rows from the production Supabase project without touching application data, the pending HTTP queue, or the active five-second dispatch-expiry scheduler. Guarded compaction then returned the unused table pages: pg_net responses fell from 410 MB to 200 kB and cron history from 104 MB to about 8.9 MB.
+- Added active maintenance jobs that retain pg_net HTTP-response diagnostics for 15 minutes and pg_cron execution history for three days. The project database role cannot alter Supabase's global `pg_net.ttl`, so the five-minute response-prune job is the enforced retention boundary.
+- Added guarded inspect/prune scripts and deployment instructions. Final verification confirms the dispatch scheduler and both maintenance jobs are active, with zero pending HTTP requests.
+
+## 2026-10-14 - Mobile notification, onboarding, and form-transition hardening
+
+- Made Android notification launches single-consumption: the app now clears the native last response before routing and persists its handled response ID, preventing a crash or ordinary relaunch from reopening an old notification destination.
+- Removed the responder tab shell's competing automatic Home redirect. Explicit notification routes now own their navigation, dispatch-offer parameters are cleared in place after one authorized hydration, and Notifications consumes both UI and Android hardware Back presses by returning to the stable tab root once.
+- Hardened Public User completion return: the response screen disables repeat taps, stops late refresh work, navigates first, then clears transient report/chatbot state after the transition begins.
+- Made a post-signup ID-upload failure resumable. Once an Auth account exists, the client routes to Verification Pending and its existing identity-document uploader instead of encouraging a duplicate registration that would reserve the same phone/email.
+- Updated signup OTP, Forgot Password, and Reset Password screens to resize and scroll above Android keyboards; the password-recovery placeholder now fits the available field width. Removed Android experimental layout animation and hardware-accelerated modal composition from the responder report form to avoid MapLibre surface flicker.
+- Repaired Public User email recovery at the authentication boundary: reset emails now use an isolated Supabase PKCE client with an encrypted verifier namespace, cold- and warm-start deep links retain their complete one-time credential in memory until exchange, and Save Password remains unavailable until the recovery session is verified. Legacy token links remain supported without changing primary sign-up/sign-in behavior.
+- Updated notification and Public User reliability regression checks. Mobile strict TypeScript, targeted lint, the Android Expo export, and focused public/responder notification and reporting checks pass. Web routes, web API contracts, and dashboard behavior are unchanged.
+
 ## 2026-10-09 - Super Admin registration-approval lifecycle clarity
 
 - Bound every Super Admin approval/rejection decision to the exact pending government-ID storage path displayed to the reviewer. If the applicant replaces that ID before the decision, the atomic update returns a conflict instead of approving or rejecting an unseen document.
@@ -1315,3 +1344,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - Restored manual map pan/zoom by using MapLibre's typed `nativeEvent.userInteraction` signal to disable automatic camera centering. The explicit Recenter action retains the existing default-camera behavior.
 - Reworked the registration OTP sheet to scroll above Android's resized keyboard and added a full sign-up payload validation boundary immediately before Supabase Auth creation, preventing edited/invalid cross-step data from reserving an account phone number.
 - Added focused public-mobile reliability regression coverage. Public notification/navigation and reliability checks pass; mobile and root TypeScript checks emit no errors.
+
+## 2026-10-14 - Mobile notification and recovery lifecycle hardening
+
+- Moved the responder dispatch-offer overlay from the Home screen into the responder tab shell. New offers are now visible above Home, Reports, Forms, and Profile without issuing a competing route replacement or duplicating the offer component.
+- Added durable notification-response consumption before navigation. SecureStore persistence and Expo native-response clearing run together; routing proceeds when either replay guard succeeds and retries without navigation when both fail.
+- Made completed public-response cleanup atomic under the existing leaving guard so Home mounts only after the emergency and chatbot workflow stores are clear.
+- Shortened the Forgot Password placeholder for narrow Android screens and moved the full email/mobile example into wrapping helper text.
+- Updated stale recovery/approval assertions to follow validated registration data and the shared approval-eligibility policy. Added behavioral coverage for notification-consumption success, fallback, and total-failure cases.
+- Focused public-account recovery, notification consumption, public reliability, public notification routing, and responder notification routing checks pass. Mobile TypeScript and targeted lint pass with no errors; remaining lint warnings predate this hardening pass.

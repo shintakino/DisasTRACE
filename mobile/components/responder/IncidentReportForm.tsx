@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, ActivityIndicator, Image, KeyboardAvoidingView, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, ActivityIndicator, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Info, ChevronDown, Minus, Plus, FolderDown, Check } from 'lucide-react-native';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -15,10 +15,6 @@ import {
   validateIncidentReportForSubmission,
 } from '../../lib/responder-form-controls';
 
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const NATURE_OPTIONS = ['Emergency', 'Non-Emergency'];
 const EMERGENCY_TYPES = [
@@ -216,7 +212,6 @@ export function IncidentReportForm() {
 
 
   const toggleDropdown = (id: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setOpenDropdown(openDropdown === id ? null : id);
   };
 
@@ -393,10 +388,9 @@ export function IncidentReportForm() {
       visible={Boolean(reportFormSession)}
       animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
       presentationStyle={Platform.OS === 'ios' ? 'formSheet' : undefined}
-      hardwareAccelerated
       onRequestClose={returnToFieldWorkflow}
     >
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <SafeAreaView className="flex-1 bg-[#16203A]">
         {/* Header */}
         <View className="px-4 py-4 flex-row items-center border-b border-blue-800/50">

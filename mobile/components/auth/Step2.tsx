@@ -459,7 +459,7 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
         animationType="slide"
         onRequestClose={() => setShowOtpModal(false)}
       >
-        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           className="flex-1 bg-black/60"
           contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, View, Text, TouchableOpacity, ScrollView, StatusBar, Image, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStatus } from '../../hooks/use-auth-status';
@@ -57,6 +57,13 @@ export default function HomeScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
   const notificationOfferId = Array.isArray(dispatchOfferId) ? dispatchOfferId[0] : dispatchOfferId;
 
+  const clearNotificationOfferRoute = useCallback(() => {
+    // Remove the one-shot notification parameter without rebuilding Home. A
+    // same-route replace remounts responders' map/subscriptions and was able
+    // to race the dispatch state transition.
+    router.setParams({ dispatchOfferId: undefined });
+  }, [router]);
+
   // Notification taps must hydrate from the database, not merely navigate to
   // Home. This is required when Android suspended the realtime channel while
   // PACC created a manual dispatch offer.
@@ -76,7 +83,7 @@ export default function HomeScreen() {
         const result = await response.json().catch(() => null);
         if (!active || !response.ok || !result?.data) {
           if (!active) return;
-          router.replace('/(tabs)');
+          clearNotificationOfferRoute();
           if (response.status === 409) {
             Alert.alert(
               'Dispatch offer released',
@@ -90,7 +97,7 @@ export default function HomeScreen() {
 
         const offer = result.data;
         if (useResponderStore.getState().submittedIncidentIds.includes(offer.id)) {
-          router.replace('/(tabs)');
+          clearNotificationOfferRoute();
           return;
         }
         const initials = offer.reporterName.split(' ').map((name: string) => name[0]).join('').slice(0, 2).toUpperCase() || 'R';
@@ -116,11 +123,11 @@ export default function HomeScreen() {
             attachmentUrl: offer.attachmentUrl || undefined,
           },
         });
-        router.replace('/(tabs)');
+        clearNotificationOfferRoute();
       } catch (error) {
         if (!active || controller.signal.aborted) return;
         console.error('[HomeScreen] Failed to hydrate responder dispatch offer:', error);
-        router.replace('/(tabs)');
+        clearNotificationOfferRoute();
         Alert.alert('Dispatch offer unavailable', 'Unable to load this dispatch offer. Please check your connection and try again.');
       }
     };
@@ -130,7 +137,7 @@ export default function HomeScreen() {
       active = false;
       controller.abort();
     };
-  }, [isLoaded, notificationOfferId, role, router, user?.id]);
+  }, [clearNotificationOfferRoute, isLoaded, notificationOfferId, role, user?.id]);
 
   // Configure notifications channel
   useEffect(() => {

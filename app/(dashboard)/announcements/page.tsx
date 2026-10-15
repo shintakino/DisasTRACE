@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { 
   Megaphone, 
@@ -25,6 +25,18 @@ export interface AnnouncementDraft {
   body: string;
   targetRole: "all" | "ambulance_responder" | "public_user";
   lastSaved: string;
+}
+
+interface BroadcastSummary {
+  id: string;
+  title: string;
+  body: string;
+  targetRole: "all" | "ambulance_responder" | "public_user";
+  createdAt: string;
+  persistedCount: number;
+  optedOutCount: number;
+  pushEligibleCount: number;
+  pushAcceptedCount: number;
 }
 
 export default function AnnouncementsPage() {
@@ -77,33 +89,18 @@ export default function AnnouncementsPage() {
     toast.success("Draft deleted.");
   };
 
-  // Mock list of recent announcements sent to make the page feel alive and functional
-  const [recentBroadcasts, setRecentBroadcasts] = useState([
-    {
-      id: "1",
-      title: "Severe Weather Warning: PAGASA Update",
-      body: "Typhoon Pepito is approaching Bulacan. Please take necessary precautions and stay indoors. Active emergency responders are put on red alert status.",
-      targetRole: "all",
-      createdAt: new Date(Date.now() - 3600000 * 2).toISOString(), // 2 hours ago
-      dispatchedCount: 148
-    },
-    {
-      id: "2",
-      title: "Ambulance Crew Telemetry System Update",
-      body: "Please make sure to keep your GPS tracking active on the DisasTRACE app during your shift to ensure auto-dispatch cascading works flawlessly.",
-      targetRole: "ambulance_responder",
-      createdAt: new Date(Date.now() - 3600000 * 24).toISOString(), // 1 day ago
-      dispatchedCount: 16
-    },
-    {
-      id: "3",
-      title: "New Public Hotlines and FAQs Page Active",
-      body: "We have updated the Support & FAQs page inside the resident app. You can now tap to call direct hotlines or view updated disaster management guides.",
-      targetRole: "public_user",
-      createdAt: new Date(Date.now() - 3600000 * 48).toISOString(), // 2 days ago
-      dispatchedCount: 132
-    }
-  ]);
+  const [recentBroadcasts, setRecentBroadcasts] = useState<BroadcastSummary[]>([]);
+
+  useEffect(() => {
+    if (!isAuthorized) return;
+    void fetch("/api/notifications/announcement")
+      .then(async (response) => response.ok ? response.json() : Promise.reject(new Error("Unable to load announcement history.")))
+      .then((payload) => setRecentBroadcasts(Array.isArray(payload.broadcasts) ? payload.broadcasts : []))
+      .catch((error) => {
+        console.error(error);
+        toast.error("Unable to load recent announcement history.");
+      });
+  }, [isAuthorized]);
 
   const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,19 +129,9 @@ export default function AnnouncementsPage() {
       const res = await response.json();
 
       if (response.ok && res.success) {
-        toast.success("🚨 Mass Announcement Broadcasted Successfully!");
+        toast.success(`Announcement saved for ${res.broadcast.persistedCount} eligible account${res.broadcast.persistedCount === 1 ? "" : "s"}.`);
         
-        // Add to recent list dynamically
-        const newBroadcast = {
-          id: Math.random().toString(),
-          title: title.trim(),
-          body: body.trim(),
-          targetRole,
-          createdAt: new Date().toISOString(),
-          dispatchedCount: targetRole === "all" ? 148 : targetRole === "ambulance_responder" ? 16 : 132
-        };
-        
-        setRecentBroadcasts((prev) => [newBroadcast, ...prev]);
+        setRecentBroadcasts((prev) => [res.broadcast as BroadcastSummary, ...prev].slice(0, 20));
 
         // Reset form
         setTitle("");
@@ -506,7 +493,9 @@ export default function AnnouncementsPage() {
                     <h4 className="text-slate-800 text-sm font-bold mb-1 leading-tight">{b.title}</h4>
                     <p className="text-slate-500 text-xs line-clamp-2 leading-relaxed mb-2">{b.body}</p>
                     <div className="text-[10px] text-slate-400 font-bold tracking-wide">
-                      Dispatched successfully to {b.dispatchedCount} active clients
+                      Saved to {b.persistedCount} inbox{b.persistedCount === 1 ? "" : "es"}
+                      {b.pushEligibleCount > 0 && ` · ${b.pushAcceptedCount}/${b.pushEligibleCount} push accepted`}
+                      {b.optedOutCount > 0 && ` · ${b.optedOutCount} opted out`}
                     </div>
                   </div>
                 ))}

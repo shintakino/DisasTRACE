@@ -5,6 +5,7 @@ export * from './reports';
 export * from './status_logs';
 export * from './verification_requests';
 export * from './notifications';
+export * from './system_broadcasts';
 export * from './system_settings';
 export * from './hospitals';
 export * from './support_settings';

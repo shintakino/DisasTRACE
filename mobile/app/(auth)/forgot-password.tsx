@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Image,
   Modal,
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { passwordRecoverySupabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Sms, TickCircle } from 'iconsax-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,14 +34,7 @@ export default function ForgotPasswordScreen() {
   const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
-  const pinRefs = [
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-  ];
+  const pinRefs = useRef<(TextInput | null)[]>([]);
 
   // SMS Resend Cooldown Countdown
   useEffect(() => {
@@ -59,14 +52,6 @@ export default function ForgotPasswordScreen() {
     const timer = setTimeout(() => setEmailCooldown((current) => current - 1), 1000);
     return () => clearTimeout(timer);
   }, [emailCooldown]);
-
-  // Direct validation triggering on full 6-digit OTP code input
-  useEffect(() => {
-    const fullCode = otpCode.join('');
-    if (fullCode.length === 6) {
-      handleVerifyOtp(fullCode);
-    }
-  }, [otpCode]);
 
   const handleIdentifierSubmit = async () => {
     setError(null);
@@ -122,7 +107,7 @@ export default function ForgotPasswordScreen() {
         
         // Auto-focus first input cell after sheet slides up
         setTimeout(() => {
-          pinRefs[0].current?.focus();
+          pinRefs.current[0]?.focus();
         }, 300);
 
       } catch (err: any) {
@@ -146,7 +131,7 @@ export default function ForgotPasswordScreen() {
 
       setIsLoading(true);
       try {
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(input, {
+        const { error: resetError } = await passwordRecoverySupabase.auth.resetPasswordForEmail(input, {
           // This must exactly match the Android custom scheme and Supabase Auth
           // Redirect URL allow-list, so the email cannot fall back to localhost.
           redirectTo: 'disastrace://reset-password',
@@ -168,7 +153,7 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  const handleVerifyOtp = async (code: string) => {
+  const handleVerifyOtp = useCallback(async (code: string) => {
     setOtpError(null);
     setIsVerifyingOtp(true);
 
@@ -204,12 +189,20 @@ export default function ForgotPasswordScreen() {
     } catch (err: any) {
       setOtpError(err.message || 'OTP verification failed.');
       setOtpCode(['', '', '', '', '', '']); // Clear on failure
-      pinRefs[0].current?.focus(); // Re-focus first cell
+      pinRefs.current[0]?.focus(); // Re-focus first cell
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } finally {
       setIsVerifyingOtp(false);
     }
-  };
+  }, [router, sentPhone]);
+
+  // Direct validation triggering on full 6-digit OTP code input.
+  useEffect(() => {
+    const fullCode = otpCode.join('');
+    if (fullCode.length === 6) {
+      void handleVerifyOtp(fullCode);
+    }
+  }, [handleVerifyOtp, otpCode]);
 
   const handleResendOtp = async () => {
     if (otpTimer > 0) return;
@@ -237,7 +230,7 @@ export default function ForgotPasswordScreen() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setOtpTimer(60);
-      pinRefs[0].current?.focus();
+      pinRefs.current[0]?.focus();
     } catch (err: any) {
       setOtpError(err.message || 'Failed to resend code.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
@@ -252,7 +245,7 @@ export default function ForgotPasswordScreen() {
     setOtpCode(newOtp);
 
     if (cleanText && index < 5) {
-      pinRefs[index + 1].current?.focus();
+      pinRefs.current[index + 1]?.focus();
     }
   };
 
@@ -263,18 +256,18 @@ export default function ForgotPasswordScreen() {
         const newOtp = [...otpCode];
         newOtp[index - 1] = '';
         setOtpCode(newOtp);
-        pinRefs[index - 1].current?.focus();
+        pinRefs.current[index - 1]?.focus();
       }
     }
   };
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1"
     >
       <LinearGradient colors={['#0A1332', '#15286A']} className="flex-1">
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
           <View className="flex-1 p-6 justify-center mt-10">
             <TouchableOpacity
               onPress={() => {
@@ -309,7 +302,7 @@ export default function ForgotPasswordScreen() {
                   <View className="relative">
                     <TextInput
                       className={`bg-gray-50 p-4 rounded-xl border ${error ? 'border-red-500' : 'border-gray-200'} text-gray-800 pr-12`}
-                      placeholder="e.g. name@email.com or 09XXXXXXXXX"
+                      placeholder="Email or mobile number"
                       placeholderTextColor="#64748B"
                       value={identifier}
                       onChangeText={(val) => {
@@ -325,6 +318,7 @@ export default function ForgotPasswordScreen() {
                       <Sms size={20} color="#9CA3AF" />
                     </View>
                   </View>
+                  <Text className="text-gray-500 text-xs mt-2 ml-1">Example: name@example.com or 09XXXXXXXXX</Text>
                 </View>
               </View>
 
@@ -364,13 +358,20 @@ export default function ForgotPasswordScreen() {
         animationType="slide"
         onRequestClose={() => setShowOtpSheet(false)}
       >
-        <View className="flex-1 justify-end bg-black/60">
-          <TouchableOpacity 
-            className="flex-grow" 
-            activeOpacity={1} 
-            onPress={() => setShowOtpSheet(false)}
-          />
-          <View className="bg-[#0E1B46] border-t border-white/10 rounded-t-[32px] p-6 pb-12 shadow-2xl">
+        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView
+            className="flex-1 bg-black/60"
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+          >
+            <TouchableOpacity
+              className="flex-grow"
+              activeOpacity={1}
+              onPress={() => setShowOtpSheet(false)}
+            />
+            <View className="bg-[#0E1B46] border-t border-white/10 rounded-t-[32px] p-6 pb-12 shadow-2xl">
             <View className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-6" />
             
             <Text className="text-2xl font-bold text-white text-center mb-2">Verify Mobile Number</Text>
@@ -383,7 +384,7 @@ export default function ForgotPasswordScreen() {
               {otpCode.map((val, index) => (
                 <TextInput
                   key={index}
-                  ref={pinRefs[index]}
+                  ref={(input) => { pinRefs.current[index] = input; }}
                   className={`w-[14%] aspect-square bg-[#15286A] rounded-xl border text-center text-white text-2xl font-bold ${
                     val ? 'border-[#10B981]' : 'border-white/10'
                   }`}
@@ -424,8 +425,9 @@ export default function ForgotPasswordScreen() {
                 </TouchableOpacity>
               )}
             </View>
-          </View>
-        </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </KeyboardAvoidingView>
   );

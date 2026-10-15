@@ -163,7 +163,7 @@ export async function exportReportsSummaryPDF(
     doc.text(filterText, 154, 52);
 
     doc.setFont("helvetica", "bold");
-    doc.text("STATUS STATUS:", 120, 58);
+    doc.text("REPORT STATUS:", 120, 58);
     doc.setFont("helvetica", "normal");
     doc.text("OFFICIAL REGISTERED LOGS", 154, 58);
 
@@ -196,9 +196,12 @@ export async function exportReportsSummaryPDF(
       body: tableRows,
       theme: "striped",
       styles: {
-        fontSize: 8.5,
+        fontSize: 8,
         font: "helvetica",
-        cellPadding: 4,
+        // The six columns must fit inside the printable 182 mm A4 width.
+        // Compact horizontal padding leaves enough room for full status labels
+        // such as REJECTED and DUPLICATE without splitting them by character.
+        cellPadding: 2.5,
         valign: "middle",
       },
       headStyles: {
@@ -208,12 +211,12 @@ export async function exportReportsSummaryPDF(
         fontSize: 9,
       },
       columnStyles: {
-        id: { fontStyle: "bold", textColor: [30, 58, 138], cellWidth: 28 },
-        responderName: { fontStyle: "bold", cellWidth: 35 },
-        type: { cellWidth: 32 },
-        status: { fontStyle: "bold", cellWidth: 22 },
-        dateTime: { cellWidth: 30 },
-        location: { cellWidth: 43 },
+        id: { fontStyle: "bold", textColor: [30, 58, 138], cellWidth: 26 },
+        responderName: { fontStyle: "bold", cellWidth: 32 },
+        type: { cellWidth: 29 },
+        status: { fontStyle: "bold", halign: "center", cellWidth: 27 },
+        dateTime: { cellWidth: 29 },
+        location: { cellWidth: 39 },
       },
       didParseCell: (data) => {
         // Dynamic styling for status values

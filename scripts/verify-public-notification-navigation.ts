@@ -51,6 +51,7 @@ assert.match(notificationScreen, /router\.replace\('\/\(tabs\)' as any\)/, 'Noti
 assert.doesNotMatch(notificationScreen, /router\.push\(`\/\(tabs\)\/reports\/\$\{incidentId\}`/, 'Notification navigation must not construct report routes from incident IDs.');
 assert.match(rootLayout, /resolvePublicNotificationRoute/, 'Native Public User notification responses must use the same safe resolver.');
 assert.match(rootLayout, /route\?\.pathname \?\? '\/notifications'/, 'Unknown native Public User notification payloads must open Notifications safely.');
-assert.match(rootLayout, /Notifications\.getLastNotificationResponseAsync\(\)[\s\S]*Notifications\.clearLastNotificationResponseAsync/, 'The persisted native response must be cleared after it is copied into memory.');
+assert.match(rootLayout, /Notifications\.getLastNotificationResponseAsync\(\)[\s\S]*await Notifications\.clearLastNotificationResponseAsync/, 'The persisted native response must be cleared before it is routed.');
+assert.match(rootLayout, /LAST_HANDLED_NOTIFICATION_RESPONSE_KEY/, 'The consumed native response ID must be persisted across Android process restarts.');
 
 console.log('Public notification navigation regression checks passed.');

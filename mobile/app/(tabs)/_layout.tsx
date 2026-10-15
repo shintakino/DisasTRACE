@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Tabs, useRouter, useSegments } from 'expo-router';
+import React from 'react';
+import { Tabs } from 'expo-router';
 import { Home2, FolderOpen, Map, User, CalendarAdd } from 'iconsax-react-native';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -10,10 +10,11 @@ import { useLocationPermission } from '../../hooks/use-location-permission';
 import { LocationPermissionDrawer } from '../../components/dashboard/LocationPermissionDrawer';
 import { getOperationalTrackingIncidentId } from '../../lib/responder-report-form-session';
 import { IncidentReportForm } from '../../components/responder/IncidentReportForm';
+import { DispatchSheet } from '../../components/responder/DispatchSheet';
 import { useDraftReminder } from '../../hooks/use-draft-reminder';
 
 function ResponderAvailabilityTracker() {
-  const { role, user } = useAuthStatus();
+  const { role } = useAuthStatus();
   const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
   const responderStatus = useResponderStore((state) => state.status);
   const activeDispatch = useResponderStore((state) => state.activeDispatch);
@@ -43,31 +44,12 @@ function ResponderAvailabilityTracker() {
 }
 
 export default function TabLayout() {
-  const router = useRouter();
-  const segments = useSegments();
   const { role, user } = useAuthStatus();
-  const responderStatus = useResponderStore((state) => state.status);
-  const activeDispatchId = useResponderStore((state) => state.activeDispatch?.id);
   const insets = useSafeAreaInsets();
   const { isLocationGateActive, requestPermissions, servicesEnabled } = useLocationPermission();
-  const lastRoutedOfferIdRef = useRef<string | null>(null);
 
   const isResponder = role === 'ambulance_responder';
   useDraftReminder(isResponder ? user?.id : null);
-
-  useEffect(() => {
-    if (!isResponder || responderStatus !== 'dispatch_offered' || !activeDispatchId) {
-      if (responderStatus !== 'dispatch_offered') lastRoutedOfferIdRef.current = null;
-      return;
-    }
-
-    // Home owns the offer sheet. Route there only once for a newly received
-    // offer and never replace Home with itself during notification hydration.
-    if (lastRoutedOfferIdRef.current === activeDispatchId) return;
-    lastRoutedOfferIdRef.current = activeDispatchId;
-    const isHomeTab = segments[0] === '(tabs)' && segments.length === 1;
-    if (!isHomeTab) router.replace('/(tabs)');
-  }, [activeDispatchId, isResponder, responderStatus, router, segments]);
 
   return (
     <>
@@ -140,6 +122,7 @@ export default function TabLayout() {
         onRequestPermission={requestPermissions}
         servicesEnabled={servicesEnabled}
       />
+      {isResponder && <DispatchSheet />}
     </>
   );
 }

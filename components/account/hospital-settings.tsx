@@ -403,12 +403,12 @@ export function HospitalSettings() {
           )}
         </div>
 
-        <div className="flex-1 rounded-2xl overflow-hidden border border-slate-200 shadow-md relative bg-[#0a0a1a]">
+        <div className="flex-1 rounded-2xl overflow-hidden border border-slate-200 shadow-md relative bg-slate-100">
           <Map
             ref={mapRef}
             initialViewState={BALIWAG_CENTER}
             style={{ width: "100%", height: "100%" }}
-            mapStyle="https://tiles.openfreemap.org/styles/dark"
+            mapStyle="https://tiles.openfreemap.org/styles/liberty"
             onClick={handleMapClick}
             attributionControl={false}
           >

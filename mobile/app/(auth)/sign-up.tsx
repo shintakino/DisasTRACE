@@ -32,6 +32,7 @@ export default function SignUpScreen() {
   const handleRegister = async () => {
     setLoading(true);
     setError(null);
+    let accountCreated = false;
 
     try {
       // Fetch latest data from Zustand
@@ -97,6 +98,7 @@ export default function SignUpScreen() {
 
       const userId = signUpData.user.id;
       if (!userId) throw new Error('Sign up failed: User ID missing');
+      accountCreated = true;
 
       // 2. Upload ID to Supabase Storage if provided
       // Note: If email confirmation is required, signUpData.session will be null.
@@ -122,6 +124,14 @@ export default function SignUpScreen() {
       setShowSuccessModal(true);
     } catch (err: any) {
       console.error('Registration error:', err);
+      if (accountCreated) {
+        // Auth and the profile already exist. Retrying the sign-up would
+        // correctly fail as a duplicate, so continue through the resumable
+        // pending-verification document uploader instead.
+        setError('Your account was created. Complete your ID upload from the Verification Pending screen.');
+        router.replace('/(verification)/pending' as never);
+        return;
+      }
       setError(err.message || 'Sign up failed');
     } finally {
       setLoading(false);
@@ -131,7 +141,7 @@ export default function SignUpScreen() {
   const handleNextSuccess = () => {
     setShowSuccessModal(false);
     reset();
-    router.replace('/(auth)/sign-in');
+    router.replace((isAutoConfirmed ? '/(verification)/pending' : '/(auth)/sign-in') as never);
   };
 
   const progressPercentage = (currentStep / 4) * 100;

@@ -1,5 +1,6 @@
 import { pgTable, text, varchar, timestamp, boolean, jsonb } from 'drizzle-orm/pg-core';
 import { users } from './users';
+import { systemBroadcasts } from './system_broadcasts';
 
 export const notifications = pgTable('notifications', {
   id: varchar('id', { length: 255 }).primaryKey(),
@@ -10,4 +11,5 @@ export const notifications = pgTable('notifications', {
   unread: boolean('unread').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   metadata: jsonb('metadata'),
+  broadcastId: varchar('broadcast_id', { length: 255 }).references(() => systemBroadcasts.id, { onDelete: 'set null' }),
 });

@@ -24,20 +24,25 @@ const LargeSecureStoreAdapter = {
     return await SecureStore.getItemAsync(key);
   },
   setItem: async (key: string, value: string) => {
-    writeLock = writeLock.then(async () => {
+    const operation = writeLock.then(async () => {
       // If the value is too large for SecureStore (> 2048 bytes)
       if (Platform.OS === 'android' && value.length > 2048) {
         console.warn(`[Storage] Session size (${value.length} bytes) exceeds SecureStore limit. Storing truncated session is not possible.`);
       }
       await SecureStore.setItemAsync(key, value);
-    }).catch(console.error) as Promise<void>;
-    return writeLock;
+    });
+    // Keep the queue usable after a failed write, but return the original
+    // operation so Auth cannot report success when its PKCE verifier was not
+    // actually persisted.
+    writeLock = operation.catch(() => undefined);
+    return operation;
   },
   removeItem: async (key: string) => {
-    writeLock = writeLock.then(async () => {
+    const operation = writeLock.then(async () => {
       await SecureStore.deleteItemAsync(key);
-    }).catch(console.error) as Promise<void>;
-    return writeLock;
+    });
+    writeLock = operation.catch(() => undefined);
+    return operation;
   },
 };
 
@@ -47,5 +52,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+  },
+});
+
+// Keep password recovery isolated from the primary auth client. Enabling PKCE
+// globally would also change sign-up confirmation links; this client gives the
+// recovery flow its own encrypted verifier/session namespace instead.
+export const passwordRecoverySupabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: LargeSecureStoreAdapter,
+    storageKey: 'disastrace-mobile-password-recovery',
+    autoRefreshToken: false,
+    persistSession: true,
+    detectSessionInUrl: false,
+    flowType: 'pkce',
   },
 });

@@ -10,7 +10,7 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { passwordRecoverySupabase, supabase } from '../../lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,6 +20,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { getRecoveryCredentials } from '../../lib/recovery-session';
+import {
+  clearRememberedRecoveryUrl,
+  getRememberedRecoveryUrl,
+  rememberRecoveryUrl,
+} from '../../lib/recovery-link-inbox';
 
 // Strict Zod Validation Schema
 const ResetPasswordSchema = z.object({
@@ -58,6 +63,7 @@ export default function ResetPasswordScreen() {
   const [isVerifyingLink, setIsVerifyingLink] = useState(false);
   const [recoveryReady, setRecoveryReady] = useState(isOtpFlow);
   const [initialRecoveryUrl, setInitialRecoveryUrl] = useState<string | null | undefined>(undefined);
+  const [rememberedRecoveryUrl, setRememberedRecoveryUrl] = useState<string | null>(() => getRememberedRecoveryUrl());
   const handledRecoveryRef = useRef<string | null>(null);
 
   // Success Modal & Redirect
@@ -75,15 +81,28 @@ export default function ResetPasswordScreen() {
   useEffect(() => {
     let mounted = true;
     void Linking.getInitialURL()
-      .then((initialUrl) => { if (mounted) setInitialRecoveryUrl(initialUrl); })
+      .then((initialUrl) => {
+        if (!mounted) return;
+        if (rememberRecoveryUrl(initialUrl)) setRememberedRecoveryUrl(initialUrl);
+        setInitialRecoveryUrl(initialUrl);
+      })
       .catch(() => { if (mounted) setInitialRecoveryUrl(null); });
     return () => { mounted = false; };
   }, []);
 
-  const recoveryUrl = url ?? initialRecoveryUrl ?? null;
+  useEffect(() => {
+    if (rememberRecoveryUrl(url)) setRememberedRecoveryUrl(url);
+  }, [url]);
+
+  const routeRecoveryParams = useMemo(
+    () => ({ access_token, refresh_token, code, '#': recoveryHash }),
+    [access_token, code, recoveryHash, refresh_token],
+  );
   const recovery = useMemo(
-    () => getRecoveryCredentials(recoveryUrl, { access_token, refresh_token, code, '#': recoveryHash }),
-    [access_token, code, recoveryHash, recoveryUrl, refresh_token],
+    () => getRecoveryCredentials(url, routeRecoveryParams)
+      ?? getRecoveryCredentials(initialRecoveryUrl, routeRecoveryParams)
+      ?? getRecoveryCredentials(rememberedRecoveryUrl, routeRecoveryParams),
+    [initialRecoveryUrl, rememberedRecoveryUrl, routeRecoveryParams, url],
   );
   const recoveryFingerprint = recovery
     ? recovery.kind === 'tokens'
@@ -91,7 +110,10 @@ export default function ResetPasswordScreen() {
       : `code:${recovery.code}`
     : null;
   const hasRecoveryRouteParameter = Boolean(access_token || refresh_token || code || recoveryHash);
-  const isWaitingForRecoveryUrl = !isOtpFlow && !hasRecoveryRouteParameter && initialRecoveryUrl === undefined;
+  const isWaitingForRecoveryUrl = !isOtpFlow
+    && !hasRecoveryRouteParameter
+    && !rememberedRecoveryUrl
+    && initialRecoveryUrl === undefined;
 
   // Capture and process both Supabase recovery link formats. Depending on the
   // project auth settings, Supabase can send either hash tokens or a PKCE code.
@@ -115,8 +137,8 @@ export default function ResetPasswordScreen() {
 
       try {
         const result = recovery.kind === 'tokens'
-          ? await supabase.auth.setSession({ access_token: recovery.accessToken!, refresh_token: recovery.refreshToken! })
-          : await supabase.auth.exchangeCodeForSession(recovery.code!);
+          ? await passwordRecoverySupabase.auth.setSession({ access_token: recovery.accessToken!, refresh_token: recovery.refreshToken! })
+          : await passwordRecoverySupabase.auth.exchangeCodeForSession(recovery.code!);
         if (result.error) throw result.error;
         const session = result.data.session;
 
@@ -124,12 +146,14 @@ export default function ResetPasswordScreen() {
           throw new Error('Open the password reset link from your email before saving a new password.');
         }
 
+        clearRememberedRecoveryUrl();
         setRecoveryReady(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       } catch (error) {
         console.error('[ResetPassword] Recovery session setup failed:', error);
+        clearRememberedRecoveryUrl();
         setRecoveryReady(false);
-        setGlobalError(error instanceof Error ? error.message : 'The reset link is invalid or has expired.');
+        setGlobalError('This reset link is invalid, expired, or was opened on a different device. Request a new link on this device and try again.');
       } finally {
         setIsVerifyingLink(false);
       }
@@ -152,7 +176,7 @@ export default function ResetPasswordScreen() {
       }
     }
     return () => clearTimeout(timer);
-  }, [showSuccessModal, countdown]);
+  }, [countdown, router, showSuccessModal]);
 
   const onSubmit = async (data: ResetPasswordType) => {
     setGlobalError(null);
@@ -182,11 +206,11 @@ export default function ResetPasswordScreen() {
 
       } else {
         // Email Link Flow: Client-side Supabase password update
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await passwordRecoverySupabase.auth.getSession();
         if (!session) {
           throw new Error('Your reset link is no longer active. Request a new password reset link and open it from your email.');
         }
-        const { error: supabaseError } = await supabase.auth.updateUser({
+        const { error: supabaseError } = await passwordRecoverySupabase.auth.updateUser({
           password: data.password
         });
 
@@ -199,6 +223,7 @@ export default function ResetPasswordScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       
       // Sign out any active sessions to secure the account and trigger fresh login
+      await passwordRecoverySupabase.auth.signOut({ scope: 'local' }).catch(() => {});
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
 
       setShowSuccessModal(true);
@@ -211,11 +236,11 @@ export default function ResetPasswordScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1"
     >
       <LinearGradient colors={['#0A1332', '#15286A']} className="flex-1">
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
           <View className="flex-1 p-6 justify-center mt-10">
             <TouchableOpacity
               onPress={() => {

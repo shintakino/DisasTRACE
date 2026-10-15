@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
 import { mobilePushTokens, users } from '@/db/schema';
@@ -12,7 +12,7 @@ const PushTokenSchema = z.object({
   pushToken: z.string().trim().regex(/^(Expo|Exponent)PushToken\[[^\]]+\]$/, 'Invalid Expo push token.'),
 }).strict();
 
-async function requireActiveResponder(request: Request) {
+async function requireActiveMobileUser(request: Request) {
   const accessToken = getBearerToken(request);
   if (!accessToken) return null;
   const supabase = await createClient();
@@ -26,7 +26,8 @@ async function requireActiveResponder(request: Request) {
     columns: { role: true, status: true, verificationStatus: true },
   });
   const sessionId = getSupabaseSessionId(accessToken);
-  if (!dbUser || dbUser.role !== 'ambulance_responder' || dbUser.status !== 'ACTIVE' || dbUser.verificationStatus !== 'APPROVED' || !sessionId) return null;
+  const supportsAnnouncements = dbUser?.role === 'ambulance_responder' || dbUser?.role === 'public_user';
+  if (!dbUser || !supportsAnnouncements || dbUser.status !== 'ACTIVE' || dbUser.verificationStatus !== 'APPROVED' || !sessionId) return null;
   return { userId: user.id, sessionId };
 }
 
@@ -34,20 +35,29 @@ export async function POST(request: Request) {
   try {
     const parsed = PushTokenSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: 'Invalid push-token request.' }, { status: 400 });
-    const responder = await requireActiveResponder(request);
-    if (!responder) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const mobileUser = await requireActiveMobileUser(request);
+    if (!mobileUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const now = new Date();
-    await db.insert(mobilePushTokens).values({
-      userId: responder.userId,
-      pushToken: parsed.data.pushToken,
-      sessionId: responder.sessionId,
-      platform: 'android',
-      createdAt: now,
-      updatedAt: now,
-    }).onConflictDoUpdate({
-      target: mobilePushTokens.userId,
-      set: { pushToken: parsed.data.pushToken, sessionId: responder.sessionId, updatedAt: now },
+    await db.transaction(async (tx) => {
+      // Expo identifies the installation, not the account. If a user changes
+      // accounts on one Android device, transfer the token rather than failing
+      // the new account's registration on the unique push-token constraint.
+      await tx.delete(mobilePushTokens).where(and(
+        eq(mobilePushTokens.pushToken, parsed.data.pushToken),
+        ne(mobilePushTokens.userId, mobileUser.userId),
+      ));
+      await tx.insert(mobilePushTokens).values({
+        userId: mobileUser.userId,
+        pushToken: parsed.data.pushToken,
+        sessionId: mobileUser.sessionId,
+        platform: 'android',
+        createdAt: now,
+        updatedAt: now,
+      }).onConflictDoUpdate({
+        target: mobilePushTokens.userId,
+        set: { pushToken: parsed.data.pushToken, sessionId: mobileUser.sessionId, updatedAt: now },
+      });
     });
     return NextResponse.json({ success: true });
   } catch (error) {

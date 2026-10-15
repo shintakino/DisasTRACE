@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getRecoveryCredentials } from '../mobile/lib/recovery-session';
+import {
+  clearRememberedRecoveryUrl,
+  getRememberedRecoveryUrl,
+  rememberRecoveryUrl,
+} from '../mobile/lib/recovery-link-inbox';
 
 function source(path: string) {
   return readFileSync(join(process.cwd(), path), 'utf8');
@@ -36,14 +41,34 @@ check('parses Supabase recovery tokens from an Android deep-link fragment', () =
   );
 });
 
+check('retains only credential-bearing mobile recovery links until exchange', () => {
+  clearRememberedRecoveryUrl();
+  assert.equal(rememberRecoveryUrl('disastrace://reset-password'), false);
+  assert.equal(rememberRecoveryUrl('https://attacker.example/reset-password?code=stolen'), false);
+  assert.equal(rememberRecoveryUrl('disastrace://reset-password?code=recovery-code'), true);
+  assert.equal(getRememberedRecoveryUrl(), 'disastrace://reset-password?code=recovery-code');
+  clearRememberedRecoveryUrl();
+  assert.equal(getRememberedRecoveryUrl(), null);
+});
+
 check('password updates require the recovery credential rather than a stale app session', () => {
   const screen = source('mobile/app/(auth)/reset-password.tsx');
-  assert.match(screen, /getRecoveryCredentials\(recoveryUrl, \{ access_token, refresh_token, code, '#': recoveryHash \}\)/);
-  assert.match(screen, /supabase\.auth\.setSession/);
-  assert.match(screen, /supabase\.auth\.exchangeCodeForSession/);
+  const rootLayout = source('mobile/app/_layout.tsx');
+  const client = source('mobile/lib/supabase.ts');
+  const forgotPassword = source('mobile/app/(auth)/forgot-password.tsx');
+  assert.match(client, /flowType: 'pkce'/);
+  assert.match(client, /storageKey: 'disastrace-mobile-password-recovery'/);
+  assert.match(forgotPassword, /passwordRecoverySupabase\.auth\.resetPasswordForEmail/);
+  assert.match(screen, /passwordRecoverySupabase\.auth\.setSession/);
+  assert.match(screen, /passwordRecoverySupabase\.auth\.exchangeCodeForSession/);
+  assert.match(screen, /passwordRecoverySupabase\.auth\.updateUser/);
   assert.match(screen, /handledRecoveryRef/);
   assert.match(screen, /handledRecoveryRef\.current === recoveryFingerprint/);
   assert.match(screen, /Linking\.getInitialURL/);
+  assert.match(screen, /getRememberedRecoveryUrl/);
+  assert.match(screen, /clearRememberedRecoveryUrl/);
+  assert.match(rootLayout, /Linking\.addEventListener\('url'/);
+  assert.match(rootLayout, /rememberRecoveryUrl/);
   assert.match(screen, /Request a new reset link/);
   assert.doesNotMatch(screen, /const existing = await supabase\.auth\.getSession\(\)/);
 });
@@ -51,7 +76,7 @@ check('password updates require the recovery credential rather than a stale app 
 check('registration uploads an ID with the freshly issued access token', () => {
   const signup = source('mobile/app/(auth)/sign-up.tsx');
   const storage = source('mobile/lib/storage.ts');
-  assert.match(signup, /uploadGovernmentID\(currentData\.idCardUri, currentData\.idCardType, signUpData\.session\.access_token\)/);
+  assert.match(signup, /uploadGovernmentID\(registrationData\.idCardUri, registrationData\.idCardType, signUpData\.session\.access_token\)/);
   assert.match(storage, /accessToken\?: string/);
   assert.match(storage, /const token = accessToken \|\| currentSession\?\.data\.session\?\.access_token/);
 });
@@ -81,7 +106,9 @@ check('registration fields notify the scroll container when they receive focus',
 
 check('approval queue excludes pending applications without an ID document', () => {
   const route = source('app/api/users/approval/route.ts');
-  assert.match(route, /isNotNull\(users\.idImageUrl\)/);
+  const policy = source('lib/account-approval.ts');
+  assert.match(route, /approvalEligibilityWhere\(\)/);
+  assert.match(policy, /isNotNull\(users\.idImageUrl\)/);
 });
 
 console.log('All mobile public-account recovery checks passed.');

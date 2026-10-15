@@ -61,12 +61,15 @@ assert.match(
 );
 assert.match(
   notificationScreen,
-  /role === 'ambulance_responder' && router\.canGoBack\(\)[\s\S]*?router\.back\(\)[\s\S]*?router\.replace\('\/\(tabs\)'/,
-  'Notification Back must pop a manually opened screen and only fall back to Home for cold-start notification launches.',
+  /BackHandler\.addEventListener\('hardwareBackPress'/,
+  'Notification Back must consume Android hardware presses.',
 );
+assert.match(notificationScreen, /router\.replace\('\/\(tabs\)' as any\)/, 'Notification Back must replace to the stable Home route exactly once.');
 
 const rootLayout = read('mobile/app/_layout.tsx');
 assert.match(rootLayout, /clearLastNotificationResponseAsync/, 'Handled Android notification taps must be consumed once.');
+assert.match(rootLayout, /consumeNotificationResponseDurably/, 'Native notification routing must wait for durable response consumption.');
+assert.match(rootLayout, /persistHandledResponseId: \(id\) => SecureStore\.setItemAsync\(LAST_HANDLED_NOTIFICATION_RESPONSE_KEY, id\)/, 'Consumed notification IDs must survive a process restart.');
 assert.match(rootLayout, /resolveResponderNotificationRoute/, 'Android responder pushes must use the same internal route resolver.');
 assert.match(rootLayout, /role === 'public_user'[\s\S]*?resolvePublicNotificationRoute/, 'Android public notification taps must use the public resolver.');
 
@@ -88,7 +91,10 @@ assert.match(
 );
 
 const tabsLayout = read('mobile/app/(tabs)/_layout.tsx');
-assert.match(tabsLayout, /responderStatus !== 'dispatch_offered'/, 'Only a new offer may auto-route a responder to Home.');
-assert.doesNotMatch(tabsLayout, /responderStatus === 'dispatch_offered'\s*\|\|\s*responderStatus === 'en_route'/, 'En-route state must not compete with report or notification navigation.');
+assert.doesNotMatch(tabsLayout, /router\.replace\('\/\(tabs\)'\)/, 'The tab shell must not compete with explicit notification navigation.');
+assert.match(tabsLayout, /isResponder && <DispatchSheet \/>/, 'Urgent responder offers must render above every responder tab without a navigation redirect.');
+const responderHome = read('mobile/components/responder/ResponderHome.tsx');
+assert.doesNotMatch(responderHome, /<DispatchSheet \/>/, 'The responder offer overlay must have one owner and must not be duplicated inside Home.');
+assert.match(homeScreen, /router\.setParams\(\{ dispatchOfferId: undefined \}\)/, 'One-shot dispatch route parameters must be cleared without remounting Home.');
 
 console.log('Responder notification routing and expiry race regression checks passed.');

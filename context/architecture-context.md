@@ -62,6 +62,8 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 
 ### Account Verification Gate
 
+- One root-owned mobile Auth provider owns session restoration, verification, and the account Realtime subscription. Screen consumers share that result; same-account auth events do not reset operational responder state. Registration uses an isolated in-memory Auth client and publishes its session only after device binding and the ID-upload attempt. A failed upload resumes through the authenticated Pending uploader, and never claims the ID is under review.
+
 - Mobile users (Public User, Ambulance Responder) must be verified before accessing any app functionality.
 - Verification status is stored in the database (`verification_status`: `pending`, `approved`, `rejected`).
 - Only the **CDRRMO Super Admin** can approve or reject pending registrations. PACC Admins are excluded from registration approvals.
@@ -140,6 +142,8 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 - Notifications are stored in the database and delivered via Supabase Realtime subscriptions while the app is active.
 - Responder dispatch offers and CDRRMO/PACC system announcements additionally use Expo Push Notifications delivered through FCM, so Android can alert an approved responder or Public User while the app is backgrounded or stopped. Expo push tokens are bound to the account's one active mobile session and removed on sign-out or provider invalidation. Push delivery is advisory: the database inbox row remains authoritative for announcements, while the server remains the authority for dispatch-offer ownership and expiry.
 - Each system announcement creates one immutable `system_broadcasts` audit row and atomically links an inbox row to every eligible recipient. The audit records eligible, opted-out, inactive, missing-auth, and Expo push outcomes. Existing Auth metadata preferences (`system` and legacy `system_notices`) remain the user opt-out boundary.
+- Mobile push setup has one root-owned lifecycle, with foreground recovery, bounded network retries, and native-to-Expo token exchange on rotation. Notification Settings exposes setup failures without conflating an in-app inbox row with delivery to a device. Navigation back to mobile tabs dismisses to the existing shell instead of replacing a pushed screen with a second tab shell.
+- Users Approval separately lists pending mobile registrations without an ID as non-actionable Awaiting ID records. Document-backed approval eligibility, exact-document checks, and role authorization are unchanged.
 - Responder draft reminders are scheduled natively once per responder-owned unsent draft set, only while the device is online, and cancelled after a confirmed submission or logout. They do not rely on a running JavaScript timer; delayed form autosave is suspended while submission is in progress so it cannot recreate an already-submitted draft.
 - Notification types: report verification updates, dispatch alerts, incident resolutions, account verification results, pending registration alerts (for admins).
 - Report rejection notifications use the distinct `incident_rejected` type and include only the owned request identifier and the PACC-provided reason. Guest reports do not create user notification rows; their reason is returned only by the token-scoped report-status endpoint.

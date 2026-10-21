@@ -46,7 +46,8 @@ assert.match(authStatus, /activeMobileAccountId/);
 assert.match(authStatus, /hasHydratedInitialMobileSession/);
 assert.match(authStatus, /reconcileResponderStoreAccount/);
 assert.match(authStatus, /useResponderStore\.getState\(\)\.clearTransientDispatch\(\)/);
-assert.match(authStatus, /event === 'SIGNED_IN' \|\| event === 'SIGNED_OUT'/);
+assert.match(authStatus, /shouldResetResponderSession\(activeMobileAccountId, nextId, hasHydratedInitialMobileSession\)/);
+assert.doesNotMatch(authStatus, /event === 'SIGNED_IN'/, 'Repeated same-account Auth events must not discard operational state.');
 
 const responderHome = read('mobile/components/responder/ResponderHome.tsx');
 assert.match(responderHome, /!incident \|\| \['DOCUMENTATION_PENDING', 'RESOLVED'\]\.includes\(incident\.status\)/);

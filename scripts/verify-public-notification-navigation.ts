@@ -47,9 +47,10 @@ assert.deepEqual(
 );
 
 assert.match(notificationScreen, /resolvePublicNotificationRoute/, 'Public notification navigation must use the typed resolver.');
-assert.match(notificationScreen, /router\.replace\('\/\(tabs\)' as any\)/, 'Notification back must always return to the stable tab root.');
+assert.match(notificationScreen, /router\.dismissTo\('\/\(tabs\)'\)/, 'Notification back must reuse the existing tab navigator.');
 assert.doesNotMatch(notificationScreen, /router\.push\(`\/\(tabs\)\/reports\/\$\{incidentId\}`/, 'Notification navigation must not construct report routes from incident IDs.');
 assert.match(rootLayout, /resolvePublicNotificationRoute/, 'Native Public User notification responses must use the same safe resolver.');
+assert.match(rootLayout, /openNotificationRoute\(router, navigationRef\.getRootState\(\), route\?\.pathname/, 'Public push taps must choose navigation from the current root state after consumption.');
 assert.match(rootLayout, /route\?\.pathname \?\? '\/notifications'/, 'Unknown native Public User notification payloads must open Notifications safely.');
 assert.match(rootLayout, /Notifications\.getLastNotificationResponseAsync\(\)[\s\S]*await Notifications\.clearLastNotificationResponseAsync/, 'The persisted native response must be cleared before it is routed.');
 assert.match(rootLayout, /LAST_HANDLED_NOTIFICATION_RESPONSE_KEY/, 'The consumed native response ID must be persisted across Android process restarts.');

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import * as SecureStore from 'expo-secure-store';
 import { useResponderStore } from '../stores/useResponderStore';
 import { supabase } from '../lib/supabase';
@@ -17,7 +18,13 @@ export function useOfflineReports() {
     dequeueAction, 
     setSyncingQueue, 
     isSyncingQueue 
-  } = useResponderStore();
+  } = useResponderStore(useShallow(state => ({
+    drafts: state.drafts,
+    offlineQueue: state.offlineQueue,
+    dequeueAction: state.dequeueAction,
+    setSyncingQueue: state.setSyncingQueue,
+    isSyncingQueue: state.isSyncingQueue,
+  })));
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [retryNonce, setRetryNonce] = useState(0);

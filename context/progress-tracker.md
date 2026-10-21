@@ -1,5 +1,29 @@
 # Progress Tracker
 
+## 2026-10-21 - Nested-tab notification routing correction
+
+- Review reproduced an ignored native notification action: Expo's `dismissTo` produces `POP_TO`, which the installed bottom-tab router cannot handle when Home/another tab is already active. The previous outer-stack tests did not cover this case.
+- Native Public User and Responder taps now read the live root navigation state after durable consumption: use `navigate` inside the tabs, and `dismissTo` from a root screen above them. This preserves exact dispatch/report destinations and the existing tab shell on return. Unknown notifications opened from a tab retain Home underneath. Auth/verification gates, replay protection, APIs, and web behavior are unchanged.
+- Expanded the navigation regression to use the installed Expo action builder and actual tab/stack reducers, including same-tab/cross-tab taps, nested report detail IDs, dispatch parameters, cold/warm roots, and a negative control reproducing the old ignored action. Installed-router behavior, public/responder notification regressions, mobile reliability/lifecycle checks, mobile TypeScript, mobile-config targeted lint, and whitespace checks pass. Running the root web ESLint configuration against mobile also reports the pre-existing `setIsAppReady` effect rule violation; that unrelated effect is unchanged. Physical-device native crash acceptance is still required.
+
+## 2026-10-20 - Testing 25 follow-up
+
+- Final verification (2026-10-21): root/mobile TypeScript, production Next.js build, Android Expo export, targeted web/mobile lint (zero errors; existing mobile warnings remain), installed navigation-stack behavior, staged-registration behavior, actual PDF rendering, approval eligibility/visibility, announcement wiring, notification replay protection, and responder documentation/report reliability checks pass. Build artifacts remain under ignored `mobile/.expo/`. No production data, Auth settings, approvals, broadcasts, or user preferences were mutated. Native crash/flicker and real-device push receipt remain unverified without a connected Android device; follow the acceptance checklist before release. Changes are not committed or deployed.
+
+- The inbox now refreshes on focus/foreground/reconnect, offers pull-to-refresh and an explicit load error, and no longer marks every unseen notice read just by opening the page. Consolidated foreground alert setup at the root, retaining the residents' report-update channel and responder-specific sound channels. Startup restoration cannot overwrite a newer live dispatch. Added `context/testing-25-acceptance.md` for new-build/device validation.
+
+- Rebalanced User Management PDF columns to the 182 mm printable width, with room for full bold SUSPENDED/DEACTIVATED labels. Added an actual jsPDF/AutoTable rendering assertion, not just a source-code check. Announcement history now distinguishes saved inbox notices, service-accepted pushes, missing devices, exclusions, and failed push attempts.
+
+- Changed the responder map to Android texture rendering, narrowed map/dispatch-sheet store subscriptions, paused visual GPS/camera/route work while a form covers the map, and removed delayed GPS subscriptions on exit. The tab-owned operational telemetry remains active during forms. Native keyboard/modal rendering still needs device acceptance testing.
+
+- Added one account-scoped push-registration lifecycle with foreground recovery and bounded retry after network errors. Token rotation now exchanges native tokens for Expo tokens before API registration. Notification Settings displays setup state and retry/settings actions, reports failed preference saves, and respects legacy opt-outs.
+
+- Added a read-only Awaiting ID section to Users Approval, including incomplete applicants and completion guidance. Document-backed review eligibility and exact-document approval protection are unchanged; the empty state no longer says all registrations were reviewed while incomplete accounts exist.
+
+- Isolated registration Auth publication until device binding and document-upload completion/recovery, with duplicate-submit protection and same-attempt session reuse. Consolidated mobile Auth into one root provider with stale-request guards and account-change-only responder resets. Added behavioral tests for binding failure, interrupted upload, delayed upload, and session publication.
+
+- Replaced notification and completed-report tab replacements with dismissal to the existing destination. Android Notifications Back is focus-scoped and guarded during navigation; cold-start fallback and exact dispatch IDs are retained. Added installed-stack behavioral coverage for warm/cold starts, repeated returns, and dispatch parameters. Native crash reproduction still requires a device.
+
 ## 2026-10-15 - Hospital locator readability and report-PDF status layout
 
 - Changed only the web Hospital Management coordinate-picker map from OpenFreeMap's dark style to the already-established light `liberty` style, with a matching light loading surface. Hospital API calls, stored coordinates, marker behavior, and every mobile map remain unchanged.

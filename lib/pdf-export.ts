@@ -8,6 +8,7 @@
 
 import { ReportEntry, DetailedIncidentReport } from "@/types/reports";
 import { UserManagementEntry } from "@/types/users";
+import { USER_REGISTRY_PDF_LAYOUT } from './user-registry-pdf-layout';
 
 /**
  * Format date helper
@@ -803,25 +804,12 @@ export async function exportUsersListPDF(
       columns: tableColumns,
       body: tableRows,
       theme: "striped",
-      styles: {
-        fontSize: 8.5,
-        font: "helvetica",
-        cellPadding: 4,
-        valign: "middle",
-      },
+      ...USER_REGISTRY_PDF_LAYOUT,
       headStyles: {
         fillColor: [30, 58, 138], // Navy Blue #1E3A8A
         textColor: [255, 255, 255],
         fontStyle: "bold",
         fontSize: 9,
-      },
-      columnStyles: {
-        fullName: { fontStyle: "bold", cellWidth: 35 },
-        email: { cellWidth: 45 },
-        role: { cellWidth: 28 },
-        status: { fontStyle: "bold", cellWidth: 24 },
-        joinedDate: { cellWidth: 28 },
-        lastActive: { cellWidth: 28 },
       },
       didParseCell: (data) => {
         if (data.section === "body" && data.column.dataKey === "status") {

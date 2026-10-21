@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { AppState, BackHandler, RefreshControl, View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ChevronLeft, Siren, Truck, ShieldCheck, Activity, CloudLightning, Megaphone, FileText, XCircle } from 'lucide-react-native';
 import { useAuthStatus } from '../hooks/use-auth-status';
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,7 @@ import { resolveResponderNotificationRoute } from '../lib/responder-notification
 import { resolvePublicNotificationRoute } from '../lib/public-notification-route';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
 import { formatManilaMobileDateTime } from '../lib/manila-presentation';
+import { fetchWithTimeout } from '../lib/network-timeout';
 
 type Notification = {
   id: string;
@@ -43,67 +44,58 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const fetchVersionRef = useRef(0);
   const navigationInProgressRef = useRef(false);
   const isLeavingRef = useRef(false);
 
   const apiUrl = getMobileApiBaseUrl();
 
-  const getAuthHeaders = async () => {
+  const getAuthHeaders = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const headers: Record<string, string> = {};
     if (session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
+    if (!session?.access_token) throw new Error('Please sign in again to load notifications.');
     return headers;
-  };
+  }, []);
 
-  const fetchNotifications = async (showPulse = true) => {
-    if (!user) return;
+  const fetchNotifications = useCallback(async (showPulse = true) => {
+    if (!user?.id) return;
+    const version = ++fetchVersionRef.current;
     if (showPulse) setLoading(true);
     
     try {
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${apiUrl}/api/notifications`, {
+      const response = await fetchWithTimeout(`${apiUrl}/api/notifications`, {
         headers: authHeaders,
-      });
+      }, 15_000, 'notification inbox');
       const data = await response.json();
-      if (response.ok && data.notifications) {
-        setNotifications(data.notifications.map(normalizeNotification).filter((item: Notification) => isNotificationVisibleForRole(item.type, role)));
-      }
+      if (!response.ok || !Array.isArray(data.notifications)) throw new Error(data.error || 'Unable to load notifications.');
+      if (version !== fetchVersionRef.current || isLeavingRef.current) return;
+      setNotifications(data.notifications.map(normalizeNotification).filter((item: Notification) => isNotificationVisibleForRole(item.type, role)));
+      setLoadError(null);
     } catch (err) {
       console.error('[Notifications] Failed to load:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${apiUrl}/api/notifications`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        body: JSON.stringify({ markAllAsRead: true }),
-      });
-
-      if (response.ok) {
-        setNotifications((prev) => prev.map((notification) => ({ ...notification, unread: false })));
+      if (version === fetchVersionRef.current && !isLeavingRef.current) {
+        setLoadError(err instanceof Error ? err.message : 'Unable to load notifications.');
       }
-    } catch (err) {
-      console.error('[Notifications] Failed to mark all as read:', err);
+    } finally {
+      if (version === fetchVersionRef.current && !isLeavingRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  };
+  }, [apiUrl, getAuthHeaders, role, user?.id]);
 
-  useEffect(() => {
-    if (user) {
-      void (async () => {
-        await fetchNotifications();
-        await markAllAsRead();
-      })();
+  useFocusEffect(useCallback(() => {
+    isLeavingRef.current = false;
+    if (user?.id) {
+      void fetchNotifications();
+      const foreground = AppState.addEventListener('change', state => {
+        if (state === 'active') void fetchNotifications(false);
+      });
 
       // Subscribe to real-time database changes
       const instanceId = Math.random().toString(36).substring(7);
@@ -118,11 +110,11 @@ export default function NotificationsScreen() {
             filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
-            console.log('[Mobile Realtime] Notification change received:', payload);
+            if (isLeavingRef.current) return;
             if (payload.eventType === 'INSERT') {
               const notification = normalizeNotification(payload.new);
               if (isNotificationVisibleForRole(notification.type, role)) {
-                setNotifications((prev) => [notification, ...prev]);
+                setNotifications((prev) => [notification, ...prev.filter(item => item.id !== notification.id)]);
               }
             } else if (payload.eventType === 'UPDATE') {
               const notification = normalizeNotification(payload.new);
@@ -135,13 +127,18 @@ export default function NotificationsScreen() {
             }
           }
         )
-        .subscribe();
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') void fetchNotifications(false);
+        });
 
       return () => {
+        isLeavingRef.current = true;
+        fetchVersionRef.current += 1;
+        foreground.remove();
         supabase.removeChannel(channel);
       };
     }
-  }, [user, role]);
+  }, [user?.id, role, fetchNotifications]));
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -154,7 +151,7 @@ export default function NotificationsScreen() {
         },
         body: JSON.stringify({ id }),
       });
-      if (response.ok) {
+      if (response.ok && !isLeavingRef.current) {
         setNotifications((prev) =>
           prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
         );
@@ -185,7 +182,7 @@ export default function NotificationsScreen() {
           metadata: item.metadata,
         });
         if (responderRoute) {
-          router.replace(responderRoute as any);
+          router.dismissTo(responderRoute);
           return;
         }
       }
@@ -199,7 +196,7 @@ export default function NotificationsScreen() {
           if (publicRoute.details) {
             useEmergencyReportStore.getState().setDetails(publicRoute.details);
           }
-          router.replace(publicRoute.pathname as any);
+          router.dismissTo(publicRoute.pathname);
           return;
         }
       }
@@ -223,25 +220,25 @@ export default function NotificationsScreen() {
   };
 
   const handleBack = useCallback(() => {
-    // A manually opened notification centre has a real previous route. Pop it
-    // instead of rebuilding the tab navigator while responder state listeners
-    // are active. Cold-start notification launches have no previous route, so
-    // they still land on the stable tab root.
     if (isLeavingRef.current || navigationInProgressRef.current) return;
     isLeavingRef.current = true;
-    // Always replace with the stable tab root. Popping a stack created by a
-    // cold-start notification can re-enter a half-initialized notification
-    // route, especially after a rapid Android hardware Back press.
-    router.replace('/(tabs)' as any);
+    // Reuse the existing tab shell. replace() would leave [Tabs, Tabs] when
+    // Notifications was pushed from Home. dismissTo also handles cold starts.
+    router.dismissTo('/(tabs)');
   }, [router]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
+    isLeavingRef.current = false;
+    navigationInProgressRef.current = false;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       handleBack();
       return true;
     });
-    return () => subscription.remove();
-  }, [handleBack]);
+    return () => {
+      isLeavingRef.current = true;
+      subscription.remove();
+    };
+  }, [handleBack]));
 
 
   const handleClearAll = async () => {
@@ -260,13 +257,13 @@ export default function NotificationsScreen() {
               method: 'DELETE',
               headers: authHeaders,
             });
-            if (response.ok) {
+            if (response.ok && !isLeavingRef.current) {
               setNotifications([]);
             }
           } catch (err) {
             console.error('[Notifications] Failed to clear all:', err);
           } finally {
-            setRefreshing(false);
+            if (!isLeavingRef.current) setRefreshing(false);
           }
         }
       }
@@ -352,13 +349,25 @@ export default function NotificationsScreen() {
             className="flex-1 px-6 pt-8" 
             contentContainerStyle={{ paddingBottom: 40 }}
             showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
+              setRefreshing(true);
+              void fetchNotifications(false);
+            }} />}
           >
             <Text className="text-slate-900 font-bold text-sm tracking-wider uppercase mb-5">Alert Box</Text>
+            {loadError && (
+              <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                <Text className="text-amber-900">{loadError}</Text>
+                <TouchableOpacity onPress={() => void fetchNotifications()} className="mt-3" accessibilityRole="button">
+                  <Text className="font-bold text-[#1E3A8A]">Retry Loading Notifications</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             
-            {notifications.length === 0 ? (
+            {notifications.length === 0 && !loadError ? (
               <View className="py-20 items-center justify-center">
                 <ShieldCheck size={48} color="#94A3B8" />
-                <Text className="text-slate-400 text-sm font-bold mt-4">You have zero unread notifications.</Text>
+                <Text className="text-slate-400 text-sm font-bold mt-4">No notifications yet.</Text>
               </View>
             ) : (
               notifications.map((item) => (

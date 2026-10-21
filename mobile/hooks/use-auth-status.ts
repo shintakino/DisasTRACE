@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { createContext, createElement, useCallback, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { verifyMobileSession } from '../lib/mobile-auth';
+import { shouldResetResponderSession } from '../lib/auth-session-policy';
 import { useResponderDutyStore } from '../stores/useResponderDutyStore';
 import { useResponderStore } from '../stores/useResponderStore';
 
@@ -12,7 +13,7 @@ type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
 type MobileVerificationStatus = VerificationStatus | 'loading' | 'banned' | 'unauthorized_platform';
 
 // Zustand stores outlive a Supabase auth session in a running Expo process.
-// Track the account globally so a second useAuthStatus consumer does not clear
+// Track the account globally so remounting the root provider does not clear
 // a valid in-progress dispatch, while a genuine account switch always removes
 // the previous responder's in-memory dispatch UI.
 let activeMobileAccountId: string | null = null;
@@ -29,7 +30,7 @@ function reconcileResponderStoreAccount(nextAccountId: string | null, clearTrans
   activeMobileAccountId = nextAccountId;
 }
 
-export function useAuthStatus() {
+function useAuthStatusState() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -37,8 +38,14 @@ export function useAuthStatus() {
   const [role, setRole] = useState<string | null>(null);
   const [profile, setProfile] = useState<{ fullName: string; address: string; barangay?: string; phone?: string; dutyStatus?: string; unitId?: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sessionVersion, setSessionVersion] = useState(0);
+  const verificationRequestRef = useRef(0);
+  const currentTokenRef = useRef<string | null>(null);
 
-  const checkVerification = async (currentUser: User, currentSession: Session) => {
+  const checkVerification = useCallback(async (currentUser: User, currentSession: Session) => {
+    const request = ++verificationRequestRef.current;
+    const isCurrent = () => request === verificationRequestRef.current
+      && currentTokenRef.current === currentSession.access_token;
     if (!currentSession) {
       setVerificationStatus('loading');
       return;
@@ -46,14 +53,11 @@ export function useAuthStatus() {
 
     try {
       const active = await verifyMobileSession(currentSession.access_token);
+      if (!isCurrent()) return;
       if (!active) {
         await supabase.auth.signOut({ scope: 'local' });
-        setUser(null);
-        setSession(null);
-        setRole(null);
-        useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
-        setVerificationStatus('loading');
-        setIsLoaded(true);
+        // SIGNED_OUT is applied by the single auth subscription. A delayed
+        // verification request must not clear a subsequently signed-in user.
         return;
       }
 
@@ -64,6 +68,7 @@ export function useAuthStatus() {
         .eq('id', currentUser.id)
         .single();
 
+      if (!isCurrent()) return;
       if (dbError) throw dbError;
       
       const role = dbUser.role;
@@ -104,6 +109,7 @@ export function useAuthStatus() {
       // Save profile to local cache for offline use
       SecureStore.setItemAsync(`profile_${currentUser.id}`, JSON.stringify(userProfile)).catch(() => {});
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('Error checking verification status via Supabase:', error);
       
       // Secondary fallback to JWT metadata if direct query fails
@@ -136,6 +142,7 @@ export function useAuthStatus() {
 
       // Load cached profile during offline failure
       SecureStore.getItemAsync(`profile_${currentUser.id}`).then((cached) => {
+        if (!isCurrent()) return;
         if (cached) {
           try {
             const cachedProfile = JSON.parse(cached);
@@ -162,6 +169,7 @@ export function useAuthStatus() {
           useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
         }
       }).catch(() => {
+        if (!isCurrent()) return;
         setProfile({
           fullName: currentUser.user_metadata?.full_name || 'Resident',
           address: currentUser.user_metadata?.address || '',
@@ -172,70 +180,77 @@ export function useAuthStatus() {
         useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
       });
     }
-  };
+  }, []);
 
   useEffect(() => {
-    // Initial session fetch
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let disposed = false;
+    let observedAuthEvent = false;
+    const applySession = (session: Session | null) => {
+      if (disposed) return;
+      const nextId = session?.user.id ?? null;
+      const accountChanged = activeMobileAccountId !== nextId;
+      currentTokenRef.current = session?.access_token ?? null;
+      verificationRequestRef.current += 1;
       setSession(session);
+      setSessionVersion(version => version + 1);
       setUser(session?.user ?? null);
-      // A store can survive a fast account replacement before the previous
-      // identity is observed. The first session hydration must therefore
-      // never trust an in-memory dispatch from an earlier account.
-      reconcileResponderStoreAccount(session?.user.id ?? null, !hasHydratedInitialMobileSession);
+      reconcileResponderStoreAccount(nextId, shouldResetResponderSession(activeMobileAccountId, nextId, hasHydratedInitialMobileSession));
       hasHydratedInitialMobileSession = true;
-      if (session?.user) {
-        checkVerification(session.user, session);
-      } else {
-        setIsLoaded(true);
-      }
-    }).catch(err => {
-      console.error('[useAuthStatus] Failed to restore session on startup:', err);
-      setIsLoaded(true);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      // A deliberate sign-in must begin from server-confirmed state. Do not
-      // clear an ongoing dispatch on ordinary token refreshes for the same
-      // responder.
-      reconcileResponderStoreAccount(session?.user.id ?? null, event === 'SIGNED_IN' || event === 'SIGNED_OUT');
-      if (session?.user) {
-        checkVerification(session.user, session);
-      } else {
-        setRole('public_user');
+      if (accountChanged || !session) {
+        setProfile(null);
+        setRole(null);
         useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
         setVerificationStatus('loading');
+      }
+      if (!session) {
         setIsLoaded(true);
       }
+    };
+    // One app-owned subscription; screen navigation cannot create another
+    // auth check or clear a same-account dispatch on repeated SIGNED_IN events.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      observedAuthEvent = true;
+      applySession(session);
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      if (!observedAuthEvent) applySession(data.session);
+    }).catch(err => {
+      console.error('[useAuthStatus] Failed to restore session on startup:', err);
+      if (!disposed && !observedAuthEvent) setIsLoaded(true);
     });
 
     return () => {
+      disposed = true;
+      currentTokenRef.current = null;
+      verificationRequestRef.current += 1;
       subscription.unsubscribe();
     };
   }, []);
 
+  // Run outside the Auth callback/lock. Session events only publish state.
+  useEffect(() => {
+    if (session?.user) void checkVerification(session.user, session);
+  }, [session, sessionVersion, checkVerification]);
+
   // Real-time status synchronizer
   useEffect(() => {
-    if (!user) return;
+    const accountId = user?.id;
+    if (!accountId) return;
+    let active = true;
 
-    // Use a unique channel name per hook instance to avoid collisions
-    // when multiple components use useAuthStatus()
-    const instanceId = Math.random().toString(36).substring(7);
     const channel = supabase
-      .channel(`status_sync_${user.id}_${instanceId}`)
+      .channel(`status_sync_${accountId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'users',
-          filter: `id=eq.${user.id}`,
+          filter: `id=eq.${accountId}`,
         },
         (payload) => {
-          console.log('Real-time profile update received:', payload.new);
+          if (!active || activeMobileAccountId !== accountId) return;
+          verificationRequestRef.current += 1;
           const newStatus = payload.new.verification_status;
           const newRole = payload.new.role;
           const newAccountStanding = payload.new.status;
@@ -256,7 +271,8 @@ export function useAuthStatus() {
           }
 
           if (newStatus) {
-            setVerificationStatus(VerificationStatusSchema.parse(newStatus.toLowerCase()));
+            const parsed = VerificationStatusSchema.safeParse(String(newStatus).toLowerCase());
+            if (parsed.success) setVerificationStatus(parsed.data);
           }
           
           if (payload.new.full_name || payload.new.address || payload.new.barangay || payload.new.phone || payload.new.duty_status || payload.new.unit_id) {
@@ -276,9 +292,10 @@ export function useAuthStatus() {
       .subscribe();
 
     return () => {
+      active = false;
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]);
 
   // Update isLoaded once verification check completes
   useEffect(() => {
@@ -294,6 +311,7 @@ export function useAuthStatus() {
     role,
     profile,
     user,
+    session,
     refreshStatus: async () => {
       if (user && session) {
         setIsRefreshing(true);
@@ -303,4 +321,17 @@ export function useAuthStatus() {
     },
     isRefreshing,
   };
+}
+
+const AuthStatusContext = createContext<ReturnType<typeof useAuthStatusState> | null>(null);
+
+export function AuthStatusProvider({ children }: { children: ReactNode }) {
+  const value = useAuthStatusState();
+  return createElement(AuthStatusContext.Provider, { value }, children);
+}
+
+export function useAuthStatus() {
+  const value = useContext(AuthStatusContext);
+  if (!value) throw new Error('useAuthStatus must be used inside AuthStatusProvider');
+  return value;
 }

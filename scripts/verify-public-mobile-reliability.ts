@@ -9,7 +9,7 @@ assert.match(responseStatus, /isLeavingRef\.current = true/, 'Return Home must d
 assert.match(responseStatus, /!mounted \|\| isLeavingRef\.current/, 'Late status responses must not update a departed screen.');
 assert.match(
   responseStatus,
-  /isLeavingRef\.current = true[\s\S]*resetReport\(\)[\s\S]*clearReportToIdle\(\)[\s\S]*router\.replace/,
+  /isLeavingRef\.current = true[\s\S]*resetReport\(\)[\s\S]*clearReportToIdle\(\)[\s\S]*router\.dismissTo/,
   'Return Home must clear completed workflow state under the leaving guard before mounting Home.',
 );
 
@@ -33,6 +33,6 @@ assert.match(signUp, /!registrationData\.privacyConsentAt \|\| !registrationData
 assert.match(signUp, /email: registrationData\.email/, 'Invalid email data must not reach Auth signup.');
 assert.doesNotMatch(signUp, /email: currentData\.email/, 'Raw cross-step email data must not reach Auth signup.');
 assert.match(signUp, /let accountCreated = false/, 'Registration must distinguish a pre-account failure from a resumable post-account upload failure.');
-assert.match(signUp, /router\.replace\('\/\(verification\)\/pending' as never\)/, 'A failed post-signup ID upload must continue to Pending Verification rather than invite a duplicate registration.');
+assert.match(signUp, /await completeRegistration\([\s\S]*router\.replace\('\/\(verification\)\/pending'\)/, 'After bound-session publication, registration must continue to Pending Verification. Upload recovery is covered by verify-registration-completion.');
 
 console.log('Public mobile reliability checks passed.');

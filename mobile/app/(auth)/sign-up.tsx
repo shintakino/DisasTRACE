@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, KeyboardAvoidingView, Platform, UIManager, findNodeHandle } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { supabase, createRegistrationClient } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSignUpStore } from '../../store/useSignUpStore';
@@ -14,6 +14,7 @@ import Step2 from '../../components/auth/Step2';
 import Step3 from '../../components/auth/Step3';
 import Step4 from '../../components/auth/Step4';
 import { SignUpPayloadSchema } from '../../schemas/auth';
+import { completeRegistration } from '../../lib/complete-registration';
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -22,6 +23,8 @@ export default function SignUpScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isAutoConfirmed, setIsAutoConfirmed] = useState(false);
+  const [registrationClient] = useState(createRegistrationClient);
+  const submittingRef = useRef(false);
   const registrationScrollRef = useRef<ScrollView>(null);
   const { reset, updateData } = useSignUpStore();
 
@@ -30,6 +33,8 @@ export default function SignUpScreen() {
   }, [updateData]);
 
   const handleRegister = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
     let accountCreated = false;
@@ -53,13 +58,13 @@ export default function SignUpScreen() {
       // If Auth succeeded on an earlier attempt but the required ID upload
       // timed out, reuse that authenticated account instead of creating a
       // duplicate or trapping the user on "already registered".
-      const existingSession = await withTimeout(supabase.auth.getSession(), 10_000, 'registration recovery');
+      const existingSession = await withTimeout(registrationClient.auth.getSession(), 10_000, 'registration recovery');
       const matchingSession = existingSession.data.session?.user.email?.toLowerCase() === registrationData.email.toLowerCase()
         ? existingSession.data.session
         : null;
       const signUpResult = matchingSession
         ? { data: { user: matchingSession.user, session: matchingSession }, error: null }
-        : await withTimeout(supabase.auth.signUp({
+        : await withTimeout(registrationClient.auth.signUp({
             email: registrationData.email,
             password: registrationData.password,
             options: {
@@ -105,7 +110,24 @@ export default function SignUpScreen() {
       // RLS policies for storage might require authentication.
       if (signUpData.session) {
         setIsAutoConfirmed(true);
-        await withTimeout(bindCurrentMobileSession(signUpData.session.access_token), 10_000, 'mobile session setup');
+        const session = signUpData.session;
+        await completeRegistration({
+          bindSession: () => withTimeout(bindCurrentMobileSession(session.access_token), 10_000, 'mobile session setup'),
+          uploadId: () => withTimeout(
+            uploadGovernmentID(registrationData.idCardUri, registrationData.idCardType, session.access_token),
+            30_000, 'government ID upload',
+          ),
+          publishSession: async () => {
+            const result = await supabase.auth.setSession({
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+            });
+            if (result.error) throw result.error;
+          },
+        });
+        reset();
+        router.replace('/(verification)/pending');
+        return;
       }
 
       if (registrationData.idCardUri) {
@@ -114,10 +136,6 @@ export default function SignUpScreen() {
           // a successful registration; after the applicant confirms and signs
           // in, the pending-verification screen collects the ID securely.
           setIsAutoConfirmed(false);
-        } else {
-            // Use the just-issued token directly. Android SecureStore may not
-            // have persisted getSession() yet even though sign-up succeeded.
-            await withTimeout(uploadGovernmentID(registrationData.idCardUri, registrationData.idCardType, signUpData.session.access_token), 30_000, 'government ID upload');
         }
       }
 
@@ -125,16 +143,15 @@ export default function SignUpScreen() {
     } catch (err: any) {
       console.error('Registration error:', err);
       if (accountCreated) {
-        // Auth and the profile already exist. Retrying the sign-up would
-        // correctly fail as a duplicate, so continue through the resumable
-        // pending-verification document uploader instead.
-        setError('Your account was created. Complete your ID upload from the Verification Pending screen.');
-        router.replace('/(verification)/pending' as never);
+        // Keep the isolated session available to retry binding/publication.
+        // Publishing an unbound session would make the auth gate sign it out.
+        setError('Your account was created, but setup could not finish. Tap Register to retry. You can also sign in later to complete ID verification.');
         return;
       }
       setError(err.message || 'Sign up failed');
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 

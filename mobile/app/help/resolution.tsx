@@ -77,7 +77,7 @@ export default function ResolutionScreen() {
     useChatbotStore.getState().clearReportToIdle();
     // Replace the terminal response route with the tab navigator. This avoids
     // leaving a dead resolution route behind Android back navigation.
-    router.replace((isGuest ? '/' : '/(tabs)') as never);
+    router.dismissTo(isGuest ? '/' : '/(tabs)');
   }, [isGuest, resetReport, router]);
  
   useEffect(() => {

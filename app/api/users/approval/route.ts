@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
-import { and, gte, inArray, sql } from "drizzle-orm";
-import { approvalEligibilityWhere } from "@/lib/account-approval";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { approvalEligibilityWhere, MOBILE_APPROVAL_ROLES } from "@/lib/account-approval";
 
 export async function GET() {
   const supabase = await createClient();
@@ -19,6 +19,20 @@ export async function GET() {
     .from(users)
     .where(approvalEligibilityWhere());
 
+  // Incomplete registrations are visible to administrators, but are never
+  // passed to the document-review controls or the approval mutation.
+  const incompleteUsers = await db.select({
+    id: users.id,
+    fullName: users.fullName,
+    email: users.email,
+    phone: users.phone,
+    registeredAt: users.createdAt,
+  }).from(users).where(and(
+    inArray(users.role, MOBILE_APPROVAL_ROLES),
+    eq(users.status, "PENDING"),
+    eq(users.verificationStatus, "PENDING"),
+    isNull(users.idImageUrl),
+  ));
   // Generate short-lived signed URLs (e.g., 60 seconds expiry)
   const applicants = await Promise.all(
     pendingUsers.map(async (u) => {
@@ -67,8 +81,10 @@ export async function GET() {
 
   return NextResponse.json({
     applicants,
+    incompleteApplicants: incompleteUsers,
     summary: {
       pending: applicants.length,
+      awaitingId: incompleteUsers.length,
       reviewedToday,
     }
   });

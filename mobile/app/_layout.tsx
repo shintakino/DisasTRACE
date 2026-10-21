@@ -1,4 +1,4 @@
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { LogBox, TextInput } from 'react-native';
@@ -8,11 +8,12 @@ import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useAuthStatus } from '../hooks/use-auth-status';
-import { registerMobilePushNotifications, subscribeToPushTokenChanges } from '../lib/push-notifications';
+import { AuthStatusProvider, useAuthStatus } from '../hooks/use-auth-status';
+import { useMobilePushRegistration } from '../hooks/use-mobile-push-registration';
 import { resolveResponderNotificationRoute } from '../lib/responder-notification-route';
 import { resolvePublicNotificationRoute } from '../lib/public-notification-route';
 import { consumeNotificationResponseDurably } from '../lib/notification-response-consumption';
+import { openNotificationRoute } from '../lib/open-notification-route';
 import { rememberRecoveryUrl } from '../lib/recovery-link-inbox';
 import { useEmergencyReportStore } from '../store/use-emergency-report-store';
 import { useResponderStore } from '../stores/useResponderStore';
@@ -40,11 +41,28 @@ const LAST_HANDLED_NOTIFICATION_RESPONSE_KEY = 'disas_trace_last_handled_notific
 // Prevent the native splash screen from auto-hiding.
 SplashScreen.preventAutoHideAsync();
 
+// Process-wide foreground policy. Screens must not compete for permission
+// prompts or replace this handler on every Home/Notifications transition.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldSetBadge: false,
+  }),
+});
+
 function InitialLayout() {
-  const { isLoaded, isSignedIn, verificationStatus, role, user } = useAuthStatus();
+  const { isLoaded, isSignedIn, verificationStatus, role, user, session } = useAuthStatus();
+  useMobilePushRegistration(
+    user?.id ?? null,
+    verificationStatus === 'approved' && (role === 'ambulance_responder' || role === 'public_user') ? role : null,
+    session?.access_token ?? null,
+  );
   const loadOfflineQueue = useResponderStore((state) => state.loadOfflineQueue);
   const segments = useSegments();
   const router = useRouter();
+  const navigationRef = useNavigationContainerRef();
   const [isAppReady, setIsAppReady] = useState(false);
   const [notificationResponseVersion, setNotificationResponseVersion] = useState(0);
   const pendingNotificationResponseRef = useRef<Notifications.NotificationResponse | null>(null);
@@ -139,6 +157,10 @@ function InitialLayout() {
     };
 
     const consumeAndRoute = async () => {
+      if (!navigationRef.isReady()) {
+        scheduleConsumptionRetry();
+        return;
+      }
       const consumed = await consumeNotificationResponseDurably({
         responseId,
         persistHandledResponseId: (id) => SecureStore.setItemAsync(LAST_HANDLED_NOTIFICATION_RESPONSE_KEY, id),
@@ -158,7 +180,7 @@ function InitialLayout() {
 
       if (role === 'ambulance_responder') {
         const route = resolveResponderNotificationRoute(data);
-        if (route) router.replace(route as never);
+        openNotificationRoute(router, navigationRef.getRootState(), route ?? '/notifications');
         return;
       }
 
@@ -170,7 +192,7 @@ function InitialLayout() {
           metadata: payload.metadata ?? payload,
         });
         if (route?.details) useEmergencyReportStore.getState().setDetails(route.details);
-        router.replace((route?.pathname ?? '/notifications') as never);
+        openNotificationRoute(router, navigationRef.getRootState(), route?.pathname ?? '/notifications');
       }
     };
 
@@ -178,16 +200,7 @@ function InitialLayout() {
       console.error('[Notifications] Failed to consume notification response:', error);
       scheduleConsumptionRetry();
     });
-  }, [isAppReady, isSignedIn, notificationResponseVersion, role, router, verificationStatus]);
-
-  useEffect(() => {
-    if (!isSignedIn || verificationStatus !== 'approved' || (role !== 'ambulance_responder' && role !== 'public_user')) return;
-    registerMobilePushNotifications(role).catch((error) => {
-      console.warn('[Push] Mobile push setup was not completed.', error);
-    });
-    const subscription = subscribeToPushTokenChanges();
-    return () => subscription.remove();
-  }, [isSignedIn, role, verificationStatus]);
+  }, [isAppReady, isSignedIn, navigationRef, notificationResponseVersion, role, router, verificationStatus]);
 
   // Offline responder actions are account-bound. Hydrate them only after the
   // approved responder session exists so a queued hospital confirmation can be
@@ -279,7 +292,9 @@ function InitialLayout() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <InitialLayout />
+      <AuthStatusProvider>
+        <InitialLayout />
+      </AuthStatusProvider>
       <StatusBar style="auto" />
     </GestureHandlerRootView>
   );

@@ -26,6 +26,10 @@ export const ApplicantSchema = z.object({
 });
 export type Applicant = z.infer<typeof ApplicantSchema>;
 
+export type IncompleteApplicant = Pick<Applicant,
+  "id" | "fullName" | "email" | "phone" | "registeredAt"
+>;
+
 export const VerificationActionSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
   documentPath: z.string().trim().min(1).max(512),

@@ -1,4 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StatusBar, TouchableOpacity, Alert, Modal } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
@@ -23,7 +25,7 @@ import { useLiveBarangay } from '../../hooks/use-live-barangay';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
 import * as Notifications from 'expo-notifications';
-import { ensureResponderEmergencyAlertChannels, getResponderEmergencyAlert } from '../../lib/push-notifications';
+import { getResponderEmergencyAlert } from '../../lib/push-notifications';
 import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 import { getMobileApiBaseUrl } from '../../lib/api-base-url';
@@ -80,44 +82,25 @@ export function ResponderHome() {
     dispatchReleaseNotice,
     releaseDispatchOffer,
     dismissDispatchReleaseNotice,
-  } = useResponderStore();
+  } = useResponderStore(useShallow(state => ({
+    status: state.status,
+    activeDispatch: state.activeDispatch,
+    targetHospital: state.targetHospital,
+    setTargetHospital: state.setTargetHospital,
+    drafts: state.drafts,
+    submittedIncidentIds: state.submittedIncidentIds,
+    dispatchReleaseNotice: state.dispatchReleaseNotice,
+    releaseDispatchOffer: state.releaseDispatchOffer,
+    dismissDispatchReleaseNotice: state.dismissDispatchReleaseNotice,
+  })));
+  const isFocused = useIsFocused();
+  const isFormOpen = useResponderStore(state => Boolean(state.reportFormSession));
+  const isMapVisible = isFocused && !isFormOpen;
   const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
   const { profile, user, role } = useAuthStatus();
   const { isOnline } = useOfflineReports();
   const [unreadCount, setUnreadCount] = useState(0);
   const mockLocationWarningShown = useRef(false);
-
-  // Configure notifications permissions and foreground notification behavior
-  useEffect(() => {
-    async function configureNotifications() {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      
-      if (finalStatus !== 'granted') {
-        console.warn('[Notifications] Permission to send local alerts was not granted.');
-        return;
-      }
-
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldVibrate: true,
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldSetBadge: false,
-        } as any),
-      });
-
-      await ensureResponderEmergencyAlertChannels();
-    }
-
-    configureNotifications();
-  }, []);
 
   // Fetch and subscribe to unread notification count
   useEffect(() => {
@@ -883,23 +866,26 @@ export function ResponderHome() {
   // Track the map position of the responder via GPS. The tab-layout tracker
   // owns server telemetry so it remains active while Profile or Forms is open.
   useEffect(() => {
-    let subscription: any;
+    if (!isMapVisible) return;
+    let cancelled = false;
+    let subscription: Location.LocationSubscription | undefined;
     
     const startTracking = async () => {
       try {
         const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
-        if (fgStatus !== 'granted') {
+        if (cancelled || fgStatus !== 'granted') {
           console.warn('[ResponderHome] Location permission not granted.');
           return;
         }
         
-        subscription = await Location.watchPositionAsync(
+        const watcher = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.BestForNavigation,
             timeInterval: 4000,
             distanceInterval: 5,
           },
           (loc) => {
+            if (cancelled) return;
             if (isSimulatingRef.current) return;
             if (isMockedLocation(loc)) {
               if (!mockLocationWarningShown.current) {
@@ -910,6 +896,7 @@ export function ResponderHome() {
             }
             let lat = loc.coords.latitude;
             let lng = loc.coords.longitude;
+            if (!isValidGeoPoint({ latitude: lat, longitude: lng })) return;
             
             const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
@@ -934,6 +921,8 @@ export function ResponderHome() {
             useResponderStore.setState({ currentSpeedKph: speedKph });
           }
         );
+        if (cancelled) watcher.remove();
+        else subscription = watcher;
       } catch (err) {
         console.error('[ResponderHome] Error tracking position:', err);
       }
@@ -943,20 +932,22 @@ export function ResponderHome() {
     startTracking();
     
     return () => {
+      cancelled = true;
       if (subscription) {
         subscription.remove();
       }
     };
-  }, [status]);
+  }, [isMapVisible]);
 
   // Fetch initial location immediately on mount for snappy rendering
   useEffect(() => {
+    let cancelled = false;
     const getInitialLocation = async () => {
       try {
         const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
-        if (fgStatus === 'granted') {
+        if (!cancelled && fgStatus === 'granted') {
           const lastLoc = await Location.getLastKnownPositionAsync();
-          if (lastLoc && lastLoc.coords) {
+          if (!cancelled && lastLoc && isValidGeoPoint(lastLoc.coords)) {
             if (isMockedLocation(lastLoc)) {
               if (!mockLocationWarningShown.current) {
                 mockLocationWarningShown.current = true;
@@ -983,6 +974,7 @@ export function ResponderHome() {
       }
     };
     getInitialLocation();
+    return () => { cancelled = true; };
   }, []);
 
   const incidentLatitude = activeDispatch?.coordinates.latitude;
@@ -999,6 +991,7 @@ export function ResponderHome() {
         : null;
     const origin = { latitude: currentLocation[1], longitude: currentLocation[0] };
 
+    if (!isMapVisible) return;
     if (!shouldRequestResponderRoute({ status, hasLiveLocation, origin, destination })) {
       setRouteCoords(null);
       setRouteBounds(null);
@@ -1066,6 +1059,7 @@ export function ResponderHome() {
     hospitalLatitude,
     hospitalLongitude,
     targetHospital?.id,
+    isMapVisible,
   ]);
 
   // Mock route coordinates from responder to incident
@@ -1091,6 +1085,7 @@ export function ResponderHome() {
       {/* Map Layer */}
       <Map
         style={{ flex: 1 }}
+        androidView="texture"
         mapStyle="https://tiles.openfreemap.org/styles/liberty"
         logo={false}
         attribution={false}
@@ -1111,7 +1106,7 @@ export function ResponderHome() {
           }
         }}
       >
-        {isCameraCentered && (
+        {isMapVisible && isCameraCentered && (
           (status === 'en_route' || status === 'to_hospital') && cameraMode === 'follow' ? (
             <Camera
               center={currentLocation}
@@ -1164,7 +1159,7 @@ export function ResponderHome() {
         </Marker>
 
         {/* Destination Marker */}
-        {activeDispatch && status !== 'to_hospital' && (
+        {activeDispatch && isValidGeoPoint(activeDispatch.coordinates) && status !== 'to_hospital' && (
           <Marker 
             id="incidentLocation" 
             lngLat={[activeDispatch.coordinates.longitude, activeDispatch.coordinates.latitude]}

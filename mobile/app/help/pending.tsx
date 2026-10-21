@@ -453,7 +453,7 @@ export default function PendingScreen() {
               Alert.alert(
                 'Report cancelled',
                 'The report was cancelled before response started. PACC will not dispatch it, and you may submit a new report.',
-                [{ text: 'Return home', onPress: () => router.replace(homeRoute as any) }],
+                [{ text: 'Return home', onPress: () => router.dismissTo(homeRoute as never) }],
               );
             } catch (err) {
               console.error('[PendingScreen] Failed to cancel report:', err);

@@ -91,7 +91,7 @@ export default function EmergencyResponseStatusScreen() {
     // the completed workflow during the replace transition.
     useEmergencyReportStore.getState().resetReport();
     useChatbotStore.getState().clearReportToIdle();
-    router.replace((isGuest ? '/' : '/(tabs)') as never);
+    router.dismissTo(isGuest ? '/' : '/(tabs)');
   }, [isGuest, router]);
 
   useEffect(() => {

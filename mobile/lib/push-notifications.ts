@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import { getMobileApiBaseUrl } from './api-base-url';
+import { fetchWithTimeout, withTimeout } from './network-timeout';
 
 interface ResponderEmergencyAlert {
   channelId: string;
@@ -67,10 +68,8 @@ export function getResponderEmergencyAlert(emergencyType: string | null | undefi
   return TYPE_SPECIFIC_EMERGENCY_ALERTS.general;
 }
 
-export async function ensureResponderEmergencyAlertChannels() {
-  if (Platform.OS !== 'android') return;
-  const alerts = [GENERIC_EMERGENCY_ALERT, ...Object.values(TYPE_SPECIFIC_EMERGENCY_ALERTS)];
-  await Promise.all(alerts.map((alert) => Notifications.setNotificationChannelAsync(alert.channelId, {
+function ensureEmergencyChannel(alert: ResponderEmergencyAlert) {
+  return Notifications.setNotificationChannelAsync(alert.channelId, {
     name: alert.channelName,
     importance: Notifications.AndroidImportance.MAX,
     sound: alert.sound,
@@ -79,7 +78,13 @@ export async function ensureResponderEmergencyAlertChannels() {
     enableLights: true,
     enableVibrate: true,
     showBadge: true,
-  })));
+  });
+}
+
+export async function ensureResponderEmergencyAlertChannels() {
+  if (Platform.OS !== 'android') return;
+  const alerts = [GENERIC_EMERGENCY_ALERT, ...Object.values(TYPE_SPECIFIC_EMERGENCY_ALERTS)];
+  await Promise.all(alerts.map(ensureEmergencyChannel));
 }
 
 export async function ensureAnnouncementAlertChannel() {
@@ -95,28 +100,31 @@ export async function ensureAnnouncementAlertChannel() {
   });
 }
 
-async function postCurrentPushToken(pushToken: string) {
+async function postCurrentPushToken(pushToken: string, expectedUserId?: string) {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) return;
-  const response = await fetch(`${getMobileApiBaseUrl()}/api/mobile-push-tokens`, {
+  if (!session?.access_token || (expectedUserId && session.user.id !== expectedUserId)) {
+    throw new Error('Sign in again to enable phone alerts.');
+  }
+  const response = await fetchWithTimeout(`${getMobileApiBaseUrl()}/api/mobile-push-tokens`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify({ pushToken }),
-  });
+  }, 12_000, 'phone alert setup');
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || 'Unable to register this device for dispatch alerts.');
   }
 }
 
-export async function registerMobilePushNotifications(role: MobilePushRole): Promise<ResponderPushRegistrationResult> {
+export async function registerMobilePushNotifications(role: MobilePushRole, expectedUserId?: string): Promise<ResponderPushRegistrationResult> {
   if (Platform.OS !== 'android') {
     return { registered: false, message: 'Mobile notifications require the Android app.' };
   }
   await ensureAnnouncementAlertChannel();
   if (role === 'ambulance_responder') await ensureResponderEmergencyAlertChannels();
+  else await ensureEmergencyChannel(GENERIC_EMERGENCY_ALERT);
   const existing = await Notifications.getPermissionsAsync();
-  const permission = existing.status === 'granted' ? existing : await Notifications.requestPermissionsAsync();
+  const permission = existing.status === 'granted' || !existing.canAskAgain ? existing : await Notifications.requestPermissionsAsync();
   if (permission.status !== 'granted') {
     return {
       registered: false,
@@ -127,8 +135,8 @@ export async function registerMobilePushNotifications(role: MobilePushRole): Pro
   }
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) throw new Error('Expo project ID is missing.');
-  const pushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  await postCurrentPushToken(pushToken);
+  const pushToken = (await withTimeout(Notifications.getExpoPushTokenAsync({ projectId }), 15_000, 'phone alert token')).data;
+  await postCurrentPushToken(pushToken, expectedUserId);
   return {
     registered: true,
     message: role === 'ambulance_responder'
@@ -142,10 +150,16 @@ export function registerResponderPushNotifications(): Promise<ResponderPushRegis
   return registerMobilePushNotifications('ambulance_responder');
 }
 
-export function subscribeToPushTokenChanges() {
+export function subscribeToPushTokenChanges(expectedUserId?: string, onError?: (error: unknown) => void) {
   return Notifications.addPushTokenListener((token) => {
-    postCurrentPushToken(token.data).catch((error) => {
-      console.warn('[Push] Unable to refresh the responder push token.', error);
-    });
+    // This listener supplies a native FCM/APNs token, not an Expo token.
+    // Pass it into the exchange to avoid recursively requesting a device token.
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    void withTimeout(Notifications.getExpoPushTokenAsync({ projectId, devicePushToken: token }), 15_000, 'phone alert token refresh')
+      .then(expoToken => postCurrentPushToken(expoToken.data, expectedUserId))
+      .catch((error) => {
+        console.warn('[Push] Unable to refresh phone alerts.', error);
+        onError?.(error);
+      });
   });
 }

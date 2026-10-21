@@ -76,7 +76,10 @@ check('password updates require the recovery credential rather than a stale app 
 check('registration uploads an ID with the freshly issued access token', () => {
   const signup = source('mobile/app/(auth)/sign-up.tsx');
   const storage = source('mobile/lib/storage.ts');
-  assert.match(signup, /uploadGovernmentID\(registrationData\.idCardUri, registrationData\.idCardType, signUpData\.session\.access_token\)/);
+  assert.match(signup, /const session = signUpData\.session/);
+  assert.match(signup, /uploadGovernmentID\(registrationData\.idCardUri, registrationData\.idCardType, session\.access_token\)/);
+  assert.match(signup, /registrationClient\.auth\.signUp/);
+  assert.match(signup, /await completeRegistration\(/);
   assert.match(storage, /accessToken\?: string/);
   assert.match(storage, /const token = accessToken \|\| currentSession\?\.data\.session\?\.access_token/);
 });

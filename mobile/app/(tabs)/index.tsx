@@ -23,7 +23,7 @@ import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 import { getRestoredResponderState } from '../../lib/responder-lifecycle-policy';
 
 import * as Notifications from 'expo-notifications';
-import { Platform, Vibration } from 'react-native';
+import { Vibration } from 'react-native';
 
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Radius of the earth in km
@@ -50,7 +50,8 @@ function formatIncidentTimestamp(value: string): string {
 export default function HomeScreen() {
   const router = useRouter();
   const { dispatchOfferId } = useLocalSearchParams<{ dispatchOfferId?: string | string[] }>();
-  const { profile, verificationStatus, role, user, isLoaded } = useAuthStatus();
+  const { profile, role, user, isLoaded } = useAuthStatus();
+  const userId = user?.id;
   const { isOnline } = useOfflineReports();
   const insets = useSafeAreaInsets();
   const [isCheckingIncident, setIsCheckingIncident] = useState(true);
@@ -73,6 +74,8 @@ export default function HomeScreen() {
     const controller = new AbortController();
 
     const hydrateOffer = async () => {
+      const initialDispatch = useResponderStore.getState().activeDispatch;
+      const initialStatus = useResponderStore.getState().status;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token || !active) return;
@@ -96,11 +99,19 @@ export default function HomeScreen() {
         }
 
         const offer = result.data;
+        const current = useResponderStore.getState();
+        // A notification can arrive while another response is progressing.
+        // Never replace a newer accepted response with a delayed offer fetch.
+        if (current.activeDispatch !== initialDispatch || current.status !== initialStatus
+          || (current.activeDispatch && current.status !== 'idle' && current.status !== 'dispatch_offered')) {
+          clearNotificationOfferRoute();
+          return;
+        }
         if (useResponderStore.getState().submittedIncidentIds.includes(offer.id)) {
           clearNotificationOfferRoute();
           return;
         }
-        const initials = offer.reporterName.split(' ').map((name: string) => name[0]).join('').slice(0, 2).toUpperCase() || 'R';
+        const initials = (offer.reporterName || 'Resident').split(' ').map((name: string) => name[0]).join('').slice(0, 2).toUpperCase() || 'R';
         useResponderStore.setState({
           status: 'dispatch_offered',
           activeDispatch: {
@@ -138,53 +149,6 @@ export default function HomeScreen() {
       controller.abort();
     };
   }, [clearNotificationOfferRoute, isLoaded, notificationOfferId, role, user?.id]);
-
-  // Configure notifications channel
-  useEffect(() => {
-    async function configureNotifications() {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      if (finalStatus !== 'granted') return;
-
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldVibrate: true,
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldSetBadge: false,
-        } as any),
-      });
-
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('announcements', {
-          name: 'Announcements',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#8B5CF6',
-          enableLights: true,
-          enableVibrate: true,
-          showBadge: true,
-        });
-
-        await Notifications.setNotificationChannelAsync('emergency-alerts', {
-          name: 'Emergency Alerts',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250, 250, 250],
-          lightColor: '#EF4444',
-          enableLights: true,
-          enableVibrate: true,
-          showBadge: true,
-        });
-      }
-    }
-    configureNotifications();
-  }, []);
 
   const processedNotifIds = React.useRef(new Set<string>());
 
@@ -268,22 +232,27 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let active = true;
+    const initialDispatch = useResponderStore.getState().activeDispatch;
+    const initialStatus = useResponderStore.getState().status;
+    const canRestoreResponder = () => active
+      && useResponderStore.getState().activeDispatch === initialDispatch
+      && useResponderStore.getState().status === initialStatus;
 
     async function checkForActiveIncident() {
-      if (!isLoaded || !user) {
+      if (!isLoaded || !userId) {
         setIsCheckingIncident(false);
         return;
       }
 
       try {
         if (role === 'public_user') {
-          console.log('[HomeScreen] Checking for active or pending incidents for resident:', user.id);
+          console.log('[HomeScreen] Checking for active or pending incidents for resident');
           
           // 1. Fetch latest verification request for the resident
           const { data: request, error: reqError } = await supabase
             .from('verification_requests')
             .select('*')
-            .eq('resident_id', user.id)
+            .eq('resident_id', userId)
             .in('status', ['PENDING', 'VERIFIED'])
             .order('created_at', { ascending: false })
             .limit(1)
@@ -301,7 +270,7 @@ export default function HomeScreen() {
             console.log('[HomeScreen] Latest verification request found:', request.id, 'status:', request.status);
             const chatbotState = useChatbotStore.getState();
             const resumesChatbotReport = chatbotState.reporterMode === 'registered'
-              && chatbotState.ownerId === user.id
+              && chatbotState.ownerId === userId
               && chatbotState.activeReport?.id === request.id;
             
             if (request.status === 'PENDING' && shouldResumeResidentRequest({ status: request.status })) {
@@ -395,17 +364,18 @@ export default function HomeScreen() {
             useChatbotStore.getState().clearReportToIdle();
           }
         } else if (role === 'ambulance_responder') {
-          console.log('[HomeScreen] Checking for active dispatch in database for responder:', user.id);
+          if (notificationOfferId || initialDispatch) return;
+          console.log('[HomeScreen] Checking for active dispatch in database for responder');
           const { data: activeInc, error } = await supabase
             .from('incidents')
             .select('*')
-            .eq('responder_id', user.id)
+            .eq('responder_id', userId)
             .in('status', ['DISPATCHED', 'EN_ROUTE', 'ARRIVED'])
             .maybeSingle();
 
           if (error) throw error;
 
-          if (!active) return;
+          if (!canRestoreResponder()) return;
 
           if (activeInc) {
             if (useResponderStore.getState().submittedIncidentIds.includes(activeInc.id)) {
@@ -452,6 +422,7 @@ export default function HomeScreen() {
             }
 
             const storeStatus = getRestoredResponderState(activeInc.status, activeInc.transport_status);
+            if (!canRestoreResponder()) return;
             if (!storeStatus) {
               useResponderStore.getState().clearTransientDispatch();
               return;
@@ -473,6 +444,7 @@ export default function HomeScreen() {
               console.log('Error getting initial distance on startup:', e);
             }
 
+            if (!canRestoreResponder()) return;
             useResponderStore.setState({
               status: storeStatus,
               fieldOutcome: storeStatus === 'at_hospital' ? 'HOSPITAL_ARRIVAL' : null,
@@ -501,11 +473,11 @@ export default function HomeScreen() {
             });
           } else {
             // If no accepted incident, check for pending dispatch offers
-            console.log('[HomeScreen] Checking for pending dispatch offers in DB for responder:', user.id);
+            console.log('[HomeScreen] Checking for pending dispatch offers in DB for responder');
             const { data: offerInc, error: offerError } = await supabase
               .from('incidents')
               .select('*')
-              .eq('current_offer_responder_id', user.id)
+              .eq('current_offer_responder_id', userId)
               .eq('status', 'DISPATCHED')
               .maybeSingle();
 
@@ -569,6 +541,7 @@ export default function HomeScreen() {
                 console.log('Error getting initial distance on startup:', e);
               }
 
+              if (!canRestoreResponder()) return;
               useResponderStore.setState({
                 status: 'dispatch_offered',
                 initialDistanceKm: parsedDistanceKm,
@@ -613,7 +586,7 @@ export default function HomeScreen() {
     return () => {
       active = false;
     };
-  }, [isLoaded, role, user]);
+  }, [isLoaded, notificationOfferId, role, router, userId]);
 
   const liveLocation = useLiveBarangay(role === 'public_user' && isLoaded);
 
@@ -636,7 +609,7 @@ export default function HomeScreen() {
 
   const initials = profile?.fullName ? getInitials(profile.fullName) : '??';
 
-  const { status } = useResponderStore();
+  const status = useResponderStore(state => state.status);
 
   if (!isLoaded || isCheckingIncident || !role || (role !== 'public_user' && role !== 'ambulance_responder')) {
     return (

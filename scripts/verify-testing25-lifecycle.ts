@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { shouldResetResponderSession } from '../mobile/lib/auth-session-policy';
+
+assert.equal(shouldResetResponderSession(null, 'responder-a', false), true, 'First hydration clears untrusted dispatch memory');
+assert.equal(shouldResetResponderSession('responder-a', 'responder-a', true), false, 'Repeated SIGNED_IN/refresh retains live dispatch');
+assert.equal(shouldResetResponderSession('responder-a', 'responder-b', true), true, 'Account switch clears dispatch');
+assert.equal(shouldResetResponderSession('responder-a', null, true), true, 'Sign out clears dispatch');
+assert.equal(shouldResetResponderSession(null, null, true), false, 'Repeated signed-out events are harmless');
+
+const read = (path: string) => readFileSync(path, 'utf8');
+const root = read('mobile/app/_layout.tsx');
+const auth = read('mobile/hooks/use-auth-status.ts');
+const home = read('mobile/app/(tabs)/index.tsx');
+const map = read('mobile/components/responder/ResponderHome.tsx');
+const inbox = read('mobile/app/notifications.tsx');
+const push = read('mobile/lib/push-notifications.ts');
+assert.match(root, /<AuthStatusProvider>/);
+assert.equal((auth.match(/\.onAuthStateChange\(/g) ?? []).length, 1);
+assert.match(auth, /useContext\(AuthStatusContext\)/);
+assert.doesNotMatch(auth, /event === 'SIGNED_IN'/, 'Same-account sign-in events cannot reset a dispatch');
+assert.match(auth, /if \(!isCurrent\(\)\) return/);
+assert.match(home, /if \(!canRestoreResponder\(\)\) return/);
+assert.match(home, /current\.activeDispatch !== initialDispatch/);
+assert.match(map, /androidView="texture"/);
+assert.match(map, /if \(!isMapVisible\) return/);
+assert.match(map, /if \(cancelled\) watcher\.remove\(\)/);
+assert.match(inbox, /useFocusEffect/);
+assert.match(inbox, /AppState\.addEventListener/);
+assert.match(inbox, /<RefreshControl/);
+assert.doesNotMatch(inbox, /markAllAsRead/, 'Opening the inbox must not silently mark unseen notices as read');
+assert.match(push, /else await ensureEmergencyChannel\(GENERIC_EMERGENCY_ALERT\)/, 'Residents retain their report-update channel');
+assert.match(push, /devicePushToken: token/);
+assert.match(root, /setNotificationHandler/);
+assert.doesNotMatch(home + map, /requestPermissionsAsync\(\)/, 'Screens cannot duplicate notification permission prompts');
+console.log('PASS: shared auth, stale restore guards, focused inbox, map lifecycle, and public/responder alert wiring');

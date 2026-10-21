@@ -80,7 +80,7 @@ export default function ChatbotPendingScreen() {
     // Mark inactive before navigation so a status request which resolves in
     // the transition cannot issue a competing route or set screen state.
     screenActiveRef.current = false;
-    router.replace(getPublicHomeNavigationPlan(activeReport.reporterMode).route as never);
+    router.dismissTo(getPublicHomeNavigationPlan(activeReport.reporterMode).route);
   }, [activeReport, router]);
 
   useEffect(() => {

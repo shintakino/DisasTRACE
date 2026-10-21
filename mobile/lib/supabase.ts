@@ -55,6 +55,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+// Sign-up must not notify the app's auth gate before its device binding and
+// document upload finish. This short-lived client never persists credentials.
+export function createRegistrationClient() {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storageKey: 'disastrace-registration',
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
 // Keep password recovery isolated from the primary auth client. Enabling PKCE
 // globally would also change sign-up confirmation links; this client gives the
 // recovery flow its own encrypted verifier/session namespace instead.

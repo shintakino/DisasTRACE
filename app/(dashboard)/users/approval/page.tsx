@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Applicant } from "@/types/approval";
+import { Applicant, IncompleteApplicant } from "@/types/approval";
 import { ApprovalQueue } from "@/components/users/approval/approval-queue";
 import { ApplicantDetails } from "@/components/users/approval/applicant-details";
 import { ApprovalActions } from "@/components/users/approval/approval-actions";
@@ -12,27 +12,11 @@ import { createClientBrowser } from "@/lib/supabase";
 
 export default function UsersApprovalPage() {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [incompleteApplicants, setIncompleteApplicants] = useState<IncompleteApplicant[]>([]);
   const [summary, setSummary] = useState({ pending: 0, reviewedToday: 0 });
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-
-  const fetchApplicants = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/users/approval");
-      const data = await response.json();
-      setApplicants(data.applicants);
-      setSummary(data.summary);
-      if (data.applicants.length > 0) {
-        setSelectedApplicant(data.applicants[0]);
-      }
-    } catch {
-      toast.error("Failed to fetch applicants");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const fetchApplicantsSilent = async () => {
     try {
@@ -40,6 +24,7 @@ export default function UsersApprovalPage() {
       const data = await response.json();
       if (response.ok) {
         setApplicants(data.applicants);
+        setIncompleteApplicants(data.incompleteApplicants ?? []);
         setSummary(data.summary);
         
         setSelectedApplicant(prev => {
@@ -62,7 +47,21 @@ export default function UsersApprovalPage() {
   };
 
   useEffect(() => {
-    fetchApplicants();
+    let active = true;
+    void fetch("/api/users/approval")
+      .then(response => {
+        if (!response.ok) throw new Error("Unable to load approval queue");
+        return response.json();
+      })
+      .then(data => {
+        if (!active) return;
+        setApplicants(data.applicants);
+        setIncompleteApplicants(data.incompleteApplicants ?? []);
+        setSummary(data.summary);
+        setSelectedApplicant(data.applicants[0] ?? null);
+      })
+      .catch(() => { if (active) toast.error("Failed to fetch applicants"); })
+      .finally(() => { if (active) setIsLoading(false); });
 
     const supabase = createClientBrowser();
     
@@ -76,7 +75,7 @@ export default function UsersApprovalPage() {
           await fetchApplicantsSilent();
           
           if (payload.eventType === "INSERT" && payload.new.verification_status === "PENDING") {
-            toast.info(`New Registration: ${payload.new.full_name || "An applicant"} is awaiting review!`, {
+            toast.info(`New Registration: ${payload.new.full_name || "An applicant"} ${payload.new.id_image_url ? "is ready for review" : "still needs to upload an ID"}.`, {
               duration: 5000,
             });
           }
@@ -85,6 +84,7 @@ export default function UsersApprovalPage() {
       .subscribe();
 
     return () => {
+      active = false;
       supabase.removeChannel(channel);
     };
   }, []);
@@ -194,6 +194,7 @@ export default function UsersApprovalPage() {
       <div className="w-80 shrink-0 h-full">
         <ApprovalQueue
           applicants={applicants}
+          incompleteApplicants={incompleteApplicants}
           selectedId={selectedApplicant?.id}
           onSelect={setSelectedApplicant}
           summary={summary}
@@ -218,8 +219,15 @@ export default function UsersApprovalPage() {
             <div className="bg-white p-6 rounded-full shadow-sm mb-4">
               <UserCheck className="w-12 h-12 text-slate-200" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900">Queue is Clear</h3>
-            <p className="text-sm">All registration requests have been reviewed.</p>
+            <h3 className="text-lg font-bold text-slate-900">No Applications Ready for Review</h3>
+            <p className="text-sm text-center px-6">
+              {incompleteApplicants.length > 0
+                ? `${incompleteApplicants.length} registration(s) still require an ID upload. They are listed under Awaiting ID.`
+                : "No pending registrations require review."}
+            </p>
+            <button className="mt-4 rounded-lg border px-4 py-2 text-sm text-[#1E3A8A]" onClick={() => void fetchApplicantsSilent()}>
+              Refresh Queue
+            </button>
           </div>
         )}
       </div>

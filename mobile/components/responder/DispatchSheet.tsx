@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View, Text, TouchableOpacity, useWindowDimensions, ActivityIndicator, Vibration, Image, Modal, Alert, ScrollView } from 'react-native';
 import { MapPin, Camera, Maximize2, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -17,7 +18,12 @@ import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 import { getDispatchReleaseNotice } from '../../lib/dispatch-release';
 
 export function DispatchSheet() {
-  const { status, activeDispatch, acceptDispatch, releaseDispatchOffer } = useResponderStore();
+  const { status, activeDispatch, acceptDispatch, releaseDispatchOffer } = useResponderStore(useShallow(state => ({
+    status: state.status,
+    activeDispatch: state.activeDispatch,
+    acceptDispatch: state.acceptDispatch,
+    releaseDispatchOffer: state.releaseDispatchOffer,
+  })));
   const offerDurationSeconds = activeDispatch?.dispatchOfferDurationSeconds ?? 30;
   const serverExpiry = activeDispatch?.offerExpiresAt ? Date.parse(activeDispatch.offerExpiresAt) : NaN;
   const insets = useSafeAreaInsets();

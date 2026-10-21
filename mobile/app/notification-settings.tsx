@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Switch, ActivityIndicator } from 'react-native';
+import { Alert, Linking, View, Text, TouchableOpacity, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft2, NotificationBing, Danger, InfoCircle } from 'iconsax-react-native';
 import { useAuthStatus } from '../hooks/use-auth-status';
 import { supabase } from '../lib/supabase';
+import { usePushRegistrationStore } from '../store/use-push-registration-store';
 
 export default function NotificationSettingsScreen() {
   const router = useRouter();
   const { user } = useAuthStatus();
+  const push = usePushRegistrationStore();
   
   const [alerts, setAlerts] = useState({
     emergencies: true,
@@ -26,13 +28,13 @@ export default function NotificationSettingsScreen() {
         // System notices are opt-out. This matches the broadcast service and
         // prevents a responder from missing safety-critical CDRRMO notices
         // solely because no preference was saved yet.
-        system: prefs.system ?? true,
+        system: prefs.system !== false && prefs.system_notices !== false,
       });
     }
   }, [user]);
 
   const handleToggle = async (key: 'emergencies' | 'updates' | 'system', value: boolean) => {
-    if (!user) return;
+    if (!user || loading) return;
     
     const newAlerts = { ...alerts, [key]: value };
     setAlerts(newAlerts);
@@ -40,14 +42,18 @@ export default function NotificationSettingsScreen() {
 
     try {
       const currentMeta = user.user_metadata || {};
-      await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         data: {
           ...currentMeta,
           notification_preferences: newAlerts,
         }
       });
+      if (error) throw error;
+      push.retry();
     } catch (err) {
+      setAlerts(alerts);
       console.error('[NotificationSettings] Failed to save preference:', err);
+      Alert.alert('Preferences not saved', 'Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -68,6 +74,21 @@ export default function NotificationSettingsScreen() {
       </View>
 
       <ScrollView className="flex-1 px-6 pt-6" showsVerticalScrollIndicator={false}>
+        <View className="bg-white border border-slate-200 rounded-2xl p-4 mb-5">
+          <Text className="font-bold text-[#1E3A8A] mb-2">Phone Alert Status</Text>
+          <Text className="text-slate-600 text-sm">
+            {push.ownerId === user?.id ? push.message : 'Checking phone alert setup…'}
+          </Text>
+          {!alerts.system && <Text className="text-amber-800 text-sm mt-2">System Notices are off. Turn them on below to receive new announcements.</Text>}
+          <View className="flex-row mt-3 gap-4">
+            <TouchableOpacity onPress={push.retry} accessibilityRole="button">
+              <Text className="text-[#1E3A8A] font-bold">Retry Setup</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => void Linking.openSettings()} accessibilityRole="button">
+              <Text className="text-[#1E3A8A] font-bold">Phone Settings</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         <View className="flex-row justify-between items-center mb-6">
           <Text className="text-sm text-slate-500 flex-1 leading-relaxed mr-4">
             Manage how you receive alerts and updates from the CDRRMO DisasTRACE system.
@@ -88,6 +109,7 @@ export default function NotificationSettingsScreen() {
               </View>
             </View>
             <Switch 
+              disabled={loading}
               value={alerts.emergencies} 
               onValueChange={(val) => handleToggle('emergencies', val)}
               trackColor={{ false: '#CBD5E1', true: '#1E3A8A' }}
@@ -106,6 +128,7 @@ export default function NotificationSettingsScreen() {
               </View>
             </View>
             <Switch 
+              disabled={loading}
               value={alerts.updates} 
               onValueChange={(val) => handleToggle('updates', val)}
               trackColor={{ false: '#CBD5E1', true: '#1E3A8A' }}
@@ -124,6 +147,7 @@ export default function NotificationSettingsScreen() {
               </View>
             </View>
             <Switch 
+              disabled={loading}
               value={alerts.system} 
               onValueChange={(val) => handleToggle('system', val)}
               trackColor={{ false: '#CBD5E1', true: '#1E3A8A' }}

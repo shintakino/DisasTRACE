@@ -28,10 +28,20 @@ function check(name: string, callback: () => void) {
   }
 }
 
-check("awaiting-ID accounts stay pending but never enter the approval queue", () => {
+check("awaiting-ID accounts stay pending but are never actionable for approval", () => {
   const applicant = account({ idImageUrl: null });
   assert.equal(deriveUserVerificationState(applicant), "AWAITING_ID");
   assert.equal(isApprovalEligible(applicant), false);
+});
+
+check("incomplete registrations are visible separately without review actions", () => {
+  const route = readFileSync(join(process.cwd(), "app/api/users/approval/route.ts"), "utf8");
+  const queue = readFileSync(join(process.cwd(), "components/users/approval/approval-queue.tsx"), "utf8");
+  assert.match(route, /incompleteApplicants: incompleteUsers/);
+  assert.match(route, /isNull\(users\.idImageUrl\)/);
+  assert.match(queue, /Awaiting ID/);
+  const incompleteCards = queue.slice(queue.indexOf('incompleteApplicants.map'));
+  assert.doesNotMatch(incompleteCards, /onSelect|onClick|ApprovalActions/);
 });
 
 check("only pending mobile applicants with an ID are actionable", () => {

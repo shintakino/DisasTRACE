@@ -51,7 +51,7 @@ assert.doesNotMatch(
 const notificationScreen = read('mobile/app/notifications.tsx');
 assert.match(
   notificationScreen,
-  /role === 'ambulance_responder'[\s\S]*?resolveResponderNotificationRoute[\s\S]*?router\.replace\(responderRoute as any\)/,
+  /role === 'ambulance_responder'[\s\S]*?resolveResponderNotificationRoute[\s\S]*?router\.dismissTo\(responderRoute\)/,
   'Responder notifications must resolve before public-user state is touched.',
 );
 assert.match(
@@ -64,13 +64,14 @@ assert.match(
   /BackHandler\.addEventListener\('hardwareBackPress'/,
   'Notification Back must consume Android hardware presses.',
 );
-assert.match(notificationScreen, /router\.replace\('\/\(tabs\)' as any\)/, 'Notification Back must replace to the stable Home route exactly once.');
+assert.match(notificationScreen, /router\.dismissTo\('\/\(tabs\)'\)/, 'Notification Back must reuse Home without duplicating Tabs.');
 
 const rootLayout = read('mobile/app/_layout.tsx');
 assert.match(rootLayout, /clearLastNotificationResponseAsync/, 'Handled Android notification taps must be consumed once.');
 assert.match(rootLayout, /consumeNotificationResponseDurably/, 'Native notification routing must wait for durable response consumption.');
 assert.match(rootLayout, /persistHandledResponseId: \(id\) => SecureStore\.setItemAsync\(LAST_HANDLED_NOTIFICATION_RESPONSE_KEY, id\)/, 'Consumed notification IDs must survive a process restart.');
 assert.match(rootLayout, /resolveResponderNotificationRoute/, 'Android responder pushes must use the same internal route resolver.');
+assert.match(rootLayout, /openNotificationRoute\(router, navigationRef\.getRootState\(\), route \?\?/, 'Responder push taps must choose navigation from the current root state after consumption.');
 assert.match(rootLayout, /role === 'public_user'[\s\S]*?resolvePublicNotificationRoute/, 'Android public notification taps must use the public resolver.');
 
 const homeScreen = read('mobile/app/(tabs)/index.tsx');

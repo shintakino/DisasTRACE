@@ -37,6 +37,9 @@ interface BroadcastSummary {
   optedOutCount: number;
   pushEligibleCount: number;
   pushAcceptedCount: number;
+  pushFailedCount?: number;
+  inactiveCount?: number;
+  missingAuthCount?: number;
 }
 
 export default function AnnouncementsPage() {
@@ -497,6 +500,13 @@ export default function AnnouncementsPage() {
                       {b.pushEligibleCount > 0 && ` · ${b.pushAcceptedCount}/${b.pushEligibleCount} push accepted`}
                       {b.optedOutCount > 0 && ` · ${b.optedOutCount} opted out`}
                     </div>
+                    <p className="mt-1 text-[10px] text-slate-500">
+                      {b.pushEligibleCount === 0 ? 'No registered devices available for push alerts. ' : 'Push accepted means accepted by the notification service, not confirmed on the phone. '}
+                      {!!b.pushFailedCount && `${b.pushFailedCount} push attempt(s) failed. `}
+                      {!!b.inactiveCount && `${b.inactiveCount} inactive account(s) excluded. `}
+                      {!!b.missingAuthCount && `${b.missingAuthCount} account(s) without sign-in access excluded. `}
+                      Residents can check saved announcements in Notifications and phone-alert setup in Notification Settings.
+                    </p>
                   </div>
                 ))}
               </div>

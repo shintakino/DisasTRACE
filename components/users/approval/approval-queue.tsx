@@ -1,6 +1,6 @@
 "use client";
 
-import { Applicant } from "@/types/approval";
+import { Applicant, IncompleteApplicant } from "@/types/approval";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 interface ApprovalQueueProps {
   applicants: Applicant[];
+  incompleteApplicants: IncompleteApplicant[];
   selectedId?: string;
   onSelect: (applicant: Applicant) => void;
   summary: {
@@ -18,6 +19,7 @@ interface ApprovalQueueProps {
 
 export function ApprovalQueue({
   applicants,
+  incompleteApplicants,
   selectedId,
   onSelect,
   summary,
@@ -29,7 +31,7 @@ export function ApprovalQueue({
         <div className="grid grid-cols-2 gap-3">
           <div className="relative h-24 overflow-hidden rounded-xl border border-[#1E3A8A] bg-[#1E3A8A] p-4 text-white shadow-sm">
             <div className="absolute inset-0 bg-black/5" />
-            <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-white/80">Pending</p>
+            <p className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-white/80">Ready for Review</p>
             <p className="relative z-10 mt-1 text-2xl font-black leading-none">{summary.pending}</p>
           </div>
           <div className="relative h-24 overflow-hidden rounded-xl border border-emerald-700 bg-emerald-700 p-4 text-white shadow-sm">
@@ -80,6 +82,24 @@ export function ApprovalQueue({
               </Card>
             ))
           )}
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-sm font-bold text-amber-800">
+              Awaiting ID ({incompleteApplicants.length})
+            </h3>
+            <p className="text-xs text-slate-600 mt-2 mb-3">
+              These accounts exist, but an ID has not been submitted. Ask the
+              applicant to sign in and select Upload Identity Document.
+              Approval becomes available after the upload succeeds.
+            </p>
+            {incompleteApplicants.map(applicant => (
+              <div key={applicant.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-2">
+                <p className="font-semibold text-sm text-slate-900">{applicant.fullName}</p>
+                <p className="text-xs text-slate-600 break-all">{applicant.email}</p>
+                <p className="text-xs text-slate-600">{applicant.phone}</p>
+                <p className="text-xs font-medium text-amber-800 mt-1">ID upload required</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -12,6 +12,7 @@ import { getOperationalTrackingIncidentId } from '../../lib/responder-report-for
 import { IncidentReportForm } from '../../components/responder/IncidentReportForm';
 import { DispatchSheet } from '../../components/responder/DispatchSheet';
 import { useDraftReminder } from '../../hooks/use-draft-reminder';
+import { useResponderRecovery } from '../../hooks/use-responder-recovery';
 
 function ResponderAvailabilityTracker() {
   const { role } = useAuthStatus();
@@ -44,11 +45,12 @@ function ResponderAvailabilityTracker() {
 }
 
 export default function TabLayout() {
-  const { role, user } = useAuthStatus();
+  const { role, user, verificationStatus } = useAuthStatus();
   const insets = useSafeAreaInsets();
   const { isLocationGateActive, requestPermissions, servicesEnabled } = useLocationPermission();
 
   const isResponder = role === 'ambulance_responder';
+  useResponderRecovery(isResponder && verificationStatus === 'approved' ? user?.id ?? null : null);
   useDraftReminder(isResponder ? user?.id : null);
 
   return (

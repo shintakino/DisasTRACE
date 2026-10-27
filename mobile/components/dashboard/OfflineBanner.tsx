@@ -7,6 +7,8 @@ import { AlertTriangle, WifiOff, Wifi } from 'lucide-react-native';
 export function OfflineBanner() {
   const { isOnline, syncing, isSyncingQueue, offlineQueue } = useOfflineReports();
   const lastQueueError = useResponderStore((state) => state.lastQueueError);
+  const recoveryError = useResponderStore((state) => state.recoveryError);
+  const displayError = lastQueueError || recoveryError;
   const [showBanner, setShowBanner] = useState(false);
   const [bannerStatus, setBannerStatus] = useState<'offline' | 'syncing' | 'restored' | 'failed'>('offline');
   const slideAnim = useRef(new Animated.Value(-100)).current;
@@ -37,7 +39,7 @@ export function OfflineBanner() {
         duration: 350,
         useNativeDriver: true,
       }).start();
-    } else if (lastQueueError) {
+    } else if (displayError) {
       setBannerStatus('failed');
       setShowBanner(true);
       Animated.timing(slideAnim, { toValue: 0, duration: 350, useNativeDriver: true }).start();
@@ -69,7 +71,7 @@ export function OfflineBanner() {
         clearTimeout(timerRef.current);
       }
     };
-  }, [isOnline, isSyncingQueue, lastQueueError, syncing, showBanner]);
+  }, [isOnline, isSyncingQueue, displayError, syncing, showBanner]);
 
   if (!showBanner) return null;
 
@@ -111,7 +113,7 @@ export function OfflineBanner() {
               : 'Restoring connections...'
           )}
           {bannerStatus === 'restored' && 'Connection Restored'}
-          {bannerStatus === 'failed' && `Update not applied: ${lastQueueError}`}
+          {bannerStatus === 'failed' && displayError}
         </Text>
       </View>
     </Animated.View>

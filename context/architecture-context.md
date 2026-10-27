@@ -17,6 +17,8 @@
 
 ## System Boundaries
 
+Responder dispatch recovery is owned by the mounted mobile tab shell. An authenticated, active, approved responder can read only their own current field response or unexpired offer plus duty state through `GET /api/responder/state`. Foreground/realtime-reconnect recovery uses this snapshot without changing dispatch authority. Delayed results are guarded by account, incident, and local state; failed reads retain the last confirmed response. Offline queue replay has one root-owned provider; screens and banners observe it rather than running workers independently.
+
 ### Next.js Web App
 
 - `app/(dashboard)/` — Authenticated web dashboard pages for PACC Admin and CDRRMO Super Admin.
@@ -68,7 +70,8 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 - Verification status is stored in the database (`verification_status`: `pending`, `approved`, `rejected`).
 - Only the **CDRRMO Super Admin** can approve or reject pending registrations. PACC Admins are excluded from registration approvals.
 - The mobile app checks verification status on every session — unverified users see only a pending-approval screen.
-- Rejection includes an optional reason; the user may re-submit.
+- Legacy rejected records may have no reason; the user may re-submit eligible application documents.
+- New registration rejections require a bounded, nonempty reason. Mobile account state reads that reason from the user record, including realtime and applicant foreground refreshes. Rejected applicants may open only the existing Contact Us support form to request CDRRMO-managed registration corrections; the general mobile name-edit restriction and approval gate remain intact. ID resubmission conditionally matches the original status, document, and update timestamp after upload, so it cannot overwrite a concurrent approval/rejection or newer document.
 - Rejection notification is sent via textbee.dev SMS gateway.
 - Mobile registration presents the current public privacy policy before consent. Public User profile creation rejects a missing explicit consent flag, timestamp, or policy version in the database trigger; the profile records all three as auditable consent evidence. Super Admin account creation and role reassignment cannot create or convert a Public User account, so they cannot fabricate resident consent.
 
@@ -142,6 +145,7 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 - Notifications are stored in the database and delivered via Supabase Realtime subscriptions while the app is active.
 - Responder dispatch offers and CDRRMO/PACC system announcements additionally use Expo Push Notifications delivered through FCM, so Android can alert an approved responder or Public User while the app is backgrounded or stopped. Expo push tokens are bound to the account's one active mobile session and removed on sign-out or provider invalidation. Push delivery is advisory: the database inbox row remains authoritative for announcements, while the server remains the authority for dispatch-offer ownership and expiry.
 - Each system announcement creates one immutable `system_broadcasts` audit row and atomically links an inbox row to every eligible recipient. The audit records eligible, opted-out, inactive, missing-auth, and Expo push outcomes. Existing Auth metadata preferences (`system` and legacy `system_notices`) remain the user opt-out boundary.
+- New dashboard broadcasts retain a client-generated UUID across uncertain responses and use the existing broadcast primary key for atomic deduplication. A matching retry returns the original broadcast without repeating inbox inserts or pushes; conflicting content/sender is rejected. Push accounting begins as pending in the existing audit metadata, and an accounting failure after commit reports saved inbox messages with incomplete phone-delivery status. This requires no schema migration and preserves older clients that omit the optional identifier.
 - Mobile push setup has one root-owned lifecycle, with foreground recovery, bounded network retries, and native-to-Expo token exchange on rotation. Notification Settings exposes setup failures without conflating an in-app inbox row with delivery to a device. Navigation back to mobile tabs dismisses to the existing shell instead of replacing a pushed screen with a second tab shell.
 - Users Approval separately lists pending mobile registrations without an ID as non-actionable Awaiting ID records. Document-backed approval eligibility, exact-document checks, and role authorization are unchanged.
 - Responder draft reminders are scheduled natively once per responder-owned unsent draft set, only while the device is online, and cancelled after a confirmed submission or logout. They do not rely on a running JavaScript timer; delayed form autosave is suspended while submission is in progress so it cannot recreate an already-submitted draft.
@@ -159,6 +163,8 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 - These signals are not device attestation. Release enforcement against a modified or rooted client requires a server-verified Google Play Integrity verdict bound to the protected request.
 
 ## Invariants
+
+Responder availability release locks the responder row before checking current accepted incidents and pending offers. Only field states (`DISPATCHED`, `EN_ROUTE`, `ARRIVED`) reserve operational availability; older documentation-pending cases do not. Completion, offer expiry, and orphan maintenance share this rule. A resolved incident cannot return to PACC action/review even if a legacy request status is pending, and a submitted final report independently blocks manual redispatch before any responder is reserved.
 
 1. Unverified mobile users are blocked from all app functionality — enforced at both API and client level.
 2. Auth and role checks are enforced at every API mutation boundary.

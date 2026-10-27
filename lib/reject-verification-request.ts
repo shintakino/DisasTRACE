@@ -1,11 +1,12 @@
 import { db } from '@/db';
 import { incidents } from '@/db/schema/incidents';
 import { verificationRequests } from '@/db/schema/verification_requests';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { canPaccRejectVerificationRequest, getPaccRejectionConflict, normalizeRequiredRejectionReason, type PaccRejectionConflictCode } from '@/lib/rejected-report-workflow';
 import { auditLogs } from '@/db/schema/audit_logs';
 import { createAuditEvent, PACC_AUDIT_ACTIONS, type AuditActor } from '@/lib/audit-events';
 import { reconcileExpiredOfferForRequest } from '@/lib/dispatch-engine';
+import { reports } from '@/db/schema/reports';
 
 interface RejectionFailure {
   success: false;
@@ -66,6 +67,14 @@ export async function rejectVerificationRequest(
       .where(eq(incidents.requestId, id))
       .limit(1)
       .for('update');
+
+    if (lockedIncident) {
+      const submitted = await tx.query.reports.findFirst({
+        where: and(eq(reports.incidentId, lockedIncident.id), eq(reports.status, 'SUBMITTED')),
+        columns: { id: true },
+      });
+      if (submitted) return { success: false, status: 409, code: 'REQUEST_TERMINAL', error: 'The final responder report has already been submitted. This completed response cannot be rejected.' } as const;
+    }
 
     const canReject = canPaccRejectVerificationRequest({
       requestStatus: lockedRequest.status,

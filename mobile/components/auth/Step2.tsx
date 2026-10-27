@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ContactDetailsSchema, ContactDetailsType } from '../../schemas/auth';
@@ -7,6 +7,9 @@ import { useSignUpStore } from '../../store/useSignUpStore';
 import { ArrowDown2, SearchNormal1 } from 'iconsax-react-native';
 import * as Haptics from 'expo-haptics';
 import { fetchWithTimeout } from '../../lib/network-timeout';
+import { OtpVerificationModal } from './OtpVerificationModal';
+import { updateOtpDigits } from '../../lib/otp-input';
+import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 
 interface Props {
   onNext: () => void;
@@ -32,10 +35,14 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
 
   // OTP State
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const otpAttempt = useRef(0);
+  const verifyingRef = useRef(false);
+  const resendingRef = useRef(false);
   const [otpCode, setOtpCode] = useState<string[]>(['', '', '', '', '', '']);
   const [otpTimer, setOtpTimer] = useState(60);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isResendingOtp, setIsResendingOtp] = useState(false);
   const [phoneForOtp, setPhoneForOtp] = useState('');
   const [pendingStepData, setPendingStepData] = useState<ContactDetailsType | null>(null);
 
@@ -60,6 +67,7 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
     }
   });
 
+  const firstPinRef = pinRefs[0];
   const currentBarangay = watch('barangay');
 
   const filteredBarangays = BARANGAYS.filter(b => 
@@ -77,19 +85,11 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
     return () => clearInterval(interval);
   }, [showOtpModal, otpTimer]);
 
-  // Direct validation triggering on full 6-digit OTP code input
-  useEffect(() => {
-    const fullCode = otpCode.join('');
-    if (fullCode.length === 6) {
-      handleVerifyOtp(fullCode);
-    }
-  }, [otpCode]);
-
   const onSubmit = async (stepData: ContactDetailsType) => {
     setCheckingPhone(true);
     setPhoneError(null);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = getMobileApiBaseUrl();
 
       // 1. Resolve phone number uniqueness first
       const response = await fetchWithTimeout(`${apiUrl}/api/auth/resolve-phone`, {
@@ -139,12 +139,9 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
       setOtpCode(['', '', '', '', '', '']);
       setOtpError(null);
       setOtpTimer(60);
+      otpAttempt.current++;
       setShowOtpModal(true);
 
-      // Focus on first PIN input cell
-      setTimeout(() => {
-        pinRefs[0].current?.focus();
-      }, 500);
 
     } catch (err) {
       console.error("Error validating phone and triggering OTP:", err);
@@ -155,12 +152,15 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
     }
   };
 
-  const handleVerifyOtp = async (code: string) => {
+  const handleVerifyOtp = useCallback(async (code: string) => {
+    if (verifyingRef.current || resendingRef.current || !showOtpModal) return;
+    verifyingRef.current = true;
+    const attempt = otpAttempt.current;
     setOtpError(null);
     setIsVerifyingOtp(true);
 
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = getMobileApiBaseUrl();
       const response = await fetchWithTimeout(`${apiUrl}/api/auth/otp/verify-signup`, {
         method: 'POST',
         headers: {
@@ -173,6 +173,7 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
       }, 12_000, 'OTP verification');
 
       const resData = await response.json();
+      if (attempt !== otpAttempt.current) return;
 
       if (!response.ok) {
         throw new Error(resData.error || 'Invalid OTP code.');
@@ -193,22 +194,32 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
       }
       onNext();
     } catch (err: any) {
+      if (attempt !== otpAttempt.current) return;
       setOtpError(err.message || 'OTP verification failed.');
       setOtpCode(['', '', '', '', '', '']); // Clear input boxes
-      pinRefs[0].current?.focus(); // Focus back to first cell
+      firstPinRef.current?.focus(); // Focus back to first cell
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } finally {
+      verifyingRef.current = false;
       setIsVerifyingOtp(false);
     }
-  };
+  }, [showOtpModal, phoneForOtp, pendingStepData, updateData, onNext, firstPinRef]);
+
+  useEffect(() => {
+    const code = otpCode.join('');
+    if (code.length === 6 && !isResendingOtp) void handleVerifyOtp(code);
+  }, [otpCode, handleVerifyOtp, isVerifyingOtp, isResendingOtp]);
 
   const handleResendOtp = async () => {
-    if (otpTimer > 0) return;
+    if (otpTimer > 0 || resendingRef.current || verifyingRef.current) return;
+    resendingRef.current = true;
+    setIsResendingOtp(true);
+    const attempt = otpAttempt.current;
     setOtpError(null);
     setOtpCode(['', '', '', '', '', '']);
 
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = getMobileApiBaseUrl();
       const response = await fetchWithTimeout(`${apiUrl}/api/auth/otp/send-signup`, {
         method: 'POST',
         headers: {
@@ -220,6 +231,7 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
       }, 15_000, 'verification SMS resend');
 
       const resData = await response.json();
+      if (attempt !== otpAttempt.current) return;
 
       if (!response.ok) {
         throw new Error(resData.error || 'Failed to resend code.');
@@ -233,32 +245,22 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
         console.log(`[Dev Simulation] Resent verification code: ${resData.code}`);
       }
     } catch (err: any) {
+      if (attempt !== otpAttempt.current) return;
       setOtpError(err.message || 'Failed to resend code.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-    }
+    } finally { resendingRef.current = false; setIsResendingOtp(false); }
   };
 
   const handleOtpChange = (text: string, index: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    const cleanText = text.replace(/[^0-9]/g, '');
-    const newOtp = [...otpCode];
-    newOtp[index] = cleanText.slice(-1);
-    setOtpCode(newOtp);
-
-    if (cleanText && index < 5) {
-      pinRefs[index + 1].current?.focus();
-    }
+    const digits = text.replace(/\D/g, '');
+    setOtpCode(previous => updateOtpDigits(previous, index, text));
+    if (digits && digits.length < 6) pinRefs[Math.min(5, index + digits.length)].current?.focus();
   };
 
-  const handleOtpKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      if (!otpCode[index] && index > 0) {
-        const newOtp = [...otpCode];
-        newOtp[index - 1] = '';
-        setOtpCode(newOtp);
-        pinRefs[index - 1].current?.focus();
-      }
+  const handleOtpBackspace = (index: number) => {
+    if (!otpCode[index] && index > 0) {
+      setOtpCode(previous => previous.map((digit, position) => position === index - 1 ? '' : digit));
+      pinRefs[index - 1].current?.focus();
     }
   };
 
@@ -452,84 +454,12 @@ export default function Step2({ onNext, onBack, onInputFocus }: Props) {
         </View>
       </Modal>
 
-      {/* Premium Frosted Glass Slide-up OTP Verification Modal */}
-      <Modal
-        visible={showOtpModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowOtpModal(false)}
-      >
-        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView
-          className="flex-1 bg-black/60"
-          contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          showsVerticalScrollIndicator={false}
-        >
-          <TouchableOpacity 
-            className="flex-grow" 
-            activeOpacity={1} 
-            onPress={() => setShowOtpModal(false)}
-          />
-          <View className="bg-[#0B1536] border-t border-white/10 rounded-t-[32px] p-6 pb-12 shadow-2xl">
-            <View className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-6" />
-            
-            <Text className="text-2xl font-bold text-white text-center mb-2">Verify Mobile Number</Text>
-            <Text className="text-white/60 text-center mb-6 px-6">
-              Enter the 6-digit verification code sent to <Text className="text-white font-semibold">{phoneForOtp}</Text>
-            </Text>
-
-            {/* OTP Grid of 6 focusable digital cells */}
-            <View className="flex-row justify-between mb-6 px-2">
-              {otpCode.map((val, index) => (
-                <TextInput
-                  key={index}
-                  ref={pinRefs[index]}
-                  className={`w-[14%] aspect-square bg-[#15286A] rounded-xl border text-center text-white text-2xl font-bold ${
-                    val ? 'border-[#10B981]' : 'border-white/10'
-                  }`}
-                  keyboardType="numeric"
-                  maxLength={1}
-                  value={val}
-                  onChangeText={(text) => handleOtpChange(text, index)}
-                  onKeyPress={(e) => handleOtpKeyPress(e, index)}
-                  selectTextOnFocus
-                />
-              ))}
-            </View>
-
-            {otpError && (
-              <View className="bg-red-500/10 p-3 rounded-lg mb-6 border border-red-500/20">
-                <Text className="text-red-400 text-center text-sm font-medium">{otpError}</Text>
-              </View>
-            )}
-
-            {isVerifyingOtp && (
-              <View className="flex-row justify-center items-center mb-6">
-                <ActivityIndicator color="#10B981" />
-                <Text className="text-white/80 font-medium ml-2">Verifying code...</Text>
-              </View>
-            )}
-
-            {/* automated 60-second cooldown timer for SMS OTP resending */}
-            <View className="items-center mt-2">
-              {otpTimer > 0 ? (
-                <Text className="text-white/45 font-medium">
-                  Resend code in <Text className="text-[#10B981] font-semibold">{otpTimer}s</Text>
-                </Text>
-              ) : (
-                <TouchableOpacity onPress={handleResendOtp}>
-                  <Text className="text-[#10B981] font-bold text-base underline">
-                    Resend Verification Code
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
+      <OtpVerificationModal
+        visible={showOtpModal} phone={phoneForOtp} digits={otpCode} inputRefs={pinRefs}
+        error={otpError} verifying={isVerifyingOtp} resending={isResendingOtp} timer={otpTimer}
+        onClose={() => { otpAttempt.current++; setShowOtpModal(false); }}
+        onChange={handleOtpChange} onBackspace={handleOtpBackspace} onResend={handleResendOtp}
+      />
     </View>
   );
 }

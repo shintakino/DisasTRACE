@@ -33,6 +33,10 @@ export type IncompleteApplicant = Pick<Applicant,
 export const VerificationActionSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
   documentPath: z.string().trim().min(1).max(512),
-  reason: z.string().optional(),
+  reason: z.string().trim().max(500).optional(),
+}).superRefine((value, context) => {
+  if (value.status === 'REJECTED' && !value.reason) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['reason'], message: 'Provide a reason for rejecting this registration.' });
+  }
 });
 export type VerificationAction = z.infer<typeof VerificationActionSchema>;

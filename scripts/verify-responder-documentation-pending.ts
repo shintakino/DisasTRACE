@@ -19,7 +19,7 @@ assert.match(incidentStatusRoute, /status: z\.enum\(\['ARRIVED', 'DOCUMENTATION_
 assert.match(incidentStatusRoute, /\.for\('update'\)/);
 assert.match(incidentStatusRoute, /fieldOutcome === 'HOSPITAL_ARRIVAL'/);
 assert.match(incidentStatusRoute, /transportStatus !== 'ARRIVED_AT_HOSPITAL'/);
-assert.match(incidentStatusRoute, /dutyStatus: 'ON_DUTY'/);
+assert.match(incidentStatusRoute, /releaseResponderAvailability\(tx, auth\.responder\.id\)/);
 assert.match(incidentStatusRoute, /retryPendingAutomaticDispatches/);
 assert.match(incidentStatusRoute, /kind: 'already_deferred'/);
 assert.match(incidentStatusRoute, /lockedIncident\.fieldOutcome === fieldOutcome/);
@@ -49,9 +49,11 @@ assert.match(authStatus, /useResponderStore\.getState\(\)\.clearTransientDispatc
 assert.match(authStatus, /shouldResetResponderSession\(activeMobileAccountId, nextId, hasHydratedInitialMobileSession\)/);
 assert.doesNotMatch(authStatus, /event === 'SIGNED_IN'/, 'Repeated same-account Auth events must not discard operational state.');
 
-const responderHome = read('mobile/components/responder/ResponderHome.tsx');
-assert.match(responderHome, /!incident \|\| \['DOCUMENTATION_PENDING', 'RESOLVED'\]\.includes\(incident\.status\)/);
-assert.match(responderHome, /clearTransientDispatch\(\)/);
+const recovery = read('mobile/hooks/use-responder-recovery.ts');
+const recoveryApi = read('app/api/responder/state/route.ts');
+assert.match(recoveryApi, /inArray\(incidents\.status, \['DISPATCHED', 'EN_ROUTE', 'ARRIVED'\]\)/);
+assert.match(recovery, /if \(!data\.dispatch\)/);
+assert.match(recovery, /completeIncident\(current\.activeDispatch\.id\)/);
 
 const offlineReports = read('mobile/hooks/use-offline-reports.ts');
 assert.match(offlineReports, /fetchWithTimeout\([^\n]+action\.endpoint/);

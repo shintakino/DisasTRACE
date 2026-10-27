@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft2 } from 'iconsax-react-native';
 import { useAuthStatus } from '../hooks/use-auth-status';
 import { supabase } from '../lib/supabase';
+import { getMobileApiBaseUrl } from '../lib/api-base-url';
 
 export default function ContactUsScreen() {
   const router = useRouter();
-  const { user, profile } = useAuthStatus();
+  const { user, profile, rejectionReason } = useAuthStatus();
+  const { topic } = useLocalSearchParams<{ topic?: string }>();
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
+  const [subject, setSubject] = useState(topic === 'registration' ? 'Registration correction request' : '');
+  const [message, setMessage] = useState(topic === 'registration'
+    ? `I need help correcting my registration.\n${rejectionReason ? `Reason for rejection: ${rejectionReason}\n` : ''}Details to correct: ` : '');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -43,7 +46,7 @@ export default function ContactUsScreen() {
     setSubmitting(true);
     
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
+      const apiUrl = getMobileApiBaseUrl();
       const { data: { session } } = await supabase.auth.getSession();
       
       const reqHeaders: Record<string, string> = {

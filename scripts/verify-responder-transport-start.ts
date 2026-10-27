@@ -31,8 +31,9 @@ assert.match(onSceneSheet, /startHospitalTransport/);
 assert.match(onSceneSheet, /void startHospitalTransport\(\)/);
 assert.doesNotMatch(onSceneSheet, /useResponderStore\.getState\(\)\.transportToHospital\(\)/);
 
-assert.match(home, /shouldPreserveConfirmedTransport/);
-assert.match(home, /hasLocallyConfirmedTransport && restoredStatus === 'on_scene'/);
-assert.match(home, /\}, \[activeDispatch\?\.id, releaseDispatchOffer, user\?\.id\]\);/);
+const recovery = read('mobile/lib/responder-recovery.ts');
+assert.match(recovery, /rank\[current\.status\] > rank\[restored\]/);
+assert.match(recovery, /transportHospitalId: incoming\.transportHospitalId/);
+assert.match(home, /activeDispatch\.transportHospitalId/);
 
 console.log('Responder transport-start workflow checks passed.');

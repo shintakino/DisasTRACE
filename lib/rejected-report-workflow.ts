@@ -39,6 +39,9 @@ export function getPaccRejectionConflict(input: {
     };
   }
   if (!input.incident) return null;
+  if (input.incident.incidentStatus === 'RESOLVED' || input.incident.incidentStatus === 'DOCUMENTATION_PENDING') {
+    return { code: 'REQUEST_TERMINAL', error: 'The field response is already completed. It cannot be rejected or dispatched again.' };
+  }
   if (input.incident.responderId) {
     return {
       code: 'ACTIVE_RESPONSE',
@@ -99,7 +102,7 @@ export function classifyVerificationQueueItem(
   input: VerificationQueueState,
 ): VerificationQueueClassification {
   if (input.requestStatus === 'REJECTED') return 'REJECTED';
-  if (input.requestStatus === 'VERIFIED' && input.incidentStatus === 'RESOLVED') {
+  if (input.incidentStatus === 'RESOLVED') {
     return 'CASE_CLOSED';
   }
   return 'ACTIVE';
@@ -109,9 +112,9 @@ export function classifyActiveVerificationBucket(
   input: ActionableVerificationQueueState,
 ): ActiveVerificationBucket | null {
   if (classifyVerificationQueueItem(input) !== 'ACTIVE') return null;
+  if (input.incidentStatus && (input.incidentStatus !== 'DISPATCHED' || input.responderId)) return null;
 
-  const awaitingResponder = input.requestStatus === 'VERIFIED'
-    && input.incidentStatus === 'DISPATCHED'
+  const awaitingResponder = input.incidentStatus === 'DISPATCHED'
     && !input.responderId
     && Boolean(input.currentOfferResponderId);
   if (awaitingResponder) return 'AWAITING';

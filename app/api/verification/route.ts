@@ -4,7 +4,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { incidents } from "@/db/schema/incidents";
 import { users } from "@/db/schema/users";
 import { createClient } from "@/lib/supabase-server";
-import { and, count, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { formatOfficialBaliwagLocation } from "@/lib/report-location";
 import { INCIDENT_DEDUPLICATION_RADIUS_METERS } from "@/lib/incident-deduplication";
 import { findReportConsolidation } from '@/lib/emergency-intake';
@@ -32,7 +32,8 @@ export async function GET() {
         .from(verificationRequests)
         .leftJoin(incidents, eq(incidents.requestId, verificationRequests.id))
         .where(or(
-          and(eq(verificationRequests.status, 'PENDING'), isNull(verificationRequests.possibleDuplicateOfId)),
+          and(eq(verificationRequests.status, 'PENDING'), isNull(verificationRequests.possibleDuplicateOfId),
+            or(isNull(incidents.id), and(eq(incidents.status, 'DISPATCHED'), isNull(incidents.responderId)))),
           and(
             eq(verificationRequests.status, 'VERIFIED'),
             eq(incidents.status, 'DISPATCHED'),
@@ -45,10 +46,7 @@ export async function GET() {
         .leftJoin(incidents, eq(incidents.requestId, verificationRequests.id))
         .where(or(
           eq(verificationRequests.status, 'REJECTED'),
-          and(
-            eq(verificationRequests.status, 'VERIFIED'),
-            eq(incidents.status, 'RESOLVED'),
-          ),
+          eq(incidents.status, 'RESOLVED'),
         ))
         .orderBy(desc(verificationRequests.createdAt))
         .limit(50),

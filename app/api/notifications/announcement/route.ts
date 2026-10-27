@@ -7,12 +7,24 @@ import crypto from "crypto";
 import { z } from "zod";
 import type { User } from "@supabase/supabase-js";
 import { sendSystemAnnouncementPush } from "@/lib/push-notifications";
+import { announcementDeliveryStatus } from '@/lib/announcement-delivery-status';
 
 const PostAnnouncementSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(160, "Title must be 160 characters or fewer"),
   body: z.string().trim().min(1, "Announcement body is required").max(2_000, "Announcement body must be 2,000 characters or fewer"),
   targetRole: z.enum(["all", "ambulance_responder", "public_user"]).default("all"),
+  broadcastId: z.string().uuid().optional(),
 });
+
+function replayResponse(broadcast: typeof systemBroadcasts.$inferSelect, senderId: string, input: z.infer<typeof PostAnnouncementSchema>) {
+  if (broadcast.senderId !== senderId || broadcast.title !== input.title || broadcast.body !== input.body || broadcast.targetRole !== input.targetRole) {
+    return NextResponse.json({ error: 'This broadcast identifier has already been used for a different announcement.' }, { status: 409 });
+  }
+  return NextResponse.json({ success: true, replayed: true,
+    broadcast: { ...broadcast, deliveryStatus: announcementDeliveryStatus(broadcast.pushFailureReason) },
+    message: 'This announcement was already saved. No duplicate notifications were created.',
+  });
+}
 
 async function listAllAuthUsers() {
   const supabaseAdmin = createAdminClient();
@@ -48,7 +60,7 @@ export async function GET() {
       orderBy: [desc(systemBroadcasts.createdAt)],
       limit: 20,
     });
-    return NextResponse.json({ broadcasts });
+    return NextResponse.json({ broadcasts: broadcasts.map(broadcast => ({ ...broadcast, deliveryStatus: announcementDeliveryStatus(broadcast.pushFailureReason) })) });
   } catch (error) {
     console.error("[Announcement API] Failed to load broadcast history:", error);
     return NextResponse.json({ error: "Unable to load announcement history" }, { status: 500 });
@@ -70,6 +82,9 @@ export async function POST(req: Request) {
     }
 
     const { title, body, targetRole } = result.data;
+    const broadcastId = result.data.broadcastId ?? crypto.randomUUID();
+    const existing = await db.query.systemBroadcasts.findFirst({ where: eq(systemBroadcasts.id, broadcastId) });
+    if (existing) return replayResponse(existing, user.id, result.data);
 
     // Read Auth metadata once for the existing opt-out preference. The
     // database user row remains the authoritative account/role record.
@@ -97,13 +112,12 @@ export async function POST(req: Request) {
     });
     const optedOutIds = new Set(optedOutAccounts.map((account) => account.id));
     const recipients = activeWithAuth.filter((account) => !optedOutIds.has(account.id));
-    const broadcastId = crypto.randomUUID();
     const createdAt = new Date();
 
     // Persist the audit row and every recipient inbox entry together. A failed
     // insert can never produce a misleading partial "sent" success response.
-    await db.transaction(async (tx) => {
-      await tx.insert(systemBroadcasts).values({
+    const inserted = await db.transaction(async (tx) => {
+      const [broadcast] = await tx.insert(systemBroadcasts).values({
         id: broadcastId,
         senderId: user.id,
         title,
@@ -115,7 +129,9 @@ export async function POST(req: Request) {
         inactiveCount: scopedAccounts.length - activeAccounts.length,
         missingAuthCount: activeAccounts.length - activeWithAuth.length,
         createdAt,
-      });
+        pushFailureReason: { deliveryStatus: 'pending' },
+      }).onConflictDoNothing({ target: systemBroadcasts.id }).returning();
+      if (!broadcast) return false;
 
       if (recipients.length > 0) {
         await tx.insert(notifications).values(recipients.map((recipient) => ({
@@ -135,7 +151,13 @@ export async function POST(req: Request) {
           },
         })));
       }
+      return true;
     });
+    if (!inserted) {
+      const previous = await db.query.systemBroadcasts.findFirst({ where: eq(systemBroadcasts.id, broadcastId) });
+      if (!previous) throw new Error('Unable to recover the saved broadcast. Retry with the same identifier.');
+      return replayResponse(previous, user.id, result.data);
+    }
 
     // Push is advisory and starts only after the inbox is committed. Limit
     // provider fan-out so a large audience does not create an unbounded burst.
@@ -165,12 +187,18 @@ export async function POST(req: Request) {
         }, {})
       : null;
 
+    let deliveryStatus: 'complete' | 'incomplete' = 'complete';
+    try {
     await db.update(systemBroadcasts).set({
       pushEligibleCount,
       pushAcceptedCount,
       pushFailedCount: pushFailures.length,
       pushFailureReason,
     }).where(eq(systemBroadcasts.id, broadcastId));
+    } catch (error) {
+      deliveryStatus = 'incomplete';
+      console.error('[Announcement API] Inbox saved; delivery accounting incomplete:', { broadcastId, error });
+    }
 
     return NextResponse.json({
       success: true,
@@ -188,13 +216,14 @@ export async function POST(req: Request) {
         pushEligibleCount,
         pushAcceptedCount,
         pushFailedCount: pushFailures.length,
+        deliveryStatus,
       },
       message: recipients.length > 0
         ? `Announcement saved for ${recipients.length} eligible account${recipients.length === 1 ? "" : "s"}.`
         : "Announcement saved, but no active recipients matched the selected audience.",
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Announcement API] Broadcast failed:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to confirm the broadcast. Retry the same announcement to check whether it was saved.' }, { status: 500 });
   }
 }

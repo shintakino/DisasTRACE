@@ -259,7 +259,6 @@ export function TripTicketModal({ visible, onClose, data, onSave }: TripTicketMo
       visible={visible}
       animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
       presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
-      hardwareAccelerated
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

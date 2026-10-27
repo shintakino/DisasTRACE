@@ -76,10 +76,7 @@ export function DispatchSheet() {
           useResponderStore.getState().status === 'dispatch_offered'
           && useResponderStore.getState().activeDispatch?.id === incidentId
         ) {
-          releaseDispatchOffer({
-            incidentId,
-            ...getDispatchReleaseNotice({}),
-          });
+          useResponderStore.getState().requestRecovery();
         }
         return;
       }
@@ -104,7 +101,7 @@ export function DispatchSheet() {
         if (mountedRef.current) void reconcileExpiredOffer(incidentId);
       }, 3_000);
     }
-  }, [releaseDispatchOffer]);
+  }, []);
 
   useEffect(() => {
     acceptingRef.current = false;
@@ -359,6 +356,9 @@ export function DispatchSheet() {
               className="bg-[#1E3A8A] rounded-[20px] py-4 items-center shadow-lg shadow-[#1E3A8A]/30 active:bg-blue-900 flex-1 flex-row justify-center"
               disabled={accepting || !acceptanceWindowOpen}
               onPress={async () => {
+                if (acceptingRef.current || !activeDispatch) return;
+                const incidentId = activeDispatch.id;
+                const ownerUserId = useResponderStore.getState().ownerUserId;
                 const currentServerTime = Date.now() + serverClockOffsetMs;
                 if (
                   !acceptanceWindowOpen
@@ -383,18 +383,20 @@ export function DispatchSheet() {
                     method: 'POST',
                     headers: reqHeaders,
                     body: JSON.stringify({
-                      incidentId: activeDispatch?.id,
+                      incidentId,
                       action: 'ACCEPT'
                     })
                   });
                   const res = await response.json();
+                  if (useResponderStore.getState().ownerUserId !== ownerUserId
+                    || useResponderStore.getState().activeDispatch?.id !== incidentId) return;
                   if (res.success) {
                     accepted = true;
-                    acceptDispatch();
+                    acceptDispatch(incidentId, res.incident);
                   } else if (response.status === 409) {
                     const disposition = res as { transferred?: boolean; reassignmentRequired?: boolean };
                     releaseDispatchOffer({
-                      incidentId: activeDispatch?.id || 'unknown',
+                      incidentId,
                       ...getDispatchReleaseNotice(disposition),
                     });
                   } else {
@@ -404,6 +406,8 @@ export function DispatchSheet() {
                     );
                   }
                 } catch (err) {
+                  if (useResponderStore.getState().ownerUserId !== ownerUserId) return;
+                  useResponderStore.getState().requestRecovery();
                   console.error("Failed to accept dispatch offer:", err);
                   Alert.alert(
                     "Dispatch not accepted",

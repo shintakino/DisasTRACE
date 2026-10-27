@@ -1,5 +1,6 @@
 import { createContext, createElement, useCallback, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import { z } from 'zod';
+import { AppState } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
@@ -26,8 +27,10 @@ function reconcileResponderStoreAccount(nextAccountId: string | null, clearTrans
   ) {
     useResponderStore.getState().clearTransientDispatch();
     useResponderStore.getState().clearReportFormSession();
+    useResponderStore.setState({ recoveryError: null, lastQueueError: null });
   }
   activeMobileAccountId = nextAccountId;
+  useResponderStore.setState({ ownerUserId: nextAccountId });
 }
 
 function useAuthStatusState() {
@@ -36,6 +39,7 @@ function useAuthStatusState() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<MobileVerificationStatus>('loading');
   const [role, setRole] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [profile, setProfile] = useState<{ fullName: string; address: string; barangay?: string; phone?: string; dutyStatus?: string; unitId?: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sessionVersion, setSessionVersion] = useState(0);
@@ -64,7 +68,7 @@ function useAuthStatusState() {
       // Direct Supabase query is more robust than a separate API call for mobile
       const { data: dbUser, error: dbError } = await supabase
         .from('users')
-        .select('role, verification_status, status, full_name, address, barangay, phone, duty_status, unit_id')
+        .select('role, verification_status, status, rejection_reason, full_name, address, barangay, phone, duty_status, unit_id')
         .eq('id', currentUser.id)
         .single();
 
@@ -74,6 +78,7 @@ function useAuthStatusState() {
       const role = dbUser.role;
       const status = dbUser.verification_status;
       const accountStanding = dbUser.status;
+      setRejectionReason(status === 'REJECTED' ? dbUser.rejection_reason?.trim() || null : null);
 
       // Publish the resolved role before applying the platform gate. The
       // unauthorized screen uses this value to distinguish a web-only admin
@@ -197,6 +202,7 @@ function useAuthStatusState() {
       reconcileResponderStoreAccount(nextId, shouldResetResponderSession(activeMobileAccountId, nextId, hasHydratedInitialMobileSession));
       hasHydratedInitialMobileSession = true;
       if (accountChanged || !session) {
+        setRejectionReason(null);
         setProfile(null);
         setRole(null);
         useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
@@ -232,6 +238,14 @@ function useAuthStatusState() {
     if (session?.user) void checkVerification(session.user, session);
   }, [session, sessionVersion, checkVerification]);
 
+  useEffect(() => {
+    if (!session || (verificationStatus !== 'pending' && verificationStatus !== 'rejected')) return;
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void checkVerification(session.user, session);
+    });
+    return () => subscription.remove();
+  }, [session, verificationStatus, checkVerification]);
+
   // Real-time status synchronizer
   useEffect(() => {
     const accountId = user?.id;
@@ -254,6 +268,7 @@ function useAuthStatusState() {
           const newStatus = payload.new.verification_status;
           const newRole = payload.new.role;
           const newAccountStanding = payload.new.status;
+          setRejectionReason(newStatus === 'REJECTED' ? payload.new.rejection_reason?.trim() || null : null);
 
           // Platform Restriction: Deny Web Admins on Mobile
           if (newRole === 'cdrrmo_super_admin' || newRole === 'pacc_admin') {
@@ -308,6 +323,7 @@ function useAuthStatusState() {
     isSignedIn: !!user,
     isLoaded,
     verificationStatus,
+    rejectionReason,
     role,
     profile,
     user,

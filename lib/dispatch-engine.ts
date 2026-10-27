@@ -6,6 +6,7 @@ import { notifications } from "@/db/schema/notifications";
 import { systemSettings } from "@/db/schema/system_settings";
 import { sendDispatchOfferExpiredPush, sendDispatchOfferPush } from "@/lib/push-notifications";
 import { legacyAmbulanceUnitId } from "@/lib/ambulance-unit";
+import { releaseResponderAvailability } from '@/lib/responder-availability';
 import { eq, and, or, sql, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import {
   AUTO_DISPATCH_RADIUS_KM,
@@ -434,9 +435,7 @@ export async function cascadeIncident(incidentId: string, timedOutResponderId: s
     }).catch((error) => console.error('[Cascade] Failed to send expired-offer push:', error));
 
     // The cascade owns the old offer now, so the responder can receive another.
-    await db.update(users)
-      .set({ dutyStatus: "ON_DUTY" })
-      .where(eq(users.id, timedOutResponderId));
+    await db.transaction(tx => releaseResponderAvailability(tx, timedOutResponderId));
 
     // Handle PACC_MANUAL incidents separately:
     if (incident.dispatchMethod === "PACC_MANUAL") {
@@ -767,39 +766,11 @@ export async function healOrphanedActiveDispatches(): Promise<DispatchMaintenanc
 
     if (activeDispatchResponders.length === 0) return { processed: 0, failed: 0 };
 
-    // 2. Find all DISPATCHED incidents that have an active offer or assigned responder
-    const activeIncidents = await db.query.incidents.findMany({
-      where: eq(incidents.status, "DISPATCHED"),
-    });
-
-    // Also check EN_ROUTE and ARRIVED — these are actively assigned
-    const enRouteIncidents = await db.query.incidents.findMany({
-      where: or(
-        eq(incidents.status, "EN_ROUTE"),
-        eq(incidents.status, "ARRIVED")
-      ),
-    });
-
-    // Build a set of responder IDs that are legitimately busy
-    const busyResponderIds = new Set<string>();
-    for (const inc of activeIncidents) {
-      if (inc.currentOfferResponderId) busyResponderIds.add(inc.currentOfferResponderId);
-      if (inc.responderId) busyResponderIds.add(inc.responderId);
-    }
-    for (const inc of enRouteIncidents) {
-      if (inc.responderId) busyResponderIds.add(inc.responderId);
-    }
-
-    // 3. Reset orphaned responders (ACTIVE_DISPATCH but no incident pointing to them)
+    // The row lock precedes a fresh incident read; never release from the earlier snapshot.
     let processed = 0;
     for (const responder of activeDispatchResponders) {
-      if (!busyResponderIds.has(responder.id)) {
-        console.log(`[SelfHeal] Responder ${responder.fullName} (${responder.id}) is stuck in ACTIVE_DISPATCH with no active incident. Resetting to ON_DUTY.`);
-        await db.update(users)
-          .set({ dutyStatus: "ON_DUTY" })
-          .where(eq(users.id, responder.id));
-        processed += 1;
-      }
+      const result = await db.transaction(tx => releaseResponderAvailability(tx, responder.id));
+      if (result.released) processed += 1;
     }
     return { processed, failed: 0 };
   } catch (error) {

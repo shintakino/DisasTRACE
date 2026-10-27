@@ -39,7 +39,9 @@ for (const agency of ["BFP · Bureau of Fire Protection", "PNP · Baliwag", "CDR
 expectIncludes("components/verification/reject-incident-dialog.tsx", "w-[min(96vw,72rem)]")
 expectIncludes("components/account/settings-view.tsx", "PasswordInput")
 expectIncludes("components/map/command-map-overlays.tsx", "INCIDENT_PRESENTATION")
-expectIncludes("components/verification/verification-details.tsx", "Advanced review controls")
+for (const label of ["PACC classification override", "PACC agency coordination", "Related reports"]) {
+  expectIncludes("components/verification/verification-details.tsx", label)
+}
 expectIncludes("components/verification/verification-details.tsx", "overflow-y-auto overscroll-contain")
 if (source("components/verification/verification-details.tsx").includes("max-h-72 space-y-3 overflow-y-auto")) {
   throw new Error("Advanced review controls must use the primary details scrollbar.")

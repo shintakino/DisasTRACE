@@ -87,8 +87,11 @@ assert.match(responderHome, /shouldRequestResponderRoute\(/);
 assert.match(homeScreen, /getRestoredResponderState\(activeInc\.status, activeInc\.transport_status\)/);
 assert.match(homeScreen, /transportHospitalId: activeInc\.transport_hospital_id/);
 assert.match(responderHome, /activeDispatch\.transportHospitalId/);
-assert.match(responderHome, /submittedIncidentIds\.includes\(inc\.id\)/);
-assert.match(responderHome, /transport_status, transport_hospital_id/);
-assert.match(responderHome, /getRestoredResponderState\(incident\.status, incident\.transport_status\)/);
+const recovery = readFileSync('mobile/hooks/use-responder-recovery.ts', 'utf8');
+const projection = readFileSync('mobile/lib/responder-recovery.ts', 'utf8');
+assert.match(recovery, /submittedIncidentIds\.includes\(data\.dispatch\.id\)/);
+assert.match(projection, /getRestoredResponderState\(incoming\.status, incoming\.transportStatus\)/);
+assert.match(recovery, /current\.activeDispatch !== initial\.activeDispatch/);
+assert.doesNotMatch(responderHome, /channel\('incoming-dispatches'\)/, 'Dispatch hydration must have one shell-owned lifecycle.');
 
 console.log('Responder route and lifecycle policy checks passed.');

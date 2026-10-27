@@ -323,7 +323,6 @@ export function PatientCareModal({ visible, onClose, patientIndex, data, respond
       visible={visible}
       animationType={Platform.OS === 'ios' ? 'slide' : 'none'}
       presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
-      hardwareAccelerated
       onRequestClose={onClose}
     >
       <SafeAreaView className="flex-1 bg-[#16203A]">

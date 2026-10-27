@@ -1,12 +1,14 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
 import { users } from '@/db/schema/users';
 import { createAdminClient, createClient } from '@/lib/supabase-server';
 
 const MAX_ID_BYTES = 5 * 1024 * 1024;
+// Preserve PostgreSQL microseconds; converting the version to a JS Date would lose precision.
+const updatedAtVersion = sql<string>`cast(${users.updatedAt} as text)`;
 const ALLOWED_ID_IMAGE_TYPES = new Map([
   ['image/jpeg', 'jpg'],
   ['image/png', 'png'],
@@ -64,13 +66,17 @@ export async function POST(request: NextRequest) {
 
     const profile = await db.query.users.findFirst({
       where: eq(users.id, user.id),
-      columns: { role: true, verificationStatus: true },
+      columns: { role: true, status: true, verificationStatus: true, idImageUrl: true },
+      extras: { updatedAtVersion: updatedAtVersion.as('updated_at_version') },
     });
     if (!profile || (profile.role !== 'public_user' && profile.role !== 'ambulance_responder')) {
       return NextResponse.json({ error: 'Only mobile applicants can upload an ID document.' }, { status: 403 });
     }
     if (profile.verificationStatus === 'APPROVED') {
       return NextResponse.json({ error: 'Your approved ID cannot be replaced from the mobile app. Please contact CDRRMO for help.' }, { status: 409 });
+    }
+    if (profile.status !== 'PENDING') {
+      return NextResponse.json({ error: 'This account cannot resubmit registration documents. Contact CDRRMO for assistance.' }, { status: 403 });
     }
 
     const formData = await request.formData();
@@ -104,7 +110,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unable to securely save the government ID image.' }, { status: 502 });
     }
 
-    await db.update(users)
+    let saved;
+    try {
+    [saved] = await db.update(users)
       .set({
         idImageUrl: filePath,
         ...(idType ? { idType } : {}),
@@ -112,7 +120,20 @@ export async function POST(request: NextRequest) {
         rejectionReason: null,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, user.id));
+      .where(and(
+        eq(users.id, user.id), eq(users.status, 'PENDING'),
+        eq(users.verificationStatus, profile.verificationStatus), eq(updatedAtVersion, profile.updatedAtVersion),
+        profile.idImageUrl ? eq(users.idImageUrl, profile.idImageUrl) : isNull(users.idImageUrl),
+      ))
+      .returning({ id: users.id });
+    } catch (error) {
+      await storage.remove([filePath]).catch(() => undefined);
+      throw error;
+    }
+    if (!saved) {
+      await storage.remove([filePath]).catch(() => undefined);
+      return NextResponse.json({ error: 'Your registration changed during upload. Refresh your status before trying again.' }, { status: 409 });
+    }
 
     return NextResponse.json({ data: { filePath }, message: 'Government ID saved for CDRRMO review.' }, { status: 201 });
   } catch (error) {

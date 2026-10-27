@@ -81,7 +81,7 @@ check('keeps responder startup auth values in the screen scopes that consume the
   const tabLayoutScope = tabLayout.slice(tabLayout.indexOf('export default function TabLayout()'));
   const reportsScreen = source('mobile/app/(tabs)/reports/index.tsx');
 
-  assert.match(tabLayoutScope, /const \{ role, user \} = useAuthStatus\(\);/,
+  assert.match(tabLayoutScope, /const \{ role, user(?:, verificationStatus)? \} = useAuthStatus\(\);/,
     'the responder tab shell must declare user before using it for draft reminders');
   assert.match(reportsScreen, /const \{ role, isLoaded, user \} = useAuthStatus\(\);/,
     'the reports screen must declare isLoaded before its session-gated fetch/render checks');

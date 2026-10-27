@@ -48,7 +48,8 @@ check('completion status is projected from the server result', () => {
   const reportsRoute = source('app/api/reports/route.ts');
   const store = source('mobile/stores/useResponderStore.ts');
   const offline = source('mobile/hooks/use-offline-reports.ts');
-  assert.match(reportsRoute, /dutyStatus: otherActiveIncident \? 'ACTIVE_DISPATCH'/);
+  assert.match(reportsRoute, /releaseResponderAvailability\(tx, user\.id\)/);
+  assert.match(reportsRoute, /dutyStatus: availability\.dutyStatus/);
   assert.match(reportsRoute, /dutyStatus: completion\.dutyStatus/);
   assert.match(store, /useResponderDutyStore\.getState\(\)\.setDutyStatus\(res\.dutyStatus\)/);
   assert.match(offline, /setDutyStatus\(result\?\.dutyStatus\)/);

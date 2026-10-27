@@ -35,6 +35,7 @@ export async function PATCH(
 
     if (status === 'APPROVED') {
       updateData.status = 'ACTIVE';
+      updateData.rejectionReason = null;
     } else {
       updateData.rejectionReason = reason;
       // Optionally set status to DEACTIVATED or similar if rejected

@@ -17,6 +17,7 @@ import { openNotificationRoute } from '../lib/open-notification-route';
 import { rememberRecoveryUrl } from '../lib/recovery-link-inbox';
 import { useEmergencyReportStore } from '../store/use-emergency-report-store';
 import { useResponderStore } from '../stores/useResponderStore';
+import { OfflineReportsProvider } from '../hooks/use-offline-reports';
 import "../global.css";
 
 // Ignore known React Native third-party warnings
@@ -231,6 +232,7 @@ function InitialLayout() {
     const atRoot = rawSegments.length === 0 || (rawSegments.length === 1 && rawSegments[0] === '');
     const isResetPassword = inAuthGroup && rawSegments[1] === 'reset-password';
     const inEmergencyIntake = rawSegments[0] === 'help';
+    const inApplicantSupport = rawSegments[0] === 'contact-us';
 
     // Allow the EntryScreen in app/index.tsx to handle the splash sequence
     // and route the user when the animation finishes.
@@ -250,6 +252,7 @@ function InitialLayout() {
           router.replace('/(verification)/pending');
         }
       } else if (verificationStatus === 'rejected') {
+        if (inApplicantSupport) return;
         if (!inVerificationGroup || rawSegments[1] !== 'rejected') {
           router.replace('/(verification)/rejected');
         }
@@ -293,7 +296,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthStatusProvider>
+        <OfflineReportsProvider>
         <InitialLayout />
+        </OfflineReportsProvider>
       </AuthStatusProvider>
       <StatusBar style="auto" />
     </GestureHandlerRootView>

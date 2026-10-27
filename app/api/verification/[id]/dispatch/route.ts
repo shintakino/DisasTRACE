@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase-server';
 import { auditLogs } from '@/db/schema/audit_logs';
 import { createAuditActor, createAuditEvent, PACC_AUDIT_ACTIONS } from '@/lib/audit-events';
 import { legacyAmbulanceUnitId } from '@/lib/ambulance-unit';
+import { reports } from '@/db/schema/reports';
 
 const ManualDispatchSchema = z.object({
   responderId: z.string().trim().min(1).max(255),
@@ -87,6 +88,14 @@ export async function POST(
         .where(eq(incidents.requestId, id))
         .limit(1)
         .for('update');
+
+      if (existingIncident) {
+        const submitted = await tx.query.reports.findFirst({
+          where: and(eq(reports.incidentId, existingIncident.id), eq(reports.status, 'SUBMITTED')),
+          columns: { id: true },
+        });
+        if (submitted) return failure(409, 'REPORT_CLOSED', 'A responder has already submitted the final report. This response cannot be dispatched again.');
+      }
 
       // Keep the lock order aligned with the offer accept/cascade paths:
       // request -> incident -> responder. This avoids cross-path deadlocks.

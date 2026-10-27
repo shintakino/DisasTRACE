@@ -16,7 +16,7 @@ import crypto from "crypto";
 import { isValidPhilippinePhone, normalizePhilippinePhone } from "@/lib/phone";
 import { isValidAmbulanceUnitId, normalizeAmbulanceUnitId } from "@/lib/ambulance-unit";
 import { isResponderAssignmentBarangay } from "@/lib/responder-assignment-barangays";
-import { deriveUserVerificationState, isMobileApprovalRole } from "@/lib/account-approval";
+import { deriveUserLastActive, deriveUserVerificationState, isMobileApprovalRole } from "@/lib/account-approval";
 
 const UpdateUserSchema = z.object({
   id: z.string(),
@@ -107,7 +107,7 @@ export async function GET() {
         month: 'long',
         day: 'numeric'
       }) : "Unknown",
-      lastActive: u.updatedAt ? "Active recently" : "Never",
+      lastActive: deriveUserLastActive(u),
       phone: u.phone,
       address: u.address,
       unitId: u.unitId,

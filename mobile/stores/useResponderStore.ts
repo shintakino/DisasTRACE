@@ -11,6 +11,8 @@ import { fetchWithTimeout } from '../lib/network-timeout';
 import { normalizeResponderDistanceKm } from '../lib/responder-report-summary';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
 import { useResponderDutyStore } from './useResponderDutyStore';
+import { isCurrentResponderOperation } from '../lib/responder-operation';
+import { getRestoredResponderState } from '../lib/responder-lifecycle-policy';
 import {
   createReportFormSession,
   getReportFormCloseStatus,
@@ -111,7 +113,11 @@ export interface DraftForm {
   explicitlySaved?: boolean;
 }
 
-interface ResponderState {
+export interface ResponderState {
+  ownerUserId: string | null;
+  recoveryVersion: number;
+  recoveryError: string | null;
+  requestRecovery: () => void;
   status: DispatchState;
   activeDispatch: DispatchDetails | null;
   reportFormSession: ReportFormSession<DispatchDetails> | null;
@@ -157,7 +163,7 @@ interface ResponderState {
   resetTimer: () => void;
   
   // Actions
-  acceptDispatch: () => void;
+  acceptDispatch: (incidentId: string, confirmedIncident?: { status?: string; transportStatus?: string; transportHospitalId?: string | null }) => void;
   confirmArrival: () => void;
   hideArrivalConfirm: () => void;
   confirmHospitalArrival: () => void;
@@ -169,7 +175,7 @@ interface ResponderState {
   deferDocumentation: (formData?: Record<string, unknown>) => Promise<boolean>;
   submitReport: (incidentId?: string, formData?: any) => Promise<void>;
   finishAndClose: () => void;
-  completeIncident: (incidentId?: string) => void;
+  completeIncident: (incidentId: string) => void;
   releaseDispatchOffer: (notice: DispatchReleaseNotice) => void;
   dismissDispatchReleaseNotice: () => void;
   /** Clears only in-memory dispatch UI when the authenticated responder changes or the server has no live assignment. */
@@ -219,6 +225,10 @@ export const checkConnectivity = async (): Promise<boolean> => {
 };
 
 export const useResponderStore = create<ResponderState>((set) => ({
+  ownerUserId: null,
+  recoveryVersion: 0,
+  recoveryError: null,
+  requestRecovery: () => set(state => ({ recoveryVersion: state.recoveryVersion + 1 })),
   status: 'idle',
   activeDispatch: null,
   reportFormSession: null,
@@ -267,9 +277,10 @@ export const useResponderStore = create<ResponderState>((set) => ({
   incrementElapsedTime: () => set((state) => ({ elapsedTimeSeconds: state.elapsedTimeSeconds + 1 })),
   resetTimer: () => set({ sceneTimeSeconds: 0, elapsedTimeSeconds: 0 }),
 
-  acceptDispatch: () => {
+  acceptDispatch: (incidentId, confirmedIncident) => {
     let parsedDist = 1.7;
     const storeState = useResponderStore.getState();
+    if (storeState.activeDispatch?.id !== incidentId || storeState.status !== 'dispatch_offered') return;
     const currentDispatch = storeState.activeDispatch;
     const currentLoc = storeState.currentLocation;
 
@@ -286,7 +297,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
       if (match) parsedDist = parseFloat(match[0]);
     }
     set({ 
-      status: 'en_route',
+      status: getRestoredResponderState(confirmedIncident?.status, confirmedIncident?.transportStatus) ?? 'en_route',
+      activeDispatch: currentDispatch ? { ...currentDispatch, transportHospitalId: confirmedIncident?.transportHospitalId || currentDispatch.transportHospitalId } : null,
       elapsedTimeSeconds: 0,
       responseTimeSeconds: 0,
       initialDistanceKm: parsedDist,
@@ -308,6 +320,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
 
   arriveAtScene: async () => {
     const activeDispatch = useResponderStore.getState().activeDispatch;
+    if (!activeDispatch) return;
+    const operation = { ownerUserId: useResponderStore.getState().ownerUserId, incidentId: activeDispatch.id };
     if (activeDispatch) {
       let isOnline = false;
       try {
@@ -330,9 +344,10 @@ export const useResponderStore = create<ResponderState>((set) => ({
             body: JSON.stringify({ incidentId: activeDispatch.id, status: 'ARRIVED' }),
           });
           const result = await response.json();
+          if (!isCurrentResponderOperation(operation, useResponderStore.getState())) return;
           if (result?.code === 'INCIDENT_REASSIGNED') {
             alert(result.error);
-            useResponderStore.getState().completeIncident();
+            useResponderStore.getState().completeIncident(activeDispatch.id);
             return;
           }
           if (!response.ok) {
@@ -348,6 +363,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       }
 
       if (!isOnline || !dbSuccess) {
+        if (!isCurrentResponderOperation(operation, useResponderStore.getState())) return;
         console.log('[useResponderStore] ArriveAtScene offline path triggered. Queuing STATE_CHANGE.');
         await useResponderStore.getState().enqueueAction({
           type: 'STATE_CHANGE',
@@ -355,10 +371,12 @@ export const useResponderStore = create<ResponderState>((set) => ({
           method: 'POST',
           payload: { incidentId: activeDispatch.id, status: 'ARRIVED' }
         });
+        if (!isCurrentResponderOperation(operation, useResponderStore.getState())) return;
         set({ lastArrivalDelivery: 'QUEUED_OFFLINE' });
         alert('Arrival saved on this device and is still syncing with PACC. Keep the app open after reconnecting.');
       }
     }
+    if (!isCurrentResponderOperation(operation, useResponderStore.getState())) return;
     const enRouteDuration = useResponderStore.getState().elapsedTimeSeconds;
     set({
       status: 'on_scene',
@@ -372,6 +390,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
     const currentState = useResponderStore.getState();
     const activeDispatch = currentState.activeDispatch;
     const targetHospital = currentState.targetHospital;
+    const operation = activeDispatch ? { ownerUserId: currentState.ownerUserId, incidentId: activeDispatch.id } : null;
     if (!canStartHospitalTransport(currentState.status)) {
       console.warn('[useResponderStore] Hospital transport is only available after scene arrival.');
       return false;
@@ -405,6 +424,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
         code?: string;
         incident?: { transportHospitalId?: string | null };
       } | null;
+      if (!operation || !isCurrentResponderOperation(operation, useResponderStore.getState())) return false;
 
       if (!response.ok) {
         if (result?.code === 'INCIDENT_REASSIGNED') {
@@ -434,7 +454,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       alert('Hospital transport could not be started. Check your connection and try again.');
       return false;
     } finally {
-      set({ isStartingHospitalTransport: false });
+      if (operation && isCurrentResponderOperation(operation, useResponderStore.getState())) set({ isStartingHospitalTransport: false });
     }
   },
 
@@ -446,6 +466,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       alert('Select an available hospital and keep live GPS active before confirming hospital arrival.');
       return;
     }
+    const operation = { ownerUserId: currentState.ownerUserId, incidentId: activeDispatch.id };
 
     let confirmed = false;
     try {
@@ -469,6 +490,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
           }),
         });
         const result = await response.json().catch(() => null);
+        if (!isCurrentResponderOperation(operation, useResponderStore.getState())) return;
         if (!response.ok || result?.held) {
           alert(result?.message || 'Hospital arrival could not be confirmed. Keep GPS active or contact PACC.');
           return;
@@ -479,6 +501,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       console.error('[useResponderStore] Hospital arrival confirmation failed:', error);
     }
 
+    if (!isCurrentResponderOperation(operation, useResponderStore.getState())) return;
     if (!confirmed) {
       await useResponderStore.getState().enqueueAction({
         type: 'HOSPITAL_ARRIVAL_CONFIRMATION',
@@ -493,6 +516,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
           confirmHospitalArrival: true,
         },
       });
+      if (!isCurrentResponderOperation(operation, useResponderStore.getState())) return;
       set({
         isHospitalArrivalPendingSync: true,
         isHospitalArrivalConfirmVisible: false,
@@ -512,6 +536,8 @@ export const useResponderStore = create<ResponderState>((set) => ({
   startReport: async () => {
     const currentState = useResponderStore.getState();
     const activeDispatch = currentState.activeDispatch;
+    if (!activeDispatch) return;
+    const operation = { ownerUserId: currentState.ownerUserId, incidentId: activeDispatch.id };
     if (currentState.isHospitalArrivalPendingSync) {
       alert('Hospital arrival is still waiting for PACC confirmation. Keep the app connected, then continue after it syncs.');
       return;
@@ -571,9 +597,10 @@ export const useResponderStore = create<ResponderState>((set) => ({
             { headers: authorizationHeaders },
           );
           const result = await response.json();
+          if (!isCurrentResponderOperation(operation, useResponderStore.getState())) return;
           if (result?.code === 'INCIDENT_REASSIGNED') {
             alert(result.error);
-            useResponderStore.getState().completeIncident();
+            useResponderStore.getState().completeIncident(activeDispatch.id);
             return;
           }
           if (!response.ok) throw new Error(result?.error || `HTTP ${response.status}`);
@@ -584,7 +611,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
         }
       }
     }
-    if (activeDispatch) {
+    if (isCurrentResponderOperation(operation, useResponderStore.getState())) {
       set({
         status: 'report_filling',
         reportFormSession: createReportFormSession(
@@ -612,13 +639,14 @@ export const useResponderStore = create<ResponderState>((set) => ({
     }
 
     await useResponderStore.getState().saveDraft(formIncident, formData, true);
+    if (useResponderStore.getState().ownerUserId !== currentState.ownerUserId) return false;
 
     if (reportFormSession?.source === 'DOCUMENTATION_DRAFT' || formIncident.documentationPending) {
-      set({ reportFormSession: null });
+      set(state => state.reportFormSession === reportFormSession ? { reportFormSession: null } : {});
       alert('Draft updated. This incident is already pending documentation, so you remain available for dispatch.');
       return true;
     }
-    const activeDispatch = currentState.activeDispatch;
+    const activeDispatch = useResponderStore.getState().activeDispatch;
     if (!activeDispatch || activeDispatch.id !== formIncident.id) {
       alert('This draft is no longer the active field response. It remains saved in Forms.');
       return false;
@@ -634,6 +662,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       fieldOutcome: currentState.fieldOutcome,
     };
     const queueDocumentationRelease = async () => {
+      if (!isCurrentResponderOperation({ ownerUserId: currentState.ownerUserId, incidentId: activeDispatch.id }, useResponderStore.getState())) return false;
       await useResponderStore.getState().enqueueAction({
         type: 'STATE_CHANGE',
         endpoint: '/api/incidents/status',
@@ -660,9 +689,10 @@ export const useResponderStore = create<ResponderState>((set) => ({
         body: JSON.stringify(documentationRelease),
       }, 12_000, 'field response confirmation');
       const result = await response.json().catch(() => null);
+      if (!isCurrentResponderOperation({ ownerUserId: currentState.ownerUserId, incidentId: activeDispatch.id }, useResponderStore.getState())) return false;
       if (result?.code === 'INCIDENT_REASSIGNED') {
         alert(result.error);
-        useResponderStore.getState().completeIncident();
+        useResponderStore.getState().completeIncident(activeDispatch.id);
         return false;
       }
       if (!response.ok) {
@@ -778,6 +808,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       });
 
       const res = await response.json().catch(() => null);
+      if (useResponderStore.getState().ownerUserId !== submissionState.ownerUserId) return;
       if (!response.ok || !res?.success) {
         console.error('Failed to submit report:', res?.error || response.status);
         if (res?.code === 'INCIDENT_REASSIGNED') {
@@ -790,7 +821,9 @@ export const useResponderStore = create<ResponderState>((set) => ({
         return;
       }
       if (res.success) {
-        useResponderDutyStore.getState().setDutyStatus(res.dutyStatus);
+        const currentIncidentId = useResponderStore.getState().activeDispatch?.id;
+        if (!currentIncidentId || currentIncidentId === idToSubmit) useResponderDutyStore.getState().setDutyStatus(res.dutyStatus);
+        else useResponderStore.getState().requestRecovery();
         const nextDrafts = useResponderStore.getState().drafts.filter(d => d.incidentId !== idToSubmit);
         const nextOfflineQueue = useResponderStore.getState().offlineQueue.filter((action) => !(
           action.endpoint === '/api/reports' && action.payload?.incidentId === idToSubmit
@@ -812,6 +845,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       }
     } catch (err) {
       console.error('Error submitting report to API, queuing offline:', err);
+      if (useResponderStore.getState().ownerUserId !== submissionState.ownerUserId) return;
       
       // Enqueue report submission action to the offline queue for auto-replay
       await useResponderStore.getState().enqueueAction({
@@ -854,6 +888,7 @@ export const useResponderStore = create<ResponderState>((set) => ({
       lastSubmittedSummary: null,
       ...(clearActiveDispatch ? {
         status: 'idle' as const,
+        isStartingHospitalTransport: false,
         activeDispatch: null,
         targetHospital: null,
         sceneTimeSeconds: 0,
@@ -871,15 +906,13 @@ export const useResponderStore = create<ResponderState>((set) => ({
   }),
 
   completeIncident: (incidentId) => set((state) => {
-    const targetIncidentId = incidentId
-      ?? state.activeDispatch?.id
-      ?? state.reportFormSession?.incident.id
-      ?? null;
-    const clearActiveDispatch = !targetIncidentId || state.activeDispatch?.id === targetIncidentId;
-    const clearReportForm = !targetIncidentId || state.reportFormSession?.incident.id === targetIncidentId;
+    const clearActiveDispatch = state.activeDispatch?.id === incidentId;
+    const clearReportForm = state.reportFormSession?.incident.id === incidentId;
+    if (!clearActiveDispatch && !clearReportForm) return state;
     return {
       ...(clearActiveDispatch ? {
         status: 'idle' as const,
+        isStartingHospitalTransport: false,
         activeDispatch: null,
         targetHospital: null,
         sceneTimeSeconds: 0,
@@ -893,14 +926,15 @@ export const useResponderStore = create<ResponderState>((set) => ({
         fieldOutcome: null,
       } : {}),
       ...(clearReportForm ? { reportFormSession: null } : {}),
-      isSubmittingReport: false,
-      showReportSuccess: false,
-      lastSubmittedSummary: null,
+      ...(clearReportForm ? { isSubmittingReport: false, showReportSuccess: false, lastSubmittedSummary: null } : {}),
+      recoveryVersion: state.recoveryVersion + 1,
     };
   }),
 
-  releaseDispatchOffer: (notice) => set({
+  releaseDispatchOffer: (notice) => set((state) => state.activeDispatch?.id !== notice.incidentId
+    || state.status !== 'dispatch_offered' ? state : ({
     status: 'idle',
+    isStartingHospitalTransport: false,
     activeDispatch: null,
     targetHospital: null,
     sceneTimeSeconds: 0,
@@ -908,20 +942,22 @@ export const useResponderStore = create<ResponderState>((set) => ({
     isArrivalConfirmVisible: false,
     isHospitalArrivalConfirmVisible: false,
     isHospitalArrivalPendingSync: false,
-    isSubmittingReport: false,
-    showReportSuccess: false,
+    isSubmittingReport: state.reportFormSession?.source === 'DOCUMENTATION_DRAFT' ? state.isSubmittingReport : false,
+    showReportSuccess: state.reportFormSession?.source === 'DOCUMENTATION_DRAFT' ? state.showReportSuccess : false,
     currentSpeedKph: 0,
     hospitalDistanceKm: null,
     hospitalEtaMins: null,
     fieldOutcome: null,
-    lastSubmittedSummary: null,
+    lastSubmittedSummary: state.reportFormSession?.source === 'DOCUMENTATION_DRAFT' ? state.lastSubmittedSummary : null,
     dispatchReleaseNotice: notice,
-  }),
+    recoveryVersion: state.recoveryVersion + 1,
+  })),
 
   dismissDispatchReleaseNotice: () => set({ dispatchReleaseNotice: null }),
 
   clearTransientDispatch: () => set((state) => ({
     status: 'idle',
+    isStartingHospitalTransport: false,
     activeDispatch: null,
     reportFormSession: state.reportFormSession?.source === 'ACTIVE_DISPATCH'
       ? null
@@ -963,8 +999,9 @@ export const useResponderStore = create<ResponderState>((set) => ({
   }),
 
   saveDraft: async (incident, formData, explicitlySaved = false) => {
+    const ownerId = useResponderStore.getState().ownerUserId;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user.id) return;
+    if (!session?.user.id || session.user.id !== ownerId || useResponderStore.getState().ownerUserId !== ownerId) return;
     set((state) => {
     const existingDraftIndex = state.drafts.findIndex(d => d.incidentId === incident.id);
     const existingDraft = existingDraftIndex >= 0 ? state.drafts[existingDraftIndex] : undefined;
@@ -1020,8 +1057,9 @@ export const useResponderStore = create<ResponderState>((set) => ({
   }),
 
   enqueueAction: async (action) => {
+    const ownerId = useResponderStore.getState().ownerUserId;
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user.id) {
+    if (!session?.user.id || session.user.id !== ownerId || useResponderStore.getState().ownerUserId !== ownerId) {
       console.error('[useResponderStore] Refusing to queue an action without an authenticated responder.');
       return;
     }

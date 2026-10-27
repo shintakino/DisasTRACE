@@ -3,7 +3,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StatusBar, TouchableOpacity, Alert, Modal } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
+import { Map, Camera, Marker, GeoJSONSource, Layer, type CameraRef } from '@maplibre/maplibre-react-native';
 import { MapPin, HelpCircle, Bell, ChevronRight, Check, Truck, Compass, Eye, Play, Pause, LogOut } from 'lucide-react-native';
 import { Hospital, Location as LocationIcon, MessageQuestion, NotificationBing } from 'iconsax-react-native';
 import { useResponderStore, checkConnectivity } from '../../stores/useResponderStore';
@@ -24,13 +24,9 @@ import * as Location from 'expo-location';
 import { useLiveBarangay } from '../../hooks/use-live-barangay';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
-import * as Notifications from 'expo-notifications';
-import { getResponderEmergencyAlert } from '../../lib/push-notifications';
 import { isNotificationVisibleForRole } from '../../lib/report-location';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 import { getMobileApiBaseUrl } from '../../lib/api-base-url';
-import { formatManilaMobileTime } from '../../lib/manila-presentation';
-import { getDispatchReleaseNotice } from '../../lib/dispatch-release';
 import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
 import {
   getAutomaticHospitalRecommendation,
@@ -40,8 +36,6 @@ import {
 } from '../../lib/hospital-destination-policy';
 import {
   getResponderStatusLabel,
-  getRestoredResponderState,
-  shouldPreserveConfirmedTransport,
   shouldRequestResponderRoute,
 } from '../../lib/responder-lifecycle-policy';
 
@@ -61,16 +55,10 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
   return R * c;
 }
 
-interface ActiveDispatchOwnership {
-  status?: string;
-  responder_id?: string | null;
-  current_offer_responder_id?: string | null;
-  transport_status?: string | null;
-  transport_hospital_id?: string | null;
-}
-
 export function ResponderHome() {
   const router = useRouter();
+  const camera = useRef<CameraRef>(null);
+  const [mapReady, setMapReady] = useState(false);
   const insets = useSafeAreaInsets();
   const {
     status,
@@ -78,9 +66,7 @@ export function ResponderHome() {
     targetHospital,
     setTargetHospital,
     drafts,
-    submittedIncidentIds,
     dispatchReleaseNotice,
-    releaseDispatchOffer,
     dismissDispatchReleaseNotice,
   } = useResponderStore(useShallow(state => ({
     status: state.status,
@@ -88,9 +74,7 @@ export function ResponderHome() {
     targetHospital: state.targetHospital,
     setTargetHospital: state.setTargetHospital,
     drafts: state.drafts,
-    submittedIncidentIds: state.submittedIncidentIds,
     dispatchReleaseNotice: state.dispatchReleaseNotice,
-    releaseDispatchOffer: state.releaseDispatchOffer,
     dismissDispatchReleaseNotice: state.dismissDispatchReleaseNotice,
   })));
   const isFocused = useIsFocused();
@@ -168,7 +152,7 @@ export function ResponderHome() {
   const [isSearchingHospital, setIsSearchingHospital] = useState(false);
   const [searchStatus, setSearchStatus] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<any>(null);
-  const [routeBounds, setRouteBounds] = useState<any>(null);
+  const [routeBounds, setRouteBounds] = useState<[number, number, number, number] | null>(null);
   const [cameraMode, setCameraMode] = useState<'follow' | 'overview'>('follow');
   const [isCameraCentered, setIsCameraCentered] = useState(true);
   const [reorientationTop, setReorientationTop] = useState(insets.top + 72);
@@ -440,356 +424,7 @@ export function ResponderHome() {
 
   // Active incident restoration is handled at the parent tab index.tsx gate to prevent screen flashing.
 
-  // Real-time incident dispatch listener
-  useEffect(() => {
-    if (!profile || role !== 'ambulance_responder' || status !== 'idle' || !user?.id) return;
-
-    console.log('[ResponderHome] Setting up real-time dispatch listener for responder ID:', user.id);
-
-    // Clean up any existing channel with the same static name to avoid duplicate listener errors on login/logout
-    const existingChannel = supabase.channel('incoming-dispatches');
-    supabase.removeChannel(existingChannel);
-
-    const channel = supabase
-      .channel('incoming-dispatches')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to INSERT and UPDATE
-          schema: 'public',
-          table: 'incidents',
-        },
-        async (payload) => {
-          console.log('[ResponderHome] Postgres change received on incidents table:', payload);
-          const inc = payload.new as any;
-          if (
-            inc
-            && inc.current_offer_responder_id === user.id
-            && inc.status === 'DISPATCHED'
-            && !submittedIncidentIds.includes(inc.id)
-          ) {
-            console.log('[ResponderHome] Active dispatch offer received for this responder!', inc);
-            
-            let reporterName = 'Resident';
-            let reporterInitials = 'R';
-            let reporterPhone: string | undefined;
-            let locationName = 'Location unavailable';
-            let typeOfEmergency = 'Medical Emergency';
-            let peopleInvolved = 1;
-            let incidentLat = 14.9538;
-            let incidentLng = 120.9029;
-            let attachmentUrl: string | undefined = undefined;
-
-            try {
-              const { data: vReq, error: vReqError } = await supabase
-                .from('verification_requests')
-                .select('*')
-                .eq('id', inc.request_id)
-                .single();
-
-              if (!vReqError && vReq) {
-                locationName = formatBaliwagLocation(vReq.barangay) ?? 'Location unavailable';
-                typeOfEmergency = vReq.type || 'Emergency';
-                incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
-                incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
-                attachmentUrl = vReq.image_url || undefined;
-                reporterPhone = vReq.contact_number || undefined;
-                
-                if (vReq.people_involved) {
-                  const matched = vReq.people_involved.match(/\d+/);
-                  peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
-                }
-
-                const { data: resUser } = await supabase
-                  .from('users')
-                  .select('*')
-                  .eq('id', vReq.resident_id)
-                  .single();
-
-                if (resUser) {
-                  reporterName = resUser.full_name || 'Resident';
-                  reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
-                  reporterPhone = reporterPhone || resUser.phone || undefined;
-                }
-              }
-            } catch (err) {
-              console.error('Error fetching verification request details for dispatch offer:', err);
-            }
-
-            let offerDist = 'Distance pending';
-            let offerEta = inc.eta_minutes ? `~${inc.eta_minutes} min` : 'Calculating';
-            if (currentLocation && incidentLat && incidentLng) {
-              const meters = calculateDistanceMeters(
-                currentLocation[1],
-                currentLocation[0],
-                incidentLat,
-                incidentLng
-              );
-              const distanceKm = Number((meters / 1000).toFixed(1));
-              offerDist = `${distanceKm} km`;
-              offerEta = `~${Math.max(2, Math.round(distanceKm * 5))} min`;
-            }
-
-            useResponderStore.setState({
-              status: 'dispatch_offered',
-              activeDispatch: {
-                id: inc.id,
-                type: typeOfEmergency,
-                locationName,
-                distance: offerDist,
-                natureOfCall: 'Emergency',
-                peopleInvolved,
-                eta: offerEta,
-                reporterName,
-                reporterInitials,
-                reporterPhone,
-                timestamp: formatManilaMobileTime(inc.created_at) ?? 'Time unavailable',
-                coordinates: {
-                  latitude: incidentLat,
-                  longitude: incidentLng,
-                },
-                typeOfEmergency,
-                dispatchOfferDurationSeconds: inc.dispatch_offer_duration_seconds || 30,
-                offerExpiresAt: inc.offer_expires_at || undefined,
-                assignedAmbulance: inc.assigned_ambulance || myVehicleId,
-                attachmentUrl,
-              }
-            });
-
-            // Trigger emergency local notification alert immediately
-            Notifications.scheduleNotificationAsync({
-              content: {
-                title: '🚨 EMERGENCY DISPATCH OFFER',
-                body: `New emergency request: ${typeOfEmergency} at ${locationName}. Tap to open the offer; you have ${inc.dispatch_offer_duration_seconds || 30}s to accept.`,
-                sound: getResponderEmergencyAlert(typeOfEmergency).sound,
-                priority: Notifications.AndroidNotificationPriority.MAX,
-                data: { kind: 'dispatch_offer', incidentId: inc.id },
-                android: {
-                  channelId: getResponderEmergencyAlert(typeOfEmergency).channelId,
-                },
-              } as any,
-              trigger: null,
-            });
-          } else if (inc && inc.responder_id === user.id && inc.status === 'EN_ROUTE') {
-            console.log('[ResponderHome] Responder has been manually dispatched! Auto-accepting and transitioning directly to EN_ROUTE.');
-            
-            let reporterName = 'Resident';
-            let reporterInitials = 'R';
-            let reporterPhone: string | undefined;
-            let locationName = 'Location unavailable';
-            let typeOfEmergency = 'Medical Emergency';
-            let peopleInvolved = 1;
-            let incidentLat = 14.9538;
-            let incidentLng = 120.9029;
-            let attachmentUrl: string | undefined = undefined;
-
-            try {
-              const { data: vReq, error: vReqError } = await supabase
-                .from('verification_requests')
-                .select('*')
-                .eq('id', inc.request_id)
-                .single();
-
-              if (!vReqError && vReq) {
-                locationName = formatBaliwagLocation(vReq.barangay) ?? 'Location unavailable';
-                typeOfEmergency = vReq.type || 'Emergency';
-                incidentLat = vReq.latitude ? Number(vReq.latitude) : 14.9538;
-                incidentLng = vReq.longitude ? Number(vReq.longitude) : 120.9029;
-                attachmentUrl = vReq.image_url || undefined;
-                reporterPhone = vReq.contact_number || undefined;
-                
-                if (vReq.people_involved) {
-                   const matched = vReq.people_involved.match(/\d+/);
-                   peopleInvolved = matched ? parseInt(matched[0], 10) : 1;
-                }
-
-                const { data: resUser } = await supabase
-                  .from('users')
-                  .select('*')
-                  .eq('id', vReq.resident_id)
-                  .single();
-
-                if (resUser) {
-                  reporterName = resUser.full_name || 'Resident';
-                  reporterInitials = reporterName.split(' ').map((n: any) => n[0]).join('').slice(0, 2).toUpperCase();
-                  reporterPhone = reporterPhone || resUser.phone || undefined;
-                }
-              }
-            } catch (err) {
-              console.error('Error fetching verification request details for manual dispatch:', err);
-            }
-
-            let manualDist = 'Distance pending';
-            let initialDistanceKm = 0;
-            if (currentLocation && incidentLat && incidentLng) {
-              const meters = calculateDistanceMeters(
-                currentLocation[1],
-                currentLocation[0],
-                incidentLat,
-                incidentLng
-              );
-              initialDistanceKm = Number((meters / 1000).toFixed(1));
-              manualDist = `${initialDistanceKm} km`;
-            }
-
-            useResponderStore.setState({
-              status: 'en_route',
-              initialDistanceKm,
-              activeDispatch: {
-                id: inc.id,
-                type: typeOfEmergency,
-                locationName,
-                distance: manualDist,
-                natureOfCall: 'Emergency',
-                peopleInvolved,
-                eta: inc.eta_minutes ? `~${inc.eta_minutes} min` : 'Calculating',
-                reporterName,
-                reporterInitials,
-                reporterPhone,
-                timestamp: formatManilaMobileTime(inc.created_at) ?? 'Time unavailable',
-                coordinates: {
-                  latitude: incidentLat,
-                  longitude: incidentLng,
-                },
-                typeOfEmergency,
-                assignedAmbulance: inc.assigned_ambulance || myVehicleId,
-                attachmentUrl,
-              }
-            });
-
-            // Trigger emergency local notification alert immediately
-            Notifications.scheduleNotificationAsync({
-              content: {
-                title: '🚨 DIRECT EMERGENCY DISPATCH',
-                body: `You have been dispatched to: ${typeOfEmergency} at ${locationName}. Proceed immediately!`,
-                sound: getResponderEmergencyAlert(typeOfEmergency).sound,
-                priority: Notifications.AndroidNotificationPriority.MAX,
-                data: { kind: 'active_dispatch', incidentId: inc.id },
-                android: {
-                  channelId: getResponderEmergencyAlert(typeOfEmergency).channelId,
-                },
-              } as any,
-              trigger: null,
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [profile, role, status, submittedIncidentIds, user?.id]);
-
-  // A timed-out offer may be cascaded to another responder while this device is
-  // backgrounded. Reconcile the local screen with the server before a stale
-  // offer can be progressed into arrival or report completion.
-  useEffect(() => {
-    if (!user?.id || !activeDispatch?.id) return;
-
-    let mounted = true;
-    const incidentId = activeDispatch.id;
-    const reconcileDispatch = (incident: ActiveDispatchOwnership) => {
-      const assignedToResponder = incident?.responder_id === user.id;
-      const stillOwned = assignedToResponder
-        || (
-          incident?.status === 'DISPATCHED'
-          && !incident?.responder_id
-          && incident?.current_offer_responder_id === user.id
-        );
-      const current = useResponderStore.getState();
-      if (['DOCUMENTATION_PENDING', 'RESOLVED'].includes(incident?.status || '')) {
-        if (current.activeDispatch?.id === incidentId) current.clearTransientDispatch();
-        return;
-      }
-
-      if (assignedToResponder) {
-        const restoredStatus = getRestoredResponderState(incident.status, incident.transport_status);
-        const reconciledHospitalId = incident.transport_hospital_id || current.activeDispatch?.transportHospitalId;
-        const hasLocallyConfirmedTransport = shouldPreserveConfirmedTransport({
-          localStatus: current.status,
-          localTransportHospitalId: current.activeDispatch?.transportHospitalId,
-          serverIncidentStatus: incident.status,
-          serverTransportStatus: incident.transport_status,
-        });
-        const canReconcileLifecycle = [
-          'dispatch_offered',
-          'en_route',
-          'on_scene',
-          'to_hospital',
-          'at_hospital',
-        ].includes(current.status);
-
-        if (restoredStatus && canReconcileLifecycle && !(hasLocallyConfirmedTransport && restoredStatus === 'on_scene')) {
-          useResponderStore.setState({
-            status: restoredStatus,
-            activeDispatch: current.activeDispatch
-              ? { ...current.activeDispatch, transportHospitalId: reconciledHospitalId || undefined }
-              : null,
-            fieldOutcome: restoredStatus === 'at_hospital' ? 'HOSPITAL_ARRIVAL' : current.fieldOutcome,
-            sceneTimeSeconds: restoredStatus === 'on_scene' ? 0 : current.sceneTimeSeconds,
-            responseTimeSeconds: restoredStatus === 'on_scene'
-              ? current.elapsedTimeSeconds
-              : current.responseTimeSeconds,
-            isArrivalConfirmVisible: false,
-            isHospitalArrivalConfirmVisible: false,
-            isHospitalArrivalPendingSync: restoredStatus === 'at_hospital' ? false : current.isHospitalArrivalPendingSync,
-          });
-        }
-        return;
-      }
-
-      if (!stillOwned && mounted && current.activeDispatch?.id === incidentId) {
-        releaseDispatchOffer({
-          incidentId,
-          ...getDispatchReleaseNotice({
-            transferred: Boolean(
-              (incident?.responder_id && incident.responder_id !== user.id)
-              || (incident?.current_offer_responder_id && incident.current_offer_responder_id !== user.id),
-            ),
-            reassignmentRequired: incident?.status === 'DISPATCHED'
-              && !incident?.responder_id
-              && !incident?.current_offer_responder_id,
-          }),
-        });
-      }
-    };
-
-    const reconcile = async () => {
-      const { data: incident, error } = await supabase
-        .from('incidents')
-        .select('id, status, responder_id, current_offer_responder_id, transport_status, transport_hospital_id')
-        .eq('id', incidentId)
-        .maybeSingle();
-      if (error || !mounted || useResponderStore.getState().activeDispatch?.id !== incidentId) return;
-
-      // A Zustand store stays in memory when someone signs out and signs in
-      // as another responder. Never resurrect that former account's sheet.
-      // DOCUMENTATION_PENDING and RESOLVED are also non-tracking terminal
-      // states: their draft belongs in Forms, not on the active dispatch map.
-      if (!incident || ['DOCUMENTATION_PENDING', 'RESOLVED'].includes(incident.status)) {
-        useResponderStore.getState().clearTransientDispatch();
-        return;
-      }
-
-      reconcileDispatch(incident);
-    };
-
-    void reconcile();
-    const channel = supabase
-      .channel(`active-dispatch-${incidentId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'incidents', filter: `id=eq.${incidentId}` },
-        (payload) => reconcileDispatch(payload.new),
-      )
-      .subscribe();
-
-    return () => {
-      mounted = false;
-      supabase.removeChannel(channel);
-    };
-  }, [activeDispatch?.id, releaseDispatchOffer, user?.id]);
+  // Dispatch reception and ownership recovery are owned by the tab shell.
 
   useEffect(() => {
     const fetchHospitals = async () => {
@@ -1062,8 +697,19 @@ export function ResponderHome() {
     isMapVisible,
   ]);
 
-  // Mock route coordinates from responder to incident
-  const routeGeoJSON = {
+  // Keep one native camera mounted; covered maps receive no visual commands.
+  useEffect(() => {
+    if (!mapReady || !isMapVisible || !isCameraCentered) return;
+    const stop = (status === 'en_route' || status === 'to_hospital') && cameraMode === 'follow'
+      ? { center: currentLocation, zoom: 16.5, bearing: heading, duration: 1000 }
+      : routeBounds
+        ? { bounds: routeBounds, padding: { top: 120, bottom: 400, left: 40, right: 40 }, duration: 1500 }
+        : { center: currentLocation, zoom: 14, duration: 1500 };
+    void camera.current?.setStop(stop).catch(() => undefined);
+  }, [mapReady, isMapVisible, isCameraCentered, status, cameraMode, currentLocation, heading, routeBounds]);
+
+  // Route geometry changes only when a new road route is available.
+  const routeGeoJSON = useMemo(() => ({
     type: 'FeatureCollection',
     features: (routeCoords && routeCoords.length >= 2) ? [
       {
@@ -1075,7 +721,7 @@ export function ResponderHome() {
         }
       }
     ] : []
-  };
+  }), [routeCoords]);
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -1086,6 +732,7 @@ export function ResponderHome() {
       <Map
         style={{ flex: 1 }}
         androidView="texture"
+        onDidFinishLoadingMap={() => setMapReady(true)}
         mapStyle="https://tiles.openfreemap.org/styles/liberty"
         logo={false}
         attribution={false}
@@ -1106,28 +753,7 @@ export function ResponderHome() {
           }
         }}
       >
-        {isMapVisible && isCameraCentered && (
-          (status === 'en_route' || status === 'to_hospital') && cameraMode === 'follow' ? (
-            <Camera
-              center={currentLocation}
-              zoom={16.5}
-              bearing={heading} // Follow phone's compass/heading orientation dynamically!
-              duration={1000}
-            />
-          ) : routeBounds ? (
-            <Camera
-              bounds={routeBounds}
-              padding={{ top: 120, bottom: 400, left: 40, right: 40 }}
-              duration={1500}
-            />
-          ) : (
-            <Camera
-              center={currentLocation}
-              zoom={14}
-              duration={1500}
-            />
-          )
-        )}
+        <Camera ref={camera} initialViewState={{ center: [120.895, 14.945], zoom: 14 }} />
 
         {/* Route Line */}
         <GeoJSONSource id="routeSource" data={routeGeoJSON as any}>

@@ -72,6 +72,7 @@ export default function VerificationPage() {
   const audioCtxRef = useRef<AudioContext | null>(null)
   const silentFetchRunningRef = useRef(false)
   const silentFetchQueuedRef = useRef(false)
+  const fetchVersionRef = useRef(0)
 
   // Sync mute state to ref for realtime callbacks
   useEffect(() => {
@@ -203,6 +204,7 @@ export default function VerificationPage() {
   };
 
   const fetchRequests = async (): Promise<VerificationRequest[]> => {
+    const version = ++fetchVersionRef.current
     setIsLoading(true)
     setLoadError(null)
     const controller = new AbortController()
@@ -211,6 +213,7 @@ export default function VerificationPage() {
       const response = await fetch("/api/verification", { signal: controller.signal })
       if (!response.ok) throw new Error("Failed to fetch requests")
       const data = await response.json()
+      if (version !== fetchVersionRef.current) return []
       setRequests(data)
       
       // Select the first pending request if none selected
@@ -220,6 +223,7 @@ export default function VerificationPage() {
       }
       return data
     } catch (error) {
+      if (version !== fetchVersionRef.current) return []
       console.error(error)
       const message = error instanceof DOMException && error.name === "AbortError"
         ? "The verification queue took too long to respond."
@@ -234,6 +238,7 @@ export default function VerificationPage() {
   }
 
   const fetchRequestsSilent = async () => {
+    fetchVersionRef.current += 1
     if (silentFetchRunningRef.current) {
       silentFetchQueuedRef.current = true
       return
@@ -241,6 +246,7 @@ export default function VerificationPage() {
     silentFetchRunningRef.current = true
     try {
       do {
+        const version = ++fetchVersionRef.current
         silentFetchQueuedRef.current = false
         const controller = new AbortController()
         const timeoutId = window.setTimeout(() => controller.abort(), 12_000)
@@ -248,7 +254,7 @@ export default function VerificationPage() {
           const response = await fetch("/api/verification", { signal: controller.signal })
           if (!response.ok) throw new Error("Failed to fetch requests")
           const data = await response.json()
-          setRequests(data)
+          if (version === fetchVersionRef.current) setRequests(data)
         } finally {
           window.clearTimeout(timeoutId)
         }
@@ -404,13 +410,15 @@ export default function VerificationPage() {
 
       const payload = await response.json().catch(() => null)
       if (!response.ok) throw new Error(payload?.error || "Failed to update status")
+      fetchVersionRef.current += 1
 
       const nextRequests = requests.map((request) =>
         request.id === id
           ? { ...request, status, rejectionReason: payload?.rejectionReason ?? rejectionReason ?? null }
           : request,
       )
-      setRequests(nextRequests)
+      setRequests(current => current.map(request => request.id === id
+        ? { ...request, status, rejectionReason: payload?.rejectionReason ?? rejectionReason ?? null } : request))
 
       const preferredBucket = filter === "ACTION" || filter === "REVIEW" ? filter : null
       const nextPending = selectNextActiveRequest(nextRequests, preferredBucket)

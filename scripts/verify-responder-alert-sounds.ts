@@ -39,8 +39,10 @@ check('packages one native sound and Android channel for each responder emergenc
 });
 
 check('routes both foreground and push dispatch offers by their actual emergency type', () => {
-  assert.match(responderHome, /getResponderEmergencyAlert\(typeOfEmergency\)\.channelId/);
-  assert.match(responderHome, /getResponderEmergencyAlert\(typeOfEmergency\)\.sound/);
+  const recovery = readFileSync(join(process.cwd(), 'mobile/hooks/use-responder-recovery.ts'), 'utf8');
+  assert.match(recovery, /getResponderEmergencyAlert\(data\.dispatch\.type\)/);
+  assert.match(recovery, /channelId: alert\.channelId/);
+  assert.match(recovery, /sound: alert\.sound/);
   assert.match(serverPush, /incidentType: string/);
   assert.match(serverPush, /channelId: alert\.channelId/);
   assert.match(serverPush, /emergencyType: incidentType/);

@@ -33,7 +33,7 @@ export function ResidentPanel({ request, onAccept, onReject, onMerge, isProcessi
   const needsManualDispatch = request.requiresPaccReassignment === true || (request.status === "VERIFIED" && request.incident?.status === "DISPATCHED" && !request.incident.responderId && !request.incident.currentOfferResponderId)
   const canMergeDuplicate = request.status === "PENDING" && request.nature === "EMERGENCY" && !request.incident
   const terminal = request.status === "REJECTED" || request.status === "DUPLICATE" || request.incident?.status === "RESOLVED"
-  const canAccept = !terminal && !isProcessing && !(request.status === "VERIFIED" && request.incident && Boolean(request.incident.responderId || request.incident.currentOfferResponderId))
+  const canAccept = !terminal && !isProcessing && (!request.incident || (request.incident.status === 'DISPATCHED' && !request.incident.responderId && !request.incident.currentOfferResponderId))
   const rejectionInput = {
     requestStatus: request.status,
     incident: request.incident ? {

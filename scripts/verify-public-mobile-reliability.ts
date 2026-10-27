@@ -18,9 +18,11 @@ assert.match(tracking, /event\.nativeEvent\.userInteraction/, 'MapLibre user cam
 assert.doesNotMatch(tracking, /properties\?\.isUserGesture/, 'The unsupported map gesture property must not keep the camera locked.');
 
 const step2 = source('mobile/components/auth/Step2.tsx');
-assert.match(step2, /contentContainerStyle=\{\{ flexGrow: 1, justifyContent: 'flex-end' \}\}/, 'The OTP sheet must remain scrollable above a resized keyboard.');
-assert.match(step2, /keyboardShouldPersistTaps="handled"/, 'OTP controls must remain usable while the keyboard is open.');
-assert.match(step2, /Platform\.OS === 'ios' \? 'padding' : 'height'/, 'The OTP modal must resize above the Android keyboard in its own native window.');
+const otpModal = source('mobile/components/auth/OtpVerificationModal.tsx');
+assert.match(step2, /<OtpVerificationModal/, 'Registration must use the modal-local keyboard viewport.');
+assert.match(otpModal, /keyboardViewportHeight\(frame.top, frame.height, keyboardTop\)/);
+assert.match(otpModal, /keyboardShouldPersistTaps="handled"/);
+assert.match(otpModal, /onLayout=\{measure\}/, 'Native window resizing must update the measured viewport.');
 
 const forgotPassword = source('mobile/app/(auth)/forgot-password.tsx');
 assert.match(forgotPassword, /placeholder="Email or mobile number"/, 'The recovery input placeholder must fit narrow Android viewports.');

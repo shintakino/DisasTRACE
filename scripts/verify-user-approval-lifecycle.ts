@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   deriveUserVerificationState,
+  deriveUserLastActive,
   isApprovalEligible,
   isApprovalEligibleForDocument,
   type ApprovalAccount,
 } from "../lib/account-approval";
+import { VerificationActionSchema } from '../types/approval';
 
 function account(overrides: Partial<ApprovalAccount>): ApprovalAccount {
   return {
@@ -117,3 +119,15 @@ check("User Management receives and renders the separate verification state", ()
 });
 
 console.log("User approval lifecycle checks passed.");
+
+for (const status of ['PENDING', 'SUSPENDED', 'DEACTIVATED'] as const) {
+  assert.equal(deriveUserLastActive(account({ status })), 'Unavailable');
+}
+assert.equal(deriveUserLastActive(account({ status: 'ACTIVE', verificationStatus: 'REJECTED' })), 'Unavailable');
+assert.equal(deriveUserLastActive(account({ status: 'ACTIVE', verificationStatus: 'APPROVED' })), 'Not recorded');
+for (const reason of [undefined, '', '   ']) {
+  assert.equal(VerificationActionSchema.safeParse({ status: 'REJECTED', documentPath: 'ids/a', reason }).success, false);
+}
+assert.equal(VerificationActionSchema.parse({ status: 'REJECTED', documentPath: 'ids/a', reason: '  Name mismatch  ' }).reason, 'Name mismatch');
+assert.equal(VerificationActionSchema.safeParse({ status: 'APPROVED', documentPath: 'ids/a' }).success, true);
+console.log('PASS truthful activity projection and required bounded rejection reasons');

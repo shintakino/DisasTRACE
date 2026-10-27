@@ -1,3 +1,4 @@
+import { releaseResponderAvailability } from '@/lib/responder-availability';
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
@@ -166,18 +167,7 @@ export async function POST(request: NextRequest) {
         .returning();
       if (!updated) return { kind: 'not_ready' as const, status: lockedIncident.status };
 
-      const otherFieldResponse = await tx.query.incidents.findFirst({
-        where: and(
-          eq(incidents.responderId, auth.responder.id),
-          inArray(incidents.status, ['DISPATCHED', 'EN_ROUTE', 'ARRIVED']),
-        ),
-        columns: { id: true },
-      });
-      if (!otherFieldResponse) {
-        await tx.update(users)
-          .set({ dutyStatus: 'ON_DUTY' })
-          .where(and(eq(users.id, auth.responder.id), eq(users.dutyStatus, 'ACTIVE_DISPATCH')));
-      }
+      await releaseResponderAvailability(tx, auth.responder.id);
 
       return { kind: 'deferred' as const, incident: updated };
     });

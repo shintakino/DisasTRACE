@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { 
   Megaphone, 
@@ -40,10 +40,12 @@ interface BroadcastSummary {
   pushFailedCount?: number;
   inactiveCount?: number;
   missingAuthCount?: number;
+  deliveryStatus?: 'pending' | 'incomplete' | 'complete';
 }
 
 export default function AnnouncementsPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
+  const submitInFlight = useRef(false);
   const isAuthorized = role?.toLowerCase() === "cdrrmo_super_admin" || role?.toLowerCase() === "pacc_admin";
 
   const [title, setTitle] = useState("");
@@ -107,6 +109,7 @@ export default function AnnouncementsPage() {
 
   const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitInFlight.current || !user) return;
     if (!title.trim() || !body.trim()) {
       toast.error("Please fill in both the Title and the Announcement Body.");
       return;
@@ -117,24 +120,36 @@ export default function AnnouncementsPage() {
     }
 
     setIsBroadcasting(true);
+    submitInFlight.current = true;
 
     try {
+      const pendingKey = `announcement_pending_${user.id}`;
+      let pending: { id: string; title: string; body: string; targetRole: string } | null = null;
+      try { pending = JSON.parse(localStorage.getItem(pendingKey) || 'null'); } catch { /* Replace invalid local draft metadata. */ }
+      const payload = { title: title.trim(), body: body.trim(), targetRole };
+      const broadcastId = typeof pending?.id === 'string' && /^[0-9a-f-]{36}$/i.test(pending.id)
+        && pending?.title === payload.title && pending?.body === payload.body && pending?.targetRole === targetRole
+        ? pending.id : crypto.randomUUID();
+      // Retain the identifier across failed/lost responses and browser reloads.
+      localStorage.setItem(pendingKey, JSON.stringify({ ...payload, id: broadcastId }));
       const response = await fetch("/api/notifications/announcement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title.trim(),
-          body: body.trim(),
-          targetRole,
+          ...payload,
+          broadcastId,
         }),
       });
 
       const res = await response.json();
 
       if (response.ok && res.success) {
-        toast.success(`Announcement saved for ${res.broadcast.persistedCount} eligible account${res.broadcast.persistedCount === 1 ? "" : "s"}.`);
+        if (res.broadcast.deliveryStatus && res.broadcast.deliveryStatus !== 'complete') {
+          toast.warning('Announcement saved to inboxes. Phone delivery status is incomplete; check the broadcast history.');
+        } else toast.success(`Announcement saved for ${res.broadcast.persistedCount} eligible account${res.broadcast.persistedCount === 1 ? "" : "s"}.`);
+        localStorage.removeItem(pendingKey);
         
-        setRecentBroadcasts((prev) => [res.broadcast as BroadcastSummary, ...prev].slice(0, 20));
+        setRecentBroadcasts((prev) => [res.broadcast as BroadcastSummary, ...prev.filter(broadcast => broadcast.id !== res.broadcast.id)].slice(0, 20));
 
         // Reset form
         setTitle("");
@@ -147,6 +162,7 @@ export default function AnnouncementsPage() {
       console.error(err);
       toast.error("Network error broadcasting announcement.");
     } finally {
+      submitInFlight.current = false;
       setIsBroadcasting(false);
     }
   };
@@ -501,7 +517,9 @@ export default function AnnouncementsPage() {
                       {b.optedOutCount > 0 && ` · ${b.optedOutCount} opted out`}
                     </div>
                     <p className="mt-1 text-[10px] text-slate-500">
-                      {b.pushEligibleCount === 0 ? 'No registered devices available for push alerts. ' : 'Push accepted means accepted by the notification service, not confirmed on the phone. '}
+                      {b.deliveryStatus && b.deliveryStatus !== 'complete'
+                        ? 'Phone delivery accounting is pending or was interrupted. Inbox messages are saved. '
+                        : b.pushEligibleCount === 0 ? 'No registered devices available for push alerts. ' : 'Push accepted means accepted by the notification service, not confirmed on the phone. '}
                       {!!b.pushFailedCount && `${b.pushFailedCount} push attempt(s) failed. `}
                       {!!b.inactiveCount && `${b.inactiveCount} inactive account(s) excluded. `}
                       {!!b.missingAuthCount && `${b.missingAuthCount} account(s) without sign-in access excluded. `}

@@ -1,3 +1,4 @@
+import { releaseResponderAvailability } from '@/lib/responder-availability';
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { reports } from "@/db/schema/reports";
@@ -6,7 +7,7 @@ import { verificationRequests } from "@/db/schema/verification_requests";
 import { users } from "@/db/schema/users";
 import { notifications } from "@/db/schema/notifications";
 import { patientCareReports, driverTripTickets } from "@/db/schema/patient_care";
-import { eq, and, asc, count, desc, gte, ilike, inArray, lt, ne, or, sql, type SQL } from "drizzle-orm";
+import { eq, and, asc, count, desc, gte, ilike, inArray, lt, or, sql, type SQL } from "drizzle-orm";
 import { createClient } from "@/lib/supabase-server";
 import { z } from "zod";
 import crypto from "crypto";
@@ -460,7 +461,7 @@ export async function POST(req: NextRequest) {
     }
 
     const responder = await db.query.users.findFirst({ where: eq(users.id, user.id) });
-    if (!responder || responder.role !== 'ambulance_responder' || responder.status !== 'ACTIVE') {
+    if (!responder || responder.role !== 'ambulance_responder' || responder.status !== 'ACTIVE' || responder.verificationStatus !== 'APPROVED') {
       return NextResponse.json({ error: 'Only active ambulance responders can submit an incident report.' }, { status: 403 });
     }
 
@@ -533,23 +534,11 @@ export async function POST(req: NextRequest) {
         await tx.update(incidents)
           .set({ status: 'RESOLVED', resolvedAt: lockedIncident.resolvedAt ?? new Date() })
           .where(eq(incidents.id, incidentId));
-        const otherActiveIncident = await tx.query.incidents.findFirst({
-          where: and(
-            eq(incidents.responderId, user.id),
-            ne(incidents.id, incidentId),
-            ne(incidents.status, 'RESOLVED'),
-          ),
-          columns: { id: true },
-        });
-        if (!otherActiveIncident) {
-          await tx.update(users)
-            .set({ dutyStatus: 'ON_DUTY' })
-            .where(and(eq(users.id, user.id), eq(users.dutyStatus, 'ACTIVE_DISPATCH')));
-        }
+        const availability = await releaseResponderAvailability(tx, user.id);
         return {
           kind: 'existing' as const,
           report: concurrentReport,
-          dutyStatus: otherActiveIncident ? 'ACTIVE_DISPATCH' as const : 'ON_DUTY' as const,
+          dutyStatus: availability.dutyStatus,
         };
       }
 
@@ -629,24 +618,12 @@ export async function POST(req: NextRequest) {
         .where(eq(incidents.id, incidentId));
 
       // 4. Reset responder status back to ON_DUTY so they become available for new dispatches
-      const otherActiveIncident = await tx.query.incidents.findFirst({
-        where: and(
-          eq(incidents.responderId, user.id),
-          ne(incidents.id, incidentId),
-          ne(incidents.status, 'RESOLVED'),
-        ),
-        columns: { id: true },
-      });
-      if (!otherActiveIncident) {
-        await tx.update(users)
-          .set({ dutyStatus: "ON_DUTY" })
-          .where(and(eq(users.id, user.id), eq(users.dutyStatus, 'ACTIVE_DISPATCH')));
-      }
+      const availability = await releaseResponderAvailability(tx, user.id);
 
       return {
         kind: 'created' as const,
         report: insertedReport,
-        dutyStatus: otherActiveIncident ? 'ACTIVE_DISPATCH' as const : 'ON_DUTY' as const,
+        dutyStatus: availability.dutyStatus,
       };
     });
 
@@ -676,6 +653,7 @@ export async function POST(req: NextRequest) {
     // 5. Send report audit status update notification if their updates setting is enabled (defaults to true)
     const updatesEnabled = user.user_metadata?.notification_preferences?.updates !== false;
     if (updatesEnabled) {
+      try {
       const notifId = crypto.randomUUID();
       await db.insert(notifications).values({
         id: notifId,
@@ -691,6 +669,7 @@ export async function POST(req: NextRequest) {
           category: "report_update"
         }
       });
+      } catch (error) { console.error('Report committed; advisory notification failed:', error); }
     }
 
     return NextResponse.json({

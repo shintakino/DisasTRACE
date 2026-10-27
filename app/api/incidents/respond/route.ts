@@ -64,12 +64,18 @@ export async function POST(req: NextRequest) {
 
     const [dbUser, incident] = await Promise.all([dbUserPromise, incidentPromise]);
 
-    if (!dbUser || dbUser.role !== 'ambulance_responder') {
+    if (!dbUser || dbUser.role !== 'ambulance_responder' || dbUser.status !== 'ACTIVE' || dbUser.verificationStatus !== 'APPROVED') {
       return NextResponse.json({ error: "Forbidden: Responder access required" }, { status: 403 });
     }
 
     if (!incident) {
       return NextResponse.json({ error: "Incident not found" }, { status: 404 });
+    }
+
+    // A lost HTTP response must not make an already committed acceptance look expired.
+    if (action === 'ACCEPT' && incident.responderId === user.id
+      && ['EN_ROUTE', 'ARRIVED'].includes(incident.status)) {
+      return NextResponse.json({ success: true, incident, message: 'Dispatch was already accepted.' });
     }
 
     // A responder may only act on their own current offer. REJECT remains

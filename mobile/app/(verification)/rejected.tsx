@@ -5,11 +5,14 @@ import { useAuthStatus } from '../../hooks/use-auth-status';
 import { XCircle, AlertCircle, Camera, ChevronDown } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadGovernmentID } from '../../lib/storage';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ID_TYPES = ["National ID", "Passport", "Driver's License", "UMID", "Postal ID", "Other Valid ID"];
 
 export default function RejectedVerificationScreen() {
-  const { user } = useAuthStatus();
+  const { user, rejectionReason: storedReason, refreshStatus } = useAuthStatus();
+  const router = useRouter();
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [selectedIdType, setSelectedIdType] = useState('');
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -115,6 +118,7 @@ export default function RejectedVerificationScreen() {
     setLoading(true);
     try {
       await uploadGovernmentID(selectedImageUri, selectedIdType);
+      await refreshStatus();
 
       Alert.alert("Success", "Your registration has been successfully resubmitted. Please wait for admin approval.");
       setIsResubmitting(false);
@@ -126,7 +130,7 @@ export default function RejectedVerificationScreen() {
     }
   };
 
-  const rejectionReason = user?.app_metadata?.rejection_reason || "Incomplete identity documents. Please ensure the photo is clear and all details are visible.";
+  const rejectionReason = storedReason || 'No rejection reason was provided. Contact CDRRMO for assistance.';
 
   if (isResubmitting) {
     return (
@@ -221,7 +225,8 @@ export default function RejectedVerificationScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background p-6 items-center justify-center">
+    <SafeAreaView className="flex-1 bg-background">
+    <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 24, alignItems: 'center', justifyContent: 'center' }}>
       <View className="bg-secondary/10 p-8 rounded-full mb-6">
         <XCircle color="#EF4444" size={80} />
       </View>
@@ -241,7 +246,7 @@ export default function RejectedVerificationScreen() {
       </View>
 
       <Text className="text-dark-grey text-center mt-8 px-4">
-        You can re-submit your registration with the correct documents through our mobile app or contact support.
+        For a document problem, upload a corrected ID. For a name mismatch or another registration detail, contact CDRRMO to request a correction before resubmitting.
       </Text>
 
       <TouchableOpacity
@@ -252,12 +257,20 @@ export default function RejectedVerificationScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
+        onPress={() => router.push({ pathname: '/contact-us', params: { topic: 'registration' } })}
+        className="mt-4 p-4 w-full border border-primary rounded-button items-center"
+      >
+        <Text className="text-primary font-bold text-lg">Request Registration Correction</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         onPress={handleSignOut}
         className="mt-4 p-4 w-full border border-gray-300 rounded-button items-center justify-center"
       >
         <Text className="text-dark-grey font-bold text-lg">Sign Out</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
+    </SafeAreaView>
   );
 }
 

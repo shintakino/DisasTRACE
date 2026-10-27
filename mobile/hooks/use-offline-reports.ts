@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { createContext, createElement, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import * as SecureStore from 'expo-secure-store';
 import { useResponderStore } from '../stores/useResponderStore';
@@ -8,10 +8,25 @@ import * as Haptics from 'expo-haptics';
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
 import { normalizeResponderLocationPayload } from '../lib/responder-location-status';
 import { useResponderDutyStore } from '../stores/useResponderDutyStore';
+import { useAuthStatus } from './use-auth-status';
 
 const OFFLINE_REPORTS_KEY = 'disas_trace_offline_reports';
 
-export function useOfflineReports() {
+function useOfflineReportsState() {
+  const { user, role, verificationStatus } = useAuthStatus();
+  const ownerId = user?.id;
+  const enabled = Boolean(ownerId) && role === 'ambulance_responder' && verificationStatus === 'approved';
+  const running = useRef(false);
+  const rerun = useRef(false);
+  const active = useRef(true);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+    };
+  }, []);
   const { 
     drafts, 
     offlineQueue, 
@@ -36,7 +51,7 @@ export function useOfflineReports() {
       try {
         await fetch('https://clients3.google.com/generate_204', { mode: 'no-cors' });
         if (mounted) setIsOnline(true);
-      } catch (err) {
+      } catch {
         if (mounted) setIsOnline(false);
       }
     };
@@ -51,13 +66,15 @@ export function useOfflineReports() {
 
   // Trigger background sync when device transitions to online
   useEffect(() => {
-    if (!isOnline || syncing) return;
+    if (!enabled || !isOnline) return;
     if (offlineQueue.length === 0 && drafts.length === 0) return;
+    if (running.current) { rerun.current = true; return; }
+    running.current = true;
+    rerun.current = false;
 
-    let mounted = true;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const isCurrentOwner = () => active.current && useResponderStore.getState().ownerUserId === ownerId;
     const syncOfflineQueueAndDrafts = async () => {
-      if (mounted) setSyncing(true);
+      setSyncing(true);
       setSyncingQueue(true);
 
       const apiUrl = getMobileApiBaseUrl();
@@ -69,11 +86,13 @@ export function useOfflineReports() {
           console.log(`[useOfflineReports] Connection recovered: Replaying ${offlineQueue.length} offline actions in FIFO order...`);
           
           for (const action of offlineQueue) {
+            if (!isCurrentOwner()) return;
             try {
               console.log(`[useOfflineReports] Replaying action: type=${action.type}, endpoint=${action.endpoint}, method=${action.method}`);
               
               // Retrieve authenticated Supabase sessions to extract current bearer tokens
               const { data: { session } } = await supabase.auth.getSession();
+              if (!isCurrentOwner()) return;
               if (!session?.user.id || action.ownerUserId !== session.user.id) {
                 console.warn('[useOfflineReports] Removing an offline action owned by a different responder session.');
                 await dequeueAction(action.id);
@@ -93,13 +112,14 @@ export function useOfflineReports() {
                   body: JSON.stringify(action.payload),
                 }, 12_000, 'queued responder update');
                 const result = await response.json().catch(() => null);
+                if (!isCurrentOwner()) return;
                 if (!response.ok) {
                   if ([400, 403, 404, 409].includes(response.status)) {
                     const message = result?.error || `The queued action was rejected (HTTP ${response.status}).`;
                     useResponderStore.setState({ lastQueueError: message });
                     await dequeueAction(action.id);
                     if (result?.code === 'INCIDENT_REASSIGNED') {
-                      useResponderStore.getState().completeIncident();
+                      useResponderStore.getState().completeIncident(action.payload.incidentId);
                     }
                     continue;
                   }
@@ -107,36 +127,24 @@ export function useOfflineReports() {
                 }
                 if (action.endpoint === '/api/reports') {
                   const incidentId = action.payload.incidentId;
-                  useResponderDutyStore.getState().setDutyStatus(result?.dutyStatus);
+                  const currentIncident = useResponderStore.getState().activeDispatch?.id;
+                  if (!currentIncident || currentIncident === incidentId) useResponderDutyStore.getState().setDutyStatus(result?.dutyStatus);
+                  else useResponderStore.getState().requestRecovery();
                   useResponderStore.setState((state) => ({
                     submittedIncidentIds: state.submittedIncidentIds.includes(incidentId)
                       ? state.submittedIncidentIds
                       : [...state.submittedIncidentIds, incidentId],
                     drafts: state.drafts.filter((draft) => draft.incidentId !== incidentId),
-                    lastReportDelivery: 'CONFIRMED',
-                    showReportSuccess: true,
+                    ...(state.reportFormSession?.incident.id === incidentId ? { lastReportDelivery: 'CONFIRMED' as const, showReportSuccess: true } : {}),
                   }));
                 } else if (action.endpoint === '/api/incidents/status' && action.payload.status === 'ARRIVED') {
-                  useResponderStore.setState({ lastArrivalDelivery: 'CONFIRMED' });
+                  if (useResponderStore.getState().activeDispatch?.id === action.payload.incidentId) {
+                    useResponderStore.setState({ lastArrivalDelivery: 'CONFIRMED' });
+                  }
                 } else if (action.endpoint === '/api/incidents/status' && action.payload.status === 'DOCUMENTATION_PENDING') {
                   const incidentId = action.payload.incidentId;
-                  useResponderStore.setState((state) => {
-                    if (state.activeDispatch?.id !== incidentId) return { lastQueueError: null };
-                    return {
-                      status: 'idle',
-                      activeDispatch: null,
-                      targetHospital: null,
-                      fieldOutcome: null,
-                      sceneTimeSeconds: 0,
-                      elapsedTimeSeconds: 0,
-                      isArrivalConfirmVisible: false,
-                      isHospitalArrivalConfirmVisible: false,
-                      hospitalDistanceKm: null,
-                      hospitalEtaMins: null,
-                      lastQueueError: null,
-                    };
-                  });
-                  alert('Field response synced. Your documentation remains saved, and you are now available for another dispatch.');
+                  useResponderStore.getState().completeIncident(incidentId);
+                  alert('Field response synced. Your documentation remains saved in Forms.');
                 }
               } else if (action.type === 'HOSPITAL_ARRIVAL_CONFIRMATION') {
                 const response = await fetchWithTimeout(`${apiUrl}${action.endpoint}`, {
@@ -145,15 +153,14 @@ export function useOfflineReports() {
                   body: JSON.stringify(normalizeResponderLocationPayload(action.payload)),
                 }, 12_000, 'hospital arrival confirmation');
                 const result = await response.json().catch(() => null);
+                if (!isCurrentOwner()) return;
                 if (!response.ok || result?.held) {
                   const message = result?.message || result?.error || 'Hospital arrival could not be confirmed.';
                   if ([202, 400, 403, 404, 409, 422].includes(response.status)) {
                     useResponderStore.setState((state) => ({
-                      isHospitalArrivalPendingSync: false,
-                      isHospitalArrivalConfirmVisible: false,
                       lastQueueError: message,
                       ...(state.activeDispatch?.id === action.payload?.incidentId
-                        ? { status: 'to_hospital', fieldOutcome: null }
+                        ? { status: 'to_hospital', fieldOutcome: null, isHospitalArrivalPendingSync: false, isHospitalArrivalConfirmVisible: false }
                         : {}),
                     }));
                     await dequeueAction(action.id);
@@ -163,11 +170,9 @@ export function useOfflineReports() {
                 }
 
                 useResponderStore.setState((state) => ({
-                  isHospitalArrivalPendingSync: false,
-                  isHospitalArrivalConfirmVisible: false,
                   lastQueueError: null,
                   ...(state.activeDispatch?.id === action.payload?.incidentId
-                    ? { status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL' as const }
+                    ? { status: 'at_hospital', fieldOutcome: 'HOSPITAL_ARRIVAL' as const, isHospitalArrivalPendingSync: false, isHospitalArrivalConfirmVisible: false }
                     : {}),
                 }));
                 alert('Hospital arrival confirmed. You can now complete the documentation or save it for later.');
@@ -178,6 +183,7 @@ export function useOfflineReports() {
                   headers,
                   body: JSON.stringify(normalizeResponderLocationPayload(action.payload)),
                 });
+                if (!isCurrentOwner()) return;
                 if (!response.ok) {
                   if ([400, 403, 404, 409].includes(response.status)) {
                     const result = await response.json().catch(() => null);
@@ -203,7 +209,7 @@ export function useOfflineReports() {
         }
 
         // 2. After replaying the queue, proceed with the standard unsent report drafts sync
-        if (queueSuccess && drafts.length > 0) {
+        if (isCurrentOwner() && queueSuccess && drafts.length > 0) {
           const cachedRaw = await SecureStore.getItemAsync(OFFLINE_REPORTS_KEY);
           const cachedQueue = cachedRaw ? JSON.parse(cachedRaw) : [];
 
@@ -213,6 +219,7 @@ export function useOfflineReports() {
             for (const draft of cachedQueue) {
               try {
                 const { data: { session } } = await supabase.auth.getSession();
+                if (!isCurrentOwner()) return;
                 if (!session?.user.id || draft.ownerUserId !== session.user.id) {
                   console.warn('[useOfflineReports] Skipping a cached report owned by another responder session.');
                   continue;
@@ -241,6 +248,7 @@ export function useOfflineReports() {
                   headers,
                   body: JSON.stringify(payload),
                 });
+                if (!isCurrentOwner()) return;
 
                 if (response.ok) {
                   console.log(`[useOfflineReports] Sync success: Draft report for incident ${draft.incidentId} uploaded.`);
@@ -280,23 +288,23 @@ export function useOfflineReports() {
         // Trigger a light tactile success haptic warning once all pending actions are fully flushed and synced
         if (queueSuccess) {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        } else if (mounted) {
-          retryTimer = setTimeout(() => setRetryNonce((value) => value + 1), 5_000);
+        } else if (isCurrentOwner()) {
+          retryTimer.current = setTimeout(() => {
+            if (active.current) setRetryNonce((value) => value + 1);
+          }, 5_000);
         }
       } catch (err) {
         console.error('[useOfflineReports] Error during background synchronization:', err);
       } finally {
-        if (mounted) setSyncing(false);
+        running.current = false;
+        if (active.current) setSyncing(false);
         setSyncingQueue(false);
+        if (rerun.current && queueSuccess && active.current) setRetryNonce((value) => value + 1);
       }
     };
 
     syncOfflineQueueAndDrafts();
-    return () => {
-      mounted = false;
-      if (retryTimer) clearTimeout(retryTimer);
-    };
-  }, [isOnline, offlineQueue.length, drafts.length, dequeueAction, retryNonce, setSyncingQueue]);
+  }, [enabled, ownerId, isOnline, offlineQueue, drafts.length, dequeueAction, retryNonce, setSyncingQueue]);
 
   // Method to save drafts offline
   const bufferReportOffline = async (report: {
@@ -330,4 +338,16 @@ export function useOfflineReports() {
     isSyncingQueue,
     offlineQueue
   };
+}
+
+const OfflineReportsContext = createContext<ReturnType<typeof useOfflineReportsState> | null>(null);
+
+export function OfflineReportsProvider({ children }: { children: ReactNode }) {
+  return createElement(OfflineReportsContext.Provider, { value: useOfflineReportsState() }, children);
+}
+
+export function useOfflineReports() {
+  const value = useContext(OfflineReportsContext);
+  if (!value) throw new Error('OfflineReportsProvider is required.');
+  return value;
 }

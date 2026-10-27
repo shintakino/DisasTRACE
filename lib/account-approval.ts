@@ -71,3 +71,10 @@ export function deriveUserVerificationState(account: ApprovalAccount): UserVerif
   if (account.verificationStatus === "APPROVED") return "APPROVED";
   return account.idImageUrl ? "READY_FOR_APPROVAL" : "AWAITING_ID";
 }
+
+/** Profile edits and creation timestamps are not evidence of user activity. */
+export function deriveUserLastActive(account: Pick<ApprovalAccount, 'role' | 'status' | 'verificationStatus'>): string {
+  if (account.status !== 'ACTIVE'
+    || (isMobileApprovalRole(account.role) && account.verificationStatus !== 'APPROVED')) return 'Unavailable';
+  return 'Not recorded';
+}

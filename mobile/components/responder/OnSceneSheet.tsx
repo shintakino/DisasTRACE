@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { View, Text, TouchableOpacity } from 'react-native';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Activity, Truck, ThumbsDown, Info, FileText, FolderDown } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useResponderStore } from '../../stores/useResponderStore';
@@ -118,8 +118,7 @@ export function OnSceneSheet() {
           <TouchableOpacity className="mt-5 flex-row items-center justify-center rounded-2xl bg-[#1E3A8A] py-4" onPress={() => {
             if (!fieldOutcome) return;
             setFieldOutcome(fieldOutcome);
-            bottomSheetRef.current?.close();
-            setTimeout(() => { void startReport(); }, 300);
+            void startReport();
           }}>
             <FileText color="white" size={18} /><Text className="ml-2 text-base font-bold text-white">Proceed to Forms</Text>
           </TouchableOpacity>

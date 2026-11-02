@@ -43,7 +43,7 @@ assert.equal(store.getState().status, 'en_route');
 store.getState().releaseDispatchOffer({ incidentId: 'B', title: 'Expired', message: 'Delayed expiry' });
 assert.equal(store.getState().activeDispatch.id, 'B', 'An expiry cannot clear an accepted response.');
 
-for (const action of ['arriveAtScene', 'startReport', 'deferDocumentation']) for (const success of [false, true]) for (const accountSwitch of [false, true]) {
+for (const action of ['arriveAtScene', 'deferDocumentation']) for (const success of [false, true]) for (const accountSwitch of [false, true]) {
   install('A', action === 'arriveAtScene' ? 'en_route' : 'on_scene');
   let finish;
   pendingResponse = new Promise(resolve => { finish = resolve; });
@@ -56,6 +56,14 @@ for (const action of ['arriveAtScene', 'startReport', 'deferDocumentation']) for
   assert.equal(store.getState().activeDispatch.id, accountSwitch ? 'A' : 'B', `${action}: old result cannot clear the newer incident/account`);
   assert.equal(store.getState().status, 'en_route');
 }
+install('A', 'on_scene');
+const openingForm = store.getState().startReport();
+assert.equal(store.getState().status, 'report_filling', 'Proceed to Forms opens synchronously without waiting on connectivity or the status API.');
+const openingSession = store.getState().reportFormSession;
+assert.equal(openingSession?.incident.id, 'A');
+await store.getState().startReport();
+assert.equal(store.getState().reportFormSession, openingSession, 'A repeated tap cannot recreate/reset an already open report form.');
+await openingForm;
 install('A', 'dispatch_offered');
 store.getState().acceptDispatch('A');
 assert.equal(store.getState().status, 'en_route');

@@ -1,5 +1,11 @@
 # Progress Tracker
 
+## 2026-11-02 - Responder form responsiveness and stale duty investigation
+
+- Confirmed that responder `Proceed to Forms` waited on connectivity and the incident-status API before opening the form, with an additional fixed 300 ms delay from the scene sheet. The form now opens synchronously after local lifecycle checks; final ownership and completion remain server-authoritative.
+- Read-only inspection of the configured database found two unassigned `DISPATCHED` incidents (one PACC manual, one automatic) and four approved active responders marked `ON_DUTY` with GPS heartbeats older than the 90-second availability window. None of the four is attached to an active incident/offer. A guarded cleanup reset exactly those four stale, unassigned accounts; follow-up inspection confirms all are OFF_DUTY with no assignment, while both unassigned incidents remain available for PACC manual assignment. Actual manual-dispatch route checks confirm both incident types accept reassignment when given a fresh, eligible responder.
+- Mobile auth and responder recovery now project expired `ON_DUTY` sessions as `OFF_DUTY`; active dispatch remains protected. This prevents a stale account from restarting location heartbeats and re-entering the dispatch pool just because the responder reopened the app. `Proceed to Forms` opens synchronously after local lifecycle checks, without waiting for connectivity or an API read; repeated taps cannot recreate the form session, and report submission remains server-authoritative. All 32 regression scripts, root/mobile TypeScript, web production build, and Android export pass. Physical device acceptance and a live PACC manual dispatch remain outstanding.
+
 ## 2026-10-27 - Reported bug implementation
 
 - Scoped responder completion, offer release, and delayed arrival/report mutations to their original incident and account. Consolidated offline replay into one root provider. Actual Zustand-store regressions exercise delayed success/failure results after a newer incident/account takes over, plus an older draft finishing while a newer form opens. No release/device acceptance is claimed.

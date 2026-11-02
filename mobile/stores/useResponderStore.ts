@@ -537,7 +537,9 @@ export const useResponderStore = create<ResponderState>((set) => ({
     const currentState = useResponderStore.getState();
     const activeDispatch = currentState.activeDispatch;
     if (!activeDispatch) return;
-    const operation = { ownerUserId: currentState.ownerUserId, incidentId: activeDispatch.id };
+    if (currentState.status === 'report_filling'
+      && currentState.reportFormSession?.source === 'ACTIVE_DISPATCH'
+      && currentState.reportFormSession.incident.id === activeDispatch.id) return;
     if (currentState.isHospitalArrivalPendingSync) {
       alert('Hospital arrival is still waiting for PACC confirmation. Keep the app connected, then continue after it syncs.');
       return;
@@ -548,80 +550,15 @@ export const useResponderStore = create<ResponderState>((set) => ({
         : 'The incident report becomes available after arrival at the scene.');
       return;
     }
-    if (activeDispatch) {
-      let isOnline = false;
-      try {
-        isOnline = await checkConnectivity();
-      } catch (err) {
-        isOnline = false;
-      }
-
-      if (isOnline) {
-        try {
-          const apiUrl = getMobileApiBaseUrl();
-          const { data: { session } } = await supabase.auth.getSession();
-          const authorizationHeaders: Record<string, string> = {};
-          if (session?.access_token) {
-            authorizationHeaders.Authorization = `Bearer ${session.access_token}`;
-          }
-
-          if (currentState.status === 'to_hospital' && currentState.targetHospital) {
-            if (!currentState.currentLocation) {
-              alert('A live responder location is required before hospital transport can be confirmed.');
-              return;
-            }
-
-            const destinationResponse = await fetch(`${apiUrl}/api/responder/location`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...authorizationHeaders,
-              },
-              body: JSON.stringify({
-                latitude: currentState.currentLocation[1],
-                longitude: currentState.currentLocation[0],
-                responderStatus: 'to_hospital',
-                incidentId: activeDispatch.id,
-                targetHospitalId: currentState.targetHospital.id,
-              }),
-            });
-            const destinationResult = await destinationResponse.json();
-            if (!destinationResponse.ok || destinationResult?.held) {
-              alert(destinationResult?.message || 'The hospital destination could not be confirmed. Contact PACC or select another available hospital.');
-              return;
-            }
-          }
-
-          const response = await fetch(
-            `${apiUrl}/api/incidents/status?incidentId=${encodeURIComponent(activeDispatch.id)}`,
-            { headers: authorizationHeaders },
-          );
-          const result = await response.json();
-          if (!isCurrentResponderOperation(operation, useResponderStore.getState())) return;
-          if (result?.code === 'INCIDENT_REASSIGNED') {
-            alert(result.error);
-            useResponderStore.getState().completeIncident(activeDispatch.id);
-            return;
-          }
-          if (!response.ok) throw new Error(result?.error || `HTTP ${response.status}`);
-        } catch (e) {
-          // A network failure must not discard a legitimate offline form draft.
-          // Final resolution remains server-authoritative when POST /api/reports succeeds.
-          console.error('[useResponderStore] Could not verify incident ownership before opening the report form:', e);
-        }
-      }
-    }
-    if (isCurrentResponderOperation(operation, useResponderStore.getState())) {
-      set({
-        status: 'report_filling',
-        reportFormSession: createReportFormSession(
-          activeDispatch,
-          'ACTIVE_DISPATCH',
-          undefined,
-          currentState.status,
-        ),
-      });
-    }
+    set({
+      status: 'report_filling',
+      reportFormSession: createReportFormSession(
+        activeDispatch,
+        'ACTIVE_DISPATCH',
+        undefined,
+        currentState.status,
+      ),
+    });
   },
 
   deferDocumentation: async (formData = {}) => {

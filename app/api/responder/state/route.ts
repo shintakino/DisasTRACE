@@ -3,6 +3,7 @@ import { and, desc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { db } from '@/db';
 import { incidents, users, verificationRequests } from '@/db/schema';
 import { createClient } from '@/lib/supabase-server';
+import { isResponderHeartbeatFresh } from '@/lib/dispatch-policy';
 
 /** One consistent, owner-scoped snapshot for foreground and reconnect recovery. */
 export async function GET() {
@@ -24,7 +25,12 @@ export async function GET() {
           isNull(incidents.responderId), gt(incidents.offerExpiresAt, new Date())),
         orderBy: [desc(incidents.createdAt)],
       });
-      if (!incident) return { dutyStatus: responder.dutyStatus, dispatch: null };
+      if (!incident) {
+        const dutyStatus = responder.dutyStatus === 'ON_DUTY' && !isResponderHeartbeatFresh(responder.lastLocationUpdatedAt)
+          ? 'OFF_DUTY'
+          : responder.dutyStatus;
+        return { dutyStatus, dispatch: null };
+      }
       const report = await tx.query.verificationRequests.findFirst({ where: eq(verificationRequests.id, incident.requestId) });
       // Missing evidence is a recovery error, never an instruction to clear a valid response.
       if (!report) throw new Error('Assigned incident report is unavailable.');

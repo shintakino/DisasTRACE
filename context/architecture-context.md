@@ -17,7 +17,7 @@
 
 ## System Boundaries
 
-Responder dispatch recovery is owned by the mounted mobile tab shell. An authenticated, active, approved responder can read only their own current field response or unexpired offer plus duty state through `GET /api/responder/state`. Foreground/realtime-reconnect recovery uses this snapshot without changing dispatch authority. Delayed results are guarded by account, incident, and local state; failed reads retain the last confirmed response. Offline queue replay has one root-owned provider; screens and banners observe it rather than running workers independently.
+Responder dispatch recovery is owned by the mounted mobile tab shell. An authenticated, active, approved responder can read only their own current field response or unexpired offer plus duty state through `GET /api/responder/state`. Foreground/realtime-reconnect recovery uses this snapshot without changing dispatch authority. A stored `ON_DUTY` state with no active response is treated as `OFF_DUTY` when its trusted location heartbeat is older than the same 90-second freshness window used by dispatch eligibility; opening the app cannot renew an expired duty session, and responders must explicitly go On Duty after a fresh GPS sync. Active incident/offer recovery takes precedence over duty expiry. Delayed results are guarded by account, incident, and local state; failed reads retain the last confirmed response. Offline queue replay has one root-owned provider; screens and banners observe it rather than running workers independently.
 
 ### Next.js Web App
 

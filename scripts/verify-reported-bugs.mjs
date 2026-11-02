@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 const typescriptChecks = [
   'verify-pacc-completion-lifecycle', 'verify-rejected-report-workflow', 'verify-dispatch-recovery',
-  'verify-responder-duty-availability', 'verify-responder-report-reliability', 'verify-responder-documentation-pending',
+  'verify-responder-duty-availability', 'verify-responder-duty-lease', 'verify-responder-report-reliability', 'verify-responder-documentation-pending',
   'verify-pacc-verification-workspace', 'verify-responder-route-lifecycle', 'verify-user-approval-lifecycle',
   'verify-announcement-delivery', 'verify-otp-viewport', 'verify-responder-recovery',
   'verify-testing25-lifecycle', 'verify-public-mobile-reliability', 'verify-responder-notification-routing',

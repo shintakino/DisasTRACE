@@ -26,8 +26,8 @@ export async function loadApiRoute(entry, dependencies) {
   });
   const exports = {};
   const context = vm.createContext({ dependencies, exports, module: { exports }, require: createRequire(import.meta.url),
-    Request, Response, File, FormData, Buffer, URL, AbortController, setTimeout, clearTimeout, process,
-    console: { ...console, error() {} },
+    Request, Response, File, FormData, Buffer, URL, AbortController, crypto: globalThis.crypto, setTimeout, clearTimeout, process,
+    console: { ...console, error: (...args) => { if (dependencies.debug) console.error(...args); } },
   });
   vm.runInContext(result.outputFiles[0].text, context);
   return context.module.exports;

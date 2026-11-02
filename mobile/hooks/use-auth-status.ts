@@ -8,10 +8,20 @@ import { verifyMobileSession } from '../lib/mobile-auth';
 import { shouldResetResponderSession } from '../lib/auth-session-policy';
 import { useResponderDutyStore } from '../stores/useResponderDutyStore';
 import { useResponderStore } from '../stores/useResponderStore';
+import { effectiveResponderDutyStatus } from '../lib/responder-duty';
 
 const VerificationStatusSchema = z.enum(['pending', 'approved', 'rejected']);
 type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
 type MobileVerificationStatus = VerificationStatus | 'loading' | 'banned' | 'unauthorized_platform';
+interface MobileProfile {
+  fullName: string;
+  address: string;
+  barangay?: string;
+  phone?: string;
+  dutyStatus?: string;
+  lastLocationUpdatedAt?: string | null;
+  unitId?: string;
+}
 
 // Zustand stores outlive a Supabase auth session in a running Expo process.
 // Track the account globally so remounting the root provider does not clear
@@ -40,7 +50,7 @@ function useAuthStatusState() {
   const [verificationStatus, setVerificationStatus] = useState<MobileVerificationStatus>('loading');
   const [role, setRole] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
-  const [profile, setProfile] = useState<{ fullName: string; address: string; barangay?: string; phone?: string; dutyStatus?: string; unitId?: string } | null>(null);
+  const [profile, setProfile] = useState<MobileProfile | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sessionVersion, setSessionVersion] = useState(0);
   const verificationRequestRef = useRef(0);
@@ -68,7 +78,7 @@ function useAuthStatusState() {
       // Direct Supabase query is more robust than a separate API call for mobile
       const { data: dbUser, error: dbError } = await supabase
         .from('users')
-        .select('role, verification_status, status, rejection_reason, full_name, address, barangay, phone, duty_status, unit_id')
+        .select('role, verification_status, status, rejection_reason, full_name, address, barangay, phone, duty_status, last_location_updated_at, unit_id')
         .eq('id', currentUser.id)
         .single();
 
@@ -100,12 +110,17 @@ function useAuthStatusState() {
 
       setVerificationStatus(VerificationStatusSchema.parse(status.toLowerCase()));
       
+      const lastLocationUpdatedAt = dbUser.last_location_updated_at;
+      const dutyStatus = role === 'ambulance_responder'
+        ? effectiveResponderDutyStatus(dbUser.duty_status, lastLocationUpdatedAt)
+        : dbUser.duty_status || 'OFF_DUTY';
       const userProfile = {
         fullName: dbUser.full_name,
         address: dbUser.address || '',
         barangay: dbUser.barangay || '',
         phone: dbUser.phone || '',
-        dutyStatus: dbUser.duty_status || 'OFF_DUTY',
+        dutyStatus,
+        lastLocationUpdatedAt,
         unitId: dbUser.unit_id || '',
       };
       setProfile(userProfile);
@@ -150,7 +165,23 @@ function useAuthStatusState() {
         if (!isCurrent()) return;
         if (cached) {
           try {
-            const cachedProfile = JSON.parse(cached);
+            const parsedProfile = JSON.parse(cached) as Partial<MobileProfile>;
+            if (typeof parsedProfile.fullName !== 'string' || typeof parsedProfile.address !== 'string') {
+              throw new Error('Cached responder profile is incomplete.');
+            }
+            const cachedProfile: MobileProfile = {
+              fullName: parsedProfile.fullName,
+              address: parsedProfile.address,
+              barangay: parsedProfile.barangay,
+              phone: parsedProfile.phone,
+              dutyStatus: parsedProfile.dutyStatus,
+              lastLocationUpdatedAt: parsedProfile.lastLocationUpdatedAt,
+              unitId: parsedProfile.unitId,
+            };
+            const cachedDutyStatus = role === 'ambulance_responder'
+              ? effectiveResponderDutyStatus(cachedProfile.dutyStatus, cachedProfile.lastLocationUpdatedAt)
+              : cachedProfile.dutyStatus;
+            cachedProfile.dutyStatus = cachedDutyStatus;
             setProfile(cachedProfile);
             useResponderDutyStore.getState().setDutyStatus(cachedProfile.dutyStatus);
           } catch (e) {
@@ -159,7 +190,7 @@ function useAuthStatusState() {
               address: currentUser.user_metadata?.address || '',
               barangay: currentUser.user_metadata?.barangay || '',
               phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
-              unitId: currentUser.user_metadata?.unit_id || '',
+              unitId: currentUser.user_metadata?.unit_id || '', lastLocationUpdatedAt: null,
             });
             useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
           }
@@ -169,7 +200,7 @@ function useAuthStatusState() {
             address: currentUser.user_metadata?.address || '',
             barangay: currentUser.user_metadata?.barangay || '',
             phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
-            unitId: currentUser.user_metadata?.unit_id || '',
+            unitId: currentUser.user_metadata?.unit_id || '', lastLocationUpdatedAt: null,
           });
           useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
         }
@@ -180,7 +211,7 @@ function useAuthStatusState() {
           address: currentUser.user_metadata?.address || '',
           barangay: currentUser.user_metadata?.barangay || '',
           phone: currentUser.user_metadata?.phone || '', dutyStatus: 'OFF_DUTY',
-          unitId: currentUser.user_metadata?.unit_id || '',
+          unitId: currentUser.user_metadata?.unit_id || '', lastLocationUpdatedAt: null,
         });
         useResponderDutyStore.getState().setDutyStatus('OFF_DUTY');
       });
@@ -291,12 +322,17 @@ function useAuthStatusState() {
           }
           
           if (payload.new.full_name || payload.new.address || payload.new.barangay || payload.new.phone || payload.new.duty_status || payload.new.unit_id) {
+            const lastLocationUpdatedAt = payload.new.last_location_updated_at ?? null;
+            const dutyStatus = newRole === 'ambulance_responder'
+              ? effectiveResponderDutyStatus(payload.new.duty_status, lastLocationUpdatedAt)
+              : payload.new.duty_status || 'OFF_DUTY';
             const updatedProfile = {
               fullName: payload.new.full_name || '',
               address: payload.new.address || '',
               barangay: payload.new.barangay || '',
               phone: payload.new.phone || '',
-              dutyStatus: payload.new.duty_status || 'OFF_DUTY',
+              dutyStatus,
+              lastLocationUpdatedAt,
               unitId: payload.new.unit_id || '',
             };
             setProfile(updatedProfile);

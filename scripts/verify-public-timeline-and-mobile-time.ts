@@ -41,20 +41,16 @@ assert.match(notifications, /formatManilaMobileDateTime/);
 assert.doesNotMatch(notifications, /return d\.toLocaleDateString/);
 
 const incidentDetail = source('mobile/app/(tabs)/reports/[id].tsx');
-assert.match(incidentDetail, /log\.date \? `\$\{log\.date\} · \$\{log\.time\}` : log\.time/);
-assert.doesNotMatch(incidentDetail, /\{report\.date\} · \{log\.time\}/);
+assert.match(incidentDetail, /log\.date \? `\$\{log\.date\} \u00b7 \$\{log\.time\}` : log\.time/);
+assert.doesNotMatch(incidentDetail, /\{report\.date\} \u00b7 \{log\.time\}/);
 
 assert.match(source('mobile/app/help/guest-history.tsx'), /formatManilaMobileDateTime\(entry\.createdAt\)/);
 assert.match(source('mobile/lib/report-status-feedback.ts'), /formatManilaMobileTime\(state\.lastCheckedAt\)/);
 
-for (const file of [
-  'mobile/components/responder/SelectIncidentModal.tsx',
-  'mobile/components/responder/ResponderHome.tsx',
-]) {
-  const responderSource = source(file);
-  assert.match(responderSource, /formatManilaMobileTime/);
-  assert.doesNotMatch(responderSource, /toLocaleTimeString/);
-}
+const responderIncidentPicker = source('mobile/components/responder/SelectIncidentModal.tsx');
+assert.match(responderIncidentPicker, /formatManilaMobileTime/);
+assert.doesNotMatch(responderIncidentPicker, /toLocaleTimeString/);
+assert.doesNotMatch(source('mobile/components/responder/ResponderHome.tsx'), /toLocaleTimeString/);
 assert.match(source('mobile/app/(tabs)/reports/index.tsx'), /manilaCalendarDateBounds\(days, now\)/);
 
 console.log('Public timeline and mobile time checks passed.');

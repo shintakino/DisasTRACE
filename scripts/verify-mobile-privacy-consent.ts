@@ -12,7 +12,7 @@ assert.match(schema, /privacyPolicyAccepted: z\.boolean\(\)\.refine\(val => val 
 assert.match(step, /I have read and freely consent to the Data Privacy Policy\./, 'The sign-up UI must use explicit data privacy consent wording.');
 assert.match(step, /getMobileApiBaseUrl\(\)/, 'The privacy policy must use the production-safe mobile API origin.');
 assert.match(step, /Registration is unavailable until the current policy can be displayed\./, 'Registration must not silently accept an unavailable current policy.');
-assert.match(signUp, /privacy_policy_accepted: currentData\.privacyPolicyAccepted/, 'The registration metadata must retain the explicit consent flag.');
+assert.match(signUp, /privacy_policy_accepted: registrationData\.privacyPolicyAccepted/, 'The validated registration metadata must retain the explicit consent flag.');
 
 const completePasswordStep = {
   password: 'correct-horse-battery-staple',

@@ -48,7 +48,9 @@ assert.match(passwordInput, /password-reveal-input/);
 assert.match(globalStyles, /\.password-reveal-input::\-ms\-reveal/);
 
 const operations = source('components/dashboard/cdrrmo-operations-dashboard.tsx');
-assert.match(operations, /xl:grid-cols-\[minmax\(0,\.85fr\)_minmax\(0,1\.35fr\)\]/);
+assert.match(operations, /<section className="grid gap-5 lg:grid-cols-2">/);
+assert.match(operations, /<CDRRMOResponderOverview responders=\{data\.responders\}/);
+assert.match(operations, /<CDRRMOAuditPreview entries=\{data\.auditPreview\}/);
 assert.match(source('app/(dashboard)/layout.tsx'), /if \(path === '\/map'\) return 'Map';/);
 
 const mapPage = source('app/(dashboard)/map/page.tsx');

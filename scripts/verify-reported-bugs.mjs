@@ -6,6 +6,7 @@ const typescriptChecks = [
   'verify-responder-duty-availability', 'verify-responder-duty-lease', 'verify-responder-report-reliability', 'verify-responder-documentation-pending',
   'verify-pacc-verification-workspace', 'verify-responder-route-lifecycle', 'verify-user-approval-lifecycle',
   'verify-announcement-delivery', 'verify-otp-viewport', 'verify-responder-recovery',
+  'verify-dispatch-delivery-and-rejection',
   'verify-testing25-lifecycle', 'verify-public-mobile-reliability', 'verify-responder-notification-routing',
   'verify-public-notification-navigation', 'verify-mobile-public-account-recovery', 'verify-responder-transport-start',
   'verify-responder-draft-form-session', 'verify-responder-alert-sounds', 'verify-mobile-resilience',
@@ -15,6 +16,7 @@ const typescriptChecks = [
 const javascriptChecks = [
   'verify-responder-operation-races', 'verify-reported-bug-api-contracts', 'verify-responder-availability-release',
   'verify-pacc-completion-api', 'verify-mobile-navigation-stack',
+  'verify-pacc-rejection-api', 'verify-announcement-inbox-api', 'verify-mobile-signout-and-announcement-inbox', 'verify-audit-followup-api',
 ];
 let failed = 0;
 for (const [name, args] of [

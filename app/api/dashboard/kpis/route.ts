@@ -29,7 +29,9 @@ export async function GET() {
 
     const [[incidentsCount], [activeIncidentsCount], [pendingVerificationCount], [respondersCount], [resolvedCount], [rejectedCount]] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(incidents).where(and(gte(incidents.createdAt, today.start), lt(incidents.createdAt, today.end))),
-      db.select({ count: sql<number>`count(*)` }).from(incidents).where(ne(incidents.status, "RESOLVED")),
+      db.select({ count: sql<number>`count(*)` }).from(incidents)
+        .innerJoin(verificationRequests, eq(verificationRequests.id, incidents.requestId))
+        .where(and(ne(incidents.status, "RESOLVED"), ne(verificationRequests.status, 'REJECTED'), ne(verificationRequests.status, 'DUPLICATE'))),
       db.select({ count: sql<number>`count(*)` }).from(verificationRequests).where(eq(verificationRequests.status, "PENDING")),
       db.select({ count: sql<number>`count(*)` }).from(users).where(and(eq(users.role, "ambulance_responder"), eq(users.status, "ACTIVE"))),
       db.select({ count: sql<number>`count(*)` }).from(incidents).where(and(eq(incidents.status, "RESOLVED"), gte(incidents.resolvedAt, today.start), lt(incidents.resolvedAt, today.end))),

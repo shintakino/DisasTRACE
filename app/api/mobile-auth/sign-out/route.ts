@@ -3,9 +3,9 @@ import { createHash, randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
-import { auditLogs, mobileDeviceSessions, mobilePushTokens } from '@/db/schema';
+import { auditLogs, mobileDeviceSessions, mobilePushTokens, users } from '@/db/schema';
 import { createClient } from '@/lib/supabase-server';
-import { getBearerToken, getMobileSessionState, getSupabaseSessionId } from '@/lib/mobile-session';
+import { getBearerToken, getSupabaseSessionId, MOBILE_ROLES } from '@/lib/mobile-session';
 
 export const runtime = 'nodejs';
 
@@ -21,28 +21,38 @@ export async function POST(request: Request) {
 
     const accessToken = getBearerToken(request);
     if (!accessToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const state = await getMobileSessionState(user.id, accessToken);
-    if (!state.exists || !state.mobile || !state.active) return NextResponse.json({ error: 'This mobile session is no longer active.' }, { status: 409 });
     const sessionId = getSupabaseSessionId(accessToken);
     if (!sessionId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const account = await db.query.users.findFirst({ where: eq(users.id, user.id), columns: { role: true } });
+    if (!account || !MOBILE_ROLES.has(account.role)) return NextResponse.json({ error: 'Mobile account required.' }, { status: 403 });
 
-    const deleted = await db.delete(mobileDeviceSessions).where(and(
-      eq(mobileDeviceSessions.userId, user.id),
-      eq(mobileDeviceSessions.deviceHash, createHash('sha256').update(parsed.data.deviceId).digest('hex')),
-      eq(mobileDeviceSessions.activeSessionId, sessionId),
-    )).returning({ userId: mobileDeviceSessions.userId });
-    if (!deleted.length) return NextResponse.json({ error: 'This mobile session is no longer active.' }, { status: 409 });
-    await db.delete(mobilePushTokens).where(and(
-      eq(mobilePushTokens.userId, user.id),
-      eq(mobilePushTokens.sessionId, sessionId),
-    ));
-    await db.insert(auditLogs).values({
-      id: randomUUID(), userId: user.id, action: 'MOBILE_SESSION_ENDED', entityType: 'MOBILE_SESSION', entityId: user.id,
+    const deviceHash = createHash('sha256').update(parsed.data.deviceId).digest('hex');
+    const released = await db.transaction(async tx => {
+      const [binding] = await tx.select().from(mobileDeviceSessions)
+        .where(eq(mobileDeviceSessions.userId, user.id)).for('update');
+      // Missing/replaced bindings confirm that this authenticated session is
+      // already released. Never delete the replacement device's reservation.
+      if (binding?.activeSessionId === sessionId && binding.deviceHash !== deviceHash) return false;
+      if (binding?.activeSessionId === sessionId) {
+        await tx.delete(mobileDeviceSessions).where(and(
+          eq(mobileDeviceSessions.userId, user.id),
+          eq(mobileDeviceSessions.deviceHash, deviceHash),
+          eq(mobileDeviceSessions.activeSessionId, sessionId),
+        ));
+        await tx.insert(auditLogs).values({
+          id: randomUUID(), userId: user.id, action: 'MOBILE_SESSION_ENDED', entityType: 'MOBILE_SESSION', entityId: user.id,
+        });
+      }
+      await tx.delete(mobilePushTokens).where(and(
+        eq(mobilePushTokens.userId, user.id),
+        eq(mobilePushTokens.sessionId, sessionId),
+      ));
+      return true;
     });
-    // Revoke the refresh token at the Auth boundary too. RLS/proxy already
-    // deny this JWT once the binding is removed, even before it expires.
-    const { error: revokeError } = await supabase.auth.admin.signOut(accessToken, 'local');
-    if (revokeError) console.warn('Supabase local session revocation failed after binding removal:', revokeError);
+    if (!released) return NextResponse.json({ error: 'This device does not own the mobile session.' }, { status: 409 });
+    // The mobile client's local-scope Auth signOut revokes its refresh token
+    // after this acknowledgement. Deferring revocation keeps a lost-response
+    // retry authenticatable; RLS/proxy already deny the released binding.
     return NextResponse.json({ success: true, released: true });
   } catch (error) {
     console.error('Mobile sign-out failed:', error);

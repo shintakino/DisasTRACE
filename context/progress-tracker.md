@@ -1,5 +1,11 @@
 # Progress Tracker
 
+## 2026-11-07 - Audit follow-up: rejected counts and lost logout responses
+
+- Changed the active-incident KPI to join its owning verification request and exclude rejected/duplicate outcomes while retaining incident history.
+- Made authenticated mobile sign-out retries idempotent for absent/replaced original bindings. Release, session-scoped push cleanup, and the audit write now commit together; wrong-device requests still fail and old retries cannot remove a replacement session. Deferred Auth revocation to the existing mobile local-scope sign-out after acknowledgement so a lost response can be retried.
+- Actual-handler regressions now cover rejected/duplicate counts, lost-response retry through the mobile client, replacement-session protection, wrong-device/auth gates, audit deduplication, and transaction rollback. Added these and the preceding dispatch/announcement follow-up checks to the main runner: all 37 scripts pass. Root/mobile TypeScript, targeted ESLint, production Next.js build, and whitespace checks pass. These changes are local and uncommitted; no production records or announcements have been changed.
+
 ## 2026-11-06 - Repeated mobile sign-out and announcement inbox recovery
 
 - Reproduced concurrent mobile sign-out calls using simulated auth/network IO. All mobile entry points now share one pending release, and a tap after completed logout is a no-op. Public Profile guards its confirmation handler synchronously and disables both confirmation controls while signing out. Failed release preserves the authenticated session and remains retryable.

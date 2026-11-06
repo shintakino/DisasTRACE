@@ -17,6 +17,8 @@ import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 export default function ProfileScreen() {
   const { user, role, profile, refreshStatus } = useAuthStatus();
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const signOutRunningRef = React.useRef(false);
   const router = useRouter();
   const isResponder = role === 'ambulance_responder';
   const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
@@ -190,11 +192,17 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
+    if (signOutRunningRef.current) return;
+    signOutRunningRef.current = true;
+    setIsSigningOut(true);
     try {
       await signOutFromMobile();
       setLogoutVisible(false);
     } catch (error) {
       Alert.alert('Sign out unavailable', error instanceof Error ? error.message : 'Please try again while connected to the internet.');
+    } finally {
+      signOutRunningRef.current = false;
+      setIsSigningOut(false);
     }
   };
 
@@ -426,6 +434,7 @@ export default function ProfileScreen() {
               <TouchableOpacity 
                 className="flex-1 bg-[#B91C1C] py-4 rounded-2xl items-center mr-2 shadow-sm"
                 onPress={() => setLogoutVisible(false)}
+                disabled={isSigningOut}
               >
                 <Text className="text-white text-lg font-bold">Cancel</Text>
               </TouchableOpacity>
@@ -433,8 +442,10 @@ export default function ProfileScreen() {
               <TouchableOpacity 
                 className="flex-1 bg-[#1E3A8A] py-4 rounded-2xl items-center ml-2 shadow-sm"
                 onPress={handleSignOut}
+                disabled={isSigningOut}
+                accessibilityState={{ disabled: isSigningOut, busy: isSigningOut }}
               >
-                <Text className="text-white text-lg font-bold">Log Out</Text>
+                <Text className="text-white text-lg font-bold">{isSigningOut ? 'Signing out…' : 'Log Out'}</Text>
               </TouchableOpacity>
             </View>
           </View>

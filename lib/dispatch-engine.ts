@@ -7,6 +7,7 @@ import { systemSettings } from "@/db/schema/system_settings";
 import { sendDispatchOfferExpiredPush, sendDispatchOfferPush } from "@/lib/push-notifications";
 import { legacyAmbulanceUnitId } from "@/lib/ambulance-unit";
 import { releaseResponderAvailability } from '@/lib/responder-availability';
+import { verificationIncidentOrder } from '@/lib/verification-incident-order';
 import { eq, and, or, sql, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import {
   AUTO_DISPATCH_RADIUS_KM,
@@ -730,6 +731,7 @@ export async function reconcileExpiredOfferForRequest(requestId: string): Promis
 > {
   const incident = await db.query.incidents.findFirst({
     where: eq(incidents.requestId, requestId),
+    orderBy: verificationIncidentOrder(),
   });
 
   if (!incident?.currentOfferResponderId || !incident.offerExpiresAt) {

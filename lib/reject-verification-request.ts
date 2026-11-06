@@ -7,6 +7,7 @@ import { auditLogs } from '@/db/schema/audit_logs';
 import { createAuditEvent, PACC_AUDIT_ACTIONS, type AuditActor } from '@/lib/audit-events';
 import { reconcileExpiredOfferForRequest } from '@/lib/dispatch-engine';
 import { reports } from '@/db/schema/reports';
+import { verificationIncidentOrder } from '@/lib/verification-incident-order';
 
 interface RejectionFailure {
   success: false;
@@ -65,6 +66,7 @@ export async function rejectVerificationRequest(
       .select()
       .from(incidents)
       .where(eq(incidents.requestId, id))
+      .orderBy(...verificationIncidentOrder())
       .limit(1)
       .for('update');
 
@@ -104,9 +106,10 @@ export async function rejectVerificationRequest(
       } as const;
     }
 
-    if (lockedIncident) {
-      await tx.delete(incidents).where(eq(incidents.id, lockedIncident.id));
-    }
+    // Keep the already-unassigned incident and its referenced drafts/status
+    // logs. The request's REJECTED outcome removes it from actionable queues.
+    // Marking the incident RESOLVED would incorrectly emit a completed-field-
+    // response notification; rejection has its own request notification.
 
     const [updatedRequest] = await tx
       .update(verificationRequests)

@@ -53,7 +53,7 @@ let locks=0;
 const manual=await loadApiRoute('app/api/verification/[id]/dispatch/route.ts',{
   supabase:{auth:{getUser:async()=>({data:{user:{id:'pacc',app_metadata:{role:'pacc_admin'}}}})}},
   db:{query:{systemSettings:{findFirst:async()=>null}},transaction:async fn=>fn({
-    select:()=>({from:table=>({where:()=>({limit:()=>({for:async()=>{
+    select:()=>({from:table=>({where:()=>({orderBy(){return this;},limit:()=>({for:async()=>{
       locks++;
       assert.notEqual(getTableName(table),'users','A completed report must be rejected before locking/reserving the selected unit.');
       return getTableName(table)==='verification_requests'?[{id:'request',status:'VERIFIED'}]:[{id:incidentId,status:'DISPATCHED',responderId:null}];
@@ -75,7 +75,7 @@ for (const dispatchMethod of ['PACC_MANUAL','AUTO_1KM']) {
   const responder={id:'owner',role:'ambulance_responder',status:'ACTIVE',verificationStatus:'APPROVED',dutyStatus,
     lastLocationUpdatedAt:new Date(),fullName:'Responder',email:'responder@example.test',unitId:'AMB-1'};
   const transaction={
-    select:()=>({from:table=>({where:()=>({limit:()=>({for:async()=>{
+    select:()=>({from:table=>({where:()=>({orderBy(){return this;},limit:()=>({for:async()=>{
       const name=getTableName(table);
       if(name==='verification_requests')return [request];
       if(name==='incidents')return [incident];

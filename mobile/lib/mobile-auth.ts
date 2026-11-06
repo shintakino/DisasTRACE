@@ -48,8 +48,18 @@ export async function signInOnMobile(email: string, password: string, replaceExi
   return result.data;
 }
 
-export async function signOutFromMobile() {
+let pendingSignOut: Promise<void> | null = null;
+
+/** Every screen shares one server release, including rapid repeated taps. */
+export function signOutFromMobile(): Promise<void> {
+  if (pendingSignOut) return pendingSignOut;
+  pendingSignOut = performMobileSignOut().finally(() => { pendingSignOut = null; });
+  return pendingSignOut;
+}
+
+async function performMobileSignOut() {
   const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
   if (session?.access_token) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), MOBILE_SIGN_OUT_TIMEOUT_MS);

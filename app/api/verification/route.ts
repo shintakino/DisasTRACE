@@ -12,6 +12,7 @@ import { resolveBaliwagBarangay } from "@/lib/barangay-boundaries";
 import { systemSettings } from "@/db/schema/system_settings";
 import { requiresPaccReassignment } from "@/lib/dispatch-policy";
 import { createPublicRequestId, deriveInitialTriage } from "@/lib/initial-triage-policy";
+import { verificationIncidentOrder } from '@/lib/verification-incident-order';
 
 export async function GET() {
   try {
@@ -72,7 +73,7 @@ export async function GET() {
     // item, which could exhaust the connection pool and stall PACC loading.
     const [requestIncidents, residentReportCounts, residentRejectedCounts, relatedRequests] = await Promise.all([
       requestIds.length
-        ? db.select().from(incidents).where(inArray(incidents.requestId, requestIds))
+        ? db.select().from(incidents).where(inArray(incidents.requestId, requestIds)).orderBy(...verificationIncidentOrder())
         : Promise.resolve([]),
       residentIds.length
         ? db.select({ residentId: verificationRequests.residentId, total: count() })
@@ -101,7 +102,10 @@ export async function GET() {
         : Promise.resolve([]),
     ]);
 
-    const incidentByRequestId = new Map(requestIncidents.map((incident) => [incident.requestId, incident]));
+    const incidentByRequestId = new Map<string, typeof incidents.$inferSelect>();
+    for (const incident of requestIncidents) {
+      if (!incidentByRequestId.has(incident.requestId)) incidentByRequestId.set(incident.requestId, incident);
+    }
     const reportCountByResidentId = new Map(
       residentReportCounts.flatMap((row) => row.residentId ? [[row.residentId, Number(row.total)] as const] : []),
     );

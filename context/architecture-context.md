@@ -142,6 +142,8 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 
 ## Notification Model
 
+- Mobile Home badges read the authenticated notification REST API and refresh on focus, foreground, realtime reconnect/change, and native notification receipt. The public and responder Home surfaces each mount one badge reader for their role. The open inbox also refreshes on native receipt and database events; a newer refresh invalidates earlier snapshots so an older empty response cannot erase a received announcement. Native push never fabricates an inbox row. Repeated mobile sign-out calls share one pending server-release operation; public Profile disables its confirmation controls while that operation is running and retains the session if release fails.
+
 - Notifications are stored in the database and delivered via Supabase Realtime subscriptions while the app is active.
 - Responder dispatch offers and CDRRMO/PACC system announcements additionally use Expo Push Notifications delivered through FCM, so Android can alert an approved responder or Public User while the app is backgrounded or stopped. Expo push tokens are bound to the account's one active mobile session and removed on sign-out or provider invalidation. Push delivery is advisory: the database inbox row remains authoritative for announcements, while the server remains the authority for dispatch-offer ownership and expiry.
 - Each system announcement creates one immutable `system_broadcasts` audit row and atomically links an inbox row to every eligible recipient. The audit records eligible, opted-out, inactive, missing-auth, and Expo push outcomes. Existing Auth metadata preferences (`system` and legacy `system_notices`) remain the user opt-out boundary.
@@ -163,6 +165,8 @@ Public Users and Ambulance Responders sign in through the mobile-auth API. A sin
 - These signals are not device attestation. Release enforcement against a modified or rooted client requires a server-verified Google Play Integrity verdict bound to the protected request.
 
 ## Invariants
+
+PACC rejection retains an already-unassigned unanswered incident and its referenced audit/status/draft history, and records the authoritative request outcome as `REJECTED`. It does not mark a field response resolved or emit a completion notification. Completed responder reports remain protected. Legacy requests with multiple incidents use one deterministic selection order across queue, rejection, expired-offer recovery, and manual dispatch: resolved responses first, then documentation-pending responses, then other incidents, newest timestamp and ID within each group. Responder offer recovery also listens to owned duty transitions and dispatch inbox inserts, so an incident-channel delivery gap does not leave a received reservation without an acceptance prompt. Repeated GPS updates with unchanged duty do not retrigger that recovery path.
 
 Responder availability release locks the responder row before checking current accepted incidents and pending offers. Only field states (`DISPATCHED`, `EN_ROUTE`, `ARRIVED`) reserve operational availability; older documentation-pending cases do not. Completion, offer expiry, and orphan maintenance share this rule. A resolved incident cannot return to PACC action/review even if a legacy request status is pending, and a submitted final report independently blocks manual redispatch before any responder is reserved.
 

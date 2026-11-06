@@ -10,7 +10,7 @@ export async function loadApiRoute(entry, dependencies) {
     '@/db': 'export const db = globalThis.dependencies.db;',
     '@/lib/supabase-server': 'export const createClient = async () => globalThis.dependencies.supabase; export const createAdminClient = () => globalThis.dependencies.admin;',
     '@/lib/push-notifications': 'export const sendSystemAnnouncementPush = (...args) => globalThis.dependencies.push(...args); export const sendDispatchOfferPush = async () => {};',
-    '@/lib/dispatch-engine': 'export const cascadeIncident = async () => {}; export const calculateHaversineDistance = () => 1; export const checkAndCascadeExpiredOffers = async () => {}; export const notifyPaccAndCdrrmo = async () => {};',
+    '@/lib/dispatch-engine': 'export const autoDispatchIncident = async () => null; export const cascadeIncident = async () => {}; export const calculateHaversineDistance = () => 1; export const checkAndCascadeExpiredOffers = async () => {}; export const notifyPaccAndCdrrmo = async () => {}; export const reconcileExpiredOfferForRequest = async (...args) => globalThis.dependencies.reconcileOffer ? globalThis.dependencies.reconcileOffer(...args) : "NOT_REQUIRED";',
     'next/server': 'export const NextResponse = { json: (body, init) => Response.json(body, init) };',
   };
   const result = await build({ entryPoints: [entry], bundle: true, write: false, format: 'cjs', platform: 'node', packages: 'external',

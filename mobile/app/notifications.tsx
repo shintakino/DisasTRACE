@@ -12,6 +12,7 @@ import { resolvePublicNotificationRoute } from '../lib/public-notification-route
 import { getMobileApiBaseUrl } from '../lib/api-base-url';
 import { formatManilaMobileDateTime } from '../lib/manila-presentation';
 import { fetchWithTimeout } from '../lib/network-timeout';
+import * as NativeNotifications from 'expo-notifications';
 
 type Notification = {
   id: string;
@@ -96,6 +97,11 @@ export default function NotificationsScreen() {
       const foreground = AppState.addEventListener('change', state => {
         if (state === 'active') void fetchNotifications(false);
       });
+      // Native push may arrive even when the database channel missed an
+      // event. Read the persisted inbox instead of fabricating a second row.
+      const received = NativeNotifications.addNotificationReceivedListener(() => {
+        void fetchNotifications(false);
+      });
 
       // Subscribe to real-time database changes
       const instanceId = Math.random().toString(36).substring(7);
@@ -109,22 +115,11 @@ export default function NotificationsScreen() {
             table: 'notifications',
             filter: `user_id=eq.${user.id}`,
           },
-          (payload) => {
+          () => {
             if (isLeavingRef.current) return;
-            if (payload.eventType === 'INSERT') {
-              const notification = normalizeNotification(payload.new);
-              if (isNotificationVisibleForRole(notification.type, role)) {
-                setNotifications((prev) => [notification, ...prev.filter(item => item.id !== notification.id)]);
-              }
-            } else if (payload.eventType === 'UPDATE') {
-              const notification = normalizeNotification(payload.new);
-              setNotifications((prev) => isNotificationVisibleForRole(notification.type, role)
-                ? prev.map((n) => (n.id === notification.id ? notification : n))
-                : prev.filter((n) => n.id !== notification.id)
-              );
-            } else if (payload.eventType === 'DELETE') {
-              setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
-            }
+            // Invalidate any older snapshot before reading the committed
+            // change. An initial empty response must not erase a new notice.
+            void fetchNotifications(false);
           }
         )
         .subscribe(status => {
@@ -135,10 +130,11 @@ export default function NotificationsScreen() {
         isLeavingRef.current = true;
         fetchVersionRef.current += 1;
         foreground.remove();
+        received.remove();
         supabase.removeChannel(channel);
       };
     }
-  }, [user?.id, role, fetchNotifications]));
+  }, [user?.id, fetchNotifications]));
 
   const handleMarkAsRead = async (id: string) => {
     try {

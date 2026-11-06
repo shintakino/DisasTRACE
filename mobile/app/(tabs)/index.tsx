@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, View, Text, TouchableOpacity, ScrollView, StatusBar, Image, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStatus } from '../../hooks/use-auth-status';
+import { useUnreadNotificationCount } from '../../hooks/use-unread-notification-count';
 import { HelpButton } from '../../components/dashboard/HelpButton';
 import { OfflineBanner } from '../../components/dashboard/OfflineBanner';
 import { Shield, Check } from 'lucide-react-native';
@@ -55,7 +56,7 @@ export default function HomeScreen() {
   const { isOnline } = useOfflineReports();
   const insets = useSafeAreaInsets();
   const [isCheckingIncident, setIsCheckingIncident] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const unreadCount = useUnreadNotificationCount(role === 'public_user' ? user?.id ?? null : null, role);
   const notificationOfferId = Array.isArray(dispatchOfferId) ? dispatchOfferId[0] : dispatchOfferId;
 
   const clearNotificationOfferRoute = useCallback(() => {
@@ -152,27 +153,9 @@ export default function HomeScreen() {
 
   const processedNotifIds = React.useRef(new Set<string>());
 
-  // Fetch and subscribe to unread notification count
+  // Show local alerts for visible realtime notifications while Home is mounted.
   useEffect(() => {
     if (!user) return;
-
-    const fetchUnreadCount = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('notifications')
-          .select('type')
-          .eq('user_id', user.id)
-          .eq('unread', true);
-        
-        if (!error && data) {
-          setUnreadCount(data.filter((notification) => isNotificationVisibleForRole(notification.type, role)).length);
-        }
-      } catch (err) {
-        console.error('[HomeScreen] Failed to fetch unread count:', err);
-      }
-    };
-
-    fetchUnreadCount();
 
     const channel = supabase
       .channel(`mobile_home_notifs_${user.id}`)
@@ -185,7 +168,6 @@ export default function HomeScreen() {
           filter: `user_id=eq.${user.id}`,
         },
           (payload) => {
-            fetchUnreadCount();
             if (payload.eventType === 'INSERT') {
               const notif = payload.new as any;
               if (notif && notif.id && isNotificationVisibleForRole(notif.type, role)) {
@@ -668,7 +650,6 @@ export default function HomeScreen() {
               className="p-2 relative" 
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={() => {
-                setUnreadCount(0);
                 router.push('/notifications');
               }}
             >

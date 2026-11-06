@@ -16,6 +16,7 @@ export function useResponderRecovery(ownerId: string | null) {
     let active = true;
     let generation = 0;
     let failures = 0;
+    let lastDutyStatus: string = useResponderDutyStore.getState().dutyStatus;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const isCurrent = () => active && useResponderStore.getState().ownerUserId === ownerId;
     const schedule = (delay = 100) => {
@@ -76,6 +77,19 @@ export function useResponderRecovery(ownerId: string | null) {
       if (state.status !== previous.status || state.recoveryVersion !== previous.recoveryVersion) schedule();
     });
     const channel = supabase.channel(`responder-recovery-${ownerId}`)
+      // A reservation updates the owned user row in the same transaction as
+      // the offer. Recover through the API even if incident Realtime delivery
+      // is unavailable or filtered by database policies.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${ownerId}` }, payload => {
+        const nextDutyStatus = payload.new.duty_status;
+        if (typeof nextDutyStatus === 'string' && nextDutyStatus !== lastDutyStatus) {
+          lastDutyStatus = nextDutyStatus;
+          schedule();
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${ownerId}` }, payload => {
+        if (payload.new.type === 'dispatch_alert') schedule();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents', filter: `responder_id=eq.${ownerId}` }, () => schedule())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents', filter: `current_offer_responder_id=eq.${ownerId}` }, () => schedule())
       .subscribe(status => { if (status === 'SUBSCRIBED') schedule(); });

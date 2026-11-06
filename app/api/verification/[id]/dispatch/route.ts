@@ -6,7 +6,7 @@ import { incidents } from '@/db/schema/incidents';
 import { systemSettings } from '@/db/schema/system_settings';
 import { users } from '@/db/schema/users';
 import { verificationRequests } from '@/db/schema/verification_requests';
-import { notifyPaccAndCdrrmo } from '@/lib/dispatch-engine';
+import { notifyPaccAndCdrrmo, reconcileExpiredOfferForRequest } from '@/lib/dispatch-engine';
 import { sendDispatchOfferPush } from '@/lib/push-notifications';
 import {
   evaluateManualDispatchEligibility,
@@ -17,6 +17,7 @@ import { auditLogs } from '@/db/schema/audit_logs';
 import { createAuditActor, createAuditEvent, PACC_AUDIT_ACTIONS } from '@/lib/audit-events';
 import { legacyAmbulanceUnitId } from '@/lib/ambulance-unit';
 import { reports } from '@/db/schema/reports';
+import { verificationIncidentOrder } from '@/lib/verification-incident-order';
 
 const ManualDispatchSchema = z.object({
   responderId: z.string().trim().min(1).max(255),
@@ -59,6 +60,17 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
+    // An expired reservation may still be present before the scheduler runs.
+    // Release it through the shared compare-and-swap path, then recheck the
+    // locked incident below before reserving the selected responder.
+    if (await reconcileExpiredOfferForRequest(id) === 'FAILED') {
+      return NextResponse.json({
+        success: false,
+        code: 'OFFER_RECOVERY_PENDING',
+        error: 'The expired responder offer is still being reconciled. Refresh the queue and try again.',
+      }, { status: 409 });
+    }
+
     const settings = await db.query.systemSettings.findFirst({
       where: eq(systemSettings.id, 'current'),
     });
@@ -86,6 +98,7 @@ export async function POST(
         .select()
         .from(incidents)
         .where(eq(incidents.requestId, id))
+        .orderBy(...verificationIncidentOrder())
         .limit(1)
         .for('update');
 

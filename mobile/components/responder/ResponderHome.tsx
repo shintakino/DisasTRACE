@@ -24,7 +24,7 @@ import * as Location from 'expo-location';
 import { useLiveBarangay } from '../../hooks/use-live-barangay';
 import { formatBaliwagLocation } from '../../lib/baliwag-location';
 import { OfflineBanner } from '../dashboard/OfflineBanner';
-import { isNotificationVisibleForRole } from '../../lib/report-location';
+import { useUnreadNotificationCount } from '../../hooks/use-unread-notification-count';
 import { isMockedLocation, MOCK_LOCATION_MESSAGE } from '../../lib/location-integrity';
 import { getMobileApiBaseUrl } from '../../lib/api-base-url';
 import { useResponderDutyStore } from '../../stores/useResponderDutyStore';
@@ -83,51 +83,9 @@ export function ResponderHome() {
   const dutyStatus = useResponderDutyStore((state) => state.dutyStatus);
   const { profile, user, role } = useAuthStatus();
   const { isOnline } = useOfflineReports();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const unreadCount = useUnreadNotificationCount(user?.id ?? null, role);
   const mockLocationWarningShown = useRef(false);
 
-  // Fetch and subscribe to unread notification count
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchUnreadCount = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('notifications')
-          .select('type')
-          .eq('user_id', user.id)
-          .eq('unread', true);
-        
-        if (!error && data) {
-          setUnreadCount(data.filter((notification) => isNotificationVisibleForRole(notification.type, role)).length);
-        }
-      } catch (err) {
-        console.error('[ResponderHome] Failed to fetch unread count:', err);
-      }
-    };
-
-    fetchUnreadCount();
-
-    const channel = supabase
-      .channel(`responder_home_notifs_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          fetchUnreadCount();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, role]);
   
   // Mock initials
   const initials = profile?.fullName ? profile.fullName.trim().split(/\s+/).map(n => n ? n[0] : '').join('').slice(0, 2).toUpperCase() : 'RB';
@@ -932,7 +890,6 @@ export function ResponderHome() {
             <TouchableOpacity 
               className="w-12 h-12 rounded-full bg-white/95 items-center justify-center backdrop-blur-xl border border-slate-200/80 shadow-sm relative"
               onPress={() => {
-                setUnreadCount(0);
                 router.push('/notifications');
               }}
             >
